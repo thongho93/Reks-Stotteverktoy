@@ -49,34 +49,6 @@ export function GlobalStyles() {
           backgroundColor: theme.palette.action.selected,
         },
 
-        /* App layout classes */
-        ".appContainer": {
-          paddingTop: theme.spacing(6),
-          paddingBottom: theme.spacing(6),
-        },
-        ".appCard": {
-          width: "100%",
-          maxWidth: 1040,
-          margin: "0 auto",
-          padding: theme.spacing(4),
-          borderRadius: 16,
-        },
-        ".appSubtitle": {
-          marginTop: theme.spacing(1),
-          marginBottom: theme.spacing(3),
-          lineHeight: 1.6,
-        },
-        ".omeqRow": {
-          display: "grid",
-          gridTemplateColumns: "minmax(320px, 2.2fr) minmax(140px, 1fr) minmax(180px, 1fr)",
-          gap: theme.spacing(2),
-          alignItems: "start",
-        },
-        "@media (max-width: 720px)": {
-          ".omeqRow": {
-            gridTemplateColumns: "1fr",
-          },
-        },
         ".ratioBox": {
           display: "flex",
           flexDirection: "column",

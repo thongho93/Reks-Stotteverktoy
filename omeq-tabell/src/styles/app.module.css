@@ -1,0 +1,168 @@
+/* App layout – browser‑standard, less rigid */
+.appContainer {
+  max-width: 1200px; /* bredere enn før */
+  margin-left: auto;
+  margin-right: auto;
+  padding: 32px 24px; /* typisk nettleser‑komfort */
+}
+
+.appCard {
+  width: 100%;
+  padding: 32px;
+  border-radius: 12px;
+}
+
+.appSubtitle {
+  margin-top: 10px;
+  margin-bottom: 40px;
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .appContainer {
+    padding: 24px 16px;
+  }
+
+  .appCard {
+    padding: 20px;
+  }
+}
+
+/* Wrapper for OMEQ-faktor field (kept for flexibility) */
+.ratioBox {
+  width: 100%;
+}
+
+/* OMEQ row layout */
+.omeqRow {
+  display: grid;
+  grid-template-columns: 2.3fr 0.6fr 0.6fr 0.4fr;
+  grid-template-rows: auto auto auto;
+  gap: 12px 16px;
+  align-items: start;
+}
+
+.omeqRow > :nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.omeqRow > :nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.omeqRow > :nth-child(3) {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.omeqRow > :nth-child(4) {
+  grid-column: 3;
+  grid-row: 2;
+  margin-top: -6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.omeqRow > :nth-child(5) {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.omeqRow > :nth-child(6) {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+.omeqRow .MuiTextField-root {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .omeqRow {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 12px;
+  }
+
+  .omeqRow > :nth-child(1),
+  .omeqRow > :nth-child(2),
+  .omeqRow > :nth-child(3),
+  .omeqRow > :nth-child(4),
+  .omeqRow > :nth-child(5),
+  .omeqRow > :nth-child(6) {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .omeqRow > :nth-child(4) {
+    margin-top: -8px;
+  }
+}
+
+/* Add-row button aligned under the OMEQ-faktor column */
+.addRowGrid {
+  display: grid;
+  grid-template-columns: 2fr 0.6fr 1fr 1fr; /* must match .omeqRow */
+  margin-top: 12px;
+}
+
+.addRowButtonCell {
+  grid-column: 2;
+  display: flex;
+  justify-content: center;
+}
+
+.addRowButton {
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  width: 44px;
+  height: 44px;
+}
+
+@media (max-width: 720px) {
+  .addRowGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .addRowButtonCell {
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+}
+
+.totalOmeqBox {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Wrapper to center Total OMEQ above action buttons */
+.totalOmeqWrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.totalOmeqBox {
+  padding: 16px 24px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.totalOmeqLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.totalOmeqValue {
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--mui-palette-primary-main);
+}

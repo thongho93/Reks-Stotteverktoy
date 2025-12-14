@@ -14,16 +14,11 @@ type SuggestionOption = {
   value: string;
 };
 
-const getProductLabel = (p: any) => (p?.manufacturer ? `${p.name} (${p.manufacturer})` : p?.name);
-
-const parseStrengthString = (s?: string | null) => {
-  if (!s) return null;
-  const m = String(s).trim().match(/^([\d.,]+)\s*(.+)$/);
-  if (!m) return null;
-  return {
-    value: m[1].replace(",", "."),
-    unit: m[2].trim(),
-  };
+const getProductLabel = (p: any, strength?: string, varenummer?: string) => {
+  const base = p?.name ?? "";
+  const s = strength ? ` ${strength}` : "";
+  const v = varenummer ? ` (${varenummer})` : "";
+  return `${base}${s}${v}`.trim();
 };
 
 export const MedicationInput = ({ value, onChange }: MedicationInputProps) => {
@@ -32,9 +27,24 @@ export const MedicationInput = ({ value, onChange }: MedicationInputProps) => {
   const options = useMemo<SuggestionOption[]>(() => {
     return Object.values(ATC_PRODUCTS)
       .flatMap((arr) => arr ?? [])
-      .map((p) => {
-        const label = p.manufacturer ? `${p.name} (${p.manufacturer})` : p.name;
-        return { label, value: p.name };
+      .flatMap((p: any) => {
+        if (Array.isArray(p.variants) && p.variants.length) {
+          return p.variants.flatMap((v: any) => {
+            const nums: number[] = Array.isArray(v.productNumbers) ? v.productNumbers : [];
+            return nums.map((n) => ({
+              label: getProductLabel(p, v.strength, String(n)),
+              value: getProductLabel(p, v.strength, String(n)),
+            }));
+          });
+        }
+
+        // fallback (no variants)
+        return [
+          {
+            label: getProductLabel(p),
+            value: getProductLabel(p),
+          },
+        ];
       })
       .filter((opt, idx, all) => all.findIndex((o) => o.label === opt.label) === idx)
       .sort((a, b) => a.label.localeCompare(b.label, "nb"));
@@ -65,8 +75,8 @@ export const MedicationInput = ({ value, onChange }: MedicationInputProps) => {
         const nums: number[] = Array.isArray(rawNums)
           ? rawNums.map((n: any) => Number(n)).filter((n: any) => Number.isFinite(n))
           : rawNums != null && Number.isFinite(Number(rawNums))
-            ? [Number(rawNums)]
-            : [];
+          ? [Number(rawNums)]
+          : [];
 
         nums.forEach((n) => map.set(String(n), { product: p }));
       });
@@ -77,7 +87,6 @@ export const MedicationInput = ({ value, onChange }: MedicationInputProps) => {
   const numericQuery = value.trim().match(/^0*(\d+)/)?.[1] ?? null;
   const varenummerHit = numericQuery ? productByVarenummer.get(numericQuery) : null;
   const resolvedProduct = parsed.product ?? varenummerHit?.product ?? null;
-  const resolvedStrength = parsed.strength ?? parseStrengthString(varenummerHit?.strength);
 
   const lastAutoConvertedRef = useRef<string | null>(null);
 
@@ -129,7 +138,7 @@ export const MedicationInput = ({ value, onChange }: MedicationInputProps) => {
           if (numeric) {
             const hit = productByVarenummer.get(numeric);
             if (!hit?.product) return [];
-            const exactLabel = getProductLabel(hit.product);
+            const exactLabel = getProductLabel(hit.product, hit.strength, numeric);
             return opts.filter((o) => o.label === exactLabel).slice(0, 25);
           }
 
@@ -149,20 +158,22 @@ export const MedicationInput = ({ value, onChange }: MedicationInputProps) => {
             label="Preparat og styrke"
             placeholder='F.eks. "Tramagetic OD 200 mg"'
             fullWidth
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                "& fieldset": {
+                  borderColor: "primary.main",
+                },
+                "&:hover fieldset": {
+                  borderColor: "primary.main",
+                },
+                "&.Mui-focused fieldset": {
+                  borderColor: "primary.main",
+                },
+              },
+            }}
           />
         )}
       />
-
-      {resolvedProduct && (
-        <Typography variant="body2" color="text.secondary">
-          Preparat: {resolvedProduct.name}
-        </Typography>
-      )}
-      {resolvedStrength && (
-        <Typography variant="body2" color="text.secondary">
-          Styrke: {resolvedStrength.value} {resolvedStrength.unit}
-        </Typography>
-      )}
 
       {!resolvedProduct && value.length > 3 && (
         <Typography variant="body2" color="error">
