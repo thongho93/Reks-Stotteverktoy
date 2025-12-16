@@ -68,7 +68,8 @@ export const OPIOIDS: OpioidDefinition[] = [
     route: ["parenteral"],
     omeqFactor: 150,
     isShortActing: true,
-    helpText: "100 mcg = 0,1 mg. Er døgndosen 50 mcg, skriv inn 0,05.",
+    helpText:
+      "Styrken er allerede omregnet fra µg til mg. Legg inn døgndose som antall tabletter/doser (nesespray).",
   },
   {
     id: "fentanyl-sublingval-intranasal",
@@ -180,7 +181,7 @@ export const OPIOIDS: OpioidDefinition[] = [
     route: ["oral"],
     omeqFactor: 1.5,
     helpText:
-      "For Targiniq: Hvis styrken 10 mg/5 mg skal benyttes, legg inn 10. For Tanonalla/Targiniq: Vær oppmerksom på at det er døgndosen i mg av virkestoffet oksykodon som må legges inn.",
+      "Styrken for virkestoffet oksykodon er allerede valgt. Legg inn døgndose som antall tabletter/doser.",
   },
   {
     id: "oksykodon-parenteral",

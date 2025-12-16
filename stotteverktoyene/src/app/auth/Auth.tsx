@@ -30,6 +30,7 @@ export function useAuthUser() {
   const [user, setUser] = React.useState<User | null>(() => auth.currentUser);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
+  const [firstName, setFirstName] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -37,15 +38,25 @@ export function useAuthUser() {
 
       if (!u) {
         setIsAdmin(false);
+        setFirstName(null);
         setLoading(false);
         return;
       }
 
       try {
-        const adminSnap = await getDoc(doc(db, "admins", u.uid));
+        const [adminSnap, userSnap] = await Promise.all([
+          getDoc(doc(db, "admins", u.uid)),
+          getDoc(doc(db, "users", u.uid)),
+        ]);
+
         setIsAdmin(adminSnap.exists());
+
+        const data = userSnap.exists() ? (userSnap.data() as any) : null;
+        const name = typeof data?.firstName === "string" ? data.firstName.trim() : "";
+        setFirstName(name.length > 0 ? name : null);
       } catch {
         setIsAdmin(false);
+        setFirstName(null);
       } finally {
         setLoading(false);
       }
@@ -54,7 +65,7 @@ export function useAuthUser() {
     return () => unsub();
   }, []);
 
-  return { user, loading, isAdmin };
+  return { user, loading, isAdmin, firstName };
 }
 
 export function RequireAuth({ children }: { children: React.ReactElement }) {
@@ -84,8 +95,10 @@ export function LoginPage() {
   const [mode, setMode] = React.useState<"login" | "signup">("login");
   const [email, setEmail] = React.useState<string>("");
   const [password, setPassword] = React.useState<string>("");
+  const [confirmPassword, setConfirmPassword] = React.useState<string>("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<boolean>(false);
+  const [firstName, setFirstName] = React.useState<string>("");
 
   const { user, loading } = useAuthUser();
 
@@ -102,6 +115,20 @@ export function LoginPage() {
 
     const trimmedEmail = email.trim();
 
+    const trimmedFirstName = firstName.trim();
+
+    if (mode === "signup" && !trimmedFirstName) {
+      setError("Fornavn må fylles ut. Kun fornavn, ikke etternavn.");
+      setBusy(false);
+      return;
+    }
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("Passordene er ikke like.");
+      setBusy(false);
+      return;
+    }
+
     if (mode === "signup" && !trimmedEmail.toLowerCase().endsWith("@farmasiet.no")) {
       setError("Du må bruke e-postadresse som slutter på @farmasiet.no for å opprette konto.");
       setBusy(false);
@@ -115,7 +142,11 @@ export function LoginPage() {
         try {
           await setDoc(
             doc(db, "users", cred.user.uid),
-            { email: cred.user.email ?? trimmedEmail, createdAt: serverTimestamp() },
+            {
+              email: cred.user.email ?? trimmedEmail,
+              firstName: trimmedFirstName,
+              createdAt: serverTimestamp(),
+            },
             { merge: true }
           );
         } catch {
@@ -150,6 +181,15 @@ export function LoginPage() {
         )}
 
         <Box component="form" onSubmit={onSubmit} sx={{ mt: 2, display: "grid", gap: 2 }}>
+          {mode === "signup" && (
+            <TextField
+              label="Fornavn"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              helperText="Skriv kun fornavn (ikke etternavn)"
+              autoComplete="given-name"
+            />
+          )}
           <TextField
             label="E-post"
             value={email}
@@ -168,7 +208,23 @@ export function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
-          <Button type="submit" variant="contained" disabled={busy}>
+          {mode === "signup" && (
+            <TextField
+              label="Bekreft passord"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+            />
+          )}
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={
+              busy ||
+              (mode === "signup" && (!firstName.trim() || !confirmPassword || password !== confirmPassword))
+            }
+          >
             {mode === "login" ? "Logg inn" : "Opprett konto"}
           </Button>
           <Button
@@ -179,6 +235,8 @@ export function LoginPage() {
               setError(null);
               setEmail("");
               setPassword("");
+              setConfirmPassword("");
+              setFirstName("");
               setMode((m) => (m === "login" ? "signup" : "login"));
             }}
           >
@@ -191,7 +249,7 @@ export function LoginPage() {
 }
 
 export function ProfileMenu() {
-  const { user, loading, isAdmin } = useAuthUser();
+  const { user, loading, isAdmin, firstName } = useAuthUser();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
@@ -218,7 +276,7 @@ export function ProfileMenu() {
       </Tooltip>
 
       <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        <MenuItem disabled>{user.email ?? "Innlogget"}</MenuItem>
+        <MenuItem disabled>{firstName ? `Hei, ${firstName}` : (user.email ?? "Innlogget")}</MenuItem>
         <MenuItem disabled>Rolle: {roleLabel}</MenuItem>
         <Divider />
         <MenuItem onClick={handleLogout}>Logg ut</MenuItem>

@@ -10,9 +10,20 @@ import {
   Paper,
   TextField,
   Typography,
+  Button,
+  Stack,
 } from "@mui/material";
-import { collection, getDocs, query, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
+import { useAuthUser } from "../../../app/auth/Auth";
 
 type StandardTekst = {
   id: string;
@@ -73,6 +84,13 @@ export default function StandardTekstPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { isAdmin, firstName } = useAuthUser();
+
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [draftTitle, setDraftTitle] = useState<string>("");
+  const [draftContent, setDraftContent] = useState<string>("");
+  const [saving, setSaving] = useState<boolean>(false);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -124,6 +142,63 @@ export default function StandardTekstPage() {
   const selected = useMemo(() => {
     return items.find((it) => it.id === selectedId) ?? null;
   }, [items, selectedId]);
+
+  const displayContent = useMemo(() => {
+    if (!selected) return "";
+    if (!firstName) return selected.content;
+
+    // Replace standalone XX with the user's first name
+    return selected.content.replace(/\bXX\b/g, firstName);
+  }, [selected, firstName]);
+
+  useEffect(() => {
+    // Når du bytter valgt tekst, avslutt redigering og synk draft
+    setIsEditing(false);
+    setDraftTitle(selected?.title ?? "");
+    setDraftContent(selected?.content ?? "");
+  }, [selectedId]);
+
+  const startEdit = () => {
+    if (!selected) return;
+    setDraftTitle(selected.title ?? "");
+    setDraftContent(selected.content ?? "");
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setDraftTitle(selected?.title ?? "");
+    setDraftContent(selected?.content ?? "");
+    setIsEditing(false);
+  };
+
+  const saveEdit = async () => {
+    if (!selected) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const ref = doc(db, "Standardtekster", selected.id);
+      await updateDoc(ref, {
+        title: draftTitle,
+        content: draftContent,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Oppdater lokalt state så UI viser ny tekst uten refresh
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === selected.id
+            ? { ...it, title: draftTitle, content: draftContent, updatedAt: new Date() }
+            : it
+        )
+      );
+      setIsEditing(false);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Ukjent feil ved lagring";
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
@@ -206,6 +281,24 @@ export default function StandardTekstPage() {
 
           {selected && (
             <>
+              {isAdmin && !isEditing && (
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={startEdit}
+                    sx={{
+                      borderRadius: 999,
+                      textTransform: "none",
+                      px: 2,
+                      py: 0.5,
+                      backgroundColor: "background.paper",
+                    }}
+                  >
+                    Endre
+                  </Button>
+                </Box>
+              )}
               <Typography variant="h5" sx={{ mb: 0.5 }}>
                 {selected.title}
               </Typography>
@@ -225,9 +318,37 @@ export default function StandardTekstPage() {
                 </Typography>
               )}
 
-              <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                {selected.content || "(Tom tekst)"}
-              </Typography>
+              {isEditing ? (
+                <>
+                  <TextField
+                    fullWidth
+                    label="Overskrift"
+                    value={draftTitle}
+                    onChange={(e) => setDraftTitle(e.target.value)}
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={10}
+                    label="Tekst"
+                    value={draftContent}
+                    onChange={(e) => setDraftContent(e.target.value)}
+                  />
+                  <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: "flex-end" }}>
+                    <Button variant="text" onClick={cancelEdit} disabled={saving}>
+                      Avbryt
+                    </Button>
+                    <Button variant="contained" onClick={saveEdit} disabled={saving}>
+                      {saving ? "Lagrer..." : "Lagre"}
+                    </Button>
+                  </Stack>
+                </>
+              ) : (
+                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                  {displayContent || "(Tom tekst)"}
+                </Typography>
+              )}
             </>
           )}
         </Paper>
