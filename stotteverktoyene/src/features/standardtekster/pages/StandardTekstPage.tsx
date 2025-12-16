@@ -11,8 +11,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { getApps, initializeApp } from "firebase/app";
-import { collection, getDocs, getFirestore, query, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, Timestamp } from "firebase/firestore";
+import { db } from "../../../firebase/firebase";
 
 type StandardTekst = {
   id: string;
@@ -21,35 +21,6 @@ type StandardTekst = {
   content: string;
   updatedAt?: Date | null;
 };
-
-let cachedDb: ReturnType<typeof getFirestore> | null = null;
-
-function getDb() {
-  if (cachedDb) return cachedDb;
-
-  // Vite exposes env vars via import.meta.env
-  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY as string | undefined;
-  const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined;
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined;
-  const appId = import.meta.env.VITE_FIREBASE_APP_ID as string | undefined;
-
-  if (!apiKey || !authDomain || !projectId || !appId) {
-    throw new Error(
-      "Mangler Firebase env-variabler. Sjekk at VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID og VITE_FIREBASE_APP_ID finnes i .env"
-    );
-  }
-
-  const firebaseConfig = {
-    apiKey,
-    authDomain,
-    projectId,
-    appId,
-  };
-
-  const app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
-  cachedDb = getFirestore(app);
-  return cachedDb;
-}
 
 function toDateMaybe(value: unknown): Date | null {
   if (!value) return null;
@@ -110,8 +81,7 @@ export default function StandardTekstPage() {
         setLoading(true);
         setError(null);
 
-        const db = getDb();
-
+        collection(db, "Standardtekster");
         // Viktig: Bytt collection-navn hvis du bruker noe annet enn "standardtekster"
         // Hvis du har et felt du vil sortere på (f.eks. "title"), kan du endre orderBy.
         const q = query(collection(db, "Standardtekster"));
