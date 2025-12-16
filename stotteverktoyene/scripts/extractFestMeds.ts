@@ -3,13 +3,7 @@ import path from "path";
 import { XMLParser } from "fast-xml-parser";
 
 const xmlPath = path.resolve(process.cwd(), "fest", "fest251.xml");
-const outPath = path.resolve(
-  process.cwd(),
-  "src",
-  "features",
-  "fest",
-  "meds.json"
-);
+const outPath = path.resolve(process.cwd(), "src", "features", "fest", "meds.json");
 
 const xml = fs.readFileSync(xmlPath, "utf-8");
 
@@ -23,7 +17,6 @@ const data = parser.parse(xml);
 
 // hjelpefunksjoner
 const asArray = <T>(v: T | T[] | undefined): T[] => (Array.isArray(v) ? v : v ? [v] : []);
-const first = <T>(v: T | T[] | undefined): T | undefined => (Array.isArray(v) ? v[0] : v);
 
 const fest = data?.FEST;
 const kat = fest?.KatLegemiddelMerkevare;

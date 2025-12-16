@@ -286,29 +286,6 @@ export default function StandardTekstPage() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <TextField
-          fullWidth
-          label="Søk i standardtekster"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        <MedicationSearch
-          onPick={(med) => {
-            const text = formatPreparatForTemplate(med);
-            if (!text) return;
-
-            setPickedPreparat(text);
-
-            // If admin is editing, also replace inside the draft so it can be saved if desired.
-            if (isEditing) {
-              setDraftContent((prev) => prev.replace(/\{\{\s*PREPARAT\s*\}\}/g, text));
-            }
-          }}
-        />
-      </Paper>
-
       <Box
         sx={{
           display: "grid",
@@ -318,8 +295,18 @@ export default function StandardTekstPage() {
         }}
       >
         <Paper sx={{ p: 1 }}>
-          <Box sx={{ px: 1.5, py: 1 }}>
-            <Typography variant="subtitle2" color="text.secondary">
+          <Box sx={{ px: 1.5, pt: 1, pb: 1 }}>
+            <Box sx={{ maxWidth: 340 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Søk i standardtekster"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </Box>
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>
               {loading ? "Laster..." : `${filtered.length} treff`}
             </Typography>
           </Box>
@@ -357,110 +344,131 @@ export default function StandardTekstPage() {
           )}
         </Paper>
 
-        <Paper
-          onClick={selected && !isEditing ? copyBodyToClipboard : undefined}
-          sx={{
-            p: 2,
-            minHeight: 280,
-            cursor: selected && !isEditing ? "copy" : "default",
-          }}
-        >
-          {!selected && !loading && (
-            <Typography variant="body2" color="text.secondary">
-              Velg en standardtekst fra listen.
-            </Typography>
-          )}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Paper sx={{ p: 2 }}>
+            <Box sx={{ maxWidth: 520 }}>
+              <MedicationSearch
+                onPick={(med) => {
+                  const text = formatPreparatForTemplate(med);
+                  if (!text) return;
 
-          {selected && (
-            <>
-              {isAdmin && !isEditing && (
-                <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startEdit();
-                    }}
-                    sx={{
-                      borderRadius: 999,
-                      textTransform: "none",
-                      px: 2,
-                      py: 0.5,
-                      backgroundColor: "background.paper",
-                    }}
-                  >
-                    Endre
-                  </Button>
-                </Box>
-              )}
-              <Typography variant="h5" sx={{ mb: 0.5 }}>
-                {selected.title}
+                  setPickedPreparat(text);
+
+                  // If admin is editing, also replace inside the draft so it can be saved if desired.
+                  if (isEditing) {
+                    setDraftContent((prev) => prev.replace(/\{\{\s*PREPARAT\s*\}\}/g, text));
+                  }
+                }}
+              />
+            </Box>
+          </Paper>
+
+          <Paper
+            onClick={selected && !isEditing ? copyBodyToClipboard : undefined}
+            sx={{
+              p: 2,
+              minHeight: 280,
+              cursor: selected && !isEditing ? "copy" : "default",
+            }}
+          >
+            {!selected && !loading && (
+              <Typography variant="body2" color="text.secondary">
+                Velg en standardtekst fra listen.
               </Typography>
-              {selected.category && (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  {selected.category}
-                </Typography>
-              )}
+            )}
 
-              {selected.updatedAt && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 2 }}
-                >
-                  Sist oppdatert: {selected.updatedAt.toLocaleString("nb-NO")}
-                </Typography>
-              )}
-
-              {isEditing ? (
-                <>
-                  <TextField
-                    fullWidth
-                    label="Overskrift"
-                    value={draftTitle}
-                    onChange={(e) => setDraftTitle(e.target.value)}
-                    sx={{ mb: 2 }}
-                  />
-                  <TextField
-                    fullWidth
-                    multiline
-                    minRows={10}
-                    label="Tekst"
-                    value={draftContent}
-                    onChange={(e) => setDraftContent(e.target.value)}
-                  />
-                  <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: "flex-end" }}>
+            {selected && (
+              <>
+                {isAdmin && !isEditing && (
+                  <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
                     <Button
-                      variant="text"
+                      variant="outlined"
+                      size="small"
                       onClick={(e) => {
                         e.stopPropagation();
-                        cancelEdit();
+                        startEdit();
                       }}
-                      disabled={saving}
-                    >
-                      Avbryt
-                    </Button>
-                    <Button
-                      variant="contained"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        saveEdit();
+                      sx={{
+                        borderRadius: 999,
+                        textTransform: "none",
+                        px: 2,
+                        py: 0.5,
+                        backgroundColor: "background.paper",
                       }}
-                      disabled={saving}
                     >
-                      {saving ? "Lagrer..." : "Lagre"}
+                      Endre
                     </Button>
-                  </Stack>
-                </>
-              ) : (
-                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                  {displayContent || "(Tom tekst)"}
+                  </Box>
+                )}
+                <Typography variant="h5" sx={{ mb: 0.5 }}>
+                  {selected.title}
                 </Typography>
-              )}
-            </>
-          )}
-        </Paper>
+                {selected.category && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    {selected.category}
+                  </Typography>
+                )}
+
+                {selected.updatedAt && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mb: 2 }}
+                  >
+                    Sist oppdatert: {selected.updatedAt.toLocaleString("nb-NO")}
+                  </Typography>
+                )}
+
+                {isEditing ? (
+                  <>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Overskrift"
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      sx={{ mb: 2, maxWidth: 520 }}
+                    />
+                    <TextField
+                      fullWidth
+                      multiline
+                      minRows={10}
+                      label="Tekst"
+                      value={draftContent}
+                      onChange={(e) => setDraftContent(e.target.value)}
+                    />
+                    <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: "flex-end" }}>
+                      <Button
+                        variant="text"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cancelEdit();
+                        }}
+                        disabled={saving}
+                      >
+                        Avbryt
+                      </Button>
+                      <Button
+                        variant="contained"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveEdit();
+                        }}
+                        disabled={saving}
+                      >
+                        {saving ? "Lagrer..." : "Lagre"}
+                      </Button>
+                    </Stack>
+                  </>
+                ) : (
+                  <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                    {displayContent || "(Tom tekst)"}
+                  </Typography>
+                )}
+              </>
+            )}
+          </Paper>
+        </Box>
       </Box>
       <Snackbar
         open={copied}
