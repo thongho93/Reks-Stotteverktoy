@@ -558,7 +558,7 @@ export default function StandardTekstPage() {
           <Paper sx={{ p: 2 }}>
             <Box sx={{ maxWidth: 520 }}>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-                {preparatRows.map((row, idx) => (
+                {preparatRows.map((row) => (
                   <Box key={row.id} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
                     <Box sx={{ flex: 1 }}>
                       <MedicationSearch
