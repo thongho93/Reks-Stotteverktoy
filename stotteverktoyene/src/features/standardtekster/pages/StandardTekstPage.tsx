@@ -22,7 +22,6 @@ import {
   getDocs,
   query,
   serverTimestamp,
-  Timestamp,
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
@@ -30,193 +29,14 @@ import { useAuthUser } from "../../../app/auth/Auth";
 import MedicationSearch from "../../fest/components/MedicationSearch";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
-
-type StandardTekst = {
-  id: string;
-  title: string;
-  category?: string;
-  content: string;
-  updatedAt?: Date | null;
-};
-
-function toDateMaybe(value: unknown): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (value instanceof Timestamp) return value.toDate();
-  // Firestore can also store millis or ISO strings depending on your implementation
-  if (typeof value === "number") return new Date(value);
-  if (typeof value === "string") {
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  return null;
-}
-
-function pickFirstNonEmptyString(...values: unknown[]): string | null {
-  for (const v of values) {
-    if (typeof v === "string") {
-      const trimmed = v.trim();
-      if (trimmed.length > 0) return trimmed;
-    }
-  }
-  return null;
-}
-
-function mapDocToStandardTekst(id: string, data: Record<string, unknown>): StandardTekst {
-  // Du kan endre feltnavnene her hvis databasen din bruker andre navn
-  const title =
-    pickFirstNonEmptyString(data["title"], data["Title"], data["tittel"]) ?? "Uten tittel";
-
-  const category = pickFirstNonEmptyString(data["category"], data["kategori"]) ?? "";
-
-  const content =
-    pickFirstNonEmptyString(data["content"], data["Body"], data["tekst"], data["body"]) ?? "";
-
-  const updatedAt = toDateMaybe(data["updatedAt"] ?? data["updated_at"] ?? data["sistOppdatert"]);
-
-  return {
-    id,
-    title,
-    category: category || undefined,
-    content,
-    updatedAt,
-  };
-}
-
-function formatPreparatForTemplate(med: {
-  varenavn: string | null;
-  navnFormStyrke: string | null;
-}): string {
-  const nfsRaw = (med.navnFormStyrke ?? "").trim();
-  const nfs = nfsRaw.replace(/\s+/g, " ").trim();
-
-  // Try to extract the first strength-like fragment.
-  // Supports: "0,1 mg/dose", "40 mg", "50 mikrog/500 mikrog", "1,25 mg/2,5 ml"
-  // We stop at comma+space (", ") which is used as field separators in many FEST strings.
-  const unit = "mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\\.e\\.|mmol|ml";
-  const m = nfs.match(
-    new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*[^;\\)\\n]+?)?)(?=,\\s|$)`, "i")
-  );
-
-  const strength = m?.[1]
-    ? m[1]
-        .replace(/\s*\/\s*/g, "/")
-        .replace(/\s+/g, " ")
-        .trim()
-    : "";
-
-  // Prefer name extracted from navnFormStyrke (this typically avoids manufacturer tokens like “Viatris/xiromed”).
-  // 1) remove trailing metadata after comma (often pack info)
-  const head = nfs.replace(/,.*$/, "").trim();
-
-  // 2) take everything before a common dosage-form keyword
-  const formWords = [
-    "tab",
-    "tablett",
-    "kaps",
-    "kapsel",
-    "inj",
-    "mikst",
-    "mikstur",
-    "inh",
-    "aerosol",
-    "pulv",
-    "plaster",
-    "spray",
-    "oppl",
-    "susp",
-    "granulat",
-    "krem",
-    "salve",
-    "gel",
-    "liniment",
-    "drasj",
-    "supp",
-    "stikkpille",
-    "mikrog",
-    "mikrogram",
-  ].join("|");
-
-  const beforeForm = head.split(new RegExp(`\\b(?:${formWords})\\b`, "i"))[0]?.trim() ?? "";
-  const nameFromNfs = beforeForm.replace(/\s+/g, " ").trim();
-
-  const fallbackName = (med.varenavn ?? "").trim();
-  const name = nameFromNfs || fallbackName;
-
-  if (name && strength) return `${name} ${strength}`.replace(/\s+/g, " ").trim();
-  if (name) return name;
-  return nfs || "";
-}
-
-function renderContentWithPreparatHighlight(text: string, pickedPreparat: string | null) {
-  const tokenSx = {
-    display: "inline-flex",
-    alignItems: "center",
-    borderRadius: 0.75,
-    px: 0.75,
-    py: 0.15,
-    lineHeight: 1.2,
-    fontSize: "0.95em",
-    whiteSpace: "nowrap",
-  } as const;
-
-  const placeholderSx = {
-    ...tokenSx,
-    bgcolor: "warning.light",
-    color: "warning.contrastText",
-    fontFamily: "monospace",
-  } as const;
-
-  const pickedSx = {
-    ...tokenSx,
-    bgcolor: "success.light",
-    color: "success.contrastText",
-    fontWeight: 600,
-  } as const;
-
-  // 1) If placeholder exists, highlight it clearly.
-  const placeholder = "{{PREPARAT}}";
-  if (text.includes(placeholder)) {
-    const parts = text.split(placeholder);
-    return (
-      <>
-        {parts.map((p, i) => (
-          <span key={i}>
-            {p}
-            {i < parts.length - 1 ? (
-              <Box component="span" sx={placeholderSx}>
-                {placeholder}
-              </Box>
-            ) : null}
-          </span>
-        ))}
-      </>
-    );
-  }
-
-  // 2) If placeholder is already replaced, highlight the chosen preparat once so you can verify it.
-  if (pickedPreparat) {
-    const lower = text.toLowerCase();
-    const needle = pickedPreparat.toLowerCase();
-    const idx = lower.indexOf(needle);
-    if (idx !== -1) {
-      const before = text.slice(0, idx);
-      const hit = text.slice(idx, idx + pickedPreparat.length);
-      const after = text.slice(idx + pickedPreparat.length);
-      return (
-        <>
-          {before}
-          <Box component="span" sx={pickedSx}>
-            {hit}
-          </Box>
-          {after}
-        </>
-      );
-    }
-  }
-
-  return text;
-}
+import type { StandardTekst } from "../types";
+import { mapDocToStandardTekst } from "../mappers/standardTekstMapper";
+import {
+  formatPreparatForTemplate,
+  replaceNextPreparatToken,
+  usePreparatRows,
+} from "../utils/preparat";
+import { renderContentWithPreparatHighlight } from "../utils/render";
 
 export default function StandardTekstPage() {
   const [items, setItems] = useState<StandardTekst[]>([]);
@@ -233,33 +53,9 @@ export default function StandardTekstPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
 
-  type PreparatRow = { id: number; picked: string | null };
-  const [preparatRows, setPreparatRows] = useState<PreparatRow[]>([{ id: 0, picked: null }]);
+  const { preparatRows, addPreparatRow, removePreparatRow, setPickedForRow, resetPreparatRows } =
+    usePreparatRows();
   const [copied, setCopied] = useState(false);
-
-  const addPreparatRow = () => {
-    setPreparatRows((prev) => {
-      const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
-      return [...prev, { id: nextId, picked: null }];
-    });
-  };
-
-  const removePreparatRow = (id: number) => {
-    setPreparatRows((prev) => {
-      const next = prev.filter((r) => r.id !== id);
-      // Always keep at least one field
-      return next.length ? next : [{ id: 0, picked: null }];
-    });
-  };
-
-  const setPickedForRow = (id: number, picked: string | null) => {
-    setPreparatRows((prev) => prev.map((r) => (r.id === id ? { ...r, picked } : r)));
-  };
-
-  const replaceNextPreparatToken = (text: string, value: string) => {
-    // Replace ONLY the next (first) placeholder occurrence
-    return text.replace(/\{\{\s*PREPARAT\s*\}\}/, value);
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -337,7 +133,7 @@ export default function StandardTekstPage() {
     setIsEditing(false);
     setDraftTitle(selected?.title ?? "");
     setDraftContent(selected?.content ?? "");
-    setPreparatRows([{ id: 0, picked: null }]);
+    resetPreparatRows();
   }, [selectedId]);
 
   const startEdit = () => {
@@ -462,7 +258,15 @@ export default function StandardTekstPage() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Box sx={{ mb: 2, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2 }}>
+      <Box
+        sx={{
+          mb: 2,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
         <Box>
           <Typography variant="h4">Standardtekster</Typography>
           <Typography variant="body2" color="text.secondary">
