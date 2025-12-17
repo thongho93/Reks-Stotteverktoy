@@ -322,7 +322,7 @@
 }
 
 .preparatSingleSearch {
-  max-width: 360px;
+  max-width: 520px;
   width: 100%;
 }
 
@@ -337,7 +337,30 @@
   border-radius: 999px !important;
 }
 
+.preparatSearchRow {
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .preparatHint {
-  display: block;
   margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  line-height: 1.35;
+}
+
+.preparatHintTip {
+  max-width: 70ch;
+}
+
+.preparatHintKeys {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.preparatHintKeyLabel {
+  font-weight: 600;
+  opacity: 0.95;
 }

@@ -252,8 +252,9 @@ export function formatPreparatForTemplate(med: {
 
 
 export function replaceNextPreparatToken(text: string, value: string) {
-  // Replace ONLY the next (first) placeholder occurrence
-  return text.replace(/\{\{\s*PREPARAT\s*\}\}/, value);
+  // Replace ONLY the next (first) placeholder occurrence.
+  // Supports both {{PREPARAT}} and {{PREPARAT1}}.
+  return text.replace(/\{\{\s*(PREPARAT1|PREPARAT)\s*\}\}/, value);
 }
 
 export function usePreparatRows() {
@@ -329,4 +330,22 @@ export function formatPreparatList(values: Array<string | null | undefined>): st
 
 export function replacePreparatTokenWithList(text: string, listValue: string) {
   return text.replace(/\{\{\s*PREPARAT\s*\}\}/g, listValue);
+}
+
+export function replacePreparatTokensPrimarySecondary(
+  text: string,
+  primary: string | null | undefined,
+  secondary: string | null | undefined
+) {
+  let out = text;
+
+  if (primary) {
+    out = out.replace(/\{\{\s*PREPARAT\s*\}\}/g, primary);
+  }
+
+  if (secondary) {
+    out = out.replace(/\{\{\s*PREPARAT1\s*\}\}/g, secondary);
+  }
+
+  return out;
 }

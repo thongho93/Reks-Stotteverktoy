@@ -45,6 +45,7 @@ const cleanHvProductName = (name: string) =>
 type Props = {
   maxResults?: number;
   onPick?: (med: Med) => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 };
 
 const NOISE_TOKENS = new Set([
@@ -140,11 +141,14 @@ const tokenMatches = (hayTokens: string[], needleRaw: string) => {
   return hayTokens.some((ht) => ht.startsWith(needle));
 };
 
-export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
+export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const anchorRef = useRef<HTMLDivElement | null>(null);
+
+  const internalInputRef = useRef<HTMLInputElement | null>(null);
+  const effectiveInputRef = inputRef ?? internalInputRef;
 
   const allItems: Med[] = useMemo(() => {
     const fest = (meds as Med[]) ?? [];
@@ -415,6 +419,7 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
     <Box>
       <TextField
         ref={anchorRef}
+        inputRef={effectiveInputRef}
         fullWidth
         label="Søk etter preparat"
         placeholder="Søk på navn, f.eks. 'Arcoxia'"

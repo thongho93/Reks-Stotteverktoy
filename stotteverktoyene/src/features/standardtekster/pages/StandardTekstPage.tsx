@@ -38,6 +38,7 @@ import {
   usePreparatRows,
   formatPreparatList,
   replacePreparatTokenWithList,
+  replacePreparatTokensPrimarySecondary,
 } from "../utils/preparat";
 import { renderContentWithPreparatHighlight } from "../utils/render";
 import styles from "../../../styles/standardTekstPage.module.css";
@@ -60,6 +61,7 @@ export default function StandardTekstPage() {
   const { preparatRows, resetPreparatRows, clearPreparats, addPickedPreparat, removePreparatById } =
     usePreparatRows();
   const preparatSectionRef = useRef<HTMLDivElement | null>(null);
+  const preparatSearchInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -73,6 +75,21 @@ export default function StandardTekstPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [clearPreparats, preparatRows]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Alt (Windows/Linux) / Option (macOS) + F -> focus preparat search
+      if (!e.altKey) return;
+      if (e.key.toLowerCase() !== "f") return;
+
+      e.preventDefault();
+      preparatSearchInputRef.current?.focus();
+      preparatSearchInputRef.current?.select();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const [copied, setCopied] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
 
@@ -137,10 +154,23 @@ export default function StandardTekstPage() {
       text = text.replace(/\bXX\b/g, firstName);
     }
 
-    // Replace {{PREPARAT}} placeholders in order, one per picked preparat
-    const preparatList = formatPreparatList(preparatRows.map((r) => r.picked));
-    if (preparatList) {
-      text = replacePreparatTokenWithList(text, preparatList);
+    const picked = preparatRows.map((r) => r.picked).filter(Boolean) as string[];
+
+    // If the template uses {{PREPARAT1}}, treat it as a 2-slot template:
+    //  - {{PREPARAT}}  -> first picked
+    //  - {{PREPARAT1}} -> second picked
+    // Otherwise keep the existing list behavior for {{PREPARAT}}.
+    const usesSecondaryToken = /\{\{\s*PREPARAT1\s*\}\}/.test(text);
+
+    if (usesSecondaryToken) {
+      const primary = picked[0] ?? null;
+      const secondary = picked[1] ?? null;
+      text = replacePreparatTokensPrimarySecondary(text, primary, secondary);
+    } else {
+      const preparatList = formatPreparatList(picked);
+      if (preparatList) {
+        text = replacePreparatTokenWithList(text, preparatList);
+      }
     }
 
     return text;
@@ -398,9 +428,15 @@ export default function StandardTekstPage() {
               </Typography>
             </Box>
 
-            <Stack direction="row" spacing={1} alignItems="flex-start">
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="flex-start"
+              className={styles.preparatSearchRow}
+            >
               <Box className={styles.preparatSingleSearch} style={{ flex: 1 }}>
                 <MedicationSearch
+                  inputRef={preparatSearchInputRef}
                   onPick={(med) => {
                     const text = formatPreparatForTemplate(med);
                     if (!text) return;
@@ -441,7 +477,13 @@ export default function StandardTekstPage() {
             </Box>
 
             <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
-              Tips: Lim inn hele produktlinjen – søket rydder opp automatisk.
+              <span className={styles.preparatHintTip}>
+                Tips: Lim inn hele produktlinjen – søket rydder opp automatisk.
+              </span>
+              <span className={styles.preparatHintKeys}>
+                <span className={styles.preparatHintKeyLabel}>Hurtigsøk:</span> ⌥F / Alt+F ·{" "}
+                <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
+              </span>
             </Typography>
           </Paper>
 
