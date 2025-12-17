@@ -28,3 +28,6 @@ dist-ssr
 
 # FEST (local source data – do not commit)
 fest/*.xml
+
+# Large source data files (not committed)
+produktkatalog/Produktkatalog HV 17 des 25.xlsx

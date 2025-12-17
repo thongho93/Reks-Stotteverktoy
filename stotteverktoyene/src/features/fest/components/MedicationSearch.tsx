@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 
 import meds from "../meds.json";
+import hvProducts from "./hvProducts.json";
 
 type Med = {
   id: string;
@@ -20,7 +21,26 @@ type Med = {
   virkestoff: string | null;
   produsent: string | null;
   reseptgruppe: string | null;
+  // Only set for HV products
+  farmaloggNumber?: string | null;
 };
+
+
+type HvProduct = {
+  farmaloggNumber: string;
+  name: string;
+};
+
+const cleanHvProductName = (name: string) =>
+  name
+    .replace(/[\s\u00A0]+/g, " ") // collapse whitespace
+    .trim()
+    // remove specific trailing multipack patterns we want to hide, e.g. "... 4x200" / "... 4x120"
+    .replace(/\s+(?:4x200|4x120)\s*$/i, "")
+    // remove trailing integer token (typically pack size), e.g. "... 60x90 50" -> "... 60x90"
+    // only when it's 2+ digits to avoid chopping dimension-style names
+    .replace(/\s+\d{2,}\s*$/g, "")
+    .trim();
 
 type Props = {
   maxResults?: number;
@@ -126,6 +146,33 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const anchorRef = useRef<HTMLDivElement | null>(null);
 
+  const allItems: Med[] = useMemo(() => {
+    const fest = (meds as Med[]) ?? [];
+
+    const hv = ((hvProducts as unknown) as HvProduct[] | undefined) ?? [];
+    const hvAsMeds: Med[] = hv
+      .filter((p) => p && p.name)
+      .map((p) => {
+        const originalName = String(p.name);
+        const cleanedName = cleanHvProductName(originalName);
+
+        return {
+          id: `hv:${p.farmaloggNumber}`,
+          farmaloggNumber: String(p.farmaloggNumber),
+          // Keep original for matching pasted queries (may include pack size)
+          varenavn: originalName,
+          // Use cleaned for display + chips
+          navnFormStyrke: cleanedName || originalName,
+          atc: null,
+          virkestoff: null,
+          produsent: null,
+          reseptgruppe: null,
+        };
+      });
+
+    return [...fest, ...hvAsMeds];
+  }, []);
+
   const results = useMemo(() => {
     const tokens = toTokens(query);
     if (tokens.length === 0) return [];
@@ -142,9 +189,21 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
       .filter((t) => t.length >= 4) // drop partials
       .filter((t) => t !== "mg" && t !== "ml");
 
-    // Require up to 2 meaningful tokens (typically substance + brand/manufacturer),
-    // but if we only have one, require that.
-    const requiredTextTokens = meaningfulTextTokens.slice(0, Math.min(2, meaningfulTextTokens.length));
+    // If the user typed a short, specific query (few meaningful tokens), require all of them
+    // to avoid returning many near-identical variants (common for HV products).
+    // For long pasted strings, keep the more forgiving "up to 2" rule.
+    const requiredTextTokens =
+      meaningfulTextTokens.length > 0 && meaningfulTextTokens.length <= 4
+        ? meaningfulTextTokens
+        : meaningfulTextTokens.slice(0, Math.min(2, meaningfulTextTokens.length));
+
+    // Farmalogg numbers are long integers. Treat them as identifiers, not strength.
+    const idNumberTokens = tokens
+      .filter((t) => isNumberToken(t))
+      .filter((t) => !t.includes("."))
+      .filter((t) => t.length >= 5);
+
+    // (computed after `numberWithUnit` is defined)
 
     // Enforce meaningful strength tokens from the query (handles long pasted strings)
     // Important: ignore pack-size numbers like "120 doser" so they don't kill results.
@@ -169,6 +228,8 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
       }
       return null;
     })();
+    const isLikelyIdSearch = idNumberTokens.length > 0 && meaningfulTextTokens.length === 0 && !numberWithUnit;
+    const restrictToHvOnly = isLikelyIdSearch;
 
     // Collect "meaningful" number tokens until we hit pack-size indicators.
     // Also drop numbers that sit right next to pack-size tokens.
@@ -201,8 +262,13 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
       const decimalToken = tokens.find((t) => /^\d+\.\d+$/.test(t));
       if (decimalToken) return [decimalToken];
 
-      // Case 4: single integer (e.g. "40")
-      if (uniq.length === 1) return [uniq[0]];
+      // Case 4: single integer (e.g. "40").
+      // If the query looks like an identifier search (e.g. Farmalogg number), don't treat it as strength.
+      if (uniq.length === 1) {
+        const only = uniq[0];
+        if (isLikelyIdSearch && idNumberTokens.includes(only)) return [];
+        return [only];
+      }
 
       return [];
     })();
@@ -214,14 +280,23 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
     let hasNonComboMatch = false;
 
     const isComboMed = (med: Med) => {
-      const name = (med.navnFormStyrke ?? med.varenavn ?? "").toLowerCase();
+      const isHv = med.id.startsWith("hv:");
+      const name = (isHv ? (med.varenavn ?? "") : (med.navnFormStyrke ?? med.varenavn ?? "")).toLowerCase();
       const subst = (med.virkestoff ?? "").toLowerCase();
       return name.includes("/") || subst.includes(" og ");
     };
 
-    for (const m of meds as Med[]) {
-      const hayText = m.navnFormStyrke ?? m.varenavn ?? "";
+    for (const m of allItems) {
+      const isHv = m.id.startsWith("hv:");
+      if (restrictToHvOnly && !isHv) continue;
+
+      const hayText = isHv ? (m.varenavn ?? "") : (m.navnFormStyrke ?? m.varenavn ?? "");
       if (!hayText) continue;
+      if (isHv && idNumberTokens.length > 0) {
+        const id = String(m.farmaloggNumber ?? m.id.replace(/^hv:/, ""));
+        const okId = idNumberTokens.every((t) => id.startsWith(t) || id === t);
+        if (!okId) continue;
+      }
 
       const hay = normalizeForSearch(hayText);
       const hayTokens = toTokens(hayText);
@@ -263,6 +338,14 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
         if (hayTokens.includes(t)) score += 3;
       }
 
+      if (isHv && idNumberTokens.length > 0) {
+        const id = String(m.farmaloggNumber ?? m.id.replace(/^hv:/, ""));
+        for (const t of idNumberTokens) {
+          if (id === t) score += 20;
+          else if (id.startsWith(t)) score += 10;
+        }
+      }
+
       // Bonus: if the query only contains a single strength number (e.g. "32 mg")
       // and the candidate is a combined strength like "32 mg/12,5 mg", rank it higher.
       // This helps when pasted texts omit the second component strength.
@@ -291,10 +374,12 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
       }
     }
 
+    if (restrictToHvOnly && out.length === 0) return [];
+
     out.sort((a, b) => b.score - a.score);
 
     return out.slice(0, maxResults).map((x) => x.med);
-  }, [query, maxResults]);
+  }, [query, maxResults, allItems]);
 
   const pickResult = (m: Med) => {
     onPick?.(m);
@@ -422,16 +507,20 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
                   selected={index === highlightedIndex}
                   onMouseEnter={() => setHighlightedIndex(index)}
                 >
-                  <ListItemText
-                    primary={m.navnFormStyrke ?? m.varenavn ?? "(uten navn)"}
-                    secondary={[
+                  {(() => {
+                    const secondaryParts = [
                       m.virkestoff ? `Virkestoff: ${m.virkestoff}` : null,
                       m.atc ? `ATC: ${m.atc}` : null,
                       m.reseptgruppe ? `Reseptgruppe: ${m.reseptgruppe}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" • ")}
-                  />
+                    ].filter(Boolean) as string[];
+
+                    return (
+                      <ListItemText
+                        primary={m.navnFormStyrke ?? m.varenavn ?? "(uten navn)"}
+                        secondary={secondaryParts.length ? secondaryParts.join(" • ") : undefined}
+                      />
+                    );
+                  })()}
                 </ListItemButton>
               ))}
             </List>
