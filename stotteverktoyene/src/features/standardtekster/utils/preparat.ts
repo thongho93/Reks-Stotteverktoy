@@ -1,9 +1,123 @@
 import { useCallback, useState } from "react";
 import type { PreparatRow } from "../types";
 
+const MANUFACTURER_TOKENS = new Set(
+  [
+    // Common Norwegian market / generic manufacturers & labelers
+    "hexal",
+    "orion",
+    "sandoz",
+    "teva",
+    "accord",
+    "zentiva",
+    "krka",
+    "stada",
+    "actavis",
+    "mylan",
+    "viatris",
+    "bluefish",
+    "orifarm",
+    "glenmark",
+    "sun",
+    "apotek",
+    "apofri",
+    "medical",
+    "valley",
+    // Some frequent brand owners (kept here only when they appear as trailing company token)
+    "pfizer",
+    "bayer",
+    "novartis",
+    "sanofi",
+    "roche",
+    "astrazeneca",
+    "msd",
+    "organon",
+    "lilly",
+    "takeda",
+    "amgen",
+    "gsk",
+    "abbvie",
+    "bms",
+    "boehringer",
+  ].map((s) => s.toLowerCase())
+);
+
+const COMPANY_SUFFIX_TOKENS = new Set(
+  [
+    "pharma",
+    "pharmaceutical",
+    "pharmaceuticals",
+    "healthcare",
+    "health",
+    "labs",
+    "laboratories",
+    "ab",
+    "as",
+    "asa",
+    "aps",
+    "oy",
+    "ltd",
+    "limited",
+    "inc",
+    "gmbh",
+    "ag",
+  ].map((s) => s.toLowerCase())
+);
+
+function stripManufacturerFromName(name: string, producer?: string | null): string {
+  // Keep the original spacing but remove obvious manufacturer/company tokens.
+  // This is heuristic by design and meant to handle e.g. "Atorvastatin Hexal" -> "Atorvastatin".
+  const tokens = name
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+
+  if (tokens.length <= 1) return name.trim();
+
+  const producerTokens = new Set(
+    (producer ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .map((t) => t.replace(/[()\[\]{},.;:&]+/g, "").toLowerCase())
+      .filter(Boolean)
+  );
+
+  const isProducerToken = (key: string) => producerTokens.has(key);
+
+  const kept: string[] = [];
+  let lastWasRemovedManufacturer = false;
+
+  for (const t of tokens) {
+    const cleaned = t.replace(/[()\[\]{},.;:]+/g, "");
+    const key = cleaned.toLowerCase();
+
+    const isManufacturer = MANUFACTURER_TOKENS.has(key) || isProducerToken(key);
+    const isCompanySuffix = COMPANY_SUFFIX_TOKENS.has(key);
+
+    // If we removed a manufacturer token, also drop immediate suffix tokens (e.g. "Orifarm Healthcare").
+    if (isManufacturer) {
+      lastWasRemovedManufacturer = true;
+      continue;
+    }
+
+    if (lastWasRemovedManufacturer && isCompanySuffix) {
+      continue;
+    }
+
+    lastWasRemovedManufacturer = false;
+    kept.push(t);
+  }
+
+  const result = kept.join(" ").replace(/\s+/g, " ").trim();
+  return result || name.trim();
+}
+
 export function formatPreparatForTemplate(med: {
   varenavn: string | null;
   navnFormStyrke: string | null;
+  produsent?: string | null;
 }): string {
   const nfsRaw = (med.navnFormStyrke ?? "").trim();
   const nfs = nfsRaw.replace(/\s+/g, " ").trim();
@@ -59,7 +173,8 @@ export function formatPreparatForTemplate(med: {
   const nameFromNfs = beforeForm.replace(/\s+/g, " ").trim();
 
   const fallbackName = (med.varenavn ?? "").trim();
-  const name = nameFromNfs || fallbackName;
+  const rawName = nameFromNfs || fallbackName;
+  const name = rawName ? stripManufacturerFromName(rawName, med.produsent) : "";
 
   if (name && strength) return `${name} ${strength}`.replace(/\s+/g, " ").trim();
   if (name) return name;
