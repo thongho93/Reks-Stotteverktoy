@@ -1,6 +1,9 @@
 import { Box } from "@mui/material";
 
-export function renderContentWithPreparatHighlight(text: string, pickedPreparat: string | null) {
+export function renderContentWithPreparatHighlight(
+  text: string,
+  pickedPreparats: Array<string | null | undefined>
+) {
   const tokenSx = {
     display: "inline-flex",
     alignItems: "center",
@@ -46,21 +49,31 @@ export function renderContentWithPreparatHighlight(text: string, pickedPreparat:
     );
   }
 
-  if (pickedPreparat) {
-    const lower = text.toLowerCase();
-    const needle = pickedPreparat.toLowerCase();
-    const idx = lower.indexOf(needle);
-    if (idx !== -1) {
-      const before = text.slice(0, idx);
-      const hit = text.slice(idx, idx + pickedPreparat.length);
-      const after = text.slice(idx + pickedPreparat.length);
+  const needles = (pickedPreparats ?? []).map((p) => (p ?? "").trim()).filter(Boolean);
+  if (needles.length > 0) {
+    // Prefer longest first to avoid partial matches (e.g. "Ventoline" inside "Ventoline 0,1 mg/dose").
+    const uniq = Array.from(new Set(needles)).sort((a, b) => b.length - a.length);
+
+    const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`(${uniq.map(escapeRegExp).join("|")})`, "gi");
+
+    const parts = text.split(pattern);
+
+    // If we didn't actually split, return original text
+    if (parts.length > 1) {
       return (
         <>
-          {before}
-          <Box component="span" sx={pickedSx}>
-            {hit}
-          </Box>
-          {after}
+          {parts.map((part, i) => {
+            const matched = uniq.find((u) => u.toLowerCase() === part.toLowerCase());
+            if (matched) {
+              return (
+                <Box key={i} component="span" sx={pickedSx}>
+                  {part}
+                </Box>
+              );
+            }
+            return <span key={i}>{part}</span>;
+          })}
         </>
       );
     }

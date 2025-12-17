@@ -220,3 +220,15 @@ export function usePreparatRows() {
     resetPreparatRows,
   };
 }
+
+export function formatPreparatList(values: Array<string | null | undefined>): string {
+  const items = values.map((v) => (v ?? "").trim()).filter(Boolean);
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} og ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} og ${items[items.length - 1]}`;
+}
+
+export function replacePreparatTokenWithList(text: string, listValue: string) {
+  return text.replace(/\{\{\s*PREPARAT\s*\}\}/g, listValue);
+}

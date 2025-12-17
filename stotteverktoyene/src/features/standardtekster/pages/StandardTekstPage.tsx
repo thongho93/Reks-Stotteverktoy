@@ -35,6 +35,8 @@ import {
   formatPreparatForTemplate,
   replaceNextPreparatToken,
   usePreparatRows,
+  formatPreparatList,
+  replacePreparatTokenWithList,
 } from "../utils/preparat";
 import { renderContentWithPreparatHighlight } from "../utils/render";
 
@@ -119,10 +121,9 @@ export default function StandardTekstPage() {
     }
 
     // Replace {{PREPARAT}} placeholders in order, one per picked preparat
-    for (const row of preparatRows) {
-      if (row.picked) {
-        text = replaceNextPreparatToken(text, row.picked);
-      }
+    const preparatList = formatPreparatList(preparatRows.map((r) => r.picked));
+    if (preparatList) {
+      text = replacePreparatTokenWithList(text, preparatList);
     }
 
     return text;
@@ -516,7 +517,7 @@ export default function StandardTekstPage() {
                   >
                     {renderContentWithPreparatHighlight(
                       displayContent || "(Tom tekst)",
-                      preparatRows.find((r) => r.picked)?.picked ?? null
+                      preparatRows.map((r) => r.picked)
                     )}
                   </Typography>
                 )}
