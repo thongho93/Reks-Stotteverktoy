@@ -69,15 +69,19 @@ const NOISE_TOKENS = new Set([
 const normalizeForSearch = (value: string) =>
   value
     .toLowerCase()
+    // remove zero-width chars that may sneak in during copy/paste (breaks tokenization)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
     // keep decimals together: "0,4" -> "0.4"
     .replace(/(\d),(\d)/g, "$1.$2")
+    // normalize "200 mg" -> "200mg" so it later becomes "200 mg" consistently
+    .replace(/(\d)\s+(mg|g|mcg|ug|µg|mikrog|mikrogram|ml|mmol|iu|ie|i\.e\.|dose|t|time)\b/g, "$1$2")
     // Split digit/letter boundaries so "30mg" becomes "30 mg"
     .replace(/(\d)([a-zA-Z])/g, "$1 $2")
     .replace(/([a-zA-Z])(\d)/g, "$1 $2")
     // Treat common punctuation as spaces (keep dot since we use it for decimals)
     .replace(/[\u00B5µ,;:()\[\]{}\/\\|+\-_*"'!?]/g, " ")
     // Collapse whitespace
-    .replace(/\s+/g, " ")
+    .replace(/[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g, " ")
     .trim();
 
 const dedupe = (arr: string[]) => {
@@ -293,9 +297,11 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
   }, [query, maxResults]);
 
   const pickResult = (m: Med) => {
-    const label = (m.navnFormStyrke ?? m.varenavn ?? "").trim();
-    if (label) setQuery(label);
     onPick?.(m);
+
+    // Clear search field after chip is added
+    setQuery("");
+
     setOpen(false);
     setHighlightedIndex(-1);
   };
@@ -314,21 +320,10 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
   }, [open, results.length]);
 
   useEffect(() => {
-    // Auto-pick when the query yields exactly one result.
-    // This avoids forcing the user to click/press Enter when the match is unambiguous.
     if (!query.trim()) return;
     if (results.length !== 1) return;
 
-    const m = results[0];
-    const label = (m.navnFormStyrke ?? m.varenavn ?? "").trim();
-
-    // Prevent loops: if we've already set the input to the picked label, just close.
-    if (label && query.trim() === label) {
-      setOpen(false);
-      return;
-    }
-
-    pickResult(m);
+    pickResult(results[0]);
   }, [query, results]);
 
   return (

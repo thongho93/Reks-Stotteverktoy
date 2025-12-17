@@ -35,7 +35,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (min-width: 900px) {
@@ -46,21 +46,73 @@
 
 .sidebar {
   padding: 8px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
+/* Sidebar readability improvements */
 .sidebarHeader {
-  padding-left: 12px;
-  padding-right: 12px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-left: 14px;
+  padding-right: 14px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebarSectionTitle {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.sidebarCreateRow {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.sidebarDivider {
+  margin-left: 10px;
+  margin-right: 10px;
 }
 
 .sidebarSearch {
-  max-width: 340px;
+  max-width: none;
 }
 
 .sidebarCount {
-  margin-top: 8px;
+  margin-top: 0;
+}
+
+.sidebarList {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.sidebarItem {
+  margin: 2px 8px;
+  border-radius: 10px;
+}
+
+.sidebarItem:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.sidebarItem:global(.Mui-selected) {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.sidebarItem:global(.Mui-selected):hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* Make the "Ny standardtekst" pill feel like a primary action in the panel */
+.sidebarCreateRow .pillButton {
+  width: 100%;
+  justify-content: center;
 }
 
 .sidebarLoading {
@@ -115,9 +167,15 @@
 }
 
 .contentPaper {
-  padding: 16px;
+  padding: 28px;
   min-height: 280px;
   cursor: default;
+}
+
+@media (min-width: 900px) {
+  .contentPaper {
+    padding: 44px;
+  }
 }
 
 .contentPaperCopy {
@@ -140,7 +198,7 @@
 
 .updatedAt {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .editorTitleField {
@@ -155,7 +213,9 @@
 
 .body {
   white-space: pre-wrap;
-  line-height: 1.7;
+  line-height: 1.8;
+  max-width: 60ch;
+  margin: 0 auto;
 }
 
 /* Auth */
@@ -196,4 +256,88 @@
 .authAvatar {
   width: 32px !important;
   height: 32px !important;
+}
+
+/* StandardTekstPage – guide panel */
+.headerActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.expandIcon {
+  transition: transform 150ms ease;
+}
+
+.expandIconOpen {
+  transition: transform 150ms ease;
+  transform: rotate(180deg);
+}
+
+.guidePaper {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.guideTitle {
+  margin-bottom: 8px;
+}
+
+.guideList {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.sidebarBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.editRowBottom {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* Preparat: single search + chips */
+.preparatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.preparatTitle {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.preparatClearButton {
+  text-transform: none !important;
+}
+
+.preparatSingleSearch {
+  max-width: 360px;
+  width: 100%;
+}
+
+.preparatChipsWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.preparatChip {
+  border-radius: 999px !important;
+}
+
+.preparatHint {
+  display: block;
+  margin-top: 10px;
 }
