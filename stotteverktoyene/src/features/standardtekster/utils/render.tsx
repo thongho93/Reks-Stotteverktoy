@@ -49,7 +49,10 @@ export function renderContentWithPreparatHighlight(
   // Render placeholders with distinct colors.
   if (text.includes(placeholder0) || text.includes(placeholder1)) {
     const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`(${escapeRegExp(placeholder1)}|${escapeRegExp(placeholder0)})`, "g");
+    const pattern = new RegExp(
+      `(${escapeRegExp(placeholder1)}|${escapeRegExp(placeholder0)})`,
+      "g"
+    );
     const parts = text.split(pattern);
 
     return (
@@ -77,7 +80,6 @@ export function renderContentWithPreparatHighlight(
 
   const needles = (pickedPreparats ?? []).map((p) => (p ?? "").trim()).filter(Boolean);
   if (needles.length > 0) {
-    const primary = (pickedPreparats?.[0] ?? "").trim();
     const secondary = (pickedPreparats?.[1] ?? "").trim();
 
     // Prefer longest first to avoid partial matches (e.g. "Ventoline" inside "Ventoline 0,1 mg/dose").
