@@ -39,6 +39,7 @@ import {
   replacePreparatTokenWithList,
 } from "../utils/preparat";
 import { renderContentWithPreparatHighlight } from "../utils/render";
+import styles from "../../../styles/standardTekstPage.module.css";
 
 export default function StandardTekstPage() {
   const [items, setItems] = useState<StandardTekst[]>([]);
@@ -258,21 +259,10 @@ export default function StandardTekstPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Box
-        sx={{
-          mb: 2,
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 2,
-        }}
-      >
+    <Box className={styles.page}>
+      <Box className={styles.header}>
         <Box>
           <Typography variant="h4">Standardtekster</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Data hentes fra Firebase (Firestore).
-          </Typography>
         </Box>
 
         {isAdmin && (
@@ -281,14 +271,7 @@ export default function StandardTekstPage() {
             size="small"
             onClick={createNewStandardTekst}
             disabled={creating}
-            sx={{
-              borderRadius: 999,
-              textTransform: "none",
-              px: 2,
-              py: 0.75,
-              whiteSpace: "nowrap",
-              alignSelf: "center",
-            }}
+            className={styles.pillButton}
           >
             {creating ? "Oppretter..." : "Ny standardtekst"}
           </Button>
@@ -296,22 +279,15 @@ export default function StandardTekstPage() {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" className={styles.error}>
           {error}
         </Alert>
       )}
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "360px 1fr" },
-          gap: 2,
-          alignItems: "start",
-        }}
-      >
-        <Paper sx={{ p: 1 }}>
-          <Box sx={{ px: 1.5, pt: 1, pb: 1 }}>
-            <Box sx={{ maxWidth: 340 }}>
+      <Box className={styles.grid}>
+        <Paper className={styles.sidebar}>
+          <Box className={styles.sidebarHeader}>
+            <Box className={styles.sidebarSearch}>
               <TextField
                 fullWidth
                 size="small"
@@ -321,14 +297,14 @@ export default function StandardTekstPage() {
               />
             </Box>
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary" className={styles.sidebarCount}>
               {loading ? "Laster..." : `${filtered.length} treff`}
             </Typography>
           </Box>
           <Divider />
 
           {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+            <Box className={styles.sidebarLoading}>
               <CircularProgress size={28} />
             </Box>
           ) : (
@@ -351,7 +327,7 @@ export default function StandardTekstPage() {
           )}
 
           {!loading && filtered.length === 0 && (
-            <Box sx={{ p: 2 }}>
+            <Box className={styles.sidebarEmpty}>
               <Typography variant="body2" color="text.secondary">
                 Ingen treff.
               </Typography>
@@ -359,13 +335,13 @@ export default function StandardTekstPage() {
           )}
         </Paper>
 
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Paper sx={{ p: 2 }}>
-            <Box sx={{ maxWidth: 520 }}>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+        <Box className={styles.main}>
+          <Paper className={styles.preparatPaper}>
+            <Box className={styles.preparatMaxWidth}>
+              <Box className={styles.preparatList}>
                 {preparatRows.map((row) => (
-                  <Box key={row.id} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-                    <Box sx={{ flex: 1 }}>
+                  <Box key={row.id} className={styles.preparatRow}>
+                    <Box className={styles.preparatField}>
                       <MedicationSearch
                         onPick={(med) => {
                           const text = formatPreparatForTemplate(med);
@@ -381,14 +357,12 @@ export default function StandardTekstPage() {
                       />
                     </Box>
 
-                    <Box sx={{ pt: 0.5, display: "flex", flexDirection: "column", gap: 0.25 }}>
+                    <Box className={styles.preparatIcons}>
                       <IconButton
                         aria-label="Legg til nytt preparat"
                         size="small"
                         onClick={addPreparatRow}
-                        sx={{
-                          borderRadius: 999,
-                        }}
+                        className={styles.roundIconButton}
                       >
                         <AddCircleOutlineIcon fontSize="small" />
                       </IconButton>
@@ -398,9 +372,7 @@ export default function StandardTekstPage() {
                           aria-label="Fjern dette preparatet"
                           size="small"
                           onClick={() => removePreparatRow(row.id)}
-                          sx={{
-                            borderRadius: 999,
-                          }}
+                          className={styles.roundIconButton}
                         >
                           <RemoveCircleOutlineIcon fontSize="small" />
                         </IconButton>
@@ -414,11 +386,11 @@ export default function StandardTekstPage() {
 
           <Paper
             onClick={selected && !isEditing ? copyBodyToClipboard : undefined}
-            sx={{
-              p: 2,
-              minHeight: 280,
-              cursor: selected && !isEditing ? "copy" : "default",
-            }}
+            className={
+              selected && !isEditing
+                ? `${styles.contentPaper} ${styles.contentPaperCopy}`
+                : styles.contentPaper
+            }
           >
             {!selected && !loading && (
               <Typography variant="body2" color="text.secondary">
@@ -429,7 +401,7 @@ export default function StandardTekstPage() {
             {selected && (
               <>
                 {isAdmin && !isEditing && (
-                  <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+                  <Box className={styles.editRow}>
                     <Button
                       variant="outlined"
                       size="small"
@@ -437,33 +409,23 @@ export default function StandardTekstPage() {
                         e.stopPropagation();
                         startEdit();
                       }}
-                      sx={{
-                        borderRadius: 999,
-                        textTransform: "none",
-                        px: 2,
-                        py: 0.5,
-                        backgroundColor: "background.paper",
-                      }}
+                      className={styles.pillButton}
                     >
                       Endre
                     </Button>
                   </Box>
                 )}
-                <Typography variant="h5" sx={{ mb: 0.5 }}>
+                <Typography variant="h5" className={styles.title}>
                   {selected.title}
                 </Typography>
                 {selected.category && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary" className={styles.category}>
                     {selected.category}
                   </Typography>
                 )}
 
                 {selected.updatedAt && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mb: 2 }}
-                  >
+                  <Typography variant="caption" color="text.secondary" className={styles.updatedAt}>
                     Sist oppdatert: {selected.updatedAt.toLocaleString("nb-NO")}
                   </Typography>
                 )}
@@ -476,7 +438,7 @@ export default function StandardTekstPage() {
                       label="Overskrift"
                       value={draftTitle}
                       onChange={(e) => setDraftTitle(e.target.value)}
-                      sx={{ mb: 2, maxWidth: 520 }}
+                      className={styles.editorTitleField}
                     />
                     <TextField
                       fullWidth
@@ -486,7 +448,7 @@ export default function StandardTekstPage() {
                       value={draftContent}
                       onChange={(e) => setDraftContent(e.target.value)}
                     />
-                    <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: "flex-end" }}>
+                    <Stack direction="row" spacing={1} className={styles.editorActions}>
                       <Button
                         variant="text"
                         onClick={(e) => {
@@ -510,11 +472,7 @@ export default function StandardTekstPage() {
                     </Stack>
                   </>
                 ) : (
-                  <Typography
-                    variant="body1"
-                    component="div"
-                    sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}
-                  >
+                  <Typography variant="body1" component="div" className={styles.body}>
                     {renderContentWithPreparatHighlight(
                       displayContent || "(Tom tekst)",
                       preparatRows.map((r) => r.picked)

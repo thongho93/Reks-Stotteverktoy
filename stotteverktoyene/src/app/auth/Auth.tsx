@@ -25,6 +25,7 @@ import {
 import type { User } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase/firebase";
+import styles from "../../styles/standardTekstPage.module.css";
 
 export function useAuthUser() {
   const [user, setUser] = React.useState<User | null>(() => auth.currentUser);
@@ -44,16 +45,20 @@ export function useAuthUser() {
       }
 
       try {
-        const [adminSnap, userSnap] = await Promise.all([
-          getDoc(doc(db, "admins", u.uid)),
-          getDoc(doc(db, "users", u.uid)),
-        ]);
-
-        setIsAdmin(adminSnap.exists());
-
+        // Always try to load the user's profile first (works for both admins and regular users)
+        const userSnap = await getDoc(doc(db, "users", u.uid));
         const data = userSnap.exists() ? (userSnap.data() as any) : null;
         const name = typeof data?.firstName === "string" ? data.firstName.trim() : "";
         setFirstName(name.length > 0 ? name : null);
+
+        // Then determine admin. If rules deny reading /admins for non-admin users,
+        // treat it as not-admin instead of failing the whole auth hydration.
+        try {
+          const adminSnap = await getDoc(doc(db, "admins", u.uid));
+          setIsAdmin(adminSnap.exists());
+        } catch {
+          setIsAdmin(false);
+        }
       } catch {
         setIsAdmin(false);
         setFirstName(null);
@@ -74,9 +79,7 @@ export function RequireAuth({ children }: { children: React.ReactElement }) {
 
   if (loading) {
     return (
-      <Box
-        sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}
-      >
+      <Box className={styles.authLoadingWrap}>
         <CircularProgress />
       </Box>
     );
@@ -165,22 +168,22 @@ export function LoginPage() {
   };
 
   return (
-    <Box sx={{ minHeight: "70vh", display: "grid", placeItems: "center", p: 2 }}>
-      <Paper sx={{ p: 3, width: "100%", maxWidth: 420 }}>
+    <Box className={styles.authCenter}>
+      <Paper className={styles.authPaper}>
         <Typography variant="h5">{mode === "login" ? "Logg inn" : "Opprett konto"}</Typography>
-        <Typography sx={{ mt: 1 }} color="text.secondary">
+        <Typography className={styles.authSubtitle} color="text.secondary">
           {mode === "login"
             ? "Logg inn med e-post og passord."
             : "Opprett ny bruker med e-post og passord."}
         </Typography>
 
         {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
+          <Alert severity="error" className={styles.authError}>
             {error}
           </Alert>
         )}
 
-        <Box component="form" onSubmit={onSubmit} sx={{ mt: 2, display: "grid", gap: 2 }}>
+        <Box component="form" onSubmit={onSubmit} className={styles.authForm}>
           {mode === "signup" && (
             <TextField
               label="Fornavn"
@@ -269,7 +272,7 @@ export function ProfileMenu() {
     <>
       <Tooltip title={`${roleLabel} • ${user.email ?? ""}`.trim()}>
         <IconButton onClick={handleOpen} aria-label="Profil">
-          <Avatar sx={{ width: 32, height: 32 }}>
+          <Avatar className={styles.authAvatar}>
             <AccountCircleIcon />
           </Avatar>
         </IconButton>

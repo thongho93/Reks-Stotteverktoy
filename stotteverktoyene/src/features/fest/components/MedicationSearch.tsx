@@ -1,9 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   ClickAwayListener,
-  IconButton,
-  InputAdornment,
   List,
   ListItemButton,
   ListItemText,
@@ -11,7 +9,6 @@ import {
   Popper,
   TextField,
 } from "@mui/material";
-import ClearIcon from "@mui/icons-material/Clear";
 
 import meds from "../meds.json";
 
@@ -122,6 +119,7 @@ const tokenMatches = (hayTokens: string[], needleRaw: string) => {
 export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const anchorRef = useRef<HTMLDivElement | null>(null);
 
   const results = useMemo(() => {
@@ -144,8 +142,20 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
     // but if we only have one, require that.
     const requiredTextTokens = meaningfulTextTokens.slice(0, Math.min(2, meaningfulTextTokens.length));
 
-    // Enforce only meaningful strength tokens from the query (handles long pasted strings)
-    const decimalToken = tokens.find((t) => /^\d+\.\d+$/.test(t));
+    // Enforce meaningful strength tokens from the query (handles long pasted strings)
+    // Important: ignore pack-size numbers like "120 doser" so they don't kill results.
+    const packSizeTokens = new Set([
+      "dose",
+      "doser",
+      "doses",
+      "inhalasjoner",
+      "inhalationer",
+      "inh",
+      "stk",
+      "stk.",
+      "pak",
+      "pakning",
+    ]);
 
     const numberWithUnit = (() => {
       for (let i = 0; i < tokens.length - 1; i++) {
@@ -156,12 +166,54 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
       return null;
     })();
 
-    const requiredStrengthTokens = [
-      ...(numberWithUnit ? [numberWithUnit] : []),
-      ...(!numberWithUnit && decimalToken ? [decimalToken] : []),
-    ];
+    // Collect "meaningful" number tokens until we hit pack-size indicators.
+    // Also drop numbers that sit right next to pack-size tokens.
+    const meaningfulNumberTokensInQuery: string[] = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      const prev = tokens[i - 1];
+      const next = tokens[i + 1];
+
+      if (packSizeTokens.has(t)) break; // stop scanning once we reach pack-size part
+
+      if (!isNumberToken(t)) continue;
+
+      // Ignore numbers used for pack size (e.g. "120 doser")
+      if ((prev && packSizeTokens.has(prev)) || (next && packSizeTokens.has(next))) continue;
+
+      meaningfulNumberTokensInQuery.push(t);
+    }
+
+    const requiredStrengthTokens = (() => {
+      // Case 1: explicit number+unit ("75 mg") -> require the number part
+      if (numberWithUnit) return [numberWithUnit];
+
+      // Case 2: ratios/combined strengths like "160/4,5" -> require first two meaningful numbers
+      // so 160/4,5 won't match 80/4,5.
+      const uniq = Array.from(new Set(meaningfulNumberTokensInQuery));
+      if (uniq.length >= 2) return uniq.slice(0, 2);
+
+      // Case 3: single decimal ("0,1")
+      const decimalToken = tokens.find((t) => /^\d+\.\d+$/.test(t));
+      if (decimalToken) return [decimalToken];
+
+      // Case 4: single integer (e.g. "40")
+      if (uniq.length === 1) return [uniq[0]];
+
+      return [];
+    })();
 
     const out: { med: Med; score: number }[] = [];
+
+    const rawQueryLower = query.toLowerCase();
+    const queryIndicatesCombo = rawQueryLower.includes("/") || rawQueryLower.includes(" og ");
+    let hasNonComboMatch = false;
+
+    const isComboMed = (med: Med) => {
+      const name = (med.navnFormStyrke ?? med.varenavn ?? "").toLowerCase();
+      const subst = (med.virkestoff ?? "").toLowerCase();
+      return name.includes("/") || subst.includes(" og ");
+    };
 
     for (const m of meds as Med[]) {
       const hayText = m.navnFormStyrke ?? m.varenavn ?? "";
@@ -184,6 +236,10 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
         if (!okStrength) continue;
       }
 
+      if (!queryIndicatesCombo && !isComboMed(m)) {
+        hasNonComboMatch = true;
+      }
+
       // Score = hvor godt den matcher query. Tall teller mer. "required" teksttokens teller ekstra.
       let score = 0;
 
@@ -203,6 +259,18 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
         if (hayTokens.includes(t)) score += 3;
       }
 
+      // Bonus: if the query only contains a single strength number (e.g. "32 mg")
+      // and the candidate is a combined strength like "32 mg/12,5 mg", rank it higher.
+      // This helps when pasted texts omit the second component strength.
+      if (requiredStrengthTokens.length === 1 && numberWithUnit) {
+        const t = requiredStrengthTokens[0];
+        const unitPattern = "mg|g|mcg|ug|µg|mikrog|mikrogram|ml";
+        const combinedStrengthRe = new RegExp(`\\b${t}\\s*(?:${unitPattern})\\s*/`, "i");
+        if (combinedStrengthRe.test(hayText)) {
+          score += 4;
+        }
+      }
+
       // Bonus when the candidate contains most of the (normalized) query text.
       // Helps when the user pastes a long product line.
       const qNorm = normalizeForSearch(query);
@@ -211,10 +279,57 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
       out.push({ med: m, score });
     }
 
+    // If the user didn't indicate a combination search and we have at least one non-combo match,
+    // hide combo products (e.g. "Candesartan/Hydrochlorothiazide") to avoid confusing 2-result dropdowns.
+    if (!queryIndicatesCombo && hasNonComboMatch) {
+      for (let i = out.length - 1; i >= 0; i--) {
+        if (isComboMed(out[i].med)) out.splice(i, 1);
+      }
+    }
+
     out.sort((a, b) => b.score - a.score);
 
     return out.slice(0, maxResults).map((x) => x.med);
   }, [query, maxResults]);
+
+  const pickResult = (m: Med) => {
+    const label = (m.navnFormStyrke ?? m.varenavn ?? "").trim();
+    if (label) setQuery(label);
+    onPick?.(m);
+    setOpen(false);
+    setHighlightedIndex(-1);
+  };
+
+  useEffect(() => {
+    if (!open || results.length === 0) {
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    // Default highlight to first item when opening
+    setHighlightedIndex((prev) => {
+      if (prev >= 0 && prev < results.length) return prev;
+      return 0;
+    });
+  }, [open, results.length]);
+
+  useEffect(() => {
+    // Auto-pick when the query yields exactly one result.
+    // This avoids forcing the user to click/press Enter when the match is unambiguous.
+    if (!query.trim()) return;
+    if (results.length !== 1) return;
+
+    const m = results[0];
+    const label = (m.navnFormStyrke ?? m.varenavn ?? "").trim();
+
+    // Prevent loops: if we've already set the input to the picked label, just close.
+    if (label && query.trim() === label) {
+      setOpen(false);
+      return;
+    }
+
+    pickResult(m);
+  }, [query, results]);
 
   return (
     <Box>
@@ -230,32 +345,57 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
           setOpen(Boolean(next.trim()));
         }}
         onFocus={() => {
-          if (query.trim()) setOpen(true);
+          // Clear the field on focus to make it ready for a new search
+          if (query) {
+            setQuery("");
+          }
+          setOpen(false);
         }}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             setOpen(false);
+            setHighlightedIndex(-1);
+            return;
+          }
+
+          if (e.key === "ArrowDown") {
+            if (results.length <= 1) return;
+            e.preventDefault();
+            setOpen(true);
+            setHighlightedIndex((prev) => {
+              const next = prev < 0 ? 0 : Math.min(prev + 1, results.length - 1);
+              return next;
+            });
+            return;
+          }
+
+          if (e.key === "ArrowUp") {
+            if (results.length <= 1) return;
+            e.preventDefault();
+            setOpen(true);
+            setHighlightedIndex((prev) => {
+              const next = prev < 0 ? results.length - 1 : Math.max(prev - 1, 0);
+              return next;
+            });
+            return;
+          }
+
+          if (e.key === "Enter") {
+            if (open && results.length > 1) {
+              const idx = highlightedIndex >= 0 ? highlightedIndex : 0;
+              const m = results[idx];
+              if (m) {
+                e.preventDefault();
+                pickResult(m);
+              }
+            }
           }
         }}
-        InputProps={{
-          endAdornment: query ? (
-            <InputAdornment position="end">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setQuery("");
-                  setOpen(false);
-                }}
-              >
-                <ClearIcon />
-              </IconButton>
-            </InputAdornment>
-          ) : null,
-        }}
+        InputProps={{}}
       />
 
       <Popper
-        open={open && results.length > 0}
+        open={open && results.length > 1}
         anchorEl={anchorRef.current}
         placement="bottom-start"
         sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
@@ -267,6 +407,7 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
         <ClickAwayListener
           onClickAway={() => {
             setOpen(false);
+            setHighlightedIndex(-1);
           }}
         >
           <Paper
@@ -279,15 +420,12 @@ export default function MedicationSearch({ maxResults = 25, onPick }: Props) {
             }}
           >
             <List dense sx={{ maxHeight: 320, overflow: "auto" }}>
-              {results.map((m) => (
+              {results.map((m, index) => (
                 <ListItemButton
                   key={m.id}
-                  onClick={() => {
-                    const label = (m.navnFormStyrke ?? m.varenavn ?? "").trim();
-                    if (label) setQuery(label);
-                    onPick?.(m);
-                    setOpen(false);
-                  }}
+                  onClick={() => pickResult(m)}
+                  selected={index === highlightedIndex}
+                  onMouseEnter={() => setHighlightedIndex(index)}
                 >
                   <ListItemText
                     primary={m.navnFormStyrke ?? m.varenavn ?? "(uten navn)"}

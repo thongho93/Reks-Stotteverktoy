@@ -64,6 +64,58 @@ const COMPANY_SUFFIX_TOKENS = new Set(
   ].map((s) => s.toLowerCase())
 );
 
+const DOSAGE_FORM_TOKENS = new Set(
+  [
+    // common Norwegian dosage form tokens that often appear in FEST strings
+    "tab",
+    "tablett",
+    "tabl",
+    "enterotab",
+    "enterotablett",
+    "depottab",
+    "depottablett",
+    "retardtab",
+    "retardtablett",
+    "smeltetab",
+    "smeltetablett",
+    "depot",
+    "retard",
+    "mikstur",
+    "susp",
+    "inj",
+    "inf",
+    "oppl",
+    "pulv",
+    "pulver",
+    "aerosol",
+    "inh",
+    "spray",
+    "dråper",
+    "dr",
+    "kaps",
+    "kapsel",
+    "stikkpille",
+    "supp",
+  ].map((s) => s.toLowerCase())
+);
+
+function stripDosageFormFromName(name: string): string {
+  const tokens = name
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+
+  if (tokens.length === 0) return "";
+
+  const kept = tokens.filter((t) => {
+    const key = t.replace(/[()\[\]{},.;:&]+/g, "").toLowerCase();
+    return !DOSAGE_FORM_TOKENS.has(key);
+  });
+
+  return kept.join(" ").replace(/\s+/g, " ").trim() || name.trim();
+}
+
 function stripManufacturerFromName(name: string, producer?: string | null): string {
   // Keep the original spacing but remove obvious manufacturer/company tokens.
   // This is heuristic by design and meant to handle e.g. "Atorvastatin Hexal" -> "Atorvastatin".
@@ -145,6 +197,13 @@ export function formatPreparatForTemplate(med: {
   const formWords = [
     "tab",
     "tablett",
+    "tabl",
+    "enterotab",
+    "enterotablett",
+    "depottab",
+    "depottablett",
+    "smeltetab",
+    "smeltetablett",
     "kaps",
     "kapsel",
     "inj",
@@ -173,8 +232,17 @@ export function formatPreparatForTemplate(med: {
   const nameFromNfs = beforeForm.replace(/\s+/g, " ").trim();
 
   const fallbackName = (med.varenavn ?? "").trim();
-  const rawName = nameFromNfs || fallbackName;
-  const name = rawName ? stripManufacturerFromName(rawName, med.produsent) : "";
+  let rawName = nameFromNfs || fallbackName;
+
+  // Remove the extracted strength from the name if it already contains it (prevents "75 mg 75 mg")
+  if (strength) {
+    const esc = strength.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    rawName = rawName.replace(new RegExp(`\\b${esc}\\b`, "i"), " ");
+  }
+
+  // Strip manufacturer/company tokens and dosage-form tokens (enterotab/depottab/smeltetab etc.)
+  const withoutManufacturer = rawName ? stripManufacturerFromName(rawName, med.produsent) : "";
+  const name = withoutManufacturer ? stripDosageFormFromName(withoutManufacturer) : "";
 
   if (name && strength) return `${name} ${strength}`.replace(/\s+/g, " ").trim();
   if (name) return name;

@@ -1,0 +1,199 @@
+.page {
+  padding: 16px;
+}
+
+@media (min-width: 900px) {
+  .page {
+    padding: 24px;
+  }
+}
+
+.header {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pillButton {
+  border-radius: 999px !important;
+  text-transform: none !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.error {
+  margin-bottom: 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: 360px 1fr;
+  }
+}
+
+.sidebar {
+  padding: 8px;
+}
+
+.sidebarHeader {
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.sidebarSearch {
+  max-width: 340px;
+}
+
+.sidebarCount {
+  margin-top: 8px;
+}
+
+.sidebarLoading {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.sidebarEmpty {
+  padding: 16px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preparatPaper {
+  padding: 16px;
+}
+
+.preparatMaxWidth {
+  max-width: 520px;
+}
+
+.preparatList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preparatRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.preparatField {
+  flex: 1;
+}
+
+.preparatIcons {
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.roundIconButton {
+  border-radius: 999px !important;
+}
+
+.contentPaper {
+  padding: 16px;
+  min-height: 280px;
+  cursor: default;
+}
+
+.contentPaperCopy {
+  cursor: copy;
+}
+
+.editRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.title {
+  margin-bottom: 4px;
+}
+
+.category {
+  margin-bottom: 8px;
+}
+
+.updatedAt {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.editorTitleField {
+  margin-bottom: 16px;
+  max-width: 520px;
+}
+
+.editorActions {
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.body {
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+/* Auth */
+.authLoadingWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.authCenter {
+  min-height: 70vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.authPaper {
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.authSubtitle {
+  margin-top: 8px;
+}
+
+.authError {
+  margin-top: 16px;
+}
+
+.authForm {
+  margin-top: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.authAvatar {
+  width: 32px !important;
+  height: 32px !important;
+}
