@@ -15,6 +15,7 @@ const MANUFACTURER_TOKENS = new Set(
     "actavis",
     "mylan",
     "viatris",
+    "xiromed",
     "bluefish",
     "orifarm",
     "glenmark",
@@ -280,12 +281,41 @@ export function usePreparatRows() {
     setPreparatRows([{ id: 0, picked: null }]);
   }, []);
 
+  const clearPreparats = useCallback(() => {
+    setPreparatRows([{ id: 0, picked: null }]);
+  }, []);
+
+  const addPickedPreparat = useCallback((picked: string) => {
+    setPreparatRows((prev) => {
+      const alreadyPicked = prev
+        .map((r) => r.picked)
+        .filter(Boolean)
+        .includes(picked);
+
+      if (alreadyPicked) return prev;
+
+      const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
+      const kept = prev.filter((r) => r.picked);
+      return [...kept, { id: nextId, picked }];
+    });
+  }, []);
+
+  const removePreparatById = useCallback((id: number) => {
+    setPreparatRows((prev) => {
+      const remaining = prev.filter((r) => r.id !== id);
+      return remaining.length > 0 ? remaining : [{ id: 0, picked: null }];
+    });
+  }, []);
+
   return {
     preparatRows,
     addPreparatRow,
     removePreparatRow,
     setPickedForRow,
     resetPreparatRows,
+    clearPreparats,
+    addPickedPreparat,
+    removePreparatById,
   };
 }
 

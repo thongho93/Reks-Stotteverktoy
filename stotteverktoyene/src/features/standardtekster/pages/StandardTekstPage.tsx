@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
   CircularProgress,
+  Collapse,
   Divider,
   List,
   ListItemButton,
@@ -11,9 +12,9 @@ import {
   TextField,
   Typography,
   Button,
+  Chip,
   Stack,
   Snackbar,
-  IconButton,
 } from "@mui/material";
 import {
   addDoc,
@@ -27,8 +28,8 @@ import {
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/Auth";
 import MedicationSearch from "../../fest/components/MedicationSearch";
-import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ClearAllIcon from "@mui/icons-material/ClearAll";
 import type { StandardTekst } from "../types";
 import { mapDocToStandardTekst } from "../mappers/standardTekstMapper";
 import {
@@ -56,9 +57,24 @@ export default function StandardTekstPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
 
-  const { preparatRows, addPreparatRow, removePreparatRow, setPickedForRow, resetPreparatRows } =
+  const { preparatRows, resetPreparatRows, clearPreparats, addPickedPreparat, removePreparatById } =
     usePreparatRows();
+  const preparatSectionRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (!preparatRows.some((r) => r.picked)) return;
+
+      // Use Escape as a fast "clear all" anywhere on the page
+      e.preventDefault();
+      clearPreparats();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [clearPreparats, preparatRows]);
   const [copied, setCopied] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -265,17 +281,19 @@ export default function StandardTekstPage() {
           <Typography variant="h4">Standardtekster</Typography>
         </Box>
 
-        {isAdmin && (
+        <Box className={styles.headerActions}>
           <Button
             variant="contained"
             size="small"
-            onClick={createNewStandardTekst}
-            disabled={creating}
+            onClick={() => setShowGuide((v) => !v)}
             className={styles.pillButton}
+            endIcon={
+              <ExpandMoreIcon className={showGuide ? styles.expandIconOpen : styles.expandIcon} />
+            }
           >
-            {creating ? "Oppretter..." : "Ny standardtekst"}
+            {showGuide ? "Skjul bruksanvisning" : "Vis bruksanvisning"}
           </Button>
-        )}
+        </Box>
       </Box>
 
       {error && (
@@ -283,10 +301,42 @@ export default function StandardTekstPage() {
           {error}
         </Alert>
       )}
+      <Collapse in={showGuide} unmountOnExit>
+        <Paper className={styles.guidePaper}>
+          <Typography variant="h6" className={styles.guideTitle}>
+            Slik bruker du Standardtekster
+          </Typography>
+
+          <Box component="ul" className={styles.guideList}>
+            <li>Søk i listen til venstre og velg en standardtekst.</li>
+            <li>Bruk "Søk etter preparat" for å erstatte {"{{PREPARAT}}"} automatisk.</li>
+            <li>Legg til flere preparater (+). De settes inn med komma, og "og" før siste.</li>
+            <li>Sjekk at navnet ditt står riktig i slutten.</li>
+            <li>Klikk i teksten for å kopiere.</li>
+            {isAdmin && <li>Som admin kan du opprette, redigere og slette standardtekster.</li>}
+          </Box>
+        </Paper>
+      </Collapse>
 
       <Box className={styles.grid}>
         <Paper className={styles.sidebar}>
           <Box className={styles.sidebarHeader}>
+            {isAdmin && (
+              <Box className={styles.sidebarCreateRow}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={createNewStandardTekst}
+                  disabled={creating}
+                  className={styles.pillButton}
+                >
+                  {creating ? "Oppretter..." : "Ny standardtekst"}
+                </Button>
+              </Box>
+            )}
+            <Typography variant="subtitle2" className={styles.sidebarSectionTitle}>
+              Finn standardtekst
+            </Typography>
             <Box className={styles.sidebarSearch}>
               <TextField
                 fullWidth
@@ -296,92 +346,103 @@ export default function StandardTekstPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </Box>
-
-            <Typography variant="subtitle2" color="text.secondary" className={styles.sidebarCount}>
-              {loading ? "Laster..." : `${filtered.length} treff`}
-            </Typography>
-          </Box>
-          <Divider />
-
-          {loading ? (
-            <Box className={styles.sidebarLoading}>
-              <CircularProgress size={28} />
-            </Box>
-          ) : (
-            <List dense disablePadding>
-              {filtered.map((it) => (
-                <ListItemButton
-                  key={it.id}
-                  selected={it.id === selectedId}
-                  onClick={() => setSelectedId(it.id)}
-                >
-                  <ListItemText
-                    primary={it.title}
-                    secondary={it.category ? it.category : undefined}
-                    primaryTypographyProps={{ noWrap: true }}
-                    secondaryTypographyProps={{ noWrap: true }}
-                  />
-                </ListItemButton>
-              ))}
-            </List>
-          )}
-
-          {!loading && filtered.length === 0 && (
-            <Box className={styles.sidebarEmpty}>
-              <Typography variant="body2" color="text.secondary">
-                Ingen treff.
+            {search.trim() && (
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                className={styles.sidebarCount}
+              >
+                {loading ? "Laster..." : `${filtered.length} treff`}
               </Typography>
-            </Box>
-          )}
+            )}
+          </Box>
+          <Divider className={styles.sidebarDivider} />
+          <Box className={styles.sidebarBody}>
+            {loading ? (
+              <Box className={styles.sidebarLoading}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : filtered.length === 0 ? (
+              <Box className={styles.sidebarEmpty}>
+                <Typography variant="body2" color="text.secondary">
+                  Ingen treff.
+                </Typography>
+              </Box>
+            ) : (
+              <List dense disablePadding className={styles.sidebarList}>
+                {filtered.map((it) => (
+                  <ListItemButton
+                    key={it.id}
+                    selected={it.id === selectedId}
+                    onClick={() => setSelectedId(it.id)}
+                    className={styles.sidebarItem}
+                  >
+                    <ListItemText
+                      primary={it.title}
+                      secondary={it.category ? it.category : undefined}
+                      primaryTypographyProps={{ noWrap: true }}
+                      secondaryTypographyProps={{ noWrap: true }}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            )}
+          </Box>
         </Paper>
 
         <Box className={styles.main}>
-          <Paper className={styles.preparatPaper}>
-            <Box className={styles.preparatMaxWidth}>
-              <Box className={styles.preparatList}>
-                {preparatRows.map((row) => (
-                  <Box key={row.id} className={styles.preparatRow}>
-                    <Box className={styles.preparatField}>
-                      <MedicationSearch
-                        onPick={(med) => {
-                          const text = formatPreparatForTemplate(med);
-                          if (!text) return;
-
-                          setPickedForRow(row.id, text);
-
-                          // If admin is editing, also replace ONLY the next placeholder in draftContent.
-                          if (isEditing) {
-                            setDraftContent((prev) => replaceNextPreparatToken(prev, text));
-                          }
-                        }}
-                      />
-                    </Box>
-
-                    <Box className={styles.preparatIcons}>
-                      <IconButton
-                        aria-label="Legg til nytt preparat"
-                        size="small"
-                        onClick={addPreparatRow}
-                        className={styles.roundIconButton}
-                      >
-                        <AddCircleOutlineIcon fontSize="small" />
-                      </IconButton>
-
-                      {preparatRows.length > 1 && (
-                        <IconButton
-                          aria-label="Fjern dette preparatet"
-                          size="small"
-                          onClick={() => removePreparatRow(row.id)}
-                          className={styles.roundIconButton}
-                        >
-                          <RemoveCircleOutlineIcon fontSize="small" />
-                        </IconButton>
-                      )}
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
+          <Paper className={styles.preparatPaper} ref={preparatSectionRef}>
+            <Box className={styles.preparatHeader}>
+              <Typography variant="subtitle2" className={styles.preparatTitle}>
+                Preparater
+              </Typography>
             </Box>
+
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <Box className={styles.preparatSingleSearch} style={{ flex: 1 }}>
+                <MedicationSearch
+                  onPick={(med) => {
+                    const text = formatPreparatForTemplate(med);
+                    if (!text) return;
+
+                    addPickedPreparat(text);
+
+                    // If admin is editing, also replace ONLY the next placeholder in draftContent.
+                    if (isEditing) {
+                      setDraftContent((prev) => replaceNextPreparatToken(prev, text));
+                    }
+                  }}
+                />
+              </Box>
+
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={clearPreparats}
+                disabled={!preparatRows.some((r) => r.picked)}
+                startIcon={<ClearAllIcon fontSize="small" />}
+                title="Tøm alle (Escape når fokus er i preparatfeltet)"
+              >
+                Tøm
+              </Button>
+            </Stack>
+
+            <Box className={styles.preparatChipsWrap}>
+              {preparatRows
+                .filter((r) => r.picked)
+                .map((r) => (
+                  <Chip
+                    key={r.id}
+                    label={r.picked as string}
+                    onDelete={() => removePreparatById(r.id)}
+                    className={styles.preparatChip}
+                  />
+                ))}
+            </Box>
+
+            <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
+              Tips: Lim inn hele produktlinjen – søket rydder opp automatisk.
+            </Typography>
           </Paper>
 
           <Paper
@@ -400,21 +461,6 @@ export default function StandardTekstPage() {
 
             {selected && (
               <>
-                {isAdmin && !isEditing && (
-                  <Box className={styles.editRow}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEdit();
-                      }}
-                      className={styles.pillButton}
-                    >
-                      Endre
-                    </Button>
-                  </Box>
-                )}
                 <Typography variant="h5" className={styles.title}>
                   {selected.title}
                 </Typography>
@@ -472,12 +518,30 @@ export default function StandardTekstPage() {
                     </Stack>
                   </>
                 ) : (
-                  <Typography variant="body1" component="div" className={styles.body}>
-                    {renderContentWithPreparatHighlight(
-                      displayContent || "(Tom tekst)",
-                      preparatRows.map((r) => r.picked)
+                  <>
+                    <Typography variant="body1" component="div" className={styles.body}>
+                      {renderContentWithPreparatHighlight(
+                        displayContent || "(Tom tekst)",
+                        preparatRows.map((r) => r.picked)
+                      )}
+                    </Typography>
+
+                    {isAdmin && (
+                      <Box className={styles.editRowBottom}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit();
+                          }}
+                          className={styles.pillButton}
+                        >
+                          Endre
+                        </Button>
+                      </Box>
                     )}
-                  </Typography>
+                  </>
                 )}
               </>
             )}
