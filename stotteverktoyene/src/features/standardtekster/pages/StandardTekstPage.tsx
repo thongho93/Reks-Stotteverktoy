@@ -1,55 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  CircularProgress,
-  Collapse,
-  Divider,
-  List,
-  ListItemButton,
-  ListItemText,
-  Paper,
-  TextField,
-  Typography,
-  Button,
-  Chip,
-  Stack,
-  Snackbar,
-} from "@mui/material";
-import {
-  addDoc,
-  collection,
-  doc,
-  getDocs,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "../../../firebase/firebase";
+import { Alert, Box, Collapse, Paper, Typography, Button, Snackbar } from "@mui/material";
+import StandardTekstSidebar from "../components/StandardTekstSidebar";
+import StandardTekstContent from "../components/StandardTekstContent";
+import { standardTeksterApi } from "../services/standardTeksterApi";
 import { useAuthUser } from "../../../app/auth/Auth";
-import MedicationSearch from "../../fest/components/MedicationSearch";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ClearAllIcon from "@mui/icons-material/ClearAll";
-import type { StandardTekst } from "../types";
-import { mapDocToStandardTekst } from "../mappers/standardTekstMapper";
-import {
-  formatPreparatForTemplate,
-  replaceNextPreparatToken,
-  usePreparatRows,
-  formatPreparatList,
-  replacePreparatTokenWithList,
-  replacePreparatTokensPrimarySecondary,
-  replaceVareTokenByCount,
-} from "../utils/preparat";
+import { replaceNextPreparatToken, usePreparatRows } from "../utils/preparat";
+import { buildDisplayContent, buildPreviewContent, templateUsesPreparat1 } from "../utils/content";
 import { renderContentWithPreparatHighlight } from "../utils/render";
 import styles from "../../../styles/standardTekstPage.module.css";
 
+import { useStandardTekster } from "../hooks/useStandardTekster";
+
+import { useStandardTekstHotkeys } from "../hooks/useStandardTekstHotkeys";
+
+import PreparatPanel from "../components/PreparatPanel";
+
 export default function StandardTekstPage() {
-  const [items, setItems] = useState<StandardTekst[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [search, setSearch] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    setItems,
+    selectedId,
+    setSelectedId,
+    search,
+    setSearch,
+    loading,
+    error,
+    filtered,
+    selected,
+  } = useStandardTekster();
+
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const errorToShow = errorLocal ?? error;
 
   const { isAdmin, firstName } = useAuthUser();
 
@@ -63,138 +44,36 @@ export default function StandardTekstPage() {
     usePreparatRows();
   const preparatSectionRef = useRef<HTMLDivElement | null>(null);
   const preparatSearchInputRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (!preparatRows.some((r) => r.picked)) return;
-
-      // Use Escape as a fast "clear all" anywhere on the page
-      e.preventDefault();
-      clearPreparats();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [clearPreparats, preparatRows]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      // Alt (Windows/Linux) / Option (macOS) + F -> focus preparat search
-      if (!e.altKey) return;
-      if (e.code !== "KeyF") return;
-
-      e.preventDefault();
-      preparatSearchInputRef.current?.focus();
-      preparatSearchInputRef.current?.select();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  useStandardTekstHotkeys({
+    preparatRows,
+    clearPreparats,
+    preparatSearchInputRef,
+  });
   const [copied, setCopied] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const run = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const q = query(collection(db, "Standardtekster"));
-
-        const snap = await getDocs(q);
-        const mapped = snap.docs
-          .map((d) => mapDocToStandardTekst(d.id, d.data()))
-          .sort((a, b) => a.title.localeCompare(b.title, "nb"));
-
-        if (!isMounted) return;
-
-        setItems(mapped);
-        // Autovelg første hvis listen ikke er tom
-        setSelectedId((prev) => prev ?? mapped[0]?.id ?? null);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "Ukjent feil ved henting fra Firebase";
-        if (!isMounted) return;
-        setError(message);
-      } finally {
-        if (!isMounted) return;
-        setLoading(false);
-      }
-    };
-
-    run();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return items;
-
-    return items.filter((it) => {
-      const haystack = `${it.title} ${it.category ?? ""} ${it.content}`.toLowerCase();
-      return haystack.includes(s);
-    });
-  }, [items, search]);
-
-  const selected = useMemo(() => {
-    return items.find((it) => it.id === selectedId) ?? null;
-  }, [items, selectedId]);
+  const pickedPreparats = useMemo(
+    () => preparatRows.map((r) => r.picked).filter(Boolean) as string[],
+    [preparatRows]
+  );
 
   const displayContent = useMemo(() => {
     if (!selected) return "";
-
-    let text = selected.content;
-
-    // Replace standalone XX with the user's first name
-    if (firstName) {
-      text = text.replace(/\bXX\b/g, firstName);
-    }
-
-    const picked = preparatRows.map((r) => r.picked).filter(Boolean) as string[];
-
-    // If the template uses {{PREPARAT1}}, treat it as a 2-slot template:
-    //  - {{PREPARAT}}  -> first picked
-    //  - {{PREPARAT1}} -> second picked
-    // Otherwise keep the existing list behavior for {{PREPARAT}}.
-    const usesSecondaryToken = /\{\{\s*PREPARAT1\s*\}\}/.test(text);
-
-    if (usesSecondaryToken) {
-      const primary = picked[0] ?? null;
-      const secondary = picked[1] ?? null;
-      text = replacePreparatTokensPrimarySecondary(text, primary, secondary);
-    } else {
-      const preparatList = formatPreparatList(picked);
-      if (preparatList) {
-        text = replacePreparatTokenWithList(text, preparatList);
-      }
-    }
-
-    const preparatCount = picked.length;
-    text = replaceVareTokenByCount(text, preparatCount);
-
-    return text;
-  }, [selected, firstName, preparatRows]);
+    return buildDisplayContent({
+      template: selected.content,
+      firstName,
+      picked: pickedPreparats,
+    });
+  }, [selected, firstName, pickedPreparats]);
 
   const previewContent = useMemo(() => {
     if (!selected) return "";
-
-    let text = selected.content;
-
-    // Replace standalone XX with the user's first name
-    if (firstName) {
-      text = text.replace(/\bXX\b/g, firstName);
-    }
-
-    const picked = preparatRows.map((r) => r.picked).filter(Boolean) as string[];
-    text = replaceVareTokenByCount(text, picked.length);
-
-    return text;
-  }, [selected, firstName, preparatRows]);
+    return buildPreviewContent({
+      template: selected.content,
+      firstName,
+      picked: pickedPreparats,
+    });
+  }, [selected, firstName, pickedPreparats]);
 
   useEffect(() => {
     // Når du bytter valgt tekst, avslutt redigering og synk draft
@@ -227,14 +106,9 @@ export default function StandardTekstPage() {
   const saveEdit = async () => {
     if (!selected) return;
     setSaving(true);
-    setError(null);
+    setErrorLocal(null);
     try {
-      const ref = doc(db, "Standardtekster", selected.id);
-      await updateDoc(ref, {
-        title: draftTitle,
-        content: draftContent,
-        updatedAt: serverTimestamp(),
-      });
+      await standardTeksterApi.update(selected.id, { title: draftTitle, content: draftContent });
 
       // Oppdater lokalt state så UI viser ny tekst uten refresh
       setItems((prev) =>
@@ -247,7 +121,7 @@ export default function StandardTekstPage() {
       setIsEditing(false);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved lagring";
-      setError(message);
+      setErrorLocal(message);
     } finally {
       setSaving(false);
     }
@@ -257,29 +131,10 @@ export default function StandardTekstPage() {
     if (!isAdmin) return;
 
     setCreating(true);
-    setError(null);
+    setErrorLocal(null);
 
     try {
-      const colRef = collection(db, "Standardtekster");
-
-      const now = serverTimestamp();
-      const newDoc = {
-        title: "Ny standardtekst",
-        category: "",
-        content: "",
-        updatedAt: now,
-        createdAt: now,
-      } as const;
-
-      const docRef = await addDoc(colRef, newDoc);
-
-      const localItem: StandardTekst = {
-        id: docRef.id,
-        title: "Ny standardtekst",
-        category: undefined,
-        content: "",
-        updatedAt: new Date(),
-      };
+      const localItem = await standardTeksterApi.createEmpty();
 
       // Add to local list and select it immediately
       setItems((prev) => {
@@ -287,7 +142,7 @@ export default function StandardTekstPage() {
         return next.sort((a, b) => a.title.localeCompare(b.title, "nb"));
       });
 
-      setSelectedId(docRef.id);
+      setSelectedId(localItem.id);
 
       // Start editing right away
       setDraftTitle(localItem.title);
@@ -295,7 +150,7 @@ export default function StandardTekstPage() {
       setIsEditing(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved opprettelse";
-      setError(message);
+      setErrorLocal(message);
     } finally {
       setCreating(false);
     }
@@ -353,9 +208,9 @@ export default function StandardTekstPage() {
         </Box>
       </Box>
 
-      {error && (
+      {errorToShow && (
         <Alert severity="error" className={styles.error}>
-          {error}
+          {errorToShow}
         </Alert>
       )}
       <Collapse in={showGuide} unmountOnExit>
@@ -376,246 +231,55 @@ export default function StandardTekstPage() {
       </Collapse>
 
       <Box className={styles.grid}>
-        <Paper className={styles.sidebar}>
-          <Box className={styles.sidebarHeader}>
-            {isAdmin && (
-              <Box className={styles.sidebarCreateRow}>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={createNewStandardTekst}
-                  disabled={creating}
-                  className={styles.pillButton}
-                >
-                  {creating ? "Oppretter..." : "Ny standardtekst"}
-                </Button>
-              </Box>
-            )}
-            <Typography variant="subtitle2" className={styles.sidebarSectionTitle}>
-              Finn standardtekst
-            </Typography>
-            <Box className={styles.sidebarSearch}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Søk i standardtekster"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </Box>
-            {search.trim() && (
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                className={styles.sidebarCount}
-              >
-                {loading ? "Laster..." : `${filtered.length} treff`}
-              </Typography>
-            )}
-          </Box>
-          <Divider className={styles.sidebarDivider} />
-          <Box className={styles.sidebarBody}>
-            {loading ? (
-              <Box className={styles.sidebarLoading}>
-                <CircularProgress size={28} />
-              </Box>
-            ) : filtered.length === 0 ? (
-              <Box className={styles.sidebarEmpty}>
-                <Typography variant="body2" color="text.secondary">
-                  Ingen treff.
-                </Typography>
-              </Box>
-            ) : (
-              <List dense disablePadding className={styles.sidebarList}>
-                {filtered.map((it) => (
-                  <ListItemButton
-                    key={it.id}
-                    selected={it.id === selectedId}
-                    onClick={() => setSelectedId(it.id)}
-                    className={styles.sidebarItem}
-                  >
-                    <ListItemText
-                      primary={it.title}
-                      secondary={it.category ? it.category : undefined}
-                      primaryTypographyProps={{ noWrap: true }}
-                      secondaryTypographyProps={{ noWrap: true }}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
-            )}
-          </Box>
-        </Paper>
+        <StandardTekstSidebar
+          isAdmin={isAdmin}
+          creating={creating}
+          onCreate={createNewStandardTekst}
+          search={search}
+          setSearch={setSearch}
+          loading={loading}
+          filtered={filtered}
+          selectedId={selectedId}
+          setSelectedId={(id) => setSelectedId(id)}
+        />
 
         <Box className={styles.main}>
-          <Paper className={styles.preparatPaper} ref={preparatSectionRef}>
-            <Box className={styles.preparatHeader}>
-              <Typography variant="subtitle2" className={styles.preparatTitle}>
-                Preparater
-              </Typography>
-            </Box>
+          <Box ref={preparatSectionRef}>
+            <PreparatPanel
+              preparatRows={preparatRows}
+              inputRef={preparatSearchInputRef}
+              onPickText={(text) => {
+                addPickedPreparat(text);
 
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="flex-start"
-              className={styles.preparatSearchRow}
-            >
-              <Box className={styles.preparatSingleSearch} style={{ flex: 1 }}>
-                <MedicationSearch
-                  inputRef={preparatSearchInputRef}
-                  onPick={(med) => {
-                    const text = formatPreparatForTemplate(med);
-                    if (!text) return;
+                if (isEditing) {
+                  setDraftContent((prev) => replaceNextPreparatToken(prev, text));
+                }
+              }}
+              onClear={clearPreparats}
+              onRemove={(id) => removePreparatById(typeof id === "number" ? id : Number(id))}
+            />
+          </Box>
 
-                    addPickedPreparat(text);
-
-                    // If admin is editing, also replace ONLY the next placeholder in draftContent.
-                    if (isEditing) {
-                      setDraftContent((prev) => replaceNextPreparatToken(prev, text));
-                    }
-                  }}
-                />
-              </Box>
-
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={clearPreparats}
-                disabled={!preparatRows.some((r) => r.picked)}
-                startIcon={<ClearAllIcon fontSize="small" />}
-                title="Tøm alle (Escape når fokus er i preparatfeltet)"
-              >
-                Tøm
-              </Button>
-            </Stack>
-
-            <Box className={styles.preparatChipsWrap}>
-              {preparatRows
-                .filter((r) => r.picked)
-                .map((r) => (
-                  <Chip
-                    key={r.id}
-                    label={r.picked as string}
-                    onDelete={() => removePreparatById(r.id)}
-                    className={styles.preparatChip}
-                  />
-                ))}
-            </Box>
-
-            <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
-              <span className={styles.preparatHintTip}>
-                Tips: Lim inn hele produktlinjen – søket rydder opp automatisk.
-              </span>
-              <span className={styles.preparatHintKeys}>
-                <span className={styles.preparatHintKeyLabel}>Hurtigsøk:</span> ⌥F / Alt+F ·{" "}
-                <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
-              </span>
-            </Typography>
-          </Paper>
-
-          <Paper
-            onClick={selected && !isEditing ? copyBodyToClipboard : undefined}
-            className={
-              selected && !isEditing
-                ? `${styles.contentPaper} ${styles.contentPaperCopy}`
-                : styles.contentPaper
-            }
-          >
-            {!selected && !loading && (
-              <Typography variant="body2" color="text.secondary">
-                Velg en standardtekst fra listen.
-              </Typography>
+          <StandardTekstContent
+            selected={selected}
+            loading={loading}
+            isAdmin={isAdmin}
+            isEditing={isEditing}
+            draftTitle={draftTitle}
+            draftContent={draftContent}
+            saving={saving}
+            onDraftTitleChange={setDraftTitle}
+            onDraftContentChange={setDraftContent}
+            onCancel={cancelEdit}
+            onSave={saveEdit}
+            onStartEdit={startEdit}
+            onCopy={copyBodyToClipboard}
+            previewNode={renderContentWithPreparatHighlight(
+              previewContent || "(Tom tekst)",
+              preparatRows.map((r) => r.picked),
+              { enableSecondaryHighlight: templateUsesPreparat1(selected?.content ?? "") }
             )}
-
-            {selected && (
-              <>
-                <Typography variant="h5" className={styles.title}>
-                  {selected.title}
-                </Typography>
-                {selected.category && (
-                  <Typography variant="body2" color="text.secondary" className={styles.category}>
-                    {selected.category}
-                  </Typography>
-                )}
-
-                {selected.updatedAt && (
-                  <Typography variant="caption" color="text.secondary" className={styles.updatedAt}>
-                    Sist oppdatert: {selected.updatedAt.toLocaleString("nb-NO")}
-                  </Typography>
-                )}
-
-                {isEditing ? (
-                  <>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="Overskrift"
-                      value={draftTitle}
-                      onChange={(e) => setDraftTitle(e.target.value)}
-                      className={styles.editorTitleField}
-                    />
-                    <TextField
-                      fullWidth
-                      multiline
-                      minRows={10}
-                      label="Tekst"
-                      value={draftContent}
-                      onChange={(e) => setDraftContent(e.target.value)}
-                    />
-                    <Stack direction="row" spacing={1} className={styles.editorActions}>
-                      <Button
-                        variant="text"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cancelEdit();
-                        }}
-                        disabled={saving}
-                      >
-                        Avbryt
-                      </Button>
-                      <Button
-                        variant="contained"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          saveEdit();
-                        }}
-                        disabled={saving}
-                      >
-                        {saving ? "Lagrer..." : "Lagre"}
-                      </Button>
-                    </Stack>
-                  </>
-                ) : (
-                  <>
-                    <Typography variant="body1" component="div" className={styles.body}>
-                      {renderContentWithPreparatHighlight(
-                        previewContent || "(Tom tekst)",
-                        preparatRows.map((r) => r.picked),
-                        { enableSecondaryHighlight: /\{\{\s*PREPARAT1\s*\}\}/.test(selected?.content ?? "") }
-                      )}
-                    </Typography>
-
-                    {isAdmin && (
-                      <Box className={styles.editRowBottom}>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEdit();
-                          }}
-                          className={styles.pillButton}
-                        >
-                          Endre
-                        </Button>
-                      </Box>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-          </Paper>
+          />
         </Box>
       </Box>
       <Snackbar
