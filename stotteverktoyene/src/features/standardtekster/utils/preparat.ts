@@ -6,6 +6,7 @@ const MANUFACTURER_TOKENS = new Set(
     // Common Norwegian market / generic manufacturers & labelers
     "hexal",
     "orion",
+    "pensa",
     "sandoz",
     "teva",
     "accord",
@@ -74,14 +75,11 @@ const DOSAGE_FORM_TOKENS = new Set(
     "enterotab",
     "enterotablett",
     "depottab",
-    "depottablett",
     "retardtab",
     "retardtablett",
     "smeltetab",
     "smeltetablett",
     "depot",
-    "retard",
-    "mikstur",
     "susp",
     "inj",
     "inf",
@@ -95,17 +93,16 @@ const DOSAGE_FORM_TOKENS = new Set(
     "dr",
     "kaps",
     "kapsel",
-    "stikkpille",
     "supp",
+    "depotkaps",
+    "enterodepottab",
+    "depottablett",
+    "enterokaps",
   ].map((s) => s.toLowerCase())
 );
 
 function stripDosageFormFromName(name: string): string {
-  const tokens = name
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .filter(Boolean);
+  const tokens = name.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
 
   if (tokens.length === 0) return "";
 
@@ -120,11 +117,7 @@ function stripDosageFormFromName(name: string): string {
 function stripManufacturerFromName(name: string, producer?: string | null): string {
   // Keep the original spacing but remove obvious manufacturer/company tokens.
   // This is heuristic by design and meant to handle e.g. "Atorvastatin Hexal" -> "Atorvastatin".
-  const tokens = name
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .filter(Boolean);
+  const tokens = name.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
 
   if (tokens.length <= 1) return name.trim();
 
@@ -176,23 +169,42 @@ export function formatPreparatForTemplate(med: {
   const nfs = nfsRaw.replace(/\s+/g, " ").trim();
 
   // Try to extract the first strength-like fragment.
-  // Supports: "0,1 mg/dose", "40 mg", "50 mikrog/500 mikrog", "1,25 mg/2,5 ml"
+  // Supports:
+  //  - "0,1 mg/dose"
+  //  - "40 mg"
+  //  - "50 mikrog/500 mikrog"
+  //  - "1,25 mg/2,5 ml"
+  //  - "80/4,5mcg"  (ratio where the unit comes after the second number)
   // We stop at comma+space (", ") which is used as field separators in many FEST strings.
-  const unit = "mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\\.e\\.|mmol|ml";
-  const m = nfs.match(
+  // Include insulin-style units like "E/ml" (Norwegian "enheter per ml") by supporting "e" as a unit token.
+  const unit = "mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\\.e\\.|mmol|ml|e";
+
+  // 1) Ratio strength where unit comes after the second number, e.g. "80/4,5mcg"
+  const ratioTrailingUnit = nfs.match(
+    new RegExp(`(\\d+[.,]?\\d*\\s*\\/\\s*\\d+[.,]?\\d*\\s*(?:${unit}))(?:\\b)?(?=,\\s|$)`, "i")
+  );
+
+  // 2) Regular pattern where the first number has a unit, optionally followed by "/..."
+  const regular = nfs.match(
     new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*[^;\\)\\n]+?)?)(?=,\\s|$)`, "i")
   );
 
-  const strength = m?.[1]
-    ? m[1]
+  // 0) Percentage strengths like "40 % w/v" / "40% w/v" / "5 % v/v"
+  const percentStrength = nfs.match(/(\d+(?:[.,]\d+)?\s*%\s*(?:w\/v|v\/v)?)(?=,\s|$)/i);
+
+  const picked = percentStrength?.[1] || ratioTrailingUnit?.[1] || regular?.[1] || "";
+
+  const strength = picked
+    ? picked
         .replace(/\s*\/\s*/g, "/")
+        .replace(/\s*%\s*/g, " % ")
         .replace(/\s+/g, " ")
         .trim()
     : "";
 
-  // Prefer name extracted from navnFormStyrke (this typically avoids manufacturer tokens like “Viatris/xiromed”).
-  // 1) remove trailing metadata after comma (often pack info)
-  const head = nfs.replace(/,.*$/, "").trim();
+  // Only treat comma as a field separator when it is followed by whitespace (", ").
+  // This avoids cutting decimal commas like "0,1mg/ml" or "2,5".
+  const head = nfs.replace(/,\s+.*$/, "").trim();
 
   // 2) take everything before a common dosage-form keyword
   const formWords = [
@@ -202,14 +214,12 @@ export function formatPreparatForTemplate(med: {
     "enterotab",
     "enterotablett",
     "depottab",
-    "depottablett",
     "smeltetab",
     "smeltetablett",
     "kaps",
     "kapsel",
     "inj",
     "mikst",
-    "mikstur",
     "inh",
     "aerosol",
     "pulv",
@@ -218,13 +228,8 @@ export function formatPreparatForTemplate(med: {
     "oppl",
     "susp",
     "granulat",
-    "krem",
-    "salve",
-    "gel",
-    "liniment",
     "drasj",
     "supp",
-    "stikkpille",
     "mikrog",
     "mikrogram",
   ].join("|");
@@ -235,21 +240,47 @@ export function formatPreparatForTemplate(med: {
   const fallbackName = (med.varenavn ?? "").trim();
   let rawName = nameFromNfs || fallbackName;
 
-  // Remove the extracted strength from the name if it already contains it (prevents "75 mg 75 mg")
+  // Remove the extracted strength from the name if it already contains it (prevents duplicates like "0,75 % 0,75 %").
+  // NOTE: We must NOT use word-boundaries here because strengths often contain non-word chars like "%", "/", ",".
   if (strength) {
     const esc = strength.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    rawName = rawName.replace(new RegExp(`\\b${esc}\\b`, "i"), " ");
+    // Remove strength occurrences with flexible whitespace around separators.
+    const flex = esc
+      .replace(/\\\s\+/g, "\\s+") // keep any existing whitespace escapes (defensive)
+      .replace(/\\s\+%\\s\+/g, "\\s*%\\s*")
+      .replace(/%/g, "%")
+      .replace(/\\\//g, "\\s*\\/\\s*"); // allow spaces around "/"
+    rawName = rawName.replace(new RegExp(`\\s*${flex}\\s*`, "i"), " ");
   }
+
+  // Drop trailing pack-size tokens that often appear at the end of PIM names, e.g. "... 2,5" or "... 120".
+  // Keep strengths intact (we already extracted `strength` separately).
+  rawName = rawName
+    .replace(/\s+\d+(?:[.,]\d+)?\s*$/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   // Strip manufacturer/company tokens and dosage-form tokens (enterotab/depottab/smeltetab etc.)
   const withoutManufacturer = rawName ? stripManufacturerFromName(rawName, med.produsent) : "";
   const name = withoutManufacturer ? stripDosageFormFromName(withoutManufacturer) : "";
 
-  if (name && strength) return `${name} ${strength}`.replace(/\s+/g, " ").trim();
+  if (name && strength) {
+    const esc = strength.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    let result = `${name} ${strength}`.replace(/\s+/g, " ").trim();
+
+    // Deduplicate identical strengths if they still end up adjacent (e.g. "0,75 % 0,75 %")
+    result = result.replace(new RegExp(`${esc}\\s+${esc}`, "i"), strength);
+
+    // Fix a common artifact where "0,1mg/ml" becomes "0 0,1mg/ml"
+    result = result.replace(/\b0\s+0([.,]\d)/g, "0$1").replace(/\b0\s+0,/g, "0,");
+
+    return result.replace(/\s+/g, " ").trim();
+  }
+
   if (name) return name;
   return nfs || "";
 }
-
 
 export function replaceNextPreparatToken(text: string, value: string) {
   // Replace ONLY the next (first) placeholder occurrence.

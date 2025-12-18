@@ -11,36 +11,33 @@ import {
 } from "@mui/material";
 
 import meds from "../meds.json";
-import hvProducts from "./hvProducts.json";
+import pimProducts from "./pimProducts.json";
+import { festToSearchIndex } from "../mappers/festToSearchIndex";
+import { pimToSearchIndex } from "../mappers/pimToSearchIndex";
+import type { SearchIndexItem } from "../../../utils/types";
 
 type Med = {
+  // Unique key used by UI (prefix with source to avoid collisions)
   id: string;
+  // Source for debugging / future UI labels
+  source: "FEST" | "PIM";
+
+  // Display fields used by current UI
   varenavn: string | null;
   navnFormStyrke: string | null;
+
+  // FEST fields (null for PIM)
   atc: string | null;
   virkestoff: string | null;
   produsent: string | null;
   reseptgruppe: string | null;
-  // Only set for HV products
+
+  // PIM-only
   farmaloggNumber?: string | null;
+
+  // Search backing text (normalized in mapper)
+  searchText: string;
 };
-
-
-type HvProduct = {
-  farmaloggNumber: string;
-  name: string;
-};
-
-const cleanHvProductName = (name: string) =>
-  name
-    .replace(/[\s\u00A0]+/g, " ") // collapse whitespace
-    .trim()
-    // remove specific trailing multipack patterns we want to hide, e.g. "... 4x200" / "... 4x120"
-    .replace(/\s+(?:4x200|4x120)\s*$/i, "")
-    // remove trailing integer token (typically pack size), e.g. "... 60x90 50" -> "... 60x90"
-    // only when it's 2+ digits to avoid chopping dimension-style names
-    .replace(/\s+\d{2,}\s*$/g, "")
-    .trim();
 
 type Props = {
   maxResults?: number;
@@ -151,30 +148,71 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
   const effectiveInputRef = inputRef ?? internalInputRef;
 
   const allItems: Med[] = useMemo(() => {
-    const fest = (meds as Med[]) ?? [];
+    const festRaw = (meds as any[]) ?? [];
+    const pimRaw = (pimProducts as any[]) ?? [];
 
-    const hv = ((hvProducts as unknown) as HvProduct[] | undefined) ?? [];
-    const hvAsMeds: Med[] = hv
-      .filter((p) => p && p.name)
-      .map((p) => {
-        const originalName = String(p.name);
-        const cleanedName = cleanHvProductName(originalName);
+    // Normalize both sources into a shared SearchIndexItem shape
+    const festIndex: SearchIndexItem[] = festToSearchIndex(
+      festRaw.map((m) => ({
+        id: String(m.id),
+        name: String(m.navnFormStyrke ?? m.varenavn ?? ""),
+        atc: m.atc ?? undefined,
+        substance: m.virkestoff ?? undefined,
+        prescriptionGroup: m.reseptgruppe ?? undefined,
+      }))
+    );
+
+    const pimIndex: SearchIndexItem[] = pimToSearchIndex(
+      pimRaw.map((p) => ({
+        farmaloggNumber: String(p.farmaloggNumber),
+        name: p.name ?? undefined,
+        nameFormStrength: p.nameFormStrength ?? undefined,
+      }))
+    );
+
+    const searchIndex: SearchIndexItem[] = [...festIndex, ...pimIndex];
+
+    // Keep a lookup for FEST so we can preserve extra fields (produsent, etc.)
+    const festByKey = new Map<string, any>();
+    for (const m of festRaw) {
+      festByKey.set(`FEST:${String(m.id)}`, m);
+    }
+
+    // Convert SearchIndexItem -> Med (the rest of this component continues to work on Med[])
+    return searchIndex.map((item) => {
+      const key = `${item.source}:${item.id}`;
+
+      if (item.source === "FEST") {
+        const original = festByKey.get(key);
 
         return {
-          id: `hv:${p.farmaloggNumber}`,
-          farmaloggNumber: String(p.farmaloggNumber),
-          // Keep original for matching pasted queries (may include pack size)
-          varenavn: originalName,
-          // Use cleaned for display + chips
-          navnFormStyrke: cleanedName || originalName,
-          atc: null,
-          virkestoff: null,
-          produsent: null,
-          reseptgruppe: null,
-        };
-      });
+          id: key,
+          source: "FEST",
+          varenavn: original?.varenavn ?? null,
+          navnFormStyrke:
+            original?.navnFormStyrke ?? original?.varenavn ?? item.displayName ?? null,
+          atc: original?.atc ?? item.atc ?? null,
+          virkestoff: original?.virkestoff ?? item.substance ?? null,
+          produsent: original?.produsent ?? null,
+          reseptgruppe: original?.reseptgruppe ?? item.prescriptionGroup ?? null,
+          searchText: item.searchText,
+        } satisfies Med;
+      }
 
-    return [...fest, ...hvAsMeds];
+      // PIM
+      return {
+        id: key,
+        source: "PIM",
+        farmaloggNumber: item.farmaloggNumber ?? String(item.id),
+        varenavn: item.name ?? item.displayName ?? null,
+        navnFormStyrke: item.nameFormStrength ?? item.displayName ?? item.name ?? null,
+        atc: null,
+        virkestoff: null,
+        produsent: null,
+        reseptgruppe: null,
+        searchText: item.searchText,
+      } satisfies Med;
+    });
   }, []);
 
   const results = useMemo(() => {
@@ -182,7 +220,19 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     if (tokens.length === 0) return [];
 
     // number + unit pair like "75 mg" or "1.25 ml"
-    const unitSet = new Set(["mg", "g", "mcg", "ug", "µg", "mikrog", "mikrogram", "ml", "dose", "t", "time"]);
+    const unitSet = new Set([
+      "mg",
+      "g",
+      "mcg",
+      "ug",
+      "µg",
+      "mikrog",
+      "mikrogram",
+      "ml",
+      "dose",
+      "t",
+      "time",
+    ]);
 
     // Split into meaningful text vs number tokens
     const textTokens = tokens.filter((t) => !isNumberToken(t) && !unitSet.has(t));
@@ -205,7 +255,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     const idNumberTokens = tokens
       .filter((t) => isNumberToken(t))
       .filter((t) => !t.includes("."))
-      .filter((t) => t.length >= 5);
+      .filter((t) => t.length >= 4);
 
     // (computed after `numberWithUnit` is defined)
 
@@ -232,8 +282,9 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       }
       return null;
     })();
-    const isLikelyIdSearch = idNumberTokens.length > 0 && meaningfulTextTokens.length === 0 && !numberWithUnit;
-    const restrictToHvOnly = isLikelyIdSearch;
+    const isLikelyIdSearch =
+      idNumberTokens.length > 0 && meaningfulTextTokens.length === 0 && !numberWithUnit;
+    const restrictToPimOnly = isLikelyIdSearch;
 
     // Collect "meaningful" number tokens until we hit pack-size indicators.
     // Also drop numbers that sit right next to pack-size tokens.
@@ -284,20 +335,21 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     let hasNonComboMatch = false;
 
     const isComboMed = (med: Med) => {
-      const isHv = med.id.startsWith("hv:");
-      const name = (isHv ? (med.varenavn ?? "") : (med.navnFormStyrke ?? med.varenavn ?? "")).toLowerCase();
+      const name = (med.navnFormStyrke ?? med.varenavn ?? "").toLowerCase();
       const subst = (med.virkestoff ?? "").toLowerCase();
       return name.includes("/") || subst.includes(" og ");
     };
 
     for (const m of allItems) {
-      const isHv = m.id.startsWith("hv:");
-      if (restrictToHvOnly && !isHv) continue;
+      const isPim = m.source === "PIM";
+      if (restrictToPimOnly && !isPim) continue;
 
-      const hayText = isHv ? (m.varenavn ?? "") : (m.navnFormStyrke ?? m.varenavn ?? "");
+      const hayText = m.searchText || (m.navnFormStyrke ?? m.varenavn ?? "");
       if (!hayText) continue;
-      if (isHv && idNumberTokens.length > 0) {
-        const id = String(m.farmaloggNumber ?? m.id.replace(/^hv:/, ""));
+
+      // If query looks like an identifier search, match against farmaloggNumber for PIM
+      if (isPim && idNumberTokens.length > 0) {
+        const id = String(m.farmaloggNumber ?? "");
         const okId = idNumberTokens.every((t) => id.startsWith(t) || id === t);
         if (!okId) continue;
       }
@@ -342,8 +394,8 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         if (hayTokens.includes(t)) score += 3;
       }
 
-      if (isHv && idNumberTokens.length > 0) {
-        const id = String(m.farmaloggNumber ?? m.id.replace(/^hv:/, ""));
+      if (isPim && idNumberTokens.length > 0) {
+        const id = String(m.farmaloggNumber ?? "");
         for (const t of idNumberTokens) {
           if (id === t) score += 20;
           else if (id.startsWith(t)) score += 10;
@@ -372,13 +424,32 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
     // If the user didn't indicate a combination search and we have at least one non-combo match,
     // hide combo products (e.g. "Candesartan/Hydrochlorothiazide") to avoid confusing 2-result dropdowns.
-    if (!queryIndicatesCombo && hasNonComboMatch) {
+    // IMPORTANT: Don't apply this when the user is doing an identifier-only search (farmaloggNumber),
+    // because some products have "/" in the name (e.g. strengths like "80/4,5") and would be wrongly removed.
+    if (!restrictToPimOnly && !queryIndicatesCombo && hasNonComboMatch) {
       for (let i = out.length - 1; i >= 0; i--) {
         if (isComboMed(out[i].med)) out.splice(i, 1);
       }
     }
 
-    if (restrictToHvOnly && out.length === 0) return [];
+    // If this is an identifier-only search (e.g. "3111"), prefer exact farmaloggNumber matches.
+    // This prevents longer numbers like "311148" from showing up when the user typed "3111".
+    if (restrictToPimOnly && idNumberTokens.length > 0) {
+      const exact = out.filter(({ med }) => {
+        if (med.source !== "PIM") return false;
+        const id = String(med.farmaloggNumber ?? "");
+        return idNumberTokens.some((t) => id === t);
+      });
+
+      if (exact.length > 0) {
+        return exact
+          .sort((a, b) => b.score - a.score)
+          .slice(0, maxResults)
+          .map((x) => x.med);
+      }
+    }
+
+    if (restrictToPimOnly && out.length === 0) return [];
 
     out.sort((a, b) => b.score - a.score);
 
@@ -409,8 +480,16 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
   }, [open, results.length]);
 
   useEffect(() => {
-    if (!query.trim()) return;
+    const q = query.trim();
+    if (!q) return;
     if (results.length !== 1) return;
+
+    // Only auto-pick on identifier-like searches (e.g. farmaloggNumber such as "3111" / "364824"),
+    // so the user can still choose among variants (stikkpille/tablett/etc.) when searching by name.
+    const qNorm = normalizeForSearch(q).replace(/\s+/g, "");
+    const isIdLike = /^\d{4,}$/.test(qNorm);
+
+    if (!isIdLike) return;
 
     pickResult(results[0]);
   }, [query, results]);

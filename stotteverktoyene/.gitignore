@@ -31,3 +31,4 @@ fest/*.xml
 
 # Large source data files (not committed)
 produktkatalog/Produktkatalog HV 17 des 25.xlsx
+rxkatalog/*.xlsx
