@@ -11,10 +11,8 @@ import {
   MenuItem,
   Paper,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   createUserWithEmailAndPassword,
@@ -225,7 +223,8 @@ export function LoginPage() {
             variant="contained"
             disabled={
               busy ||
-              (mode === "signup" && (!firstName.trim() || !confirmPassword || password !== confirmPassword))
+              (mode === "signup" &&
+                (!firstName.trim() || !confirmPassword || password !== confirmPassword))
             }
           >
             {mode === "login" ? "Logg inn" : "Opprett konto"}
@@ -259,6 +258,7 @@ export function ProfileMenu() {
   if (loading || !user) return null;
 
   const roleLabel = isAdmin ? "Admin" : "Bruker";
+  const avatarLabel = (firstName?.trim()?.[0] || user.email?.trim()?.[0] || "?").toUpperCase();
 
   const handleOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
   const handleClose = () => setAnchorEl(null);
@@ -270,19 +270,41 @@ export function ProfileMenu() {
 
   return (
     <>
-      <Tooltip title={`${roleLabel} • ${user.email ?? ""}`.trim()}>
-        <IconButton onClick={handleOpen} aria-label="Profil">
-          <Avatar className={styles.authAvatar}>
-            <AccountCircleIcon />
-          </Avatar>
-        </IconButton>
-      </Tooltip>
+      <IconButton onClick={handleOpen} aria-label="Profil" className={styles.profileIconButton}>
+        <Avatar className={styles.profileAvatar}>{avatarLabel}</Avatar>
+      </IconButton>
 
-      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        <MenuItem disabled>{firstName ? `Hei, ${firstName}` : (user.email ?? "Innlogget")}</MenuItem>
-        <MenuItem disabled>Rolle: {roleLabel}</MenuItem>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        className={styles.profileMenuRoot}
+        slotProps={{
+          paper: { className: styles.profileMenuPaper },
+          list: { className: styles.profileMenuList },
+        }}
+        transformOrigin={{ vertical: "bottom", horizontal: "right" }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Box className={styles.profileMenuHeader}>
+          <Box className={styles.profileMenuHeaderRow}>
+            <Avatar className={styles.profileMenuAvatarSmall}>{avatarLabel}</Avatar>
+            <Box className={styles.profileMenuHeaderText}>
+              <Typography className={styles.profileMenuHello}>
+                {firstName ? `Hei, ${firstName}` : "Hei"}
+              </Typography>
+              <Typography className={styles.profileMenuEmail}>{user.email ?? ""}</Typography>
+            </Box>
+          </Box>
+
+          <Box className={styles.profileMenuRolePill}>{roleLabel}</Box>
+        </Box>
+
         <Divider />
-        <MenuItem onClick={handleLogout}>Logg ut</MenuItem>
+
+        <MenuItem onClick={handleLogout} className={styles.profileMenuLogout}>
+          Logg ut
+        </MenuItem>
       </Menu>
     </>
   );
