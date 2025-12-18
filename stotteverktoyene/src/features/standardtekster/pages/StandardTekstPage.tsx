@@ -80,7 +80,7 @@ export default function StandardTekstPage() {
     const onKeyDown = (e: KeyboardEvent) => {
       // Alt (Windows/Linux) / Option (macOS) + F -> focus preparat search
       if (!e.altKey) return;
-      if (e.key.toLowerCase() !== "f") return;
+      if (e.code !== "KeyF") return;
 
       e.preventDefault();
       preparatSearchInputRef.current?.focus();

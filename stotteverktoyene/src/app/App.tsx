@@ -53,6 +53,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           boxSizing: "border-box",
           overflowX: "hidden",
           transition: "width 180ms ease",
+          display: "flex",
+          flexDirection: "column",
         },
       }}
     >
@@ -98,6 +100,17 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           </Tooltip>
         ))}
       </List>
+      <Box sx={{ flexGrow: 1 }} />
+      <Divider />
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          py: 1.5,
+        }}
+      >
+        <ProfileMenu />
+      </Box>
     </Drawer>
   );
 }
@@ -115,9 +128,6 @@ function Layout() {
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <Box component="main" sx={{ flex: 1, p: 2 }}>
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
-          <ProfileMenu />
-        </Box>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/omeq" element={<OMEQPage />} />
