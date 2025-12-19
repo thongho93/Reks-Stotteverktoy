@@ -14,11 +14,15 @@ export function mapDocToStandardTekst(id: string, data: Record<string, unknown>)
 
   const updatedAt = toDateMaybe(data["updatedAt"] ?? data["updated_at"] ?? data["sistOppdatert"]);
 
+  const followUpsRaw = data["followUps"] ?? data["follow_ups"];
+  const followUps = Array.isArray(followUpsRaw) ? (followUpsRaw as unknown[]) : undefined;
+
   return {
     id,
     title,
     category: category || undefined,
     content,
+    followUps: followUps as any,
     updatedAt,
   };
 }

@@ -6,9 +6,10 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
-import type { StandardTekst } from "../types";
+import type { StandardTekst, UpdateStandardTekstDto } from "../types";
 import { mapDocToStandardTekst } from "../mappers/standardTekstMapper";
 
 const COL_NAME = "Standardtekster";
@@ -23,13 +24,18 @@ export const standardTeksterApi = {
       .sort((a, b) => a.title.localeCompare(b.title, "nb"));
   },
 
-  async update(id: string, patch: { title: string; content: string }): Promise<void> {
+  async update(id: string, patch: UpdateStandardTekstDto): Promise<void> {
     const ref = doc(db, COL_NAME, id);
-    await updateDoc(ref, {
-      title: patch.title,
-      content: patch.content,
+
+    const payload: Record<string, unknown> = {
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (typeof patch.title === "string") payload.title = patch.title;
+    if (typeof patch.content === "string") payload.content = patch.content;
+    if (patch.followUps !== undefined) payload.followUps = patch.followUps;
+
+    await updateDoc(ref, payload);
   },
 
   async createEmpty(): Promise<StandardTekst> {
@@ -40,6 +46,7 @@ export const standardTeksterApi = {
       title: "Ny standardtekst",
       category: "",
       content: "",
+      followUps: [] as const,
       updatedAt: now,
       createdAt: now,
     } as const;
@@ -51,7 +58,13 @@ export const standardTeksterApi = {
       title: newDoc.title,
       category: undefined,
       content: newDoc.content,
+      followUps: [],
       updatedAt: new Date(),
     };
+  },
+
+  async remove(id: string): Promise<void> {
+    const ref = doc(db, COL_NAME, id);
+    await deleteDoc(ref);
   },
 };

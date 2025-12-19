@@ -19,8 +19,14 @@ type Props = {
   onCancel: () => void;
   onSave: () => void;
   onStartEdit: () => void;
+  onDelete: () => void;
+  deleting: boolean;
 
   onCopy: () => void;
+
+  editorTools?: ReactNode;
+  belowContent?: ReactNode;
+  headerRight?: ReactNode;
 
   previewNode: ReactNode;
 };
@@ -38,7 +44,12 @@ export default function StandardTekstContent({
   onCancel,
   onSave,
   onStartEdit,
+  onDelete,
+  deleting,
   onCopy,
+  editorTools,
+  belowContent,
+  headerRight,
   previewNode,
 }: Props) {
   return (
@@ -58,9 +69,32 @@ export default function StandardTekstContent({
 
       {selected && (
         <>
-          <Typography variant="h5" className={styles.title}>
-            {selected.title}
-          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+            }}
+          >
+            <Typography variant="h2" className={styles.title} sx={{ mb: 1 }}>
+              {selected.title}
+            </Typography>
+
+            {headerRight ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 1,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {headerRight}
+              </Box>
+            ) : null}
+          </Box>
 
           {selected.category && (
             <Typography variant="body2" color="text.secondary" className={styles.category}>
@@ -76,14 +110,23 @@ export default function StandardTekstContent({
 
           {isEditing ? (
             <>
-              <TextField
-                fullWidth
-                size="small"
-                label="Overskrift"
-                value={draftTitle}
-                onChange={(e) => onDraftTitleChange(e.target.value)}
-                className={styles.editorTitleField}
-              />
+              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-end" }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Overskrift"
+                  value={draftTitle}
+                  onChange={(e) => onDraftTitleChange(e.target.value)}
+                  className={styles.editorTitleField}
+                  sx={{ flex: 1 }}
+                />
+
+                {editorTools ? (
+                  <Box sx={{ pb: 0.25, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                    {editorTools}
+                  </Box>
+                ) : null}
+              </Box>
               <TextField
                 fullWidth
                 multiline
@@ -92,6 +135,7 @@ export default function StandardTekstContent({
                 value={draftContent}
                 onChange={(e) => onDraftContentChange(e.target.value)}
               />
+              {belowContent}
 
               <Box display="flex" gap={1} className={styles.editorActions}>
                 <Button
@@ -121,12 +165,15 @@ export default function StandardTekstContent({
               <Typography variant="body1" component="div" className={styles.body}>
                 {previewNode}
               </Typography>
+              {belowContent}
 
               {isAdmin && (
-                <Box className={styles.editRowBottom}>
+                <Box className={styles.editRowBottom} display="flex" gap={1}>
                   <Button
-                    variant="outlined"
+                    variant="contained"
                     size="small"
+                    color="primary"
+                    sx={{ color: "#fff" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       onStartEdit();
@@ -134,6 +181,20 @@ export default function StandardTekstContent({
                     className={styles.pillButton}
                   >
                     Endre
+                  </Button>
+
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="error"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                    }}
+                    className={styles.pillButton}
+                    disabled={saving || deleting}
+                  >
+                    Slett
                   </Button>
                 </Box>
               )}

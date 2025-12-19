@@ -1,15 +1,49 @@
+.headerLinkButton {
+  text-transform: none !important;
+  padding: 4px 10px !important;
+  min-width: auto !important;
+  color: #b9829a !important;
+  font-weight: 600;
+  border-radius: 999px !important;
+  align-self: center;
+  border: 1px solid rgba(185, 130, 154, 0.55);
+  background: rgba(185, 130, 154, 0.06);
+}
+
+.headerLinkButton:hover {
+  background: rgba(185, 130, 154, 0.12) !important;
+  border-color: rgba(185, 130, 154, 0.75);
+  text-decoration: none;
+}
+
+.headerLinkButton:global(.Mui-focusVisible) {
+  outline: 2px solid rgba(185, 130, 154, 0.55);
+  outline-offset: 2px;
+}
 .page {
-  padding: 16px;
+  min-height: 100%;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+@media (max-width: 899px) {
+  .page {
+    height: auto;
+    max-height: none;
+    overflow-y: auto;
+  }
 }
 
 @media (min-width: 900px) {
   .page {
-    padding: 24px;
+    padding: 16px;
   }
 }
 
 .header {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -32,24 +66,27 @@
 }
 
 .grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 12px;
   align-items: stretch;
 }
 
 @media (min-width: 900px) {
   .grid {
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 340px 1fr;
   }
 }
 
 .sidebar {
-  padding: 8px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 0;
+  overflow: hidden;
+  max-height: 90%;
 }
 
 /* Sidebar readability improvements */
@@ -113,6 +150,7 @@
 .sidebarCreateRow .pillButton {
   width: 100%;
   justify-content: center;
+  color: #fff !important  ;
 }
 
 .sidebarLoading {
@@ -126,13 +164,13 @@
 }
 
 .main {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .preparatPaper {
-  padding: 16px;
+  padding: 12px;
 }
 
 .preparatMaxWidth {
@@ -167,14 +205,15 @@
 }
 
 .contentPaper {
-  padding: 28px;
-  min-height: 280px;
-  cursor: default;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 12px;
 }
 
 @media (min-width: 900px) {
   .contentPaper {
-    padding: 44px;
+    padding: 28px;
   }
 }
 
@@ -193,7 +232,7 @@
 }
 
 .category {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .updatedAt {
@@ -213,9 +252,11 @@
 
 .body {
   white-space: pre-wrap;
-  line-height: 1.8;
+  line-height: 1.45; /* tettere linjeavstand */
   max-width: 60ch;
+  max-height: 55vh;
   margin: 0 auto;
+  padding-top: 6px; /* litt mindre luft på toppen */
 }
 
 /* Auth */
@@ -268,16 +309,18 @@
 
 .expandIcon {
   transition: transform 150ms ease;
+  color: #b9829a;
 }
 
 .expandIconOpen {
   transition: transform 150ms ease;
   transform: rotate(180deg);
+  color: #b9829a;
 }
 
 .guidePaper {
-  padding: 16px;
-  margin-bottom: 16px;
+  padding: 12px;
+  margin-bottom: 12px;
 }
 
 .guideTitle {

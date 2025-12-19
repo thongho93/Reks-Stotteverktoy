@@ -47,16 +47,16 @@ const theme = createTheme({
       fontWeight: 600,
     },
     h2: {
-      fontSize: "1.4rem",
-      fontWeight: 600,
+      fontSize: "1.55rem",
+      fontWeight: 650,
     },
     h3: {
       fontSize: "1.2rem",
       fontWeight: 600,
     },
     h4: {
-      fontSize: "2rem",
-      fontWeight: 700,
+      fontSize: "1rem",
+      fontWeight: 600,
       letterSpacing: "-0.01em",
     },
     body1: {

@@ -15,10 +15,12 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CalculateIcon from "@mui/icons-material/Calculate";
-import TextSnippetIcon from "@mui/icons-material/TextSnippet";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import DescriptionIcon from "@mui/icons-material/Description";
+import AssignmentIcon from "@mui/icons-material/Assignment";
 import OMEQPage from "../features/omeq/pages/OMEQPage";
 import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
+import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
 import HomePage from "./HomePage";
 import { LoginPage, ProfileMenu, RequireAuth } from "./auth/Auth";
 
@@ -38,7 +40,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const items = [
     { label: "OMEQ-beregning", path: "/omeq", icon: <CalculateIcon /> },
-    { label: "Standardtekster", path: "/standardtekster", icon: <TextSnippetIcon /> },
+    { label: "Standardtekster", path: "/standardtekster", icon: <DescriptionIcon /> },
+    { label: "Produktskjema", path: "/produktskjema", icon: <AssignmentIcon /> },
     { label: "Felleskatalogen", path: "/felleskatalogen", icon: <MenuBookIcon /> },
   ];
 
@@ -132,6 +135,7 @@ function Layout() {
           <Route path="/" element={<HomePage />} />
           <Route path="/omeq" element={<OMEQPage />} />
           <Route path="/standardtekster" element={<StandardTekstPage />} />
+          <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
           <Route path="/felleskatalogen" element={<div>Felleskatalogen (kommer)</div>} />
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>

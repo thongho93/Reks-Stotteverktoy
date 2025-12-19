@@ -25,7 +25,7 @@ export function GlobalStyles() {
           color: theme.palette.text.primary,
         },
         "#root": {
-          minHeight: "100%",
+          minHeight: "100vh",
         },
         "img, picture, video, canvas, svg": {
           display: "block",

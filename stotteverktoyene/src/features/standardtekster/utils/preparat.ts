@@ -302,6 +302,22 @@ export const replaceVareTokenByCount = (text: string, count: number): string => 
     .replace(/\{\{\s*VARE\(N?E?\)\s*\}\}/gi, replacement);
 };
 
+export function replaceNextTallToken(text: string, value: string) {
+  // Replace ONLY the next (first) placeholder occurrence.
+  // Supports both {{TALL}} and indexed variants like {{TALL1}}, {{TALL2}}, ...
+  return text.replace(/\{\{\s*TALL\d*\s*\}\}/i, value);
+}
+
+export function replaceTallTokens(text: string, value: string) {
+  // Replace ALL occurrences.
+  // Supports both {{TALL}} and indexed variants like {{TALL1}}, {{TALL2}}, ...
+  return text.replace(/\{\{\s*TALL\d*\s*\}\}/gi, value);
+}
+
+export function templateHasTallToken(text: string): boolean {
+  return /\{\{\s*TALL\d*\s*\}\}/i.test(text);
+}
+
 export function usePreparatRows() {
   const [preparatRows, setPreparatRows] = useState<PreparatRow[]>([{ id: 0, picked: null }]);
 
