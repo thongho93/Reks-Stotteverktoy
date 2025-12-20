@@ -15,7 +15,6 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CalculateIcon from "@mui/icons-material/Calculate";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
 import DescriptionIcon from "@mui/icons-material/Description";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import OMEQPage from "../features/omeq/pages/OMEQPage";
@@ -39,10 +38,9 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   const items = [
-    { label: "OMEQ-beregning", path: "/omeq", icon: <CalculateIcon /> },
-    { label: "Standardtekster", path: "/standardtekster", icon: <DescriptionIcon /> },
-    { label: "Produktskjema", path: "/produktskjema", icon: <AssignmentIcon /> },
-    { label: "Felleskatalogen", path: "/felleskatalogen", icon: <MenuBookIcon /> },
+    { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#1E88E5" },
+    { label: "Standardtekster", path: "/standardtekster", Icon: DescriptionIcon, color: "#43A047" },
+    { label: "Produktskjema", path: "/produktskjema", Icon: AssignmentIcon, color: "#8E24AA" },
   ];
 
   return (
@@ -94,9 +92,10 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                   minWidth: 0,
                   mr: collapsed ? 0 : 2,
                   justifyContent: "center",
+                  color: item.color,
                 }}
               >
-                {item.icon}
+                <item.Icon sx={{ fontSize: collapsed ? 45 : 35 }} />
               </ListItemIcon>
               {!collapsed && <ListItemText primary={item.label} />}
             </ListItemButton>
@@ -136,7 +135,6 @@ function Layout() {
           <Route path="/omeq" element={<OMEQPage />} />
           <Route path="/standardtekster" element={<StandardTekstPage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
-          <Route path="/felleskatalogen" element={<div>Felleskatalogen (kommer)</div>} />
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>
       </Box>

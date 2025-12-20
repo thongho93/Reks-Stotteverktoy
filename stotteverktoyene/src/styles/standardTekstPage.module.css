@@ -166,7 +166,7 @@
 .main {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .preparatPaper {
@@ -206,8 +206,8 @@
 
 .contentPaper {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  min-height: 75%;
+  overflow: visible;
   margin-top: 12px;
 }
 
@@ -254,7 +254,6 @@
   white-space: pre-wrap;
   line-height: 1.45; /* tettere linjeavstand */
   max-width: 60ch;
-  max-height: 55vh;
   margin: 0 auto;
   padding-top: 6px; /* litt mindre luft på toppen */
 }

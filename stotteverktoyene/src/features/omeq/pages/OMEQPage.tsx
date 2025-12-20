@@ -175,7 +175,6 @@ export default function OMEQPage() {
   return (
     <Container maxWidth={false} className={styles.appContainer}>
       <Paper elevation={3} className={styles.appCard}>
-
         {/* Header row */}
         <Box
           sx={{
@@ -186,7 +185,7 @@ export default function OMEQPage() {
             gap: 2,
           }}
         >
-          <Typography variant="h4" sx={{ m: 0 }}>
+          <Typography variant="h1" sx={{ m: 0 }}>
             Beregning av OMEQ
           </Typography>
 
@@ -319,7 +318,9 @@ export default function OMEQPage() {
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600 }}>Virkestoff</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Administrasjonsvei</TableCell>
-                      <TableCell sx={{ fontWeight: 600, width: 180 }}>Ekvianalgetisk ratio</TableCell>
+                      <TableCell sx={{ fontWeight: 600, width: 180 }}>
+                        Ekvianalgetisk ratio
+                      </TableCell>
                     </TableRow>
                   </TableHead>
 

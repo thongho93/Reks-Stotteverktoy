@@ -76,11 +76,7 @@ export default function PreparatPanel({
 
       <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
         <span className={styles.preparatHintTip}>
-          Tips: Lim inn hele produktlinjen – søket rydder opp automatisk.
-        </span>
-        <span className={styles.preparatHintKeys}>
-          <span className={styles.preparatHintKeyLabel}>Hurtigsøk:</span> ⌥F / Alt+F ·{" "}
-          <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
+          Tips: Skriv eller lim inn varenummer – søket rydder opp automatisk.
         </span>
       </Typography>
     </Paper>

@@ -58,6 +58,17 @@ export default function StandardTekstPage() {
     selected,
   } = useStandardTekster();
 
+  const clearedInitialSelectionRef = useRef(false);
+
+  // Start with no selected template after initial load (so the user actively selects one)
+  useEffect(() => {
+    if (loading) return;
+    if (clearedInitialSelectionRef.current) return;
+
+    clearedInitialSelectionRef.current = true;
+    setSelectedId(null);
+  }, [loading, setSelectedId]);
+
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
   const errorToShow = errorLocal ?? error;
 
@@ -65,6 +76,7 @@ export default function StandardTekstPage() {
 
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [draftTitle, setDraftTitle] = useState<string>("");
+  const [draftCategory, setDraftCategory] = useState<string>("");
   const [draftContent, setDraftContent] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
@@ -135,6 +147,7 @@ export default function StandardTekstPage() {
     // Når du bytter valgt tekst, avslutt redigering og synk draft
     setIsEditing(false);
     setDraftTitle(selected?.title ?? "");
+    setDraftCategory(selected?.category ?? "");
     setDraftContent(selected?.content ?? "");
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
@@ -158,6 +171,7 @@ export default function StandardTekstPage() {
   const startEdit = () => {
     if (!selected) return;
     setDraftTitle(selected.title ?? "");
+    setDraftCategory(selected.category ?? "");
     setDraftContent(selected.content ?? "");
     setDraftFollowUps((selected.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
@@ -167,6 +181,7 @@ export default function StandardTekstPage() {
 
   const cancelEdit = () => {
     setDraftTitle(selected?.title ?? "");
+    setDraftCategory(selected?.category ?? "");
     setDraftContent(selected?.content ?? "");
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
@@ -192,6 +207,7 @@ export default function StandardTekstPage() {
 
       await standardTeksterApi.update(selected.id, {
         title: draftTitle,
+        category: draftCategory.trim() || undefined,
         content: draftContent,
         followUps: followUpsToSave,
       });
@@ -203,6 +219,7 @@ export default function StandardTekstPage() {
             ? {
                 ...it,
                 title: draftTitle,
+                category: draftCategory.trim() || undefined,
                 content: draftContent,
                 followUps: followUpsToSave,
                 updatedAt: new Date(),
@@ -244,6 +261,7 @@ export default function StandardTekstPage() {
 
       // Start editing right away
       setDraftTitle(localItem.title);
+      setDraftCategory(localItem.category ?? "");
       setDraftContent(localItem.content);
       setIsEditing(true);
     } catch (e) {
@@ -273,6 +291,22 @@ export default function StandardTekstPage() {
       .filter((t) => t.id !== selected?.id)
       .map((t) => ({ id: t.id, title: t.title }));
   }, [filtered, selected?.id]);
+
+  const categoryOptions = useMemo(() => {
+    const categories = new Set<string>();
+
+    for (const t of filtered ?? []) {
+      const c = (t.category ?? "").trim();
+      if (c) categories.add(c);
+    }
+
+    // Ensure selected category is included even if it isn't in the filtered list
+    if (selected?.category?.trim()) {
+      categories.add(selected.category.trim());
+    }
+
+    return Array.from(categories).sort((a, b) => a.localeCompare(b, "nb"));
+  }, [filtered, selected?.category]);
 
   const addFollowUp = () => {
     if (!followUpPick) return;
@@ -447,6 +481,7 @@ export default function StandardTekstPage() {
       setDeleteOpen(false);
       setIsEditing(false);
       setDraftTitle("");
+      setDraftCategory("");
       setDraftContent("");
       resetPreparatRows();
     } catch {
@@ -460,10 +495,20 @@ export default function StandardTekstPage() {
     <Box className={styles.page}>
       <Box className={styles.header}>
         <Box>
-          <Typography variant="h4">Standardtekster</Typography>
+          <Typography variant="h1">Standardtekster</Typography>
         </Box>
 
         <Box className={styles.headerActions}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "flex", alignItems: "center" }}
+          >
+            <span className={styles.preparatHintKeys}>
+              <span className={styles.preparatHintKeyLabel}>Hurtigsøk:</span> ⌥F / Alt+F ·{" "}
+              <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
+            </span>
+          </Typography>
           <Button
             variant="text"
             size="small"
@@ -568,9 +613,11 @@ export default function StandardTekstPage() {
             isAdmin={isAdmin}
             isEditing={isEditing}
             draftTitle={draftTitle}
+            draftCategory={draftCategory}
             draftContent={draftContent}
             saving={saving || deleting}
             onDraftTitleChange={setDraftTitle}
+            onDraftCategoryChange={setDraftCategory}
             onDraftContentChange={setDraftContent}
             onCancel={cancelEdit}
             onSave={saveEdit}
@@ -598,6 +645,7 @@ export default function StandardTekstPage() {
               ) : null
             }
             headerRight={!isEditing ? followUpsPreview : null}
+            categoryOptions={categoryOptions}
           />
         </Box>
       </Box>

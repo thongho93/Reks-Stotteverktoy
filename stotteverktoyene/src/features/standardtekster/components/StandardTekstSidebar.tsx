@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Collapse,
   Divider,
   List,
   ListItemButton,
@@ -14,12 +15,14 @@ import {
 } from "@mui/material";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import IconButton from "@mui/material/IconButton";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/Auth";
+
 
 type Props = {
   isAdmin: boolean;
@@ -35,6 +38,33 @@ type Props = {
   selectedId: string | null;
   setSelectedId: (id: string) => void;
 };
+
+const CATEGORY_COLOR_PALETTE = [
+  "#1E88E5", // blue
+  "#43A047", // green
+  "#E53935", // red
+  "#8E24AA", // purple
+  "#00ACC1", // cyan
+  "#FB8C00", // orange
+  "#6D4C41", // brown
+  "#546E7A", // blue grey
+];
+
+function hashStringToIndex(input: string, modulo: number) {
+  let h = 0;
+  for (let i = 0; i < input.length; i++) {
+    h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return modulo === 0 ? 0 : h % modulo;
+}
+
+function getCategoryMarkerColor(category: string) {
+  const c = (category ?? "").trim();
+  if (!c) return "#9E9E9E";
+  if (c.toLowerCase() === "favoritter") return "#F9A825";
+  if (c.toLowerCase() === "uten kategori") return "#78909C";
+  return CATEGORY_COLOR_PALETTE[hashStringToIndex(c.toLowerCase(), CATEGORY_COLOR_PALETTE.length)];
+}
 
 function TruncatedTitle({ title }: { title: string }) {
   const textRef = useRef<HTMLSpanElement | null>(null);
@@ -109,6 +139,26 @@ export default function StandardTekstSidebar({
   const [favorites, setFavorites] = useState<string[]>([]);
   const [favoritesHydrated, setFavoritesHydrated] = useState(false);
 
+  // Category expand/collapse state (persisted locally)
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [expandedHydrated, setExpandedHydrated] = useState(false);
+
+  // Hydrate expand/collapse state from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("standardtekster:categoryExpanded");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setExpandedCategories(parsed);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setExpandedHydrated(true);
+    }
+  }, []);
+
   const favoritesDocRef = useMemo(() => {
     if (!user?.uid) return null;
     return doc(db, "users", user.uid, "preferences", "standardtekster");
@@ -179,6 +229,80 @@ export default function StandardTekstSidebar({
     });
   }, [filtered, favorites]);
 
+  const groupedByCategory = useMemo(() => {
+    const favoriteItems = sortedItems.filter((it) => favorites.includes(it.id));
+    const nonFavoriteItems = sortedItems.filter((it) => !favorites.includes(it.id));
+
+    const groups = new Map<string, StandardTekst[]>();
+
+    for (const it of nonFavoriteItems) {
+      const key = (it.category ?? "").trim() || "Uten kategori";
+      const arr = groups.get(key) ?? [];
+      arr.push(it);
+      groups.set(key, arr);
+    }
+
+    const categoryGroups = Array.from(groups.entries())
+      .map(([category, items]) => ({ category, items }))
+      .sort((a, b) => a.category.localeCompare(b.category, "nb"));
+
+    // Favorites group always on top (if any)
+    if (favoriteItems.length > 0) {
+      return [{ category: "Favoritter", items: favoriteItems }, ...categoryGroups];
+    }
+
+    return categoryGroups;
+  }, [sortedItems, favorites]);
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories((prev) => {
+      const isExpanded = prev[category] !== false; // default expanded
+      return {
+        ...prev,
+        [category]: !isExpanded,
+      };
+    });
+  };
+
+  // Persist expand/collapse state
+  useEffect(() => {
+    if (!expandedHydrated) return;
+    try {
+      localStorage.setItem("standardtekster:categoryExpanded", JSON.stringify(expandedCategories));
+    } catch {
+      // ignore
+    }
+  }, [expandedCategories, expandedHydrated]);
+
+  const prevSelectedIdRef = useRef<string | null>(null);
+
+  // Ensure the category containing the selected item is expanded
+  // Only do this when selection changes due to user interaction, not on initial load.
+  useEffect(() => {
+    if (!expandedHydrated) return;
+
+    // On initial mount, just record the current selection and do not auto-expand.
+    if (prevSelectedIdRef.current === null) {
+      prevSelectedIdRef.current = selectedId ?? null;
+      return;
+    }
+
+    // Only auto-expand when the selectedId actually changes
+    if (!selectedId || selectedId === prevSelectedIdRef.current) return;
+
+    prevSelectedIdRef.current = selectedId;
+
+    for (const g of groupedByCategory) {
+      if (g.items.some((x) => x.id === selectedId)) {
+        setExpandedCategories((prev) => ({
+          ...prev,
+          [g.category]: true,
+        }));
+        break;
+      }
+    }
+  }, [selectedId, groupedByCategory, expandedHydrated]);
+
   return (
     <Paper className={styles.sidebar}>
       <Box className={styles.sidebarHeader}>
@@ -232,35 +356,88 @@ export default function StandardTekstSidebar({
           </Box>
         ) : (
           <List dense disablePadding className={styles.sidebarList}>
-            {sortedItems.map((it) => (
-              <ListItemButton
-                key={it.id}
-                selected={it.id === selectedId}
-                onClick={() => setSelectedId(it.id)}
-                className={styles.sidebarItem}
-              >
-                <ListItemText
-                  primary={<TruncatedTitle title={it.title} />}
-                  secondary={it.category ? it.category : undefined}
-                  secondaryTypographyProps={{ noWrap: true }}
-                />
+            {groupedByCategory.map((group) => {
+              const isExpanded = expandedCategories[group.category] !== false;
 
-                <IconButton
-                  size="small"
-                  edge="end"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(it.id);
-                  }}
-                >
-                  {favorites.includes(it.id) ? (
-                    <StarIcon fontSize="small" color="warning" />
-                  ) : (
-                    <StarBorderIcon fontSize="small" />
-                  )}
-                </IconButton>
-              </ListItemButton>
-            ))}
+              return (
+                <Box key={group.category}>
+                  <ListItemButton
+                    onClick={() => toggleCategory(group.category)}
+                    sx={{
+                      py: 0.75,
+                      px: 1.25,
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 1,
+                      backgroundColor: "background.paper",
+                    }}
+                  >
+                    <Box
+                      aria-hidden
+                      sx={{
+                        width: 8,
+                        height: 22,
+                        borderRadius: 1,
+                        mr: 1,
+                        bgcolor: getCategoryMarkerColor(group.category),
+                        flexShrink: 0,
+                      }}
+                    />
+                    <ListItemText
+                      primary={group.category}
+                      primaryTypographyProps={{
+                        variant: "subtitle2",
+                        noWrap: true,
+                      }}
+                    />
+                    <ExpandMoreIcon
+                      fontSize="small"
+                      sx={{
+                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 120ms ease",
+                        opacity: 0.8,
+                      }}
+                    />
+                  </ListItemButton>
+
+                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                    <List dense disablePadding>
+                      {group.items.map((it) => (
+                        <ListItemButton
+                          key={it.id}
+                          selected={it.id === selectedId}
+                          onClick={() => setSelectedId(it.id)}
+                          className={styles.sidebarItem}
+                          sx={{ pl: 2.25 }}
+                        >
+                          <ListItemText
+                            primary={<TruncatedTitle title={it.title} />}
+                            secondary={undefined}
+                          />
+
+                          <IconButton
+                            size="small"
+                            edge="end"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(it.id);
+                            }}
+                          >
+                            {favorites.includes(it.id) ? (
+                              <StarIcon fontSize="small" color="warning" />
+                            ) : (
+                              <StarBorderIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </Collapse>
+
+                  <Divider sx={{ opacity: 0.35 }} />
+                </Box>
+              );
+            })}
           </List>
         )}
       </Box>

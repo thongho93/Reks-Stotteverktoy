@@ -549,7 +549,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         inputRef={effectiveInputRef}
         fullWidth
         label="Søk etter preparat"
-        placeholder="Søk på navn, f.eks. 'Arcoxia'"
+        placeholder="Søk på navn eller varenummer"
         value={query}
         onChange={(e) => {
           const next = e.target.value;
@@ -648,7 +648,9 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
                     return (
                       <ListItemText
-                        primary={`${m.navnFormStyrke ?? m.varenavn ?? "(uten navn)"}${m.farmaloggNumber ? ` (${m.farmaloggNumber})` : ""}`}
+                        primary={`${m.navnFormStyrke ?? m.varenavn ?? "(uten navn)"}${
+                          m.farmaloggNumber ? ` (${m.farmaloggNumber})` : ""
+                        }`}
                         secondary={secondaryParts.length ? secondaryParts.join(" • ") : undefined}
                       />
                     );

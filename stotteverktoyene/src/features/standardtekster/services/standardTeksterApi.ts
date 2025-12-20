@@ -32,6 +32,7 @@ export const standardTeksterApi = {
     };
 
     if (typeof patch.title === "string") payload.title = patch.title;
+    if (typeof patch.category === "string") payload.category = patch.category;
     if (typeof patch.content === "string") payload.content = patch.content;
     if (patch.followUps !== undefined) payload.followUps = patch.followUps;
 
