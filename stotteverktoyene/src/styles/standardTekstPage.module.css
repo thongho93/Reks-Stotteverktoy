@@ -274,9 +274,9 @@
 }
 
 .authPaper {
-  padding: 24px;
+  padding: 60px;
   width: 100%;
-  max-width: 420px;
+  max-width: 640px;
 }
 
 .authSubtitle {
@@ -289,6 +289,7 @@
 
 .authForm {
   margin-top: 16px;
+  padding: 0 50px;
   display: grid;
   gap: 16px;
 }
@@ -409,7 +410,7 @@
 
 /* Profile menu (avatar + dropdown) */
 .profileIconButton {
-  padding: 6px;
+  padding: 8px;
   border-radius: 999px;
 }
 
@@ -418,9 +419,9 @@
 }
 
 .profileAvatar {
-  width: 34px !important;
-  height: 34px !important;
-  font-size: 14px;
+  width: 60px !important;
+  height: 60px !important;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.2px;
   color: #fff;

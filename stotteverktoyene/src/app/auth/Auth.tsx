@@ -4,6 +4,7 @@ import {
   Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   IconButton,
@@ -21,15 +22,111 @@ import {
   signOut,
 } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase/firebase";
 import styles from "../../styles/standardTekstPage.module.css";
+
+type ImageEncodeFormat = "image/webp" | "image/jpeg";
+
+function estimateDataUrlBytes(dataUrl: string): number {
+  const i = dataUrl.indexOf(",");
+  const b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+  return Math.floor((b64.length * 3) / 4);
+}
+
+async function fileToImage(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    img.loading = "eager";
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Kunne ikke lese bildefilen."));
+      img.src = url;
+    });
+
+    return img;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function drawCoverSquare(ctx: CanvasRenderingContext2D, img: HTMLImageElement, size: number) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const scale = Math.max(size / iw, size / ih);
+  const w = Math.round(iw * scale);
+  const h = Math.round(ih * scale);
+  const x = Math.floor((size - w) / 2);
+  const y = Math.floor((size - h) / 2);
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.drawImage(img, x, y, w, h);
+}
+
+async function canvasToDataUrl(
+  canvas: HTMLCanvasElement,
+  format: ImageEncodeFormat,
+  quality: number
+) {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, format, quality));
+  if (!blob) return canvas.toDataURL(format, quality);
+
+  return await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(typeof r.result === "string" ? r.result : "");
+    r.onerror = () => reject(new Error("Kunne ikke kode bildet."));
+    r.readAsDataURL(blob);
+  });
+}
+
+async function compressAvatarToDataUrl(file: File): Promise<string> {
+  const img = await fileToImage(file);
+
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Kunne ikke starte bildekoding.");
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  drawCoverSquare(ctx, img, size);
+
+  const TARGET = 70_000; // ca 70 KB
+  const HARD = 140_000; // sikkerhetsgrense
+
+  const formats: ImageEncodeFormat[] = ["image/webp", "image/jpeg"];
+
+  for (const fmt of formats) {
+    let q = fmt === "image/webp" ? 0.78 : 0.82;
+
+    for (let i = 0; i < 7; i++) {
+      const dataUrl = await canvasToDataUrl(canvas, fmt, q);
+      const bytes = estimateDataUrlBytes(dataUrl);
+      if (bytes <= TARGET) return dataUrl;
+      if (bytes <= HARD && q <= 0.6) return dataUrl;
+      q = Math.max(0.45, q - 0.07);
+    }
+
+    const last = await canvasToDataUrl(canvas, fmt, 0.5);
+    if (estimateDataUrlBytes(last) <= HARD) return last;
+  }
+
+  // Siste utvei
+  return canvas.toDataURL("image/jpeg", 0.5);
+}
 
 export function useAuthUser() {
   const [user, setUser] = React.useState<User | null>(() => auth.currentUser);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
   const [firstName, setFirstName] = React.useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -38,6 +135,7 @@ export function useAuthUser() {
       if (!u) {
         setIsAdmin(false);
         setFirstName(null);
+        setAvatarUrl(null);
         setLoading(false);
         return;
       }
@@ -48,6 +146,8 @@ export function useAuthUser() {
         const data = userSnap.exists() ? (userSnap.data() as any) : null;
         const name = typeof data?.firstName === "string" ? data.firstName.trim() : "";
         setFirstName(name.length > 0 ? name : null);
+        const avatar = typeof data?.avatarUrl === "string" ? data.avatarUrl.trim() : "";
+        setAvatarUrl(avatar.length > 0 ? avatar : null);
 
         // Then determine admin. If rules deny reading /admins for non-admin users,
         // treat it as not-admin instead of failing the whole auth hydration.
@@ -60,6 +160,7 @@ export function useAuthUser() {
       } catch {
         setIsAdmin(false);
         setFirstName(null);
+        setAvatarUrl(null);
       } finally {
         setLoading(false);
       }
@@ -68,7 +169,7 @@ export function useAuthUser() {
     return () => unsub();
   }, []);
 
-  return { user, loading, isAdmin, firstName };
+  return { user, loading, isAdmin, firstName, avatarUrl };
 }
 
 export function RequireAuth({ children }: { children: React.ReactElement }) {
@@ -146,6 +247,7 @@ export function LoginPage() {
             {
               email: cred.user.email ?? trimmedEmail,
               firstName: trimmedFirstName,
+              avatarUrl: null,
               createdAt: serverTimestamp(),
             },
             { merge: true }
@@ -251,8 +353,9 @@ export function LoginPage() {
 }
 
 export function ProfileMenu() {
-  const { user, loading, isAdmin, firstName } = useAuthUser();
+  const { user, loading, isAdmin, firstName, avatarUrl } = useAuthUser();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const navigate = useNavigate();
   const open = Boolean(anchorEl);
 
   if (loading || !user) return null;
@@ -271,7 +374,9 @@ export function ProfileMenu() {
   return (
     <>
       <IconButton onClick={handleOpen} aria-label="Profil" className={styles.profileIconButton}>
-        <Avatar className={styles.profileAvatar}>{avatarLabel}</Avatar>
+        <Avatar className={styles.profileAvatar} src={avatarUrl ?? undefined}>
+          {avatarLabel}
+        </Avatar>
       </IconButton>
 
       <Menu
@@ -288,7 +393,9 @@ export function ProfileMenu() {
       >
         <Box className={styles.profileMenuHeader}>
           <Box className={styles.profileMenuHeaderRow}>
-            <Avatar className={styles.profileMenuAvatarSmall}>{avatarLabel}</Avatar>
+            <Avatar className={styles.profileMenuAvatarSmall} src={avatarUrl ?? undefined}>
+              {avatarLabel}
+            </Avatar>
             <Box className={styles.profileMenuHeaderText}>
               <Typography className={styles.profileMenuHello}>
                 {firstName ? `Hei, ${firstName}` : "Hei"}
@@ -302,10 +409,232 @@ export function ProfileMenu() {
 
         <Divider />
 
+        <MenuItem
+          onClick={() => {
+            handleClose();
+            navigate("/profil");
+          }}
+        >
+          Min profil
+        </MenuItem>
+
         <MenuItem onClick={handleLogout} className={styles.profileMenuLogout}>
           Logg ut
         </MenuItem>
       </Menu>
     </>
+  );
+}
+
+export function ProfilePage() {
+  const navigate = useNavigate();
+  const { user, loading, isAdmin, firstName, avatarUrl } = useAuthUser();
+
+  const [draftFirstName, setDraftFirstName] = React.useState<string>(firstName ?? "");
+  const [draftAvatarUrl, setDraftAvatarUrl] = React.useState<string>(avatarUrl ?? "");
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [saved, setSaved] = React.useState(false);
+
+  React.useEffect(() => {
+    setDraftFirstName(firstName ?? "");
+  }, [firstName]);
+
+  React.useEffect(() => {
+    setDraftAvatarUrl(avatarUrl ?? "");
+  }, [avatarUrl]);
+
+  if (loading) {
+    return (
+      <Box className={styles.authLoadingWrap}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const roleLabel = isAdmin ? "Admin" : "Bruker";
+
+  const onPickAvatarFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const onAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // allow re-selecting same file
+    e.target.value = "";
+
+    if (!file.type.startsWith("image/")) {
+      setError("Velg en bildefil (PNG/JPG/WebP). ");
+      return;
+    }
+
+    // Tillat større originaler siden vi komprimerer uansett
+    if (file.size > 5_000_000) {
+      setError("Bildet er for stort. Velg et bilde under 5 MB. ");
+      return;
+    }
+
+    setSaved(false);
+    setError(null);
+    setUploadingAvatar(true);
+
+    try {
+      const dataUrl = await compressAvatarToDataUrl(file);
+      const bytes = estimateDataUrlBytes(dataUrl);
+
+      // Ekstra sikkerhetsnett for å unngå store Firestore-dokumenter
+      if (bytes > 160_000) {
+        setError("Bildet ble fortsatt for stort etter komprimering. Prøv et annet bilde.");
+        return;
+      }
+
+      setDraftAvatarUrl(dataUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke behandle bildet.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const onSave = async () => {
+    setError(null);
+    setSaved(false);
+
+    const trimmed = draftFirstName.trim();
+    if (!trimmed) {
+      setError("Fornavn må fylles ut. Kun fornavn, ikke etternavn.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Update profile in users/{uid}
+      await updateDoc(doc(db, "users", user.uid), {
+        firstName: trimmed,
+        avatarUrl: draftAvatarUrl.trim() || null,
+      });
+      setSaved(true);
+    } catch {
+      // If document doesn't exist yet, create it
+      try {
+        await setDoc(
+          doc(db, "users", user.uid),
+          {
+            email: user.email ?? "",
+            firstName: trimmed,
+            avatarUrl: draftAvatarUrl.trim() || null,
+            createdAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+        setSaved(true);
+      } catch {
+        setError("Kunne ikke lagre profilen akkurat nå.");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Box className={styles.authCenter}>
+      <Paper className={styles.authPaper}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            mb: 5,
+          }}
+        >
+          <Typography variant="h2">Min profil</Typography>
+          <Chip label={roleLabel} />
+        </Box>
+
+        {error && (
+          <Alert severity="error" className={styles.authError}>
+            {error}
+          </Alert>
+        )}
+
+        {saved && !error && (
+          <Alert severity="success" className={styles.authError}>
+            Profil oppdatert.
+          </Alert>
+        )}
+
+        <Box className={styles.authForm}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
+            <Avatar
+              src={draftAvatarUrl.trim() ? draftAvatarUrl.trim() : undefined}
+              sx={{ width: 150, height: 150 }}
+            >
+              {(draftFirstName?.trim()?.[0] || user.email?.trim()?.[0] || "?").toUpperCase()}
+            </Avatar>
+
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                <Button
+                  variant="outlined"
+                  onClick={onPickAvatarFile}
+                  disabled={saving || uploadingAvatar}
+                >
+                  Last opp bilde
+                </Button>
+                <Button
+                  variant="text"
+                  onClick={() => {
+                    setSaved(false);
+                    setDraftAvatarUrl("");
+                  }}
+                  disabled={saving || uploadingAvatar}
+                >
+                  Fjern
+                </Button>
+              </Box>
+            </Box>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={onAvatarFileChange}
+            />
+          </Box>
+
+          <TextField label="E-post" value={user.email ?? ""} InputProps={{ readOnly: true }} />
+
+          <TextField
+            label="Fornavn"
+            value={draftFirstName}
+            onChange={(e) => {
+              setSaved(false);
+              setDraftFirstName(e.target.value);
+            }}
+            helperText="Skriv kun fornavn (ikke etternavn)"
+            autoComplete="given-name"
+          />
+
+          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+            <Button variant="text" onClick={() => navigate(-1)} disabled={saving}>
+              Tilbake
+            </Button>
+            <Button variant="contained" onClick={onSave} disabled={saving || uploadingAvatar}>
+              {saving ? "Lagrer..." : "Lagre"}
+            </Button>
+          </Box>
+        </Box>
+      </Paper>
+    </Box>
   );
 }

@@ -9,8 +9,8 @@ export default function HomePage() {
         </Typography>
 
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Dette er et internt støtteverktøy for Farmasiet, laget for å gjøre
-          farmasøytisk arbeid raskere, tryggere og mer oversiktlig.
+          Dette er et internt støtteverktøy for Farmasiet, laget for å gjøre farmasøytisk arbeid
+          raskere, tryggere og mer oversiktlig.
         </Typography>
 
         <Typography variant="body1" sx={{ mb: 2 }}>
@@ -19,9 +19,7 @@ export default function HomePage() {
 
         <ul>
           <li>
-            <Typography variant="body1">
-              Beregne OMEQ ved bruk av opioider
-            </Typography>
+            <Typography variant="body1">Beregne OMEQ ved bruk av opioider</Typography>
           </li>
           <li>
             <Typography variant="body1">
@@ -29,9 +27,7 @@ export default function HomePage() {
             </Typography>
           </li>
           <li>
-            <Typography variant="body1">
-              Slå opp informasjon i Felleskatalogen
-            </Typography>
+            <Typography variant="body1">Sende produktskjema til innkjøpsteamet</Typography>
           </li>
         </ul>
 

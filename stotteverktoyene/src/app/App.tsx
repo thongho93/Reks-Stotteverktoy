@@ -21,7 +21,7 @@ import OMEQPage from "../features/omeq/pages/OMEQPage";
 import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
 import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
 import HomePage from "./HomePage";
-import { LoginPage, ProfileMenu, RequireAuth } from "./auth/Auth";
+import { LoginPage, ProfileMenu, RequireAuth, ProfilePage } from "./auth/Auth";
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
@@ -134,6 +134,7 @@ function Layout() {
           <Route path="/" element={<HomePage />} />
           <Route path="/omeq" element={<OMEQPage />} />
           <Route path="/standardtekster" element={<StandardTekstPage />} />
+          <Route path="/profil" element={<ProfilePage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>
