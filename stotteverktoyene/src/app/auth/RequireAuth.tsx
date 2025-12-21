@@ -5,7 +5,7 @@ import { useAuthUser } from "./useAuthUser";
 import styles from "../../styles/standardTekstPage.module.css";
 
 export function RequireAuth({ children }: { children: React.ReactElement }) {
-  const { user, loading } = useAuthUser();
+  const { user, loading, isAdmin, isApproved } = useAuthUser();
   const location = useLocation();
 
   if (loading) {
@@ -18,6 +18,11 @@ export function RequireAuth({ children }: { children: React.ReactElement }) {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  // Approval gate: admins bypass
+  if (!isAdmin && !isApproved) {
+    return <Navigate to="/pending-approval" replace state={{ from: location.pathname }} />;
   }
 
   return children;

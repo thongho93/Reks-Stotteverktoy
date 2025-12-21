@@ -22,6 +22,7 @@ import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPa
 import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
 import HomePage from "./HomePage";
 import { RequireAuth, LoginPage, ProfileMenu, ProfilePage } from "./auth/Auth";
+import PendingApprovalPage from "./auth/PendingApprovalPage";
 import { logUsage } from "../shared/services/usage";
 import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
 
@@ -174,6 +175,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/pending-approval" element={<PendingApprovalPage />} />
         <Route
           path="/*"
           element={

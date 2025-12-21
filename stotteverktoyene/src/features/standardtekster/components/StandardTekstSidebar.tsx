@@ -25,6 +25,7 @@ import { useAuthUser } from "../../../app/auth/Auth";
 import { logUsage } from "../../../shared/services/usage";
 
 type Props = {
+  disabled?: boolean;
   isAdmin: boolean;
   creating: boolean;
   onCreate: () => void;
@@ -64,6 +65,10 @@ function getCategoryMarkerColor(category: string) {
   if (c.toLowerCase() === "favoritter") return "#F9A825";
   if (c.toLowerCase() === "uten kategori") return "#78909C";
   return CATEGORY_COLOR_PALETTE[hashStringToIndex(c.toLowerCase(), CATEGORY_COLOR_PALETTE.length)];
+}
+
+function isUtenKategori(category: string) {
+  return (category ?? "").trim().toLowerCase() === "uten kategori";
 }
 
 // Component that shows a truncated title with ellipsis, and a tooltip on hover if truncated
@@ -125,6 +130,7 @@ function TruncatedTitle({ title }: { title: string }) {
   );
 }
 export default function StandardTekstSidebar({
+  disabled = false,
   isAdmin,
   creating,
   onCreate,
@@ -246,7 +252,13 @@ export default function StandardTekstSidebar({
 
     const categoryGroups = Array.from(groups.entries())
       .map(([category, items]) => ({ category, items }))
-      .sort((a, b) => a.category.localeCompare(b.category, "nb"));
+      .sort((a, b) => {
+        const aIsUncat = isUtenKategori(a.category);
+        const bIsUncat = isUtenKategori(b.category);
+        if (aIsUncat && !bIsUncat) return 1;
+        if (!aIsUncat && bIsUncat) return -1;
+        return a.category.localeCompare(b.category, "nb");
+      });
 
     // Favorites group always on top (if any)
     if (favoriteItems.length > 0) {
@@ -306,7 +318,20 @@ export default function StandardTekstSidebar({
   }, [selectedId, groupedByCategory, expandedHydrated]);
 
   return (
-    <Paper className={styles.sidebar}>
+    <Paper className={styles.sidebar} sx={{ position: "relative" }}>
+      {disabled && (
+        <Box
+          sx={{ position: "absolute", inset: 0, zIndex: 50 }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        />
+      )}
       <Box className={styles.sidebarHeader}>
         {isAdmin && (
           <Box className={styles.sidebarCreateRow}>
@@ -342,6 +367,7 @@ export default function StandardTekstSidebar({
                 });
               }
             }}
+            disabled={disabled}
           />
         </Box>
 

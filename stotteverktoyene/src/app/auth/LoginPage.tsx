@@ -65,6 +65,7 @@ export function LoginPage() {
               firstName: trimmedFirstName,
               avatarUrl: null,
               createdAt: serverTimestamp(),
+              approved: false, 
             },
             { merge: true }
           );

@@ -346,6 +346,14 @@
   margin-top: 16px;
 }
 
+/* Block clicks in StandardTekstContent until admin has saved a new placeholder */
+.contentLockOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+}
+
 /* Preparat: single search + chips */
 .preparatHeader {
   display: flex;

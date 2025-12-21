@@ -75,6 +75,7 @@ export default function StandardTekstPage() {
   const [draftContent, setDraftContent] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
+  const lockBeforeEdit = Boolean(selected && !isEditing && selected.title === "Ny standardtekst");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -85,7 +86,7 @@ export default function StandardTekstPage() {
   const preparatSectionRef = useRef<HTMLDivElement | null>(null);
   const preparatSearchInputRef = useRef<HTMLInputElement | null>(null);
   const preserveInputsOnNextSelectRef = useRef(false);
-  
+
   // Hotkeys for preparat search focus and clearing
   useStandardTekstHotkeys({
     preparatRows,
@@ -549,6 +550,7 @@ export default function StandardTekstPage() {
 
       <Box className={styles.grid}>
         <StandardTekstSidebar
+          disabled={lockBeforeEdit}
           isAdmin={isAdmin}
           creating={creating}
           onCreate={createNewStandardTekst}
@@ -561,52 +563,73 @@ export default function StandardTekstPage() {
         />
 
         <Box className={styles.main}>
-          <Box ref={preparatSectionRef}>
-            <PreparatPanel
-              preparatRows={preparatRows}
-              inputRef={preparatSearchInputRef}
-              onPickText={(text) => {
-                addPickedPreparat(text);
+          <Box sx={{ position: "relative" }}>
+            {lockBeforeEdit && (
+              <Box
+                sx={{ position: "absolute", inset: 0, zIndex: 20 }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              />
+            )}
 
-                if (isEditing) {
-                  setDraftContent((prev) => replaceNextPreparatToken(prev, text));
-                }
-              }}
-              onClear={clearPreparats}
-              onRemove={(id) => removePreparatById(typeof id === "number" ? id : Number(id))}
-            />
+            <Box ref={preparatSectionRef}>
+              <PreparatPanel
+                preparatRows={preparatRows}
+                inputRef={preparatSearchInputRef}
+                onPickText={(text) => {
+                  addPickedPreparat(text);
+                  if (isEditing) {
+                    setDraftContent((prev) => replaceNextPreparatToken(prev, text));
+                  }
+                }}
+                onClear={clearPreparats}
+                onRemove={(id) => removePreparatById(typeof id === "number" ? id : Number(id))}
+              />
+            </Box>
+
+            {selected && templateHasTallToken(selected.content) && (
+              <Paper
+                elevation={0}
+                sx={{
+                  mt: 1,
+                  mb: 1.5,
+                  p: 1.25,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                  Tall i teksten
+                </Typography>
+                <TextField
+                  label="Tall"
+                  value={tallValue}
+                  onChange={(e) => setTallValue(e.target.value)}
+                  size="small"
+                  type="number"
+                  inputProps={{ inputMode: "numeric" }}
+                  helperText={
+                    tallValue.trim()
+                      ? "Tallet settes inn der {{TALL}} står i teksten."
+                      : "Plasseringen vises som ____ i teksten til du fyller inn et tall."
+                  }
+                  fullWidth
+                />
+              </Paper>
+            )}
           </Box>
 
-          {selected && templateHasTallToken(selected.content) && (
-            <Paper
-              elevation={0}
-              sx={{
-                mt: 1,
-                mb: 1.5,
-                p: 1.25,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 2,
-              }}
-            >
-              <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                Tall i teksten
-              </Typography>
-              <TextField
-                label="Tall"
-                value={tallValue}
-                onChange={(e) => setTallValue(e.target.value)}
-                size="small"
-                type="number"
-                inputProps={{ inputMode: "numeric" }}
-                helperText={
-                  tallValue.trim()
-                    ? "Tallet settes inn der {{TALL}} står i teksten."
-                    : "Plasseringen vises som ____ i teksten til du fyller inn et tall."
-                }
-                fullWidth
-              />
-            </Paper>
+          {lockBeforeEdit && (
+            <Alert severity="warning" sx={{ mb: 1.25, mt: 2 }}>
+              Ny standardtekst kan ikke stå tom. Rediger eller slett før du kan fortsette.
+            </Alert>
           )}
 
           <StandardTekstContent

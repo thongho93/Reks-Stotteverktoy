@@ -62,6 +62,15 @@ export default function StandardTekstContent({
 }: Props) {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
+  const draftContentPlaceholder =
+    "Bruk {{PREPARAT}} der preparatnavn skal settes inn.\n" +
+    "Hvis ulike preparatnavn skal vises flere steder i teksten, bruk f.eks. {{PREPARAT}} og {{PREPARAT1}}.\n" +
+    "Bruk {{TALL}} der tall skal settes inn.\n\n" +
+    "På slutten av teksten: \n" +
+    "Vennlig hilsen\n" +
+    "XX, farmasøyt\n" +
+    "Farmasiet";
+
   useEffect(() => {
     if (!isEditing) return;
 
@@ -77,9 +86,12 @@ export default function StandardTekstContent({
     onCopy();
   };
 
+  const lockBeforeEdit = Boolean(selected && !isEditing && selected.title === "Ny standardtekst");
+
   return (
     <Paper
-      onClick={selected && !isEditing ? handleCopy : undefined}
+      sx={{ position: "relative" }}
+      onClick={selected && !isEditing && !lockBeforeEdit ? handleCopy : undefined}
       className={
         selected && !isEditing
           ? `${styles.contentPaper} ${styles.contentPaperCopy}`
@@ -94,6 +106,19 @@ export default function StandardTekstContent({
 
       {selected && (
         <>
+          {lockBeforeEdit ? (
+            <Box
+              className={styles.contentLockOverlay}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            />
+          ) : null}
           <Box
             sx={{
               display: "flex",
@@ -180,6 +205,7 @@ export default function StandardTekstContent({
                   minRows={10}
                   label="Tekst"
                   value={draftContent}
+                  placeholder={isEditing ? draftContentPlaceholder : undefined}
                   onChange={(e) => onDraftContentChange(e.target.value)}
                 />
 
@@ -217,7 +243,12 @@ export default function StandardTekstContent({
               {belowContent}
 
               {isAdmin && (
-                <Box className={styles.editRowBottom} display="flex" gap={1}>
+                <Box
+                  className={styles.editRowBottom}
+                  display="flex"
+                  gap={1}
+                  sx={{ position: "relative", zIndex: 2 }}
+                >
                   <Button
                     variant="contained"
                     size="small"
@@ -229,7 +260,7 @@ export default function StandardTekstContent({
                     }}
                     className={styles.pillButton}
                   >
-                    Endre
+                    Rediger
                   </Button>
 
                   <Button
