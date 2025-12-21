@@ -7,14 +7,14 @@ import { useAuthUser } from "./useAuthUser";
 import styles from "../../styles/standardTekstPage.module.css";
 
 export function ProfileMenu() {
-  const { user, loading, isAdmin, firstName, avatarUrl } = useAuthUser();
+  const { user, loading, isAdmin, isOwner, firstName, avatarUrl } = useAuthUser();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const navigate = useNavigate();
   const open = Boolean(anchorEl);
 
   if (loading || !user) return null;
 
-  const roleLabel = isAdmin ? "Admin" : "Bruker";
+  const roleLabel = isOwner ? "Eier" : isAdmin ? "Admin" : "Bruker";
   const avatarLabel = (firstName?.trim()?.[0] || user.email?.trim()?.[0] || "?").toUpperCase();
 
   const handleOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
