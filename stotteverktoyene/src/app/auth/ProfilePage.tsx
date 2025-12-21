@@ -46,13 +46,13 @@ type RegisteredUserRow = {
   uid: string;
   firstName: string;
   email: string;
-  role: "Admin" | "Bruker";
+  role: "Eier" | "Admin" | "Bruker";
   approved: boolean; // true if approved is true or missing; false if approved === false
 };
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { user, loading, isAdmin, firstName, avatarUrl } = useAuthUser();
+  const { user, loading, isAdmin, isOwner, firstName, avatarUrl } = useAuthUser();
 
   const [draftFirstName, setDraftFirstName] = React.useState<string>(firstName ?? "");
   const [draftAvatarUrl, setDraftAvatarUrl] = React.useState<string>(avatarUrl ?? "");
@@ -76,6 +76,30 @@ export function ProfilePage() {
   const [deleteUserError, setDeleteUserError] = React.useState<string | null>(null);
   const [approvingUid, setApprovingUid] = React.useState<string | null>(null);
   const [approveError, setApproveError] = React.useState<string | null>(null);
+  const [promotingUid, setPromotingUid] = React.useState<string | null>(null);
+  const [promoteError, setPromoteError] = React.useState<string | null>(null);
+  const [demotingUid, setDemotingUid] = React.useState<string | null>(null);
+  const [demoteError, setDemoteError] = React.useState<string | null>(null);
+  const demoteFromAdmin = async (target: RegisteredUserRow) => {
+    if (!user) return;
+    if (!isOwner) return;
+
+    setDemotingUid(target.uid);
+    setDemoteError(null);
+
+    try {
+      await deleteDoc(doc(db, "admins", target.uid));
+
+      setRegisteredUsers((prev) =>
+        prev.map((u) => (u.uid === target.uid ? { ...u, role: "Bruker" } : u))
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Kunne ikke fjerne admin-rollen.";
+      setDemoteError(msg);
+    } finally {
+      setDemotingUid(null);
+    }
+  };
 
   const handleAdminSecretTap = () => {
     // Triple-click within a short window reveals the stats button
@@ -128,14 +152,16 @@ export function ProfilePage() {
         // Read from /users collection (requires Firestore rules to allow admin read)
         const usersQ = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(200));
 
-        // admins collection: doc id == uid
-        const [usersSnap, adminsSnap] = await Promise.all([
+        // admins collection: doc id == uid; owners collection: doc id == uid
+        const [usersSnap, adminsSnap, ownersSnap] = await Promise.all([
           getDocs(usersQ),
           getDocs(collection(db, "admins")),
+          getDocs(collection(db, "owners")),
         ]);
 
         const adminIds = new Set<string>();
         const adminEmails = new Set<string>();
+        const ownerIds = new Set<string>();
 
         adminsSnap.forEach((d) => {
           adminIds.add(d.id);
@@ -150,13 +176,19 @@ export function ProfilePage() {
           }
         });
 
+        ownersSnap.forEach((d) => {
+          ownerIds.add(d.id);
+        });
+
         const rows: RegisteredUserRow[] = usersSnap.docs.map((d) => {
           const data = d.data() as any;
           const firstName = typeof data.firstName === "string" ? data.firstName : "";
           const email = typeof data.email === "string" ? data.email : "";
           const emailLower = email ? email.toLowerCase() : "";
-          const role: RegisteredUserRow["role"] =
-            adminIds.has(d.id) || (emailLower && adminEmails.has(emailLower)) ? "Admin" : "Bruker";
+          const isOwnerRow = ownerIds.has(d.id);
+          const isAdminRow = adminIds.has(d.id) || (emailLower && adminEmails.has(emailLower));
+
+          const role: RegisteredUserRow["role"] = isOwnerRow ? "Eier" : isAdminRow ? "Admin" : "Bruker";
 
           // Approval: approved === false => waiting; missing/true => active
           const approvedRaw = data?.approved;
@@ -165,12 +197,14 @@ export function ProfilePage() {
           return { uid: d.id, firstName, email, role, approved };
         });
 
-        // Sort nicely by firstName, then role, then email
+        // Sort by role priority (Eier, Admin, Bruker), then firstName, then email
+        const roleRank = (r: RegisteredUserRow["role"]) => (r === "Eier" ? 0 : r === "Admin" ? 1 : 2);
+
         rows.sort((a, b) => {
+          const rr = roleRank(a.role) - roleRank(b.role);
+          if (rr !== 0) return rr;
           const n = a.firstName.localeCompare(b.firstName, "nb");
           if (n !== 0) return n;
-          const r = a.role.localeCompare(b.role, "nb");
-          if (r !== 0) return r;
           return a.email.localeCompare(b.email, "nb");
         });
 
@@ -201,7 +235,24 @@ export function ProfilePage() {
     return <Navigate to="/login" replace />;
   }
 
-  const roleLabel = isAdmin ? "Admin" : "Bruker";
+  const roleLabel = isOwner ? "Eier" : isAdmin ? "Admin" : null;
+
+  const canDeleteUserRow = (target: RegisteredUserRow) => {
+    // Safety: do not allow deleting yourself from the users collection
+    if (target.uid === user.uid) return false;
+
+    // Owner can delete any users-doc
+    if (isOwner) return true;
+
+    // Non-owner admins can only delete regular users
+    return target.role === "Bruker";
+  };
+
+  const canOpenDeleteDialog = (target: RegisteredUserRow) => {
+    // Only admins see the list, but keep the check explicit
+    if (!isAdmin) return false;
+    return canDeleteUserRow(target);
+  };
 
   const onPickAvatarFile = () => {
     fileInputRef.current?.click();
@@ -290,6 +341,12 @@ export function ProfilePage() {
   const confirmDeleteUser = async () => {
     if (!deleteUserTarget) return;
 
+    // UI + security guard: prevent non-owner admins from deleting Owner/Admin or self
+    if (!canDeleteUserRow(deleteUserTarget)) {
+      setDeleteUserError("Du har ikke tilgang til å slette denne brukeren.");
+      return;
+    }
+
     setDeletingUser(true);
     setDeleteUserError(null);
 
@@ -329,6 +386,35 @@ export function ProfilePage() {
     }
   };
 
+  const promoteToAdmin = async (target: RegisteredUserRow) => {
+    if (!user) return;
+
+    setPromotingUid(target.uid);
+    setPromoteError(null);
+
+    try {
+      await setDoc(
+        doc(db, "admins", target.uid),
+        {
+          uid: target.uid,
+          email: (target.email || "").toLowerCase(),
+          promotedAt: serverTimestamp(),
+          promotedBy: user.uid,
+        },
+        { merge: true }
+      );
+
+      setRegisteredUsers((prev) =>
+        prev.map((u) => (u.uid === target.uid ? { ...u, role: "Admin" } : u))
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Kunne ikke promotere brukeren til admin.";
+      setPromoteError(msg);
+    } finally {
+      setPromotingUid(null);
+    }
+  };
+
   return (
     <Box className={styles.authCenter}>
       <Paper className={styles.authPaper}>
@@ -348,45 +434,54 @@ export function ProfilePage() {
                 Statistikk
               </Button>
             )}
-            <Chip
-              label={roleLabel}
-              onClick={isAdmin ? handleAdminSecretTap : undefined}
-              onMouseDown={(e) => {
-                // Prevent focus/pressed visual state on click
-                e.preventDefault();
-              }}
-              tabIndex={-1}
-              sx={(theme) => ({
-                cursor: "default",
-                userSelect: "none",
-                // Chip becomes MuiChip-clickable when onClick is provided. Lock its visual state.
-                backgroundColor: theme.palette.action.selected,
-                transition: "none",
-                "& .MuiTouchRipple-root": {
-                  display: "none",
-                },
-                "&.MuiChip-clickable": {
-                  transition: "none",
-                },
-                "&.MuiChip-clickable:hover": {
-                  backgroundColor: theme.palette.action.selected,
-                },
-                "&.MuiChip-clickable:active": {
-                  backgroundColor: theme.palette.action.selected,
-                  boxShadow: "none",
-                },
-                "&.MuiChip-clickable:focus": {
-                  backgroundColor: theme.palette.action.selected,
-                  boxShadow: "none",
-                  outline: "none",
-                },
-                "&.Mui-focusVisible": {
-                  backgroundColor: theme.palette.action.selected,
-                  boxShadow: "none",
-                  outline: "none",
-                },
-              })}
-            />
+            {roleLabel && (
+              <Chip
+                label={roleLabel}
+                onClick={isAdmin ? handleAdminSecretTap : undefined}
+                onMouseDown={(e) => {
+                  // Prevent focus/pressed visual state on click
+                  e.preventDefault();
+                }}
+                tabIndex={-1}
+                sx={(theme) => {
+                  const ownerBg = theme.palette.secondary.dark;
+                  const adminBg = theme.palette.action.selected;
+                  const bg = isOwner ? ownerBg : adminBg;
+                  const fg = isOwner ? theme.palette.getContrastText(ownerBg) : "inherit";
+
+                  return {
+                    cursor: "default",
+                    userSelect: "none",
+                    backgroundColor: bg,
+                    color: fg,
+                    transition: "none",
+                    "& .MuiTouchRipple-root": {
+                      display: "none",
+                    },
+                    "&.MuiChip-clickable": {
+                      transition: "none",
+                    },
+                    "&.MuiChip-clickable:hover": {
+                      backgroundColor: bg,
+                    },
+                    "&.MuiChip-clickable:active": {
+                      backgroundColor: bg,
+                      boxShadow: "none",
+                    },
+                    "&.MuiChip-clickable:focus": {
+                      backgroundColor: bg,
+                      boxShadow: "none",
+                      outline: "none",
+                    },
+                    "&.Mui-focusVisible": {
+                      backgroundColor: bg,
+                      boxShadow: "none",
+                      outline: "none",
+                    },
+                  };
+                }}
+              />
+            )}
           </Box>
         </Box>
 
@@ -511,6 +606,16 @@ export function ProfilePage() {
                       {approveError}
                     </Alert>
                   )}
+                  {promoteError && (
+                    <Alert severity="error" sx={{ mb: 1.5 }}>
+                      {promoteError}
+                    </Alert>
+                  )}
+                  {demoteError && (
+                    <Alert severity="error" sx={{ mb: 1.5 }}>
+                      {demoteError}
+                    </Alert>
+                  )}
 
                   <TableContainer
                     sx={{
@@ -535,7 +640,7 @@ export function ProfilePage() {
                           <TableCell sx={{ width: 260, whiteSpace: "nowrap" }}>E-post</TableCell>
                           <TableCell sx={{ whiteSpace: "nowrap", minWidth: 30 }}>Rolle</TableCell>
                           <TableCell sx={{ whiteSpace: "nowrap", minWidth: 30 }}>Status</TableCell>
-                          <TableCell sx={{ whiteSpace: "nowrap", minWidth: 100 }}>
+                          <TableCell sx={{ whiteSpace: "nowrap", minWidth: 150 }}>
                             Handling
                           </TableCell>
                         </TableRow>
@@ -574,31 +679,71 @@ export function ProfilePage() {
                                 </Typography>
                               </Box>
                             </TableCell>
-                            <TableCell sx={{ whiteSpace: "nowrap", minWidth: 100 }}>
+                            <TableCell sx={{ whiteSpace: "nowrap", minWidth: 150 }}>
                               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
                                 {!u.approved && (
                                   <Button
                                     size="small"
                                     variant="contained"
                                     onClick={() => approveUser(u)}
-                                    disabled={Boolean(approvingUid) || deletingUser}
+                                    disabled={Boolean(approvingUid) || Boolean(promotingUid) || deletingUser}
                                   >
                                     {approvingUid === u.uid ? "Godkjenner..." : "Godkjenn"}
                                   </Button>
                                 )}
 
-                                <Button
-                                  size="small"
-                                  color="error"
-                                  variant="outlined"
-                                  onClick={() => {
-                                    setDeleteUserError(null);
-                                    setDeleteUserTarget(u);
-                                  }}
-                                  disabled={deletingUser || Boolean(approvingUid)}
-                                >
-                                  Slett
-                                </Button>
+                                {u.role === "Bruker" && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => promoteToAdmin(u)}
+                                    disabled={
+                                      Boolean(approvingUid) ||
+                                      Boolean(promotingUid) ||
+                                      Boolean(demotingUid) ||
+                                      deletingUser
+                                    }
+                                  >
+                                    {promotingUid === u.uid ? "Promoterer..." : "Gjør admin"}
+                                  </Button>
+                                )}
+
+                                {isOwner && u.role === "Admin" && (
+                                  <Button
+                                    size="small"
+                                    color="warning"
+                                    variant="outlined"
+                                    onClick={() => demoteFromAdmin(u)}
+                                    disabled={
+                                      Boolean(approvingUid) ||
+                                      Boolean(promotingUid) ||
+                                      Boolean(demotingUid) ||
+                                      deletingUser
+                                    }
+                                  >
+                                    {demotingUid === u.uid ? "Fjerner..." : "Fjern admin"}
+                                  </Button>
+                                )}
+
+                                {canOpenDeleteDialog(u) && (
+                                  <Button
+                                    size="small"
+                                    color="error"
+                                    variant="outlined"
+                                    onClick={() => {
+                                      setDeleteUserError(null);
+                                      setDeleteUserTarget(u);
+                                    }}
+                                    disabled={
+                                      deletingUser ||
+                                      Boolean(approvingUid) ||
+                                      Boolean(promotingUid) ||
+                                      Boolean(demotingUid)
+                                    }
+                                  >
+                                    Slett
+                                  </Button>
+                                )}
                               </Box>
                             </TableCell>
                           </TableRow>
@@ -644,6 +789,12 @@ export function ProfilePage() {
             <Typography variant="body2">E-post: {deleteUserTarget?.email || "-"}</Typography>
           </Box>
 
+          {!deleteUserTarget ? null : !canDeleteUserRow(deleteUserTarget) ? (
+            <Alert severity="warning" sx={{ mt: 1.5 }}>
+              Du kan ikke slette denne brukeren.
+            </Alert>
+          ) : null}
+
           {deleteUserError && (
             <Alert severity="error" sx={{ mt: 1.5 }}>
               {deleteUserError}
@@ -665,7 +816,7 @@ export function ProfilePage() {
             color="error"
             variant="contained"
             onClick={confirmDeleteUser}
-            disabled={deletingUser}
+            disabled={deletingUser || !deleteUserTarget || !canDeleteUserRow(deleteUserTarget)}
           >
             {deletingUser ? "Sletter..." : "Slett"}
           </Button>
