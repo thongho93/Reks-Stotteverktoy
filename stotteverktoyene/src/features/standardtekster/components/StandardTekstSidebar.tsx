@@ -22,7 +22,7 @@ import styles from "../../../styles/standardTekstPage.module.css";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/Auth";
-
+import { logUsage } from "../../../shared/services/usage";
 
 type Props = {
   isAdmin: boolean;
@@ -66,6 +66,7 @@ function getCategoryMarkerColor(category: string) {
   return CATEGORY_COLOR_PALETTE[hashStringToIndex(c.toLowerCase(), CATEGORY_COLOR_PALETTE.length)];
 }
 
+// Component that shows a truncated title with ellipsis, and a tooltip on hover if truncated
 function TruncatedTitle({ title }: { title: string }) {
   const textRef = useRef<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -123,7 +124,6 @@ function TruncatedTitle({ title }: { title: string }) {
     </Tooltip>
   );
 }
-
 export default function StandardTekstSidebar({
   isAdmin,
   creating,
@@ -219,6 +219,7 @@ export default function StandardTekstSidebar({
     setFavorites((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  // Sort items: favorites on top (alphabetically), then by category and title
   const sortedItems = useMemo(() => {
     return [...filtered].sort((a, b) => {
       const aFav = favorites.includes(a.id);
@@ -229,6 +230,7 @@ export default function StandardTekstSidebar({
     });
   }, [filtered, favorites]);
 
+  // Group items by category, with favorites as a separate group on top
   const groupedByCategory = useMemo(() => {
     const favoriteItems = sortedItems.filter((it) => favorites.includes(it.id));
     const nonFavoriteItems = sortedItems.filter((it) => !favorites.includes(it.id));
@@ -330,7 +332,16 @@ export default function StandardTekstSidebar({
             size="small"
             label="Søk i standardtekster"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearch(value);
+
+              if (value.length === 1) {
+                logUsage("search_standardtekster", {
+                  searchLen: value.length,
+                });
+              }
+            }}
           />
         </Box>
 
@@ -406,7 +417,10 @@ export default function StandardTekstSidebar({
                         <ListItemButton
                           key={it.id}
                           selected={it.id === selectedId}
-                          onClick={() => setSelectedId(it.id)}
+                          onClick={() => {
+                            logUsage("standardtekst_open", { standardtekstId: it.id });
+                            setSelectedId(it.id);
+                          }}
                           className={styles.sidebarItem}
                           sx={{ pl: 2.25 }}
                         >

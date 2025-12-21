@@ -34,15 +34,10 @@ import {
 import { buildDisplayContent, buildPreviewContent, templateUsesPreparat1 } from "../utils/content";
 import { renderContentWithPreparatHighlight } from "../utils/render";
 import styles from "../../../styles/standardTekstPage.module.css";
-
 import { useStandardTekster } from "../hooks/useStandardTekster";
-
 import { useStandardTekstHotkeys } from "../hooks/useStandardTekstHotkeys";
-
 import PreparatPanel from "../components/PreparatPanel";
-
 import { deleteStandardTekst } from "../utils/deleteStandardTekst";
-
 import type { StandardTekstFollowUp } from "../types";
 
 export default function StandardTekstPage() {
@@ -90,11 +85,14 @@ export default function StandardTekstPage() {
   const preparatSectionRef = useRef<HTMLDivElement | null>(null);
   const preparatSearchInputRef = useRef<HTMLInputElement | null>(null);
   const preserveInputsOnNextSelectRef = useRef(false);
+  
+  // Hotkeys for preparat search focus and clearing
   useStandardTekstHotkeys({
     preparatRows,
     clearPreparats,
     preparatSearchInputRef,
   });
+
   const [tallValue, setTallValue] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
@@ -107,6 +105,7 @@ export default function StandardTekstPage() {
     [preparatRows]
   );
 
+  // Bygg innhold med preparater og tall
   const displayContent = useMemo(() => {
     if (!selected) return "";
 
@@ -126,6 +125,7 @@ export default function StandardTekstPage() {
     return base;
   }, [selected, firstName, pickedPreparats, tallValue]);
 
+  // Preview content with preparats and tall
   const previewContent = useMemo(() => {
     if (!selected) return "";
 
@@ -143,8 +143,8 @@ export default function StandardTekstPage() {
     return base;
   }, [selected, firstName, pickedPreparats, tallValue]);
 
+  // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
-    // Når du bytter valgt tekst, avslutt redigering og synk draft
     setIsEditing(false);
     setDraftTitle(selected?.title ?? "");
     setDraftCategory(selected?.category ?? "");
@@ -330,6 +330,7 @@ export default function StandardTekstPage() {
     setSelectedId(id);
   };
 
+  // Editor for follow-up texts
   const followUpsEditor = (
     <Box sx={{ mt: 0.5 }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -401,6 +402,7 @@ export default function StandardTekstPage() {
     </Box>
   );
 
+  // Preview for follow-up texts
   const followUpsPreview = selected?.followUps?.length ? (
     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
       {selected.followUps.map((fu) => (

@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
+import { logUsage } from "../../../shared/services/usage";
 
 type Props = {
   selected: StandardTekst | null;
@@ -70,9 +71,15 @@ export default function StandardTekstContent({
     });
   }, [isEditing]);
 
+  const handleCopy = () => {
+    // Log copy without storing sensitive text
+    logUsage("standardtekst_copy");
+    onCopy();
+  };
+
   return (
     <Paper
-      onClick={selected && !isEditing ? onCopy : undefined}
+      onClick={selected && !isEditing ? handleCopy : undefined}
       className={
         selected && !isEditing
           ? `${styles.contentPaper} ${styles.contentPaperCopy}`

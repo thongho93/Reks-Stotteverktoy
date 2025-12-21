@@ -21,7 +21,9 @@ import OMEQPage from "../features/omeq/pages/OMEQPage";
 import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
 import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
 import HomePage from "./HomePage";
-import { LoginPage, ProfileMenu, RequireAuth, ProfilePage } from "./auth/Auth";
+import { RequireAuth, LoginPage, ProfileMenu, ProfilePage } from "./auth/Auth";
+import { logUsage } from "../shared/services/usage";
+import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
@@ -126,6 +128,29 @@ function Layout() {
     localStorage.setItem("sidebar-collapsed", String(collapsed));
   }, [collapsed]);
 
+  const location = useLocation();
+
+  // Log one app_open per successful authenticated app load
+  React.useEffect(() => {
+    logUsage("app_open");
+  }, []);
+
+  // Log page views on route changes
+  React.useEffect(() => {
+    const pathname = location.pathname;
+    const page = pathname.startsWith("/standardtekster")
+      ? "standardtekster"
+      : pathname.startsWith("/omeq") || pathname === "/"
+      ? "omeq"
+      : pathname.startsWith("/profil")
+      ? "profil"
+      : pathname.startsWith("/produktskjema")
+      ? "produktskjema"
+      : "other";
+
+    logUsage("page_view", { page });
+  }, [location.pathname]);
+
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
@@ -135,6 +160,7 @@ function Layout() {
           <Route path="/omeq" element={<OMEQPage />} />
           <Route path="/standardtekster" element={<StandardTekstPage />} />
           <Route path="/profil" element={<ProfilePage />} />
+          <Route path="/statistikk" element={<StatistikkPage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>
