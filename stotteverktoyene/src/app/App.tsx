@@ -25,6 +25,8 @@ import { RequireAuth, LoginPage, ProfileMenu, ProfilePage } from "./auth/Auth";
 import PendingApprovalPage from "./auth/PendingApprovalPage";
 import { logUsage } from "../shared/services/usage";
 import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
+import InteraksjonerPage from "../features/interaksjoner/pages/InteraksjonerPage";
+import MedicationIcon from "@mui/icons-material/Medication";
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
@@ -43,6 +45,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const items = [
     { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#1E88E5" },
     { label: "Standardtekster", path: "/standardtekster", Icon: DescriptionIcon, color: "#43A047" },
+    { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#FB8C00" },
     { label: "Produktskjema", path: "/produktskjema", Icon: AssignmentIcon, color: "#8E24AA" },
   ];
 
@@ -160,6 +163,7 @@ function Layout() {
           <Route path="/" element={<HomePage />} />
           <Route path="/omeq" element={<OMEQPage />} />
           <Route path="/standardtekster" element={<StandardTekstPage />} />
+          <Route path="/interaksjoner" element={<InteraksjonerPage />} />
           <Route path="/profil" element={<ProfilePage />} />
           <Route path="/statistikk" element={<StatistikkPage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
