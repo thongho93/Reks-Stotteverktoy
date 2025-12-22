@@ -17,6 +17,7 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import IconButton from "@mui/material/IconButton";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -149,6 +150,10 @@ export default function StandardTekstSidebar({
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [expandedHydrated, setExpandedHydrated] = useState(false);
 
+  // Category hide/show state (persisted locally)
+  const [hiddenCategories, setHiddenCategories] = useState<Record<string, boolean>>({});
+  const [hiddenHydrated, setHiddenHydrated] = useState(false);
+
   // Hydrate expand/collapse state from localStorage on mount
   useEffect(() => {
     try {
@@ -162,6 +167,22 @@ export default function StandardTekstSidebar({
       // ignore
     } finally {
       setExpandedHydrated(true);
+    }
+  }, []);
+
+  // Hydrate hide/show state from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("standardtekster:categoryHidden");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setHiddenCategories(parsed);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setHiddenHydrated(true);
     }
   }, []);
 
@@ -278,6 +299,21 @@ export default function StandardTekstSidebar({
     });
   };
 
+  const hideCategory = (category: string) => {
+    setHiddenCategories((prev) => ({
+      ...prev,
+      [category]: true,
+    }));
+  };
+
+  const showCategory = (category: string) => {
+    setHiddenCategories((prev) => {
+      const next = { ...prev };
+      delete next[category];
+      return next;
+    });
+  };
+
   // Persist expand/collapse state
   useEffect(() => {
     if (!expandedHydrated) return;
@@ -288,7 +324,19 @@ export default function StandardTekstSidebar({
     }
   }, [expandedCategories, expandedHydrated]);
 
+  // Persist hide/show state
+  useEffect(() => {
+    if (!hiddenHydrated) return;
+    try {
+      localStorage.setItem("standardtekster:categoryHidden", JSON.stringify(hiddenCategories));
+    } catch {
+      // ignore
+    }
+  }, [hiddenCategories, hiddenHydrated]);
+
   const prevSelectedIdRef = useRef<string | null>(null);
+  // Clear search on next focus if the user previously left the field with a value
+  const clearSearchOnNextFocusRef = useRef(false);
 
   // Ensure the category containing the selected item is expanded
   // Only do this when selection changes due to user interaction, not on initial load.
@@ -307,6 +355,7 @@ export default function StandardTekstSidebar({
     prevSelectedIdRef.current = selectedId;
 
     for (const g of groupedByCategory) {
+      if (hiddenCategories[g.category]) continue;
       if (g.items.some((x) => x.id === selectedId)) {
         setExpandedCategories((prev) => ({
           ...prev,
@@ -315,7 +364,7 @@ export default function StandardTekstSidebar({
         break;
       }
     }
-  }, [selectedId, groupedByCategory, expandedHydrated]);
+  }, [selectedId, groupedByCategory, expandedHydrated, hiddenCategories]);
 
   return (
     <Paper className={styles.sidebar} sx={{ position: "relative" }}>
@@ -367,6 +416,15 @@ export default function StandardTekstSidebar({
                 });
               }
             }}
+            onBlur={() => {
+              // If the user leaves the field after searching, clear on next focus to make it ready for a new search
+              clearSearchOnNextFocusRef.current = search.trim().length > 0;
+            }}
+            onFocus={() => {
+              if (!clearSearchOnNextFocusRef.current) return;
+              clearSearchOnNextFocusRef.current = false;
+              setSearch("");
+            }}
             disabled={disabled}
           />
         </Box>
@@ -392,93 +450,171 @@ export default function StandardTekstSidebar({
             </Typography>
           </Box>
         ) : (
-          <List dense disablePadding className={styles.sidebarList}>
-            {groupedByCategory.map((group) => {
-              const isExpanded = expandedCategories[group.category] !== false;
+          <>
+            <List dense disablePadding className={styles.sidebarList}>
+              {groupedByCategory.map((group) => {
+                if (hiddenCategories[group.category]) return null;
 
-              return (
-                <Box key={group.category}>
-                  <ListItemButton
-                    onClick={() => toggleCategory(group.category)}
-                    sx={{
-                      py: 0.75,
-                      px: 1.25,
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 1,
-                      backgroundColor: "background.paper",
-                    }}
-                  >
-                    <Box
-                      aria-hidden
+                const isExpanded = expandedCategories[group.category] !== false;
+
+                return (
+                  <Box key={group.category}>
+                    <ListItemButton
+                      onClick={() => toggleCategory(group.category)}
                       sx={{
-                        width: 8,
-                        height: 22,
-                        borderRadius: 1,
-                        mr: 1,
-                        bgcolor: getCategoryMarkerColor(group.category),
-                        flexShrink: 0,
+                        py: 0.75,
+                        px: 1.25,
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 1,
+                        backgroundColor: "background.paper",
+                        "&:hover .hide-category-btn": { opacity: 1 },
+                        "&.Mui-selected .hide-category-btn": { opacity: 1 },
                       }}
-                    />
-                    <ListItemText
-                      primary={group.category}
-                      primaryTypographyProps={{
-                        variant: "subtitle2",
-                        noWrap: true,
-                      }}
-                    />
-                    <ExpandMoreIcon
-                      fontSize="small"
-                      sx={{
-                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                        transition: "transform 120ms ease",
-                        opacity: 0.8,
-                      }}
-                    />
-                  </ListItemButton>
+                    >
+                      <Box
+                        aria-hidden
+                        sx={{
+                          width: 8,
+                          height: 22,
+                          borderRadius: 1,
+                          mr: 1,
+                          bgcolor: getCategoryMarkerColor(group.category),
+                          flexShrink: 0,
+                        }}
+                      />
+                      <ListItemText
+                        primary={group.category}
+                        primaryTypographyProps={{
+                          variant: "body1",
+                          fontWeight: 700,
+                          noWrap: true,
+                        }}
+                      />
 
-                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                    <List dense disablePadding>
-                      {group.items.map((it) => (
-                        <ListItemButton
-                          key={it.id}
-                          selected={it.id === selectedId}
-                          onClick={() => {
-                            logUsage("standardtekst_open", { standardtekstId: it.id });
-                            setSelectedId(it.id);
-                          }}
-                          className={styles.sidebarItem}
-                          sx={{ pl: 2.25 }}
-                        >
-                          <ListItemText
-                            primary={<TruncatedTitle title={it.title} />}
-                            secondary={undefined}
-                          />
-
+                      {group.category !== "Favoritter" && (
+                        <Tooltip title="Skjul kategori" placement="top" arrow>
                           <IconButton
+                            className="hide-category-btn"
                             size="small"
-                            edge="end"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
-                              toggleFavorite(it.id);
+                              hideCategory(group.category);
+                            }}
+                            sx={{
+                              mr: 0.5,
+                              opacity: 0,
+                              transition: "opacity 120ms ease",
                             }}
                           >
-                            {favorites.includes(it.id) ? (
-                              <StarIcon fontSize="small" color="warning" />
-                            ) : (
-                              <StarBorderIcon fontSize="small" />
-                            )}
+                            <VisibilityOffIcon fontSize="small" />
                           </IconButton>
+                        </Tooltip>
+                      )}
+
+                      <ExpandMoreIcon
+                        fontSize="small"
+                        sx={{
+                          transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 120ms ease",
+                          opacity: 0.8,
+                        }}
+                      />
+                    </ListItemButton>
+
+                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                      <List dense disablePadding>
+                        {group.items.map((it) => (
+                          <ListItemButton
+                            key={it.id}
+                            selected={it.id === selectedId}
+                            onClick={() => {
+                              logUsage("standardtekst_open", { standardtekstId: it.id });
+                              setSelectedId(it.id);
+                            }}
+                            className={styles.sidebarItem}
+                            sx={{ pl: 2.25 }}
+                          >
+                            <ListItemText
+                              primary={<TruncatedTitle title={it.title} />}
+                              secondary={undefined}
+                            />
+
+                            <IconButton
+                              size="small"
+                              edge="end"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(it.id);
+                              }}
+                            >
+                              {favorites.includes(it.id) ? (
+                                <StarIcon fontSize="small" color="warning" />
+                              ) : (
+                                <StarBorderIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </ListItemButton>
+                        ))}
+                      </List>
+                    </Collapse>
+
+                    <Divider sx={{ opacity: 0.35 }} />
+                  </Box>
+                );
+              })}
+            </List>
+
+            {(() => {
+              const hidden = Object.keys(hiddenCategories).filter((k) => hiddenCategories[k]);
+              if (hidden.length === 0) return null;
+
+              return (
+                <Box sx={{ px: 1.25, py: 1 }}>
+                  <Divider sx={{ mb: 1, opacity: 0.35 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                    Skjulte kategorier
+                  </Typography>
+                  <List dense disablePadding>
+                    {hidden
+                      .slice()
+                      .sort((a, b) => a.localeCompare(b, "nb"))
+                      .map((cat) => (
+                        <ListItemButton
+                          key={cat}
+                          onClick={() => showCategory(cat)}
+                          sx={{
+                            py: 0.5,
+                            px: 1,
+                            borderRadius: 1,
+                          }}
+                        >
+                          <Box
+                            aria-hidden
+                            sx={{
+                              width: 8,
+                              height: 18,
+                              borderRadius: 1,
+                              mr: 1,
+                              bgcolor: getCategoryMarkerColor(cat),
+                              flexShrink: 0,
+                            }}
+                          />
+                          <ListItemText
+                            primary={cat}
+                            primaryTypographyProps={{
+                              variant: "body2",
+                              noWrap: true,
+                            }}
+                          />
                         </ListItemButton>
                       ))}
-                    </List>
-                  </Collapse>
-
-                  <Divider sx={{ opacity: 0.35 }} />
+                  </List>
                 </Box>
               );
-            })}
-          </List>
+            })()}
+          </>
         )}
       </Box>
     </Paper>
