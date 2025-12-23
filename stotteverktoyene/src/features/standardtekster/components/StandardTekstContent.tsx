@@ -1,4 +1,5 @@
 import { Box, Button, Paper, Typography, TextField, Stack, Autocomplete } from "@mui/material";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
@@ -124,26 +125,35 @@ export default function StandardTekstContent({
               display: "flex",
               alignItems: "flex-start",
               justifyContent: "space-between",
+              gap: 1,
             }}
           >
             <Typography variant="h2" className={styles.title} sx={{ mb: 1 }}>
               {selected.title}
             </Typography>
 
-            {headerRight ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 1,
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {headerRight}
-              </Box>
-            ) : null}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {!isEditing && !lockBeforeEdit && (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={handleCopy}
+                  sx={{ minWidth: "auto", p: 0.5 }}
+                  aria-label="Kopier standardtekst"
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </Button>
+              )}
+
+              {headerRight ? headerRight : null}
+            </Box>
           </Box>
 
           {isAdmin && isEditing && (
