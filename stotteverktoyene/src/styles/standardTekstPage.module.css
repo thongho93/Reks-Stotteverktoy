@@ -253,8 +253,9 @@
 .body {
   white-space: pre-wrap;
   line-height: 1.45; /* tettere linjeavstand */
-  max-width: 60ch;
-  margin: 0 auto;
+  max-width: none;
+  width: 80%;
+  margin: 0;
   padding-top: 6px; /* litt mindre luft på toppen */
 }
 
