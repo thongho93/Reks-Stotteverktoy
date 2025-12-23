@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const OFFICE_FORM_URL = import.meta.env.VITE_OFFICE_FORM_URL as string;
 
@@ -7,11 +7,14 @@ if (!OFFICE_FORM_URL) {
 }
 
 export default function OfficeFormRedirectPage() {
-  const [showFallback, setShowFallback] = useState(false);
+  const [iframeError, setIframeError] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setShowFallback(true);
+      if (!hasLoadedRef.current) {
+        setIframeError(true);
+      }
     }, 4000);
 
     return () => clearTimeout(timer);
@@ -19,7 +22,7 @@ export default function OfficeFormRedirectPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {showFallback && (
+      {iframeError && (
         <div style={{ padding: 12 }}>
           Bruk knappen hvis skjemaet ikke lastes automatisk:
           <br />
@@ -50,7 +53,16 @@ export default function OfficeFormRedirectPage() {
         </div>
       )}
 
-      <iframe src={OFFICE_FORM_URL} title="Produktskjema" style={{ flex: 1, border: 0 }} />
+      <iframe
+        src={OFFICE_FORM_URL}
+        title="Produktskjema"
+        style={{ flex: 1, border: 0 }}
+        onLoad={() => {
+          hasLoadedRef.current = true;
+          setIframeError(false);
+        }}
+        onError={() => setIframeError(true)}
+      />
     </div>
   );
 }

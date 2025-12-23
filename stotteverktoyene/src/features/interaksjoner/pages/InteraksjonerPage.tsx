@@ -303,6 +303,9 @@ export default function InteraksjonerPage() {
                 />
               )}
             />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -0.5 }}>
+              Tips: Lim inn ATC-kode/virkestoff direkte i søkefeltet.
+            </Typography>
             {selected.length > 0 ? (
               <Box
                 sx={{
@@ -451,9 +454,42 @@ export default function InteraksjonerPage() {
           }}
         >
           {selected.length === 0 ? (
-            <Typography color="text.secondary">
-              Velg minst to virkestoff/ATC fra ulike grupper for å få treff.
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 360,
+                px: 2,
+              }}
+            >
+              <Box sx={{ width: "100%", maxWidth: 560 }}>
+                <Typography
+                  color="text.secondary"
+                  sx={{ fontWeight: 600, textAlign: "center", fontSize: 23, mt: 1 }}
+                >
+                  Søk minst 2 ATC-koder/virkestoffer fra ulike grupper for å få treff.
+                </Typography>
+              </Box>
+              <Box
+                component="img"
+                alt="Venter"
+                src="/img/imwaiting.gif"
+                sx={{
+                  width: 340,
+                  maxWidth: "85%",
+                  mb: 2,
+                  opacity: 0.95,
+                  mt: 5,
+                }}
+              />
+              <Box sx={{ width: "100%", maxWidth: 560 }}>
+                <Typography color="text.secondary" sx={{ textAlign: "center", fontSize: 23 }}>
+                  Kom igjen. Jeg har ikke hele dagen.{" "}
+                </Typography>
+              </Box>
+            </Box>
           ) : null}
 
           {index && results.length > 0 ? (
@@ -730,7 +766,7 @@ export default function InteraksjonerPage() {
                               </Box>
                               {!activeLinkedStd ? (
                                 <Typography color="text.secondary" sx={{ mt: 1, fontSize: 13 }}>
-                                  Trykk på en chip for å vise standardteksten.
+                                  Trykk på en tittel for å vise standardteksten.
                                 </Typography>
                               ) : null}
 

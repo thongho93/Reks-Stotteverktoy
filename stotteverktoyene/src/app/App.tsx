@@ -17,9 +17,11 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import WysiwygIcon from "@mui/icons-material/Wysiwyg";
 import OMEQPage from "../features/omeq/pages/OMEQPage";
 import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
 import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
+import AndbruddPage from "../features/anbrudd/andbruddPage";
 import HomePage from "./HomePage";
 import { RequireAuth, LoginPage, ProfileMenu, ProfilePage } from "./auth/Auth";
 import PendingApprovalPage from "./auth/PendingApprovalPage";
@@ -47,6 +49,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     { label: "Standardtekster", path: "/standardtekster", Icon: DescriptionIcon, color: "#43A047" },
     { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#FB8C00" },
     { label: "Produktskjema", path: "/produktskjema", Icon: AssignmentIcon, color: "#8E24AA" },
+    { label: "Anbrudd", path: "/anbrudd", Icon: WysiwygIcon, color: "#D32F2F" },
   ];
 
   return (
@@ -167,6 +170,7 @@ function Layout() {
           <Route path="/profil" element={<ProfilePage />} />
           <Route path="/statistikk" element={<StatistikkPage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
+          <Route path="/anbrudd" element={<AndbruddPage />} />
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>
       </Box>

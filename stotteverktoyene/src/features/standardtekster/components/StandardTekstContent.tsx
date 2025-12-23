@@ -100,9 +100,45 @@ export default function StandardTekstContent({
       }
     >
       {!selected && !loading && (
-        <Typography variant="body2" color="text.secondary">
-          Velg en standardtekst fra listen.
-        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            minHeight: 360,
+            px: 2,
+          }}
+        >
+          <Box
+            component="img"
+            src="/img/checkthisout.gif"
+            alt="Velg standardtekst"
+            sx={{
+              width: 400,
+              maxWidth: "80%",
+              mb: 2,
+              opacity: 0.95,
+            }}
+          />
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontWeight: 600, fontSize: 25 }}
+          >
+            Velg en standardtekst fra listen.
+          </Typography>
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 0.5 }}
+          >
+            Tips: Bruk Ctrl+S for å søke raskt.
+          </Typography>
+        </Box>
       )}
 
       {selected && (
