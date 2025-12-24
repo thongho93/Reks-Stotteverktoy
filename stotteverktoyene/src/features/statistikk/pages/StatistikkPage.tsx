@@ -194,7 +194,6 @@ export default function StatistikkPage() {
   const [showAllUsers, setShowAllUsers] = React.useState(false);
 
   const [rows, setRows] = React.useState<TotalsRow[]>([]);
-  const [userRows, setUserRows] = React.useState<UserAggRow[]>([]);
   const [aggregatedUsers, setAggregatedUsers] = React.useState<UserAggRow[]>([]);
   const [loadingTotals, setLoadingTotals] = React.useState(false);
   const [loadingUsers, setLoadingUsers] = React.useState(false);
@@ -208,7 +207,6 @@ export default function StatistikkPage() {
     try {
       if (!from || !to) {
         setRows([]);
-        setUserRows([]);
         setAggregatedUsers([]);
         setLoadingTotals(false);
         setLoadingUsers(false);
@@ -217,7 +215,6 @@ export default function StatistikkPage() {
 
       if (from > to) {
         setRows([]);
-        setUserRows([]);
         setAggregatedUsers([]);
         setError("Fra-dato kan ikke være etter til-dato.");
         setLoadingTotals(false);
@@ -230,7 +227,6 @@ export default function StatistikkPage() {
 
       if (!isValidDate(fromDate) || !isValidDate(toDate)) {
         setRows([]);
-        setUserRows([]);
         setAggregatedUsers([]);
         setError("Ugyldig datoformat. Bruk dato-velgeren (yyyy-mm-dd).");
         setLoadingTotals(false);
@@ -363,7 +359,6 @@ export default function StatistikkPage() {
       const message = typeof e?.message === "string" ? e.message : "Kunne ikke hente statistikk.";
       setError(message);
       setRows([]);
-      setUserRows([]);
       setAggregatedUsers([]);
       setLoadingTotals(false);
       setLoadingUsers(false);
