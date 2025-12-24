@@ -16,8 +16,8 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import WysiwygIcon from "@mui/icons-material/Wysiwyg";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import ListAltIcon from "@mui/icons-material/ListAlt";
 import OMEQPage from "../features/omeq/pages/OMEQPage";
 import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
 import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
@@ -48,8 +48,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#1E88E5" },
     { label: "Standardtekster", path: "/standardtekster", Icon: DescriptionIcon, color: "#43A047" },
     { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#FB8C00" },
-    { label: "Produktskjema", path: "/produktskjema", Icon: AssignmentIcon, color: "#8E24AA" },
-    { label: "Anbrudd", path: "/anbrudd", Icon: WysiwygIcon, color: "#D32F2F" },
+    { label: "Produktskjema", path: "/produktskjema", Icon: LocalShippingIcon, color: "#671aff" },
+    { label: "Anbrudd", path: "/anbrudd", Icon: ListAltIcon, color: "#D32F2F" },
   ];
 
   return (

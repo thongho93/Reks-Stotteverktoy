@@ -44,7 +44,7 @@ export default function AndbruddPage() {
           mb: 1,
         }}
       >
-        <Typography variant="h6">{current.title}</Typography>
+        <Typography variant="h1">{current.title}</Typography>
       </Box>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} aria-label="Anbrudd tabs">

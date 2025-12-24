@@ -75,10 +75,27 @@ export default function InteraksjonerPage() {
     return map;
   }, [selected]);
 
-  const isLikelyAtc = (v: string) => {
+  const isExactAtc7 = (v: string) => {
     const s = v.trim().toUpperCase();
-    // Typisk ATC: N02AC52 (7 tegn), men tillat litt fleks
-    return /^[A-Z][0-9]{2}[A-Z]{1,2}[0-9]{0,2}$/.test(s);
+    // Eksakt ATC (7 tegn): f.eks. C09AA01 / N02AA03
+    return /^[A-Z][0-9]{2}[A-Z]{2}[0-9]{2}$/.test(s);
+  };
+
+  const normalizeAtcInput = (v: string) => {
+    const raw = v ?? "";
+    const trimmed = raw.trim();
+    if (!trimmed) return raw;
+
+    // Only collapse whitespace if the result looks like an ATC code/prefix.
+    // Examples users paste/type: "C03A A", "C03A B", "C03A B01".
+    const collapsed = trimmed.replace(/\s+/g, "");
+    const looksAtcPrefix = /^[A-Z][0-9]{2}[A-Z0-9]{1,4}$/.test(collapsed.toUpperCase());
+
+    if (looksAtcPrefix && /\s/.test(trimmed)) {
+      return collapsed;
+    }
+
+    return raw;
   };
 
   const handleReset = React.useCallback(() => {
@@ -89,6 +106,26 @@ export default function InteraksjonerPage() {
     setInputValue("");
     setActiveLinkedStdId(null);
   }, []);
+
+  // Hotkey: Escape => reset search
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Don't interfere while dialogs are open
+      if (stdOpen) return;
+
+      e.preventDefault();
+      handleReset();
+
+      // Refocus search for fast re-entry
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleReset, stdOpen]);
 
   const handleSearch = React.useCallback(() => {
     if (!index) return;
@@ -192,9 +229,23 @@ export default function InteraksjonerPage() {
         flexDirection: "column",
       }}
     >
-      <Typography variant="h2" gutterBottom>
-        Interaksjonssøk
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <Typography variant="h2">Interaksjonssøk</Typography>
+        <Typography color="text.secondary" sx={{ fontSize: 14 }}>
+          <Box component="span" sx={{ fontWeight: 800 }}>
+            Nullstill
+          </Box>
+          : Escape
+        </Typography>
+      </Box>
 
       <Box
         sx={{
@@ -237,10 +288,13 @@ export default function InteraksjonerPage() {
               inputValue={inputValue}
               open={inputValue.trim().length > 0}
               onInputChange={(_, v) => {
-                setInputValue(v);
+                const normalized = normalizeAtcInput(v);
+                setInputValue(normalized);
 
-                const q = v.trim().toUpperCase();
-                if (!q || !isLikelyAtc(q) || !index?.entities?.length) return;
+                const q = normalized.trim().toUpperCase();
+                // Auto-velg kun ved eksakt 7-tegns ATC. Ved kortere prefix (f.eks. C09AA)
+                // skal vi la dropdownen være åpen slik at bruker kan velge riktig kode.
+                if (!q || !isExactAtc7(q) || !index?.entities?.length) return;
 
                 // Finn eksakt ATC-match
                 const exactAtcMatches = index.entities.filter(
@@ -386,9 +440,22 @@ export default function InteraksjonerPage() {
                   <List disablePadding>
                     {results.map((r, i) => {
                       const it = index.interactions[r.interactionIndex];
-                      const titleA = it.substansgrupper?.[r.matchedGroups?.[0]]?.navn || "";
-                      const titleB = it.substansgrupper?.[r.matchedGroups?.[1]]?.navn || "";
-                      const label = [titleA, titleB].filter(Boolean).join(" × ") || "Vis treff";
+                      const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
+                      const gB = it.substansgrupper?.[r.matchedGroups?.[1]];
+
+                      const nameFromGroup = (g?: any) => {
+                        if (!g) return "";
+                        // Prioriter gruppenavn hvis det finnes
+                        if (g.navn) return g.navn;
+                        // Fallback: bruk substans-navn (første substans i gruppen)
+                        const subst = g.substanser?.[0]?.substans;
+                        return subst || "";
+                      };
+
+                      const titleA = nameFromGroup(gA);
+                      const titleB = nameFromGroup(gB);
+
+                      const label = [titleA, titleB].filter(Boolean).join(" × ") || "Interaksjon";
 
                       return (
                         <React.Fragment key={`hit:${r.interactionIndex}:${i}`}>

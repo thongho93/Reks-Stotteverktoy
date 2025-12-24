@@ -123,20 +123,8 @@ export default function StandardTekstContent({
             }}
           />
 
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ fontWeight: 600, fontSize: 25 }}
-          >
-            Velg en standardtekst fra listen.
-          </Typography>
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ mt: 0.5 }}
-          >
-            Tips: Bruk Ctrl+S for å søke raskt.
+          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, fontSize: 25 }}>
+            Velg eller søk etter en standardtekst fra listen.
           </Typography>
         </Box>
       )}

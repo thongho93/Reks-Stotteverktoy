@@ -90,6 +90,16 @@ export default function StandardTekstPage() {
   const standardTekstSearchInputRef = useRef<HTMLInputElement | null>(null);
   const preserveInputsOnNextSelectRef = useRef(false);
 
+  // For auto-focus glow effect on preparat / standardtekst search inputs
+  const [autoFocusGlowTarget, setAutoFocusGlowTarget] = useState<"standard" | "preparat" | null>(
+    null
+  );
+
+  const triggerGlow = (target: "standard" | "preparat") => {
+    setAutoFocusGlowTarget(target);
+    window.setTimeout(() => setAutoFocusGlowTarget(null), 1000);
+  };
+
   // Hotkeys for preparat search focus/clearing and standardtekster search focus
   useStandardTekstHotkeys({
     preparatRows,
@@ -175,17 +185,30 @@ export default function StandardTekstPage() {
         setTallByIndex({ 0: "" });
       }
 
-      // Auto-focus preparat search when a template is selected, so user can start typing right away.
-      // Use rAF to wait for the input to be mounted/updated.
-      requestAnimationFrame(() => {
-        preparatSearchInputRef.current?.focus();
-        preparatSearchInputRef.current?.select();
-      });
+      if (selected) {
+        requestAnimationFrame(() => {
+          preparatSearchInputRef.current?.focus();
+          preparatSearchInputRef.current?.select();
+          triggerGlow("preparat");
+        });
+      }
     }
 
     // Always clear the flag after handling a selection change
     preserveInputsOnNextSelectRef.current = false;
   }, [selectedId, resetPreparatRows, selected]);
+
+  // Auto-focus standardtekst search on first load when no template is selected
+  useEffect(() => {
+    if (loading) return;
+    if (selected) return;
+
+    requestAnimationFrame(() => {
+      standardTekstSearchInputRef.current?.focus();
+      standardTekstSearchInputRef.current?.select();
+      triggerGlow("standard");
+    });
+  }, [loading, selected]);
 
   const startEdit = () => {
     if (!selected) return;
@@ -449,9 +472,7 @@ export default function StandardTekstPage() {
       const indices = getTallTokenIndices(selected.content);
       const missing = indices.filter((i) => !(tallByIndex[i] ?? "").trim());
       if (missing.length) {
-        const label = missing
-          .map((i) => (i === 0 ? "{{TALL}}" : `{{TALL${i}}}`))
-          .join(", ");
+        const label = missing.map((i) => (i === 0 ? "{{TALL}}" : `{{TALL${i}}}`)).join(", ");
         setErrorLocal(`Fyll inn tallfeltet før du kopierer teksten: ${label}.`);
         return;
       }
@@ -465,6 +486,7 @@ export default function StandardTekstPage() {
       setCopied(true);
       clearPreparats();
       setTallByIndex({ 0: "" });
+      setSearch("");
 
       // Focus back to preparat search for fast next use
       requestAnimationFrame(() => {
@@ -488,6 +510,7 @@ export default function StandardTekstPage() {
         setCopied(true);
         clearPreparats();
         setTallByIndex({ 0: "" });
+        setSearch("");
         requestAnimationFrame(() => {
           preparatSearchInputRef.current?.focus();
           preparatSearchInputRef.current?.select?.();
@@ -590,19 +613,21 @@ export default function StandardTekstPage() {
       </Collapse>
 
       <Box className={styles.grid}>
-        <StandardTekstSidebar
-          disabled={lockBeforeEdit}
-          isAdmin={isAdmin}
-          creating={creating}
-          onCreate={createNewStandardTekst}
-          search={search}
-          setSearch={setSearch}
-          loading={loading}
-          filtered={filtered}
-          selectedId={selectedId}
-          setSelectedId={(id) => setSelectedId(id)}
-          searchInputRef={standardTekstSearchInputRef}
-        />
+        <Box className={autoFocusGlowTarget === "standard" ? styles.autoFocusGlow : undefined}>
+          <StandardTekstSidebar
+            disabled={lockBeforeEdit}
+            isAdmin={isAdmin}
+            creating={creating}
+            onCreate={createNewStandardTekst}
+            search={search}
+            setSearch={setSearch}
+            loading={loading}
+            filtered={filtered}
+            selectedId={selectedId}
+            setSelectedId={(id) => setSelectedId(id)}
+            searchInputRef={standardTekstSearchInputRef}
+          />
+        </Box>
 
         <Box className={styles.main}>
           <Box sx={{ position: "relative" }}>
@@ -620,7 +645,10 @@ export default function StandardTekstPage() {
               />
             )}
 
-            <Box ref={preparatSectionRef}>
+            <Box
+              ref={preparatSectionRef}
+              className={autoFocusGlowTarget === "preparat" ? styles.autoFocusGlow : undefined}
+            >
               <PreparatPanel
                 preparatRows={preparatRows}
                 inputRef={preparatSearchInputRef}
