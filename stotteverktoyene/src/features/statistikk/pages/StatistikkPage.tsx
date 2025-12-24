@@ -13,14 +13,15 @@ import {
   Stack,
   ToggleButton,
   ToggleButtonGroup,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 
 type TotalsRow = {
   key: string; // dateKey (daily) or weekKey (weekly)
   label: string; // shown in table
-  opens: number;
   pageViews: number;
   copies: number;
   searches: number;
@@ -30,7 +31,6 @@ type UserAggRow = {
   uid: string;
   firstName?: string;
   email?: string;
-  opens: number;
   pageViews: number;
   standardtekstOpens: number;
   copies: number;
@@ -139,7 +139,6 @@ function groupByIsoWeeks(dayRows: TotalsRow[]) {
     {
       weekStart: Date;
       weekEnd: Date;
-      opens: number;
       pageViews: number;
       copies: number;
       searches: number;
@@ -159,13 +158,11 @@ function groupByIsoWeeks(dayRows: TotalsRow[]) {
       map.set(weekKey, {
         weekStart,
         weekEnd: endOfIsoWeekSunday(d),
-        opens: r.opens,
         pageViews: r.pageViews,
         copies: r.copies,
         searches: r.searches,
       });
     } else {
-      prev.opens += r.opens;
       prev.pageViews += r.pageViews;
       prev.copies += r.copies;
       prev.searches += r.searches;
@@ -179,7 +176,6 @@ function groupByIsoWeeks(dayRows: TotalsRow[]) {
       return {
         key: weekKey,
         label,
-        opens: v.opens,
         pageViews: v.pageViews,
         copies: v.copies,
         searches: v.searches,
@@ -194,29 +190,38 @@ export default function StatistikkPage() {
   });
   const [to, setTo] = React.useState(() => toDateKey(new Date()));
   const [viewMode, setViewMode] = React.useState<"day" | "week">("day");
+  const [userViewMode, setUserViewMode] = React.useState<"day" | "total">("total");
+  const [showAllUsers, setShowAllUsers] = React.useState(false);
 
   const [rows, setRows] = React.useState<TotalsRow[]>([]);
   const [userRows, setUserRows] = React.useState<UserAggRow[]>([]);
-  const [loading, setLoading] = React.useState(false);
+  const [aggregatedUsers, setAggregatedUsers] = React.useState<UserAggRow[]>([]);
+  const [loadingTotals, setLoadingTotals] = React.useState(false);
+  const [loadingUsers, setLoadingUsers] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetchStats = React.useCallback(async () => {
-    setLoading(true);
+    setLoadingTotals(true);
+    setLoadingUsers(true);
     setError(null);
 
     try {
       if (!from || !to) {
         setRows([]);
         setUserRows([]);
-        setLoading(false);
+        setAggregatedUsers([]);
+        setLoadingTotals(false);
+        setLoadingUsers(false);
         return;
       }
 
       if (from > to) {
         setRows([]);
         setUserRows([]);
+        setAggregatedUsers([]);
         setError("Fra-dato kan ikke være etter til-dato.");
-        setLoading(false);
+        setLoadingTotals(false);
+        setLoadingUsers(false);
         return;
       }
 
@@ -226,8 +231,10 @@ export default function StatistikkPage() {
       if (!isValidDate(fromDate) || !isValidDate(toDate)) {
         setRows([]);
         setUserRows([]);
+        setAggregatedUsers([]);
         setError("Ugyldig datoformat. Bruk dato-velgeren (yyyy-mm-dd).");
-        setLoading(false);
+        setLoadingTotals(false);
+        setLoadingUsers(false);
         return;
       }
 
@@ -236,54 +243,65 @@ export default function StatistikkPage() {
 
       const dateKeys = listDateKeysInclusive(toDateKey(rangeStart), toDateKey(rangeEnd));
 
-      // For each day, read totals/all directly.
-      const dayRows = await Promise.all(
-        dateKeys.map(async (dateKey) => {
-          const totalsRef = doc(db, "usage_daily", dateKey, "totals", "all");
-          const totalsSnap = await getDoc(totalsRef);
-          const data = (totalsSnap.exists() ? totalsSnap.data() : {}) as any;
+      // Per-user aggregation can be either the full selected range (total) or only the selected "Til" day.
+      const userDayKey = toDateKey(toDate);
+      const userDateKeys = userViewMode === "day" ? [userDayKey] : dateKeys;
 
-          return {
-            key: dateKey,
-            label: formatDashDateKey(dateKey),
-            opens: Number(data.opens ?? 0),
-            pageViews: Number(data.pageViews ?? 0),
-            copies: Number(data.copies ?? 0),
-            searches: Number(data.searches ?? 0),
-          } satisfies TotalsRow;
-        })
-      );
+      // Hent eier(e) og ekskluder fra statistikken (både totals og per bruker).
+      const ownerSnap = await getDocs(collection(db, "owners"));
+      const ownerUids = new Set<string>(ownerSnap.docs.map((d) => d.id));
 
-      const existingDayRows = dayRows.filter(
-        (r) => r.opens !== 0 || r.pageViews !== 0 || r.copies !== 0 || r.searches !== 0
-      );
-
-      const viewRows = viewMode === "week" ? groupByIsoWeeks(existingDayRows) : existingDayRows;
-
-      setRows(viewRows);
-
-      // Aggregate per-user usage across the selected range.
+      const dayTotals = new Map<string, TotalsRow>();
       const userAgg = new Map<string, UserAggRow>();
 
+      // 1) Build main per-day totals (for the day/week table)
       await Promise.all(
         dateKeys.map(async (dateKey) => {
           const usersRef = collection(db, "usage_daily", dateKey, "users");
           const snap = await getDocs(usersRef);
 
+          const dayRow: TotalsRow = {
+            key: dateKey,
+            label: formatDashDateKey(dateKey),
+            pageViews: 0,
+            copies: 0,
+            searches: 0,
+          };
+
           snap.forEach((d) => {
-            const data = d.data() as any;
             const uid = d.id;
+            if (ownerUids.has(uid)) return;
+            const data = d.data() as any;
+
+            dayRow.pageViews += Number(data.pageViews ?? 0);
+            dayRow.copies += Number(data.copies ?? 0);
+            dayRow.searches += Number(data.searches ?? 0);
+          });
+
+          dayTotals.set(dateKey, dayRow);
+        })
+      );
+      setLoadingTotals(false);
+
+      // 2) Build per-user aggregation (either day or total)
+      await Promise.all(
+        userDateKeys.map(async (dateKey) => {
+          const usersRef = collection(db, "usage_daily", dateKey, "users");
+          const snap = await getDocs(usersRef);
+
+          snap.forEach((d) => {
+            const uid = d.id;
+            if (ownerUids.has(uid)) return;
+            const data = d.data() as any;
 
             const prev = userAgg.get(uid) ?? {
               uid,
-              opens: 0,
               pageViews: 0,
               standardtekstOpens: 0,
               copies: 0,
               searches: 0,
             };
 
-            prev.opens += Number(data.opens ?? 0);
             prev.pageViews += Number(data.pageViews ?? 0);
             prev.standardtekstOpens += Number(data.standardtekstOpens ?? 0);
             prev.copies += Number(data.copies ?? 0);
@@ -319,31 +337,43 @@ export default function StatistikkPage() {
           });
         })
       );
+      setLoadingUsers(false);
+
+      const existingDayRows = [...dayTotals.values()].filter(
+        (r) => r.pageViews !== 0 || r.copies !== 0 || r.searches !== 0
+      );
+
+      const viewRows = viewMode === "week" ? groupByIsoWeeks(existingDayRows) : existingDayRows;
+      setRows(viewRows);
 
       const aggregatedUsers = [...userAgg.values()]
-        .filter((u) => u.opens || u.pageViews || u.standardtekstOpens || u.copies || u.searches)
+        .filter((u) => u.pageViews || u.standardtekstOpens || u.copies || u.searches)
         .sort(
           (a, b) =>
             b.pageViews +
-            b.opens +
+            b.standardtekstOpens +
             b.copies +
             b.searches -
-            (a.pageViews + a.opens + a.copies + a.searches)
+            (a.pageViews + a.standardtekstOpens + a.copies + a.searches)
         );
 
-      // Keep the page compact: show only top 8 users.
-      const topUsers = aggregatedUsers.slice(0, 8);
-      setUserRows(topUsers);
+      setAggregatedUsers(aggregatedUsers);
       return;
     } catch (e: any) {
       const message = typeof e?.message === "string" ? e.message : "Kunne ikke hente statistikk.";
       setError(message);
       setRows([]);
       setUserRows([]);
+      setAggregatedUsers([]);
+      setLoadingTotals(false);
+      setLoadingUsers(false);
     } finally {
-      setLoading(false);
+      // If we returned early, these might already be false.
+      // Keep safe: turn both off.
+      setLoadingTotals(false);
+      setLoadingUsers(false);
     }
-  }, [from, to, viewMode]);
+  }, [from, to, viewMode, userViewMode]);
 
   React.useEffect(() => {
     fetchStats();
@@ -352,15 +382,18 @@ export default function StatistikkPage() {
   const totals = React.useMemo(() => {
     return rows.reduce(
       (acc, r) => {
-        acc.opens += r.opens;
         acc.pageViews += r.pageViews;
         acc.copies += r.copies;
         acc.searches += r.searches;
         return acc;
       },
-      { opens: 0, pageViews: 0, copies: 0, searches: 0 }
+      { pageViews: 0, copies: 0, searches: 0 }
     );
   }, [rows]);
+
+  const visibleUsers = React.useMemo(() => {
+    return showAllUsers ? aggregatedUsers : aggregatedUsers.slice(0, 5);
+  }, [showAllUsers, aggregatedUsers]);
 
   return (
     <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -406,7 +439,7 @@ export default function StatistikkPage() {
             <Button
               variant="outlined"
               onClick={fetchStats}
-              disabled={loading}
+              disabled={loadingTotals || loadingUsers}
               sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
             >
               Oppdater
@@ -415,7 +448,6 @@ export default function StatistikkPage() {
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography color="text.secondary">Vis:</Typography>
               <ToggleButtonGroup
                 size="small"
                 exclusive
@@ -440,40 +472,41 @@ export default function StatistikkPage() {
             <TableHead>
               <TableRow>
                 <TableCell>{viewMode === "week" ? "Uke" : "Dato"}</TableCell>
-                <TableCell align="right">Logget inn</TableCell>
-                <TableCell align="right">Sider vist</TableCell>
-                <TableCell align="right">Tekst kopiert</TableCell>
-                <TableCell align="right">Tekst søkt</TableCell>
+                <TableCell align="center">Sider vist</TableCell>
+                <TableCell align="center">Tekst kopiert</TableCell>
+                <TableCell align="center">Tekst søkt</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.key}>
                   <TableCell>{r.label}</TableCell>
-                  <TableCell align="right">{r.opens}</TableCell>
-                  <TableCell align="right">{r.pageViews}</TableCell>
-                  <TableCell align="right">{r.copies}</TableCell>
-                  <TableCell align="right">{r.searches}</TableCell>
+                  <TableCell align="center">{r.pageViews}</TableCell>
+                  <TableCell align="center">{r.copies}</TableCell>
+                  <TableCell align="center">{r.searches}</TableCell>
                 </TableRow>
               ))}
 
-              <TableRow>
-                <TableCell>Sum</TableCell>
-                <TableCell align="right">{totals.opens}</TableCell>
-                <TableCell align="right">{totals.pageViews}</TableCell>
-                <TableCell align="right">{totals.copies}</TableCell>
-                <TableCell align="right">{totals.searches}</TableCell>
-              </TableRow>
+              {viewMode === "week" && (
+                <TableRow
+                  sx={{
+                    backgroundColor: "rgba(0,0,0,0.03)",
+                    "& td": {
+                      fontWeight: 700,
+                      borderTop: "2px solid rgba(0,0,0,0.12)",
+                    },
+                  }}
+                >
+                  <TableCell>Sum</TableCell>
+                  <TableCell align="center">{totals.pageViews}</TableCell>
+                  <TableCell align="center">{totals.copies}</TableCell>
+                  <TableCell align="center">{totals.searches}</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
 
-          {loading && (
-            <Typography color="text.secondary" sx={{ mt: 2 }}>
-              Laster…
-            </Typography>
-          )}
-
-          {!loading && !error && rows.length === 0 && (
+          {!loadingTotals && !error && rows.length === 0 && (
             <Typography color="text.secondary" sx={{ mt: 2 }}>
               Ingen data i valgt periode.
             </Typography>
@@ -488,35 +521,72 @@ export default function StatistikkPage() {
               flexDirection: "column",
             }}
           >
-            <Typography sx={{ mb: 1 }}>Per bruker (topp 8)</Typography>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                mb: 1,
+                mt: 4,
+              }}
+            >
+              {" "}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                <ToggleButtonGroup
+                  size="small"
+                  exclusive
+                  value={userViewMode}
+                  onChange={(_, next) => {
+                    if (next) setUserViewMode(next);
+                  }}
+                >
+                  <ToggleButton value="day">Dag</ToggleButton>
+                  <ToggleButton value="total">Totalt</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography>
+                  {showAllUsers ? "Per bruker (alle)" : "Per bruker (topp 5)"}
+                </Typography>
+                <FormControlLabel
+                  sx={{ ml: 1 }}
+                  control={
+                    <Switch
+                      size="small"
+                      checked={showAllUsers}
+                      onChange={(e) => setShowAllUsers(e.target.checked)}
+                    />
+                  }
+                  label={showAllUsers ? "Alle" : "Topp 5"}
+                />
+              </Box>{" "}
+            </Box>
 
             <Box sx={{ flex: "1 1 auto", overflow: "hidden" }}>
               <Table size="small" aria-label="statistikk per bruker">
                 <TableHead>
                   <TableRow>
                     <TableCell>Bruker</TableCell>
-                    <TableCell align="right">Opens</TableCell>
-                    <TableCell align="right">Page views</TableCell>
-                    <TableCell align="right">Standardtekst åpnet</TableCell>
-                    <TableCell align="right">Copies</TableCell>
-                    <TableCell align="right">Searches</TableCell>
+                    <TableCell align="center">Sider vist</TableCell>
+                    <TableCell align="center">Standardtekst åpnet</TableCell>
+                    <TableCell align="center">Tekst kopiert</TableCell>
+                    <TableCell align="center">Tekst søkt</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {userRows.map((u) => (
+                  {visibleUsers.map((u) => (
                     <TableRow key={u.uid}>
                       <TableCell>
                         {u.firstName ?? u.email ?? `${u.uid.slice(0, 6)}…${u.uid.slice(-4)}`}
                       </TableCell>
-                      <TableCell align="right">{u.opens}</TableCell>
-                      <TableCell align="right">{u.pageViews}</TableCell>
-                      <TableCell align="right">{u.standardtekstOpens}</TableCell>
-                      <TableCell align="right">{u.copies}</TableCell>
-                      <TableCell align="right">{u.searches}</TableCell>
+                      <TableCell align="center">{u.pageViews}</TableCell>
+                      <TableCell align="center">{u.standardtekstOpens}</TableCell>
+                      <TableCell align="center">{u.copies}</TableCell>
+                      <TableCell align="center">{u.searches}</TableCell>
                     </TableRow>
                   ))}
 
-                  {!loading && !error && userRows.length === 0 && (
+                  {!loadingUsers && !error && visibleUsers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7}>
                         <Typography color="text.secondary">

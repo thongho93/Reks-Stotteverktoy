@@ -111,21 +111,24 @@ export default function StandardTekstContent({
             px: 2,
           }}
         >
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontWeight: 600, fontSize: 25, mt: 2 }}
+          >
+            Søk eller velg en standardtekst fra listen
+          </Typography>
           <Box
             component="img"
             src="/img/checkthisout.gif"
             alt="Velg standardtekst"
             sx={{
-              width: 400,
+              width: 450,
               maxWidth: "80%",
-              mb: 2,
+              mt: 2,
               opacity: 0.95,
             }}
           />
-
-          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, fontSize: 25 }}>
-            Velg eller søk etter en standardtekst fra listen.
-          </Typography>
         </Box>
       )}
 

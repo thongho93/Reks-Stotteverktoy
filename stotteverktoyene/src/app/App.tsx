@@ -10,6 +10,7 @@ import {
   ListItemText,
   Toolbar,
   Tooltip,
+  Typography,
 } from "@mui/material";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -47,9 +48,9 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const items = [
     { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#1E88E5" },
     { label: "Standardtekster", path: "/standardtekster", Icon: DescriptionIcon, color: "#43A047" },
-    { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#FB8C00" },
+    { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#D32F2F" },
     { label: "Produktskjema", path: "/produktskjema", Icon: LocalShippingIcon, color: "#671aff" },
-    { label: "Anbrudd", path: "/anbrudd", Icon: ListAltIcon, color: "#D32F2F" },
+    { label: "Anbrudd", path: "/anbrudd", Icon: ListAltIcon, color: "#FB8C00" },
   ];
 
   return (
@@ -68,12 +69,34 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         },
       }}
     >
+      <Box
+        onClick={() => navigate("/")}
+        sx={{
+          height: 64,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <Typography
+          sx={{
+            fontWeight: 800,
+            fontSize: collapsed ? 20 : 35,
+            color: "#C05A7A", // mørk rosa
+            letterSpacing: "0.04em",
+          }}
+        >
+          REKS+
+        </Typography>
+      </Box>
       <Toolbar
         sx={{
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-end",
-          px: 1,
+          px: 0.5,
         }}
       >
         <Tooltip title={collapsed ? "Utvid meny" : "Skjul meny"}>
