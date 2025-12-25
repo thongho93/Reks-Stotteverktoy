@@ -1,4 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
+import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
@@ -9,7 +10,16 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const app =
+  getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Initialize Gemini (Firebase AI Logic)
+export const ai = getAI(app, { backend: new GoogleAIBackend() });
+
+// Default Gemini model instance
+export const geminiModel = getGenerativeModel(ai, {
+  model: "gemini-2.5-flash",
+});

@@ -30,6 +30,7 @@ import { logUsage } from "../shared/services/usage";
 import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
 import InteraksjonerPage from "../features/interaksjoner/pages/InteraksjonerPage";
 import MedicationIcon from "@mui/icons-material/Medication";
+import Chatbot from "../features/kunstigintelligens/Chatbot";
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
@@ -197,6 +198,7 @@ function Layout() {
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>
       </Box>
+      <Chatbot />
     </Box>
   );
 }
