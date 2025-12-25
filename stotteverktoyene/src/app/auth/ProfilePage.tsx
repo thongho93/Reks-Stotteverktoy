@@ -36,17 +36,22 @@ import {
   query,
   limit,
   deleteDoc,
+  getDoc,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { useAuthUser } from "./useAuthUser";
 import styles from "../../styles/standardTekstPage.module.css";
 import { compressAvatarToDataUrl, estimateAvatarBytes } from "../../app/auth/avatarUtils";
 
+const OWNER_UID = (import.meta as any)?.env?.VITE_OWNER_UID || "uFRgce8mJjaVeDjqyJZ0wsiLqNo2";
+
 type RegisteredUserRow = {
   uid: string;
   firstName: string;
   email: string;
-  role: "Eier" | "Admin" | "Bruker";
+  role: "Eier" | "Admin" | "Rekspert" | "Bruker";
+  isRekspert: boolean;
   approved: boolean; // true if approved is true or missing; false if approved === false
 };
 
@@ -78,6 +83,8 @@ export function ProfilePage() {
   const [approveError, setApproveError] = React.useState<string | null>(null);
   const [promotingUid, setPromotingUid] = React.useState<string | null>(null);
   const [promoteError, setPromoteError] = React.useState<string | null>(null);
+  const [promotingRekspertUid, setPromotingRekspertUid] = React.useState<string | null>(null);
+  const [rekspertError, setRekspertError] = React.useState<string | null>(null);
   const [demotingUid, setDemotingUid] = React.useState<string | null>(null);
   const [demoteError, setDemoteError] = React.useState<string | null>(null);
   const demoteFromAdmin = async (target: RegisteredUserRow) => {
@@ -153,15 +160,21 @@ export function ProfilePage() {
         const usersQ = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(200));
 
         // admins collection: doc id == uid; owners collection: doc id == uid
-        const [usersSnap, adminsSnap, ownersSnap] = await Promise.all([
+        const [usersSnap, adminsSnap, ownersSnap, rootOwnerSnap] = await Promise.all([
           getDocs(usersQ),
           getDocs(collection(db, "admins")),
           getDocs(collection(db, "owners")),
+          getDoc(doc(db, "owners", OWNER_UID)),
         ]);
 
         const adminIds = new Set<string>();
         const adminEmails = new Set<string>();
         const ownerIds = new Set<string>();
+
+        const rolesMap: Record<string, string> =
+          rootOwnerSnap.exists() && (rootOwnerSnap.data() as any)?.roles
+            ? (rootOwnerSnap.data() as any).roles
+            : {};
 
         adminsSnap.forEach((d) => {
           adminIds.add(d.id);
@@ -187,18 +200,26 @@ export function ProfilePage() {
           const emailLower = email ? email.toLowerCase() : "";
           const isOwnerRow = ownerIds.has(d.id);
           const isAdminRow = adminIds.has(d.id) || (emailLower && adminEmails.has(emailLower));
+          const isRekspertRow = rolesMap?.[d.id] === "rekspert";
 
-          const role: RegisteredUserRow["role"] = isOwnerRow ? "Eier" : isAdminRow ? "Admin" : "Bruker";
+          const role: RegisteredUserRow["role"] = isOwnerRow
+            ? "Eier"
+            : isAdminRow
+            ? "Admin"
+            : isRekspertRow
+            ? "Rekspert"
+            : "Bruker";
 
           // Approval: approved === false => waiting; missing/true => active
           const approvedRaw = data?.approved;
           const approved = approvedRaw !== false;
 
-          return { uid: d.id, firstName, email, role, approved };
+          return { uid: d.id, firstName, email, role, isRekspert: isRekspertRow, approved };
         });
 
         // Sort by role priority (Eier, Admin, Bruker), then firstName, then email
-        const roleRank = (r: RegisteredUserRow["role"]) => (r === "Eier" ? 0 : r === "Admin" ? 1 : 2);
+        const roleRank = (r: RegisteredUserRow["role"]) =>
+          r === "Eier" ? 0 : r === "Admin" ? 1 : r === "Rekspert" ? 2 : 3;
 
         rows.sort((a, b) => {
           const rr = roleRank(a.role) - roleRank(b.role);
@@ -415,6 +436,54 @@ export function ProfilePage() {
     }
   };
 
+  const promoteToRekspert = async (target: RegisteredUserRow) => {
+    if (!user) return;
+    if (!isOwner) return;
+
+    setPromotingRekspertUid(target.uid);
+    setRekspertError(null);
+
+    try {
+      await updateDoc(doc(db, "owners", OWNER_UID), {
+        [`roles.${target.uid}`]: "rekspert",
+      });
+      setRegisteredUsers((prev) =>
+        prev.map((u) =>
+          u.uid === target.uid
+            ? { ...u, role: u.role === "Eier" ? "Eier" : u.role, isRekspert: true }
+            : u
+        )
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Kunne ikke gi rekspert-rollen.";
+      setRekspertError(msg);
+    } finally {
+      setPromotingRekspertUid(null);
+    }
+  };
+
+  const demoteFromRekspert = async (target: RegisteredUserRow) => {
+    if (!user) return;
+    if (!isOwner) return;
+
+    setPromotingRekspertUid(target.uid);
+    setRekspertError(null);
+
+    try {
+      await updateDoc(doc(db, "owners", OWNER_UID), {
+        [`roles.${target.uid}`]: deleteField(),
+      });
+      setRegisteredUsers((prev) =>
+        prev.map((u) => (u.uid === target.uid ? { ...u, isRekspert: false } : u))
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Kunne ikke fjerne rekspert-rollen.";
+      setRekspertError(msg);
+    } finally {
+      setPromotingRekspertUid(null);
+    }
+  };
+
   return (
     <Box className={styles.authCenter}>
       <Paper className={styles.authPaper}>
@@ -616,6 +685,11 @@ export function ProfilePage() {
                       {demoteError}
                     </Alert>
                   )}
+                  {rekspertError && (
+                    <Alert severity="error" sx={{ mb: 1.5 }}>
+                      {rekspertError}
+                    </Alert>
+                  )}
 
                   <TableContainer
                     sx={{
@@ -686,7 +760,9 @@ export function ProfilePage() {
                                     size="small"
                                     variant="contained"
                                     onClick={() => approveUser(u)}
-                                    disabled={Boolean(approvingUid) || Boolean(promotingUid) || deletingUser}
+                                    disabled={
+                                      Boolean(approvingUid) || Boolean(promotingUid) || deletingUser
+                                    }
                                   >
                                     {approvingUid === u.uid ? "Godkjenner..." : "Godkjenn"}
                                   </Button>
@@ -742,6 +818,47 @@ export function ProfilePage() {
                                     }
                                   >
                                     Slett
+                                  </Button>
+                                )}
+
+                                {isOwner &&
+                                  (u.role === "Bruker" || u.role === "Admin") &&
+                                  !u.isRekspert && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={() => promoteToRekspert(u)}
+                                      disabled={
+                                        Boolean(approvingUid) ||
+                                        Boolean(promotingUid) ||
+                                        Boolean(demotingUid) ||
+                                        Boolean(promotingRekspertUid) ||
+                                        deletingUser
+                                      }
+                                    >
+                                      {promotingRekspertUid === u.uid
+                                        ? "Oppdaterer..."
+                                        : "Gjør rekspert"}
+                                    </Button>
+                                  )}
+
+                                {isOwner && u.isRekspert && u.role !== "Eier" && (
+                                  <Button
+                                    size="small"
+                                    color="warning"
+                                    variant="outlined"
+                                    onClick={() => demoteFromRekspert(u)}
+                                    disabled={
+                                      Boolean(approvingUid) ||
+                                      Boolean(promotingUid) ||
+                                      Boolean(demotingUid) ||
+                                      Boolean(promotingRekspertUid) ||
+                                      deletingUser
+                                    }
+                                  >
+                                    {promotingRekspertUid === u.uid
+                                      ? "Oppdaterer..."
+                                      : "Fjern rekspert"}
                                   </Button>
                                 )}
                               </Box>

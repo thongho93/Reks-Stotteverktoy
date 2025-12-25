@@ -26,9 +26,7 @@ function extractHvProducts() {
   const headerRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(sheet, { header: 1 });
   const rawHeaderRow = (headerRows?.[0] ?? []) as (string | number | null)[];
 
-  const foundHeaders = rawHeaderRow
-    .map((h) => (h == null ? "" : String(h)).trim())
-    .filter(Boolean);
+  const foundHeaders = rawHeaderRow.map((h) => (h == null ? "" : String(h)).trim()).filter(Boolean);
 
   const missing = EXPECTED_HEADERS.filter((h) => !foundHeaders.includes(h));
   const extras = foundHeaders.filter((h) => !EXPECTED_HEADERS.includes(h as any));
@@ -48,7 +46,9 @@ function extractHvProducts() {
   }
   // --- end header validation ---
 
-  const rows = XLSX.utils.sheet_to_json<Record<(typeof EXPECTED_HEADERS)[number], string | number | null>>(sheet, {
+  const rows = XLSX.utils.sheet_to_json<
+    Record<(typeof EXPECTED_HEADERS)[number], string | number | null>
+  >(sheet, {
     defval: null,
   });
 
@@ -67,8 +67,6 @@ function extractHvProducts() {
     .filter(Boolean) as HvProduct[];
 
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(products, null, 2), "utf-8");
-
-  console.log(`✅ Extracted ${products.length} HV products`);
 }
 
 extractHvProducts();

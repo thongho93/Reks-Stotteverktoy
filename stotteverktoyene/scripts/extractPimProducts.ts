@@ -72,9 +72,6 @@ function main() {
 
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(out, null, 2), "utf8");
-
-  console.log(`✅ Skrev ${out.length} produkter til: ${OUTPUT_FILE}`);
-  console.log(`📄 Ark: ${sheetName}`);
 }
 
 main();

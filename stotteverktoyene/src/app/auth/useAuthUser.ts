@@ -4,11 +4,16 @@ import type { User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase/firebase";
 
+// Root owner document (where roles map lives). Prefer env, fallback to your known owner uid.
+const OWNER_UID = (import.meta as any)?.env?.VITE_OWNER_UID || "uFRgce8mJjaVeDjqyJZ0wsiLqNo2";
+
 export function useAuthUser() {
   const [user, setUser] = React.useState<User | null>(() => auth.currentUser);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
   const [isOwner, setIsOwner] = React.useState<boolean>(false);
+  const [isRekspert, setIsRekspert] = React.useState<boolean>(false);
+  const [role, setRole] = React.useState<"owner" | "admin" | "rekspert" | "user">("user");
   const [firstName, setFirstName] = React.useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
   const [isApproved, setIsApproved] = React.useState<boolean>(true);
@@ -20,6 +25,8 @@ export function useAuthUser() {
       if (!u) {
         setIsOwner(false);
         setIsAdmin(false);
+        setIsRekspert(false);
+        setRole("user");
         setIsApproved(true);
         setFirstName(null);
         setAvatarUrl(null);
@@ -45,23 +52,59 @@ export function useAuthUser() {
         setIsApproved(approved);
 
         try {
-          // Fast path: docId == uid
-          const [ownerSnap, adminSnap] = await Promise.all([
+          // Owner/admin are still resolved via docId == uid
+          // Rekspert is resolved via roles map on the single root owner doc: owners/{OWNER_UID}
+          const rootOwnerDocId = OWNER_UID;
+
+          const shouldFetchRootOwner = rootOwnerDocId && rootOwnerDocId !== u.uid;
+
+          const [ownerSnap, adminSnap, rootOwnerSnap] = await Promise.all([
             getDoc(doc(db, "owners", u.uid)),
             getDoc(doc(db, "admins", u.uid)),
+            shouldFetchRootOwner
+              ? getDoc(doc(db, "owners", rootOwnerDocId))
+              : Promise.resolve(null as any),
           ]);
 
           const owner = ownerSnap.exists();
           const admin = owner || adminSnap.exists();
 
+          // Determine rekspert:
+          // - If you are the root owner, you may also be listed in roles map, but owner already implies full access.
+          // - Otherwise, check owners/{OWNER_UID}.roles[uid] === "rekspert"
+          let rekspert = false;
+
+          if (!owner && rootOwnerSnap && typeof rootOwnerSnap.data === "function") {
+            const rootData = rootOwnerSnap.exists() ? (rootOwnerSnap.data() as any) : null;
+            const rolesMap = rootData?.roles;
+            const roleValue =
+              rolesMap && typeof rolesMap === "object" ? rolesMap[u.uid] : undefined;
+            rekspert = roleValue === "rekspert";
+          }
+
           setIsOwner(owner);
           setIsAdmin(admin);
+          setIsRekspert(rekspert);
+
+          // Resolve combined role string
+          const resolvedRole: "owner" | "admin" | "rekspert" | "user" = owner
+            ? "owner"
+            : admin
+            ? "admin"
+            : rekspert
+            ? "rekspert"
+            : "user";
+          setRole(resolvedRole);
         } catch {
           setIsOwner(false);
           setIsAdmin(false);
+          setIsRekspert(false);
+          setRole("user");
         }
       } catch {
         setIsAdmin(false);
+        setIsRekspert(false);
+        setRole("user");
         setIsApproved(true);
         setFirstName(null);
         setAvatarUrl(null);
@@ -73,5 +116,5 @@ export function useAuthUser() {
     return () => unsub();
   }, []);
 
-  return { user, loading, isOwner, isAdmin, isApproved, firstName, avatarUrl };
+  return { user, loading, isOwner, isAdmin, isRekspert, role, isApproved, firstName, avatarUrl };
 }
