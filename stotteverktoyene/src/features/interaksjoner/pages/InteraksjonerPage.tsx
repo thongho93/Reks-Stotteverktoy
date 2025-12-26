@@ -35,7 +35,6 @@ import {
   type MatchResult,
 } from "../../fest/mappers/interactionsToIndex";
 
-import { toDisplayDateIso } from "../utils/date";
 import { RelevanceIcon, relevanceKind } from "../utils/relevance";
 
 import { replaceFirstName } from "../../standardtekster/utils/content";
@@ -219,8 +218,6 @@ export default function InteraksjonerPage() {
       searchInputRef.current?.focus();
     });
   }, []);
-
-  const today = React.useMemo(() => toDisplayDateIso(new Date()), []);
 
   return (
     <Box
