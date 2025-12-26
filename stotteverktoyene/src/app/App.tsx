@@ -31,11 +31,15 @@ import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
 import InteraksjonerPage from "../features/interaksjoner/pages/InteraksjonerPage";
 import MedicationIcon from "@mui/icons-material/Medication";
 import Chatbot from "../features/kunstigintelligens/Chatbot";
+import { useAuthUser } from "./auth/useAuthUser";
+import ConstructionIcon from "@mui/icons-material/Construction";
+import RekspertPage from "../features/rekspert/RekspertPage";
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const { role } = useAuthUser();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -46,13 +50,25 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
-  const items = [
+  const mainItems = [
     { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#1E88E5" },
     { label: "Standardtekster", path: "/standardtekster", Icon: DescriptionIcon, color: "#43A047" },
     { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#D32F2F" },
     { label: "Produktskjema", path: "/produktskjema", Icon: LocalShippingIcon, color: "#671aff" },
     { label: "Anbrudd", path: "/anbrudd", Icon: ListAltIcon, color: "#FB8C00" },
   ];
+
+  const adminItems =
+    role === "rekspert" || role === "admin" || role === "owner"
+      ? [
+          {
+            label: "Rekspert",
+            path: "/rekspert",
+            Icon: ConstructionIcon,
+            color: "#004b74ff",
+          },
+        ]
+      : [];
 
   return (
     <Drawer
@@ -110,7 +126,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       <Divider />
 
       <List>
-        {items.map((item) => (
+        {mainItems.map((item) => (
           <Tooltip key={item.path} title={collapsed ? item.label : ""} placement="right">
             <ListItemButton
               selected={isSelected(item.path)}
@@ -134,6 +150,50 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             </ListItemButton>
           </Tooltip>
         ))}
+
+        {adminItems.length > 0 && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            {!collapsed && (
+              <Typography
+                variant="caption"
+                sx={{
+                  px: 2,
+                  pb: 0.5,
+                  color: "text.secondary",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Rekspert-verktøy
+              </Typography>
+            )}
+            {adminItems.map((item) => (
+              <Tooltip key={item.path} title={collapsed ? item.label : ""} placement="right">
+                <ListItemButton
+                  selected={isSelected(item.path)}
+                  onClick={() => navigate(item.path)}
+                  sx={{
+                    justifyContent: collapsed ? "center" : "flex-start",
+                    px: collapsed ? 1 : 2,
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 0,
+                      mr: collapsed ? 0 : 2,
+                      justifyContent: "center",
+                      color: item.color,
+                    }}
+                  >
+                    <item.Icon sx={{ fontSize: collapsed ? 45 : 35 }} />
+                  </ListItemIcon>
+                  {!collapsed && <ListItemText primary={item.label} />}
+                </ListItemButton>
+              </Tooltip>
+            ))}
+          </>
+        )}
       </List>
       <Box sx={{ flexGrow: 1 }} />
       <Divider />
@@ -195,6 +255,7 @@ function Layout() {
           <Route path="/statistikk" element={<StatistikkPage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
           <Route path="/anbrudd" element={<AndbruddPage />} />
+          <Route path="/rekspert" element={<RekspertPage />} />
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>
       </Box>
