@@ -4,11 +4,17 @@ import type { User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase/firebase";
 
+// App-level user shape (Firebase Auth user + Firestore user document fields we care about)
+export type AppUser = User & {
+  firstName?: string | null;
+  avatarUrl?: string | null;
+};
+
 // Root owner document (where roles map lives). Prefer env, fallback to your known owner uid.
 const OWNER_UID = (import.meta as any)?.env?.VITE_OWNER_UID || "uFRgce8mJjaVeDjqyJZ0wsiLqNo2";
 
 export function useAuthUser() {
-  const [user, setUser] = React.useState<User | null>(() => auth.currentUser);
+  const [user, setUser] = React.useState<AppUser | null>(() => auth.currentUser as AppUser | null);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
   const [isOwner, setIsOwner] = React.useState<boolean>(false);
@@ -20,7 +26,7 @@ export function useAuthUser() {
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
+      setUser(u as AppUser | null);
 
       if (!u) {
         setIsOwner(false);
@@ -39,10 +45,19 @@ export function useAuthUser() {
         const data = userSnap.exists() ? (userSnap.data() as any) : null;
 
         const name = typeof data?.firstName === "string" ? data.firstName.trim() : "";
-        setFirstName(name.length > 0 ? name : null);
+        const resolvedFirstName = name.length > 0 ? name : null;
+        setFirstName(resolvedFirstName);
 
         const avatar = typeof data?.avatarUrl === "string" ? data.avatarUrl.trim() : "";
-        setAvatarUrl(avatar.length > 0 ? avatar : null);
+        const resolvedAvatarUrl = avatar.length > 0 ? avatar : null;
+        setAvatarUrl(resolvedAvatarUrl);
+
+        // Attach app-level fields onto the auth user instance (typed as AppUser)
+        setUser((prev) =>
+          prev
+            ? ({ ...prev, firstName: resolvedFirstName, avatarUrl: resolvedAvatarUrl } as AppUser)
+            : prev
+        );
 
         // Approval gate:
         // - approved === false => NOT approved

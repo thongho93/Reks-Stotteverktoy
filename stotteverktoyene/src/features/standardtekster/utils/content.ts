@@ -1,6 +1,9 @@
-
-
-import { formatPreparatList, replacePreparatTokenWithList, replacePreparatTokensPrimarySecondary, replaceVareTokenByCount } from "./preparat";
+import {
+  formatPreparatList,
+  replacePreparatTokenWithList,
+  replacePreparatTokensPrimarySecondary,
+  replaceVareTokenByCount,
+} from "./preparat";
 
 type BuildArgs = {
   template: string;
@@ -8,7 +11,7 @@ type BuildArgs = {
   picked: string[];
 };
 
-const replaceFirstName = (text: string, firstName?: string | null) => {
+export const replaceFirstName = (text: string, firstName?: string | null) => {
   if (!firstName) return text;
   return text.replace(/\bXX\b/g, firstName);
 };
@@ -48,4 +51,5 @@ export const buildPreviewContent = ({ template, firstName, picked }: BuildArgs):
   return text;
 };
 
-export const templateUsesPreparat1 = (template: string): boolean => usesSecondaryToken(template ?? "");
+export const templateUsesPreparat1 = (template: string): boolean =>
+  usesSecondaryToken(template ?? "");

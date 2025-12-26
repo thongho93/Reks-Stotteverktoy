@@ -38,9 +38,15 @@ import {
 import { toDisplayDateIso } from "../utils/date";
 import { RelevanceIcon, relevanceKind } from "../utils/relevance";
 
+import { replaceFirstName } from "../../standardtekster/utils/content";
+import { useAuthUser } from "../../../app/auth/useAuthUser";
+
 export default function InteraksjonerPage() {
   const { index, loading, error, reload } = useInteractions();
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const { user } = useAuthUser();
+  const firstName = (user?.firstName ?? null) as string | null;
 
   const [selected, setSelected] = React.useState<InteractionEntity[]>([]);
   const [inputValue, setInputValue] = React.useState("");
@@ -178,16 +184,17 @@ export default function InteraksjonerPage() {
 
   const handleCopyStandardtekst = React.useCallback(
     async (text: string) => {
-      const t = (text ?? "").trim();
-      if (!t) return;
+      const raw = (text ?? "").trim();
+      if (!raw) return;
+      const rendered = replaceFirstName(raw, firstName);
       try {
-        await navigator.clipboard.writeText(t);
+        await navigator.clipboard.writeText(rendered);
         showCopySnack("Standardtekst kopiert");
       } catch {
         // ignore
       }
     },
-    [showCopySnack]
+    [showCopySnack, firstName]
   );
 
   // Auto-run search when selected changes and at least 2 are selected
@@ -250,7 +257,7 @@ export default function InteraksjonerPage() {
       <Box
         sx={{
           display: { xs: "block", md: "grid" },
-          gridTemplateColumns: { md: "480px minmax(0, 1fr)" },
+          gridTemplateColumns: { md: "1fr 2fr" },
           gap: 4,
           alignItems: "start",
           flex: 1,
@@ -423,11 +430,12 @@ export default function InteraksjonerPage() {
                 >
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Typography sx={{ fontWeight: 800 }}>Treff</Typography>
-                    <Chip size="small" label={`${results.length} treff`} sx={{ fontWeight: 700 }} />
+                    <Chip
+                      size="small"
+                      label={`${results.length} treff`}
+                      sx={{ fontWeight: 700, ml: 1 }}
+                    />
                   </Stack>
-                  <Typography color="text.secondary" sx={{ fontSize: 12 }}>
-                    Oppdatert: {today}
-                  </Typography>
                 </Box>
 
                 <Paper
@@ -435,6 +443,9 @@ export default function InteraksjonerPage() {
                   sx={{
                     borderRadius: 2,
                     overflow: "hidden",
+                    borderColor: "divider",
+                    boxShadow: "none",
+                    mt: 2,
                   }}
                 >
                   <List disablePadding>
@@ -466,7 +477,7 @@ export default function InteraksjonerPage() {
                               setActiveLinkedStdId(null);
                             }}
                             sx={{
-                              py: 1.25,
+                              py: 1.75,
                               alignItems: "flex-start",
                             }}
                           >
@@ -847,6 +858,7 @@ export default function InteraksjonerPage() {
                                       (activeLinkedStd as any).body ??
                                       (activeLinkedStd as any).template ??
                                       "";
+                                    const renderedCopyText = replaceFirstName(copyText, firstName);
                                     return (
                                       <Box
                                         sx={{
@@ -887,7 +899,7 @@ export default function InteraksjonerPage() {
                                           </IconButton>
                                         </Box>
                                         <Typography sx={{ whiteSpace: "pre-line" }}>
-                                          {copyText}
+                                          {renderedCopyText}
                                         </Typography>
                                       </Box>
                                     );
