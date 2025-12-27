@@ -24,6 +24,90 @@ export type GeminiErr = {
 };
 
 export type GeminiResult = GeminiOk | GeminiErr;
+export type StreamChunkHandler = (chunkText: string) => void;
+async function fakeStreamDeltas(fullText: string, onChunk: StreamChunkHandler) {
+  // Emit only deltas (new text) to avoid duplication in UI
+  const step = 28; // characters per tick
+  let i = 0;
+  while (i < fullText.length) {
+    const next = fullText.slice(i, i + step);
+    onChunk(next);
+    i += step;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 18));
+  }
+}
+export async function askGeminiStream(params: {
+  messages: ChatMessage[];
+  userText: string;
+  onChunk: StreamChunkHandler;
+}): Promise<GeminiResult> {
+  const t0 = performance.now();
+
+  try {
+    const templateID = import.meta.env.VITE_GEMINI_TEMPLATE_ID as string | undefined;
+
+    if (!templateID) {
+      throw new Error(
+        "Mangler VITE_GEMINI_TEMPLATE_ID. Sett den til template ID-en din (f.eks. reks-clinical-system) i .env."
+      );
+    }
+
+    const inputs = buildTemplateInputs(params.messages, params.userText, "");
+
+    // Try true streaming if the SDK supports it on the template model.
+    const maybe: any = geminiTemplateModel as any;
+
+    if (typeof maybe?.generateContentStream === "function") {
+      const result: any = await maybe.generateContentStream(templateID, inputs);
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log("[Gemini] Streaming via generateContentStream (SDK)");
+      }
+      const stream: any = result?.stream ?? result;
+
+      if (stream && typeof stream[Symbol.asyncIterator] === "function") {
+        for await (const chunk of stream) {
+          const chunkText =
+            (typeof chunk?.text === "function" ? chunk.text() : undefined) ??
+            (typeof chunk?.response?.text === "function" ? chunk.response.text() : undefined) ??
+            chunk?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ??
+            "";
+
+          if (chunkText) params.onChunk(chunkText);
+        }
+      }
+
+      return {
+        ok: true,
+        text: "",
+        latencyMs: Math.round(performance.now() - t0),
+      };
+    }
+
+    // Fallback: non-streaming request, then emit deltas so UI still feels live
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[Gemini] Streaming fallback (generateContent + fakeStreamDeltas)");
+    }
+    const result = await geminiTemplateModel.generateContent(templateID, inputs);
+    const text = result.response.text()?.trim() || "Beklager, jeg fikk ikke noe svar.";
+
+    await fakeStreamDeltas(text, params.onChunk);
+
+    return {
+      ok: true,
+      text,
+      latencyMs: Math.round(performance.now() - t0),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: toErrorMessage(e),
+      latencyMs: Math.round(performance.now() - t0),
+    };
+  }
+}
 
 function extractGroundingSources(response: any): GroundingInfo | undefined {
   const md = response?.groundingMetadata;
