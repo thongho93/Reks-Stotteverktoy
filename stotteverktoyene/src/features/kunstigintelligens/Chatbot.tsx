@@ -14,8 +14,9 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import SendIcon from "@mui/icons-material/Send";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 
-import { askGemini, askGeminiWithSearchAndTemplate } from "./geminiService";
+import { askGeminiStream, askGeminiWithSearchAndTemplate } from "./geminiService";
 import type { ChatMessage } from "./geminiService";
 
 export default function Chatbot() {
@@ -184,6 +185,29 @@ export default function Chatbot() {
     setResizing(true);
   };
 
+  const shouldUseGrounding = (userText: string) => {
+    const t = userText.toLowerCase();
+
+    // Only enable web grounding for time-sensitive / policy / price / shortage questions
+    const triggers = [
+      "siste nytt",
+      "oppdatert",
+      "2026",
+      "dmp mangel",
+      "legemiddelmangel",
+      "mangel",
+      "fhi anbefaling",
+      "anbefaling",
+      "pris",
+      "trinnpris",
+      "frikortgrense",
+      "frikort",
+      "vedtak",
+    ];
+
+    return triggers.some((k) => t.includes(k));
+  };
+
   const SOURCE_DETECTION = {
     medication:
       /(dosering|dose|døgndose|maksdose|mg\/ml|mg|mikrogram|µg|ie|ml|tablett|kapsel|plaster|injeksjon|interaksjon|bivirk|kontraindik|forsikt|resept|atc|indikasjon)/i,
@@ -197,22 +221,35 @@ export default function Chatbot() {
     // Infection/vaccine/antibiotics
     infect:
       /(antibiotika|penicillin|amoksicillin|doxy|azitro|cefalosporin|infeksjon|smitte|vaksine|influensa|covid)/i,
+    // Pregnancy / breastfeeding / "mamma" questions
+    pregnancy: /(gravid|svangerskap|trimester|foster|gestasjon|gravide|sperm|fertilitet)/i,
+    lactation: /(amming|amme|ammes|morsmelk|brystmelk|laktasjon|nyfødt|spedbarn)/i,
+    // Pediatrics / children
+    pediatrics:
+      /(barn|baby|spedbarn|nyfødt|ungdom|pediatri|barne|kg|kroppsvekt|5\s*år|6\s*år|7\s*år|_attach|feber hos barn)/i,
+    // Tablet/capsule manipulation
+    manipulation:
+      /(knus|knusing|del|deling|dele|kapsel|åpne kapsel|mikstur|sonde|n\.?g\.?\s*sonde|svelgevansker)/i,
     // Reimbursement/HELFO
     reimbursement:
       /(helfo|blå resept|blåresept|refusjon|egenandel|vedtak|h-resept|hresept|§\s*\d+|paragraf\s*\d+)/i,
   };
 
-  const getSourceLinks = (text: string) => {
-    // Only show sources when the question looks medication/clinical related
-    const isMedicationRelated = SOURCE_DETECTION.medication.test(text);
+  const getSourceLinks = (questionText: string) => {
+    // Only show sources when the QUESTION looks medication/clinical related
+    const isMedicationRelated = SOURCE_DETECTION.medication.test(questionText);
     if (!isMedicationRelated) return [];
 
-    const isOmeqRelated = SOURCE_DETECTION.omeq.test(text);
-    const isInteractionRelated = SOURCE_DETECTION.interaction.test(text);
-    const isDoseRelated = SOURCE_DETECTION.dose.test(text);
-    const isReimbursementRelated = SOURCE_DETECTION.reimbursement.test(text);
-    const isInfectRelated = SOURCE_DETECTION.infect.test(text);
-    const isToxRelated = SOURCE_DETECTION.tox.test(text);
+    const isOmeqRelated = SOURCE_DETECTION.omeq.test(questionText);
+    const isInteractionRelated = SOURCE_DETECTION.interaction.test(questionText);
+    const isDoseRelated = SOURCE_DETECTION.dose.test(questionText);
+    const isReimbursementRelated = SOURCE_DETECTION.reimbursement.test(questionText);
+    const isInfectRelated = SOURCE_DETECTION.infect.test(questionText);
+    const isToxRelated = SOURCE_DETECTION.tox.test(questionText);
+    const isPregnancyRelated = SOURCE_DETECTION.pregnancy.test(questionText);
+    const isLactationRelated = SOURCE_DETECTION.lactation.test(questionText);
+    const isPediatricsRelated = SOURCE_DETECTION.pediatrics.test(questionText);
+    const isManipulationRelated = SOURCE_DETECTION.manipulation.test(questionText);
 
     const candidates: Array<{ label: string; href: string }> = [];
 
@@ -265,11 +302,48 @@ export default function Chatbot() {
       pushUnique("Felleskatalogen", "https://www.felleskatalogen.no/");
     }
 
+    // Theme: pregnancy / breastfeeding (prioritize: Trygg mammamedisin → Felleskatalogen → KOBLE)
+    if (isPregnancyRelated || isLactationRelated) {
+      pushUnique("Trygg mammamedisin", "https://tryggmammamedisin.no/");
+      // Keep at least one drug source too
+      pushUnique("Felleskatalogen", "https://www.felleskatalogen.no/");
+      // KOBLE has pediatric drug dosing/usage, also relevant for breastfeeding infants
+      pushUnique("KOBLE", "https://koble.info/");
+    }
+
+    // Theme: pediatrics / children (prioritize: KOBLE → Helsebiblioteket → Felleskatalogen)
+    if (isPediatricsRelated) {
+      pushUnique("KOBLE", "https://koble.info/");
+      pushUnique(
+        "Helsebiblioteket – pediatri",
+        "https://www.helsebiblioteket.no/innhold/retningslinjer/pediatri/generell-veileder-i-pediatri"
+      );
+      // Keep at least one drug source too
+      pushUnique("Felleskatalogen", "https://www.felleskatalogen.no/");
+    }
+
+    // Theme: tablet/capsule manipulation (prioritize: OUS eHåndboken → Felleskatalogen)
+    if (isManipulationRelated) {
+      pushUnique("OUS eHåndboken – knusing/deling", "https://ehandboken.ous-hf.no/document/10301");
+      // Keep at least one drug source too
+      pushUnique("Felleskatalogen", "https://www.felleskatalogen.no/");
+    }
+
     // Fallback: general medication-related (when none of the above matched strongly)
     if (candidates.length === 0) {
       pushUnique("Felleskatalogen", "https://www.felleskatalogen.no/");
       pushUnique("Legemiddelhåndboka", "https://www.legemiddelhandboka.no/");
       pushUnique("RELIS", "https://relis.no/");
+
+      // Only add these when the question hints at those populations
+      if (isPregnancyRelated || isLactationRelated) {
+        pushUnique("Trygg mammamedisin", "https://tryggmammamedisin.no/");
+      }
+      if (isPediatricsRelated) {
+        pushUnique("KOBLE", "https://koble.info/");
+      }
+
+      // If room remains, add DMP
       pushUnique("DMP", "https://www.dmp.no/");
     }
 
@@ -486,20 +560,42 @@ export default function Chatbot() {
     );
   };
 
-  const renderBubbleContent = (m: ChatMessage) => {
+  const getUserQuestionForAssistantIndex = (assistantIndex: number) => {
+    // Walk backwards to find the closest preceding user message
+    for (let j = assistantIndex - 1; j >= 0; j -= 1) {
+      if (messages[j]?.role === "user") return messages[j].text;
+    }
+    return "";
+  };
+
+  const renderBubbleContent = (m: ChatMessage, index: number) => {
     // Keep user messages simple; format assistant messages into paragraphs/lists
     if (m.role === "user") {
-      return <Typography variant="body2">{m.text}</Typography>;
+      return (
+        <Typography variant="body2" sx={{ color: "inherit" }}>
+          {m.text}
+        </Typography>
+      );
     }
     return (
       <Fragment>
         {renderMessageText(m.text)}
         {(() => {
-          const links = getSourceLinks(m.text);
+          const questionText = getUserQuestionForAssistantIndex(index);
+          const links = getSourceLinks(questionText);
           if (links.length === 0) return null;
 
           return (
             <Box sx={{ mt: 1 }}>
+              {import.meta.env.DEV && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", lineHeight: 1.4 }}
+                >
+                  Kilder valgt basert på spørsmålet.
+                </Typography>
+              )}
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -570,18 +666,63 @@ export default function Chatbot() {
     setMessages(nextMessages);
     setLoading(true);
 
-    const useGrounding = import.meta.env.DEV && import.meta.env.VITE_ENABLE_GROUNDING === "true";
+    const useGrounding =
+      import.meta.env.VITE_ENABLE_GROUNDING === "true" && shouldUseGrounding(text);
 
-    const res = useGrounding
-      ? await askGeminiWithSearchAndTemplate({ messages: nextMessages, userText: text })
-      : await askGemini({ messages: nextMessages, userText: text });
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("Chatbot: useGrounding =", useGrounding);
+    }
 
-    if (res.ok) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: res.text, grounding: (res as any).grounding },
-      ]);
-    } else {
+    if (useGrounding) {
+      const res = await askGeminiWithSearchAndTemplate({ messages: nextMessages, userText: text });
+
+      if (res.ok) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: res.text, grounding: (res as any).grounding },
+        ]);
+      } else {
+        setError(res.error);
+      }
+
+      setLoading(false);
+      return;
+    }
+
+    // Streaming (template without grounding)
+    let assistantIndex = -1;
+    setMessages((prev) => {
+      const next = [...prev, { role: "assistant", text: "" } as ChatMessage];
+      assistantIndex = next.length - 1;
+      return next;
+    });
+
+    const res = await askGeminiStream({
+      messages: nextMessages,
+      userText: text,
+      onChunk: (chunkText) => {
+        setMessages((prev) => {
+          const next = [...prev];
+          if (assistantIndex >= 0 && next[assistantIndex]?.role === "assistant") {
+            next[assistantIndex] = {
+              ...(next[assistantIndex] as any),
+              text: (next[assistantIndex]?.text ?? "") + chunkText,
+            } as any;
+          }
+          return next;
+        });
+      },
+    });
+
+    if (!res.ok) {
+      // Remove empty assistant bubble on error
+      setMessages((prev) => {
+        const next = [...prev];
+        if (assistantIndex >= 0 && next[assistantIndex]?.role === "assistant")
+          next.splice(assistantIndex, 1);
+        return next;
+      });
       setError(res.error);
     }
 
@@ -709,7 +850,7 @@ export default function Chatbot() {
             </Box>
 
             {/* Body */}
-            <Stack spacing={2} sx={{ height: panelHeight, p: 1.5 }}>
+            <Stack spacing={2} sx={{ height: panelHeight, p: 1.5, bgcolor: "grey.50" }}>
               {showUsageTip && (
                 <Paper
                   variant="outlined"
@@ -742,39 +883,105 @@ export default function Chatbot() {
                 </Paper>
               )}
               <Box sx={{ flex: 1, overflowY: "auto" }}>
-                <Stack spacing={1}>
+                <Stack spacing={1.75}>
                   {messages.map((m, i) => {
                     const isUser = m.role === "user";
+                    // When streaming we append an empty assistant message and fill it via chunks.
+                    // Avoid rendering it as a blank card before the first chunk arrives.
+                    if (m.role === "assistant" && !m.text.trim()) {
+                      return null;
+                    }
                     return (
                       <Box
                         key={i}
                         sx={{
                           display: "flex",
                           justifyContent: isUser ? "flex-end" : "flex-start",
-                          px: 1,
+                          px: 0.5,
                         }}
                       >
-                        <Paper
+                        <Box
                           sx={{
-                            px: 2,
-                            py: 1,
-                            maxWidth: "85%",
-                            borderRadius: 2.5,
-                            bgcolor: isUser ? "primary.main" : "grey.100",
-                            color: isUser ? "primary.contrastText" : "text.primary",
-                            whiteSpace: "normal",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 1,
+                            maxWidth: "min(680px, 100%)",
+                            width: isUser ? "auto" : "100%",
+                            flexDirection: isUser ? "row-reverse" : "row",
                           }}
                         >
-                          {renderBubbleContent(m)}
-                        </Paper>
+                          {/* Avatar */}
+                          <Box
+                            sx={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 999,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              bgcolor: isUser ? "primary.main" : "background.paper",
+                              color: isUser ? "common.white" : "text.secondary",
+                              border: isUser ? "none" : "1px solid",
+                              borderColor: isUser ? undefined : "divider",
+                              flex: "0 0 auto",
+                              mt: 0.25,
+                            }}
+                          >
+                            {isUser ? (
+                              <PersonOutlineIcon fontSize="small" />
+                            ) : (
+                              <AutoAwesomeIcon fontSize="small" />
+                            )}
+                          </Box>
+
+                          {/* Message card */}
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              mt: 0.25,
+                              px: 2,
+                              py: 1.25,
+                              maxWidth: isUser ? "min(520px, 85vw)" : "min(620px, 85vw)",
+                              borderRadius: 2,
+                              bgcolor: isUser ? "primary.main" : "background.paper",
+                              color: isUser ? "common.white" : "text.primary",
+                              border: isUser ? "none" : "1px solid",
+                              borderColor: isUser ? undefined : "divider",
+                              boxShadow: isUser ? 2 : 0,
+                              whiteSpace: "normal",
+                              fontWeight: isUser ? 600 : "normal",
+                            }}
+                          >
+                            {renderBubbleContent(m, i)}
+                          </Paper>
+                        </Box>
                       </Box>
                     );
                   })}
 
                   {loading && (
-                    <Typography variant="body2" color="text.secondary" sx={{ px: 1 }}>
-                      Tenker …
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.5 }}>
+                      <Box
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 999,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: "background.paper",
+                          color: "text.secondary",
+                          border: "1px solid",
+                          borderColor: "divider",
+                          flex: "0 0 auto",
+                        }}
+                      >
+                        <AutoAwesomeIcon fontSize="small" />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Tenker …
+                      </Typography>
+                    </Box>
                   )}
 
                   <div ref={bottomRef} />

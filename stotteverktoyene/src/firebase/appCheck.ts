@@ -1,3 +1,10 @@
+// Enable App Check debug token in development to avoid reCAPTCHA/domain issues
+// This must run BEFORE initializeAppCheck is called
+if (import.meta.env.DEV) {
+  // true = Firebase generates a debug token and logs it once in the console
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import type { FirebaseApp } from "firebase/app";
 
@@ -17,4 +24,9 @@ export function initAppCheck(app: FirebaseApp) {
     provider: new ReCaptchaV3Provider(siteKey),
     isTokenAutoRefreshEnabled: true,
   });
+
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.info("[AppCheck] Debug token enabled (see console output above).");
+  }
 }
