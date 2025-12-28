@@ -20,15 +20,16 @@ import {
   Snackbar,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import IndeterminateCheckBoxOutlinedIcon from "@mui/icons-material/IndeterminateCheckBoxOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 
+import { CreateStandardtekstDialog, EditStandardtekstDialog } from "../components/CreateStandardtekstDialog";
 import { useInteractions } from "../services/useInteractions";
-import { LinkStandardtekstDialog } from "../components/LinkStandardtekstDialog";
-import { useStandardtekstLinking } from "../hooks/useStandardtekstLinking";
+import { useStandardtekster } from "../hooks/useStandardtekster";
 import {
   matchInteractionsBySelectedTerms,
   type InteractionEntity,
@@ -40,12 +41,28 @@ import { RelevanceIcon, relevanceKind } from "../utils/relevance";
 import { replaceFirstName } from "../../standardtekster/utils/content";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 
+const HISTORY_KEY_PREFIX = "interaksjoner_history_v1";
+
+type HistoryItem = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  interactionIndex: number;
+  selected: InteractionEntity[];
+  createdAt: number;
+};
+
 export default function InteraksjonerPage() {
   const { index, loading, error, reload } = useInteractions();
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const { user } = useAuthUser();
+  const { user, isAdmin } = useAuthUser();
   const firstName = (user?.firstName ?? null) as string | null;
+
+  const historyKey = React.useMemo(() => {
+    const uid = user?.uid;
+    return uid ? `${HISTORY_KEY_PREFIX}:${uid}` : `${HISTORY_KEY_PREFIX}:anon`;
+  }, [user?.uid]);
 
   const [selected, setSelected] = React.useState<InteractionEntity[]>([]);
   const [inputValue, setInputValue] = React.useState("");
@@ -53,22 +70,37 @@ export default function InteraksjonerPage() {
   const [activeResult, setActiveResult] = React.useState<number>(0);
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({});
   const [activeLinkedStdId, setActiveLinkedStdId] = React.useState<string | null>(null);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+
+  const [history, setHistory] = React.useState<HistoryItem[]>([]);
+  const lastAutoHistoryKeyRef = React.useRef<string | null>(null);
 
   const [copySnackOpen, setCopySnackOpen] = React.useState(false);
   const [copySnackMsg, setCopySnackMsg] = React.useState<string>("Tekst kopiert");
 
-  const {
-    stdOpen,
-    stdLoading,
-    stdError,
-    standardtekster,
-    chosenStd,
-    setChosenStd,
-    savingLink,
-    openLinkDialog,
-    closeLinkDialog,
-    saveLink,
-  } = useStandardtekstLinking();
+  const { standardtekster, reload: reloadStandardtekster } = useStandardtekster();
+
+  const activeCtx = React.useMemo(() => {
+    if (!index || results.length === 0) return null;
+    const r = results[Math.min(activeResult, results.length - 1)];
+    const it = index.interactions[r.interactionIndex];
+
+    const interactionId = it?.interaksjonId ?? null;
+
+    const groups = (r.matchedGroups ?? []).slice(0, 2);
+    const names = groups
+      .map((gi) => {
+        const g = it.substansgrupper?.[gi];
+        return g?.navn || g?.substanser?.[0]?.substans || "";
+      })
+      .filter(Boolean);
+
+    const prefillTitle =
+      names.length === 2 ? `${names[0]} × ${names[1]}` : "Interaksjon";
+
+    return { r, it, interactionId, prefillTitle };
+  }, [index, results, activeResult]);
 
   const labelByTerm = React.useMemo(() => {
     // Map both name-key and ATC to a nice display label (for "søkeinput ...")
@@ -110,6 +142,8 @@ export default function InteraksjonerPage() {
     setExpanded({});
     setInputValue("");
     setActiveLinkedStdId(null);
+    setCreateOpen(false);
+    setEditOpen(false);
   }, []);
 
   // Hotkey: Escape => reset search
@@ -117,7 +151,7 @@ export default function InteraksjonerPage() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       // Don't interfere while dialogs are open
-      if (stdOpen) return;
+      if (createOpen || editOpen) return;
 
       e.preventDefault();
       handleReset();
@@ -130,7 +164,106 @@ export default function InteraksjonerPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleReset, stdOpen]);
+  }, [handleReset, createOpen, editOpen]);
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(historyKey);
+      if (!raw) {
+        setHistory([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as HistoryItem[];
+      if (!Array.isArray(parsed)) {
+        setHistory([]);
+        return;
+      }
+      setHistory(parsed.slice(0, 5));
+    } catch {
+      setHistory([]);
+    }
+  }, [historyKey]);
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 5)));
+    } catch {
+      // ignore
+    }
+  }, [history, historyKey]);
+
+  const getMatchTitle = React.useCallback(
+    (r: MatchResult) => {
+      if (!index) return "Interaksjon";
+      const it = index.interactions[r.interactionIndex];
+      const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
+      const gB = it.substansgrupper?.[r.matchedGroups?.[1]];
+
+      const nameFromGroup = (g?: any) => {
+        if (!g) return "";
+        if (g.navn) return g.navn;
+        return g.substanser?.[0]?.substans || "";
+      };
+
+      const a = nameFromGroup(gA);
+      const b = nameFromGroup(gB);
+      return [a, b].filter(Boolean).join(" × ") || "Interaksjon";
+    },
+    [index]
+  );
+
+  const pushHistory = React.useCallback(
+    (r: MatchResult) => {
+      if (!index) return;
+      const it = index.interactions[r.interactionIndex];
+      const title = getMatchTitle(r);
+
+      const item: HistoryItem = {
+        id: `${it.interaksjonId ?? r.interactionIndex}:${Date.now()}`,
+        title,
+        subtitle: it.kliniskKonsekvens ?? undefined,
+        interactionIndex: r.interactionIndex,
+        selected: selected,
+        createdAt: Date.now(),
+      };
+
+      setHistory((prev) => {
+        const withoutDup = prev.filter(
+          (x) => x.interactionIndex !== item.interactionIndex
+        );
+        return [item, ...withoutDup].slice(0, 5);
+      });
+    },
+    [index, getMatchTitle, selected]
+  );
+
+  // Auto-lagre til historikk når det kun finnes 1 treff.
+  // Når det finnes flere treff, krever vi at bruker klikker på et spesifikt treff.
+  React.useEffect(() => {
+    if (!index) return;
+    if (selected.length < 2) {
+      lastAutoHistoryKeyRef.current = null;
+      return;
+    }
+
+    if (results.length !== 1) {
+      lastAutoHistoryKeyRef.current = null;
+      return;
+    }
+
+    const r = results[0];
+    const selKey = selected
+      .map((s) => (s.atc ? `atc:${s.atc}` : `name:${s.key}`))
+      .sort()
+      .join("|");
+    const key = `${r.interactionIndex}::${selKey}`;
+
+    if (lastAutoHistoryKeyRef.current === key) return;
+    lastAutoHistoryKeyRef.current = key;
+
+    pushHistory(r);
+  }, [index, results, selected, pushHistory]);
+
+  const showHistory = selected.length === 0 && inputValue.trim().length === 0 && history.length > 0;
 
   const handleSearch = React.useCallback(() => {
     if (!index) return;
@@ -364,6 +497,83 @@ export default function InteraksjonerPage() {
             <Typography variant="caption" color="text.secondary" sx={{ mt: -0.5 }}>
               Tips: Lim inn ATC-kode/virkestoff direkte i søkefeltet.
             </Typography>
+            {showHistory ? (
+              <Box sx={{ pt: 1 }}>
+                <Divider sx={{ my: 2 }} />
+
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    mb: 1,
+                  }}
+                >
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography sx={{ fontWeight: 800 }}>Historikk</Typography>
+                    <Chip size="small" label={`${history.length}`} sx={{ fontWeight: 700 }} />
+                  </Stack>
+                </Box>
+
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    borderColor: "divider",
+                    boxShadow: "none",
+                    mt: 1,
+                  }}
+                >
+                  <List disablePadding>
+                    {history.slice(0, 5).map((h) => (
+                      <React.Fragment key={h.id}>
+                        <ListItemButton
+                          onClick={() => {
+                            setSelected(h.selected);
+                            setInputValue("");
+                            setActiveLinkedStdId(null);
+                            setExpanded({});
+                            setCreateOpen(false);
+                            setEditOpen(false);
+                          }}
+                          sx={{ py: 1.5, alignItems: "flex-start" }}
+                        >
+                          <ListItemText
+                            primary={
+                              <Typography sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                                {h.title}
+                              </Typography>
+                            }
+                            secondary={
+                              h.subtitle ? (
+                                <Typography
+                                  color="text.secondary"
+                                  sx={{
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                    mt: 0.25,
+                                  }}
+                                >
+                                  {h.subtitle}
+                                </Typography>
+                              ) : null
+                            }
+                          />
+                        </ListItemButton>
+                        <Divider />
+                      </React.Fragment>
+                    ))}
+                  </List>
+                </Paper>
+
+                <Typography color="text.secondary" sx={{ mt: 1, fontSize: 13 }}>
+                  Historikk skjules når du begynner å søke.
+                </Typography>
+              </Box>
+            ) : null}
             {selected.length > 0 ? (
               <Box
                 sx={{
@@ -472,6 +682,7 @@ export default function InteraksjonerPage() {
                             onClick={() => {
                               setActiveResult(i);
                               setActiveLinkedStdId(null);
+                              pushHistory(r);
                             }}
                             sx={{
                               py: 1.75,
@@ -571,13 +782,14 @@ export default function InteraksjonerPage() {
             <Stack spacing={2}>
               {/* Active result details */}
               {(() => {
-                const r = results[Math.min(activeResult, results.length - 1)];
-                const it = index.interactions[r.interactionIndex];
+                const r = activeCtx?.r;
+                const it = activeCtx?.it;
+                if (!r || !it) return null;
                 const kind = relevanceKind(it.relevansDn);
                 // Compute linked standardtekster for the current interaction
-                const linkedStandardtekster = it.interaksjonId
+                const linkedStandardtekster = activeCtx.interactionId
                   ? standardtekster.filter((s) =>
-                      (s.interactionIds ?? []).includes(it.interaksjonId!)
+                      (s.interactionIds ?? []).includes(activeCtx.interactionId!)
                     )
                   : [];
                 const activeLinkedStd = activeLinkedStdId
@@ -604,7 +816,7 @@ export default function InteraksjonerPage() {
                       : (atcRaw as { v?: string } | null | undefined)?.v;
                   const atcDisplay = atcMaybe ? ` ${atcMaybe}` : "";
 
-                  return { gi, title: `${name}${atcDisplay}`, suffix };
+                  return { gi, nameOnly: name, title: `${name}${atcDisplay}`, suffix };
                 });
 
                 const isOpen = !!expanded[r.interactionIndex];
@@ -670,15 +882,17 @@ export default function InteraksjonerPage() {
                                 Vis detaljer
                               </Button>
 
-                              <Button
-                                variant="contained"
-                                onClick={() => {
-                                  if (!it?.interaksjonId) return;
-                                  openLinkDialog();
-                                }}
-                              >
-                                Knytt standardtekst
-                              </Button>
+                              {isAdmin ? (
+                                <Button
+                                  variant="contained"
+                                  onClick={() => {
+                                    if (!activeCtx.interactionId) return;
+                                    setCreateOpen(true);
+                                  }}
+                                >
+                                  Ny standardtekst
+                                </Button>
+                              ) : null}
                             </Box>
                           </Box>
 
@@ -884,16 +1098,28 @@ export default function InteraksjonerPage() {
                                           <Typography sx={{ fontWeight: 800, mb: 0.75 }}>
                                             {activeLinkedStd.title || "Standardtekst"}
                                           </Typography>
-                                          <IconButton
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleCopyStandardtekst(copyText);
-                                            }}
-                                            size="small"
-                                            sx={{ ml: 1 }}
-                                          >
-                                            <ContentCopyIcon fontSize="small" />
-                                          </IconButton>
+                                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: 1 }}>
+                                            {isAdmin ? (
+                                              <IconButton
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setEditOpen(true);
+                                                }}
+                                                size="small"
+                                              >
+                                                <EditOutlinedIcon fontSize="small" />
+                                              </IconButton>
+                                            ) : null}
+                                            <IconButton
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleCopyStandardtekst(copyText);
+                                              }}
+                                              size="small"
+                                            >
+                                              <ContentCopyIcon fontSize="small" />
+                                            </IconButton>
+                                          </Box>
                                         </Box>
                                         <Typography sx={{ whiteSpace: "pre-line" }}>
                                           {renderedCopyText}
@@ -933,21 +1159,47 @@ export default function InteraksjonerPage() {
           {copySnackMsg}
         </Alert>
       </Snackbar>
-      <LinkStandardtekstDialog
-        open={stdOpen}
-        loading={stdLoading}
-        error={stdError}
-        standardtekster={standardtekster}
-        chosenStd={chosenStd}
-        onChoose={setChosenStd}
-        saving={savingLink}
-        onClose={closeLinkDialog}
-        onSave={() => {
-          if (!index || results.length === 0) return;
-          const r = results[Math.min(activeResult, results.length - 1)];
-          const it = index.interactions[r.interactionIndex];
-          if (!it?.interaksjonId) return;
-          saveLink(it.interaksjonId);
+     <CreateStandardtekstDialog
+        open={createOpen}
+        interactionId={activeCtx?.interactionId ?? null}
+        prefillTitle={activeCtx?.prefillTitle ?? "Interaksjon"}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(createdId) => {
+          setActiveLinkedStdId(createdId);
+          void reloadStandardtekster();
+          showCopySnack("Standardtekst opprettet og knyttet");
+        }}
+      />
+      <EditStandardtekstDialog
+        open={editOpen}
+        standardtekst={
+          activeLinkedStdId && activeCtx?.interactionId
+            ? (() => {
+                const linked = standardtekster.filter((s) =>
+                  (s.interactionIds ?? []).includes(activeCtx.interactionId!)
+                );
+                const s = linked.find((x) => x.id === activeLinkedStdId);
+                if (!s) return null;
+                return {
+                  id: s.id,
+                  title: s.title,
+                  category: (s as any).category,
+                  content:
+                    (s as any).content ??
+                    (s as any).text ??
+                    (s as any).melding ??
+                    (s as any).body ??
+                    (s as any).template ??
+                    "",
+                  followUps: (s as any).followUps ?? [],
+                };
+              })()
+            : null
+        }
+        onClose={() => setEditOpen(false)}
+        onSaved={() => {
+          void reloadStandardtekster();
+          showCopySnack("Standardtekst oppdatert");
         }}
       />
     </Box>
