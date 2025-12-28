@@ -16,6 +16,9 @@ import {
   Stack,
   TextField,
   Typography,
+  FormControlLabel,
+  Switch,
+  Tooltip,
 } from "@mui/material";
 import StandardTekstSidebar from "../components/StandardTekstSidebar";
 import StandardTekstContent from "../components/StandardTekstContent";
@@ -110,6 +113,22 @@ export default function StandardTekstPage() {
 
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
   const [copied, setCopied] = useState(false);
+  const [clearOnCopy, setClearOnCopy] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem("standardtekster.clearOnCopy");
+      return raw === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("standardtekster.clearOnCopy", String(clearOnCopy));
+    } catch {
+      // ignore
+    }
+  }, [clearOnCopy]);
   const [showGuide, setShowGuide] = useState(false);
   const [draftFollowUps, setDraftFollowUps] = useState<StandardTekstFollowUp[]>([]);
   const [followUpPick, setFollowUpPick] = useState<{ id: string; title: string } | null>(null);
@@ -467,6 +486,13 @@ export default function StandardTekstPage() {
     if (!selected) return;
     if (isEditing) return;
 
+    // If the user has marked (selected) text, do NOT auto-copy the full template.
+    // This keeps normal text selection + Ctrl/Cmd+C working.
+    const selectionText = window.getSelection?.()?.toString() ?? "";
+    if (selectionText.trim().length > 0) {
+      return;
+    }
+
     // Prevent copying if the template requires a number and it hasn't been filled in.
     if (templateHasTallToken(selected.content)) {
       const indices = getTallTokenIndices(selected.content);
@@ -484,9 +510,25 @@ export default function StandardTekstPage() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      clearPreparats();
-      setTallByIndex({ 0: "" });
-      setSearch("");
+
+      if (clearOnCopy) {
+        clearPreparats();
+
+        if (templateHasTallToken(selected.content)) {
+          const indices = getTallTokenIndices(selected.content);
+          if (indices.length) {
+            const next: Record<number, string> = {};
+            for (const i of indices) next[i] = "";
+            setTallByIndex(next);
+          } else {
+            setTallByIndex({ 0: "" });
+          }
+        } else {
+          setTallByIndex({ 0: "" });
+        }
+
+        setSearch("");
+      }
 
       // Focus back to preparat search for fast next use
       requestAnimationFrame(() => {
@@ -508,9 +550,26 @@ export default function StandardTekstPage() {
         document.execCommand("copy");
         document.body.removeChild(el);
         setCopied(true);
-        clearPreparats();
-        setTallByIndex({ 0: "" });
-        setSearch("");
+
+        if (clearOnCopy) {
+          clearPreparats();
+
+          if (templateHasTallToken(selected.content)) {
+            const indices = getTallTokenIndices(selected.content);
+            if (indices.length) {
+              const next: Record<number, string> = {};
+              for (const i of indices) next[i] = "";
+              setTallByIndex(next);
+            } else {
+              setTallByIndex({ 0: "" });
+            }
+          } else {
+            setTallByIndex({ 0: "" });
+          }
+
+          setSearch("");
+        }
+
         requestAnimationFrame(() => {
           preparatSearchInputRef.current?.focus();
           preparatSearchInputRef.current?.select?.();
@@ -576,6 +635,19 @@ export default function StandardTekstPage() {
               <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
             </span>
           </Typography>
+          <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
+            <FormControlLabel
+              sx={{ ml: 1 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={clearOnCopy}
+                  onChange={(e) => setClearOnCopy(e.target.checked)}
+                />
+              }
+              label={<Typography variant="caption">Tøm etter kopiering</Typography>}
+            />
+          </Tooltip>
           <Button
             variant="text"
             size="small"

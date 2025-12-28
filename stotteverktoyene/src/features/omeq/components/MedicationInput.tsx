@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Autocomplete, TextField, Box, Typography } from "@mui/material";
 
 import { buildProductIndex, parseMedicationInput } from "../lib/parseMedicationInput";
@@ -23,8 +23,60 @@ const getProductLabel = (p: any, strength?: string, varenummer?: string) => {
   return `${base}${f}${s}${v}`.trim();
 };
 
+const getFilteredOptions = (
+  opts: SuggestionOption[],
+  rawInput: string,
+  productByVarenummer: Map<string, { product: any; strength?: string }>
+) => {
+  const raw = rawInput.trim();
+  const numeric = raw.match(/^0*(\d+)$/)?.[1] ?? null;
+
+  if (numeric) {
+    const prefix = numeric;
+
+    const matches = opts.filter((o) => {
+      const m = o.label.match(/\((\d+)\)\s*$/);
+      if (!m) return false;
+      const vn = m[1];
+      return vn.startsWith(prefix);
+    });
+
+    if (matches.length === 0) {
+      const hit = productByVarenummer.get(prefix);
+      if (!hit?.product) return [];
+      const exactLabel = getProductLabel(hit.product, hit.strength, prefix);
+      return opts.filter((o) => o.label === exactLabel).slice(0, 25);
+    }
+
+    const exactFirst = matches.sort((a, b) => {
+      const av = a.label.match(/\((\d+)\)\s*$/)?.[1] ?? "";
+      const bv = b.label.match(/\((\d+)\)\s*$/)?.[1] ?? "";
+
+      const aExact = av === prefix ? 0 : 1;
+      const bExact = bv === prefix ? 0 : 1;
+      if (aExact !== bExact) return aExact - bExact;
+
+      if (av.length !== bv.length) return av.length - bv.length;
+      return a.label.localeCompare(b.label, "nb");
+    });
+
+    return exactFirst.slice(0, 25);
+  }
+
+  const q = raw.toLowerCase();
+  if (!q) return opts.slice(0, 25);
+
+  const starts = opts.filter((o) => o.label.toLowerCase().startsWith(q));
+  const contains = opts.filter(
+    (o) => !o.label.toLowerCase().startsWith(q) && o.label.toLowerCase().includes(q)
+  );
+
+  return [...starts, ...contains].slice(0, 25);
+};
+
 export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputProps) => {
   const productIndex = useMemo(() => buildProductIndex(), []);
+  const [open, setOpen] = useState(false);
 
   const inputElRef = useRef<HTMLInputElement | null>(null);
 
@@ -114,7 +166,14 @@ export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputP
   const varenummerHit = numericQuery ? productByVarenummer.get(numericQuery) : null;
   const resolvedProduct = parsed.product ?? varenummerHit?.product ?? null;
 
+  const trimmedValue = value.trim();
+  const isExactOptionSelected = useMemo(() => {
+    if (!trimmedValue) return false;
+    return options.some((o) => o.value === trimmedValue);
+  }, [options, trimmedValue]);
+
   const lastAutoConvertedRef = useRef<string | null>(null);
+  const lastAutoSelectedRef = useRef<string | null>(null);
 
   const isPureVarenummerInput = useMemo(() => {
     const raw = value.trim();
@@ -158,6 +217,45 @@ export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputP
     }
   }, [isPureVarenummerInput, numericQuery, onChange, productByVarenummer, value, options]);
 
+  useEffect(() => {
+    // Don't fight with the varenummer-only auto-convert effect.
+    if (isPureVarenummerInput) return;
+
+    if (isExactOptionSelected) {
+      setOpen(false);
+      return;
+    }
+
+    const raw = value.trim();
+    if (!raw) {
+      lastAutoSelectedRef.current = null;
+      return;
+    }
+
+    // Avoid overly aggressive auto-fill on very short inputs.
+    if (raw.length < 3) {
+      lastAutoSelectedRef.current = null;
+      return;
+    }
+
+    const filtered = getFilteredOptions(options, raw, productByVarenummer);
+
+    if (filtered.length === 1) {
+      const only = filtered[0];
+
+      // Prevent loops: only auto-select if we are not already on that value
+      if (only.value.trim() !== raw && lastAutoSelectedRef.current !== only.value) {
+        lastAutoSelectedRef.current = only.value;
+        onChange(only.value);
+        setOpen(false);
+      }
+      return;
+    }
+
+    // Reset when there are multiple matches again.
+    lastAutoSelectedRef.current = null;
+  }, [isPureVarenummerInput, isExactOptionSelected, onChange, options, productByVarenummer, value]);
+
   return (
     <Box className="medicationInput">
       <Autocomplete
@@ -165,62 +263,22 @@ export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputP
         options={options}
         value={null}
         inputValue={value}
+        open={open && !isExactOptionSelected}
+        onOpen={() => {
+          if (!isExactOptionSelected) setOpen(true);
+        }}
+        onClose={() => setOpen(false)}
         onInputChange={(_, newInputValue) => onChange(newInputValue)}
         onChange={(_, selected) => {
           if (!selected) return;
           const opt = selected as SuggestionOption;
           onChange(opt.value);
         }}
-        filterOptions={(opts, state) => {
-          const raw = state.inputValue.trim();
-          const numeric = raw.match(/^0*(\d+)$/)?.[1] ?? null;
-
-          if (numeric) {
-            // While typing digits, show matches by varenummer prefix (e.g. "293" -> all (293xxx)).
-            // Options include varenummer at the end: "... (504394)".
-            const prefix = numeric;
-
-            const matches = opts.filter((o) => {
-              const m = o.label.match(/\((\d+)\)\s*$/);
-              if (!m) return false;
-              const vn = m[1];
-              return vn.startsWith(prefix);
-            });
-
-            // If no options match (e.g. data mismatch), fall back to map lookup for exact varenummer.
-            if (matches.length === 0) {
-              const hit = productByVarenummer.get(prefix);
-              if (!hit?.product) return [];
-              const exactLabel = getProductLabel(hit.product, hit.strength, prefix);
-              return opts.filter((o) => o.label === exactLabel).slice(0, 25);
-            }
-
-            // Prefer exact varenummer first, then shorter varenummer, then lexicographic.
-            const exactFirst = matches.sort((a, b) => {
-              const av = a.label.match(/\((\d+)\)\s*$/)?.[1] ?? "";
-              const bv = b.label.match(/\((\d+)\)\s*$/)?.[1] ?? "";
-
-              const aExact = av === prefix ? 0 : 1;
-              const bExact = bv === prefix ? 0 : 1;
-              if (aExact !== bExact) return aExact - bExact;
-
-              if (av.length !== bv.length) return av.length - bv.length;
-              return a.label.localeCompare(b.label, "nb");
-            });
-
-            return exactFirst.slice(0, 25);
-          }
-
-          const q = raw.toLowerCase();
-          if (!q) return opts.slice(0, 25);
-
-          const starts = opts.filter((o) => o.label.toLowerCase().startsWith(q));
-          const contains = opts.filter(
-            (o) => !o.label.toLowerCase().startsWith(q) && o.label.toLowerCase().includes(q)
-          );
-
-          return [...starts, ...contains].slice(0, 25);
-        }}
+        filterOptions={(opts, state) =>
+          isExactOptionSelected
+            ? []
+            : getFilteredOptions(opts as SuggestionOption[], state.inputValue, productByVarenummer)
+        }
         renderInput={(params) => (
           <TextField
             {...params}
