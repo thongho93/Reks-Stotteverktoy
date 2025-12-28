@@ -69,3 +69,41 @@ export const standardTeksterApi = {
     await deleteDoc(ref);
   },
 };
+
+export async function createStandardtekstForInteraction(params: {
+  title: string;
+  category?: string;
+  content: string;
+  interactionId: string;
+  followUps: any[];
+}) {
+  const colRef = collection(db, "Standardtekster");
+
+  const newDoc: any = {
+    title: params.title,
+    category: params.category || undefined,
+    content: params.content,
+    followUps: params.followUps as any,
+    interactionIds: [params.interactionId],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(colRef, newDoc);
+  return docRef.id;
+}
+
+export async function updateStandardtekst(params: {
+  standardtekstId: string;
+  title: string;
+  category?: string;
+  content: string;
+  followUps: any[];
+}) {
+  await standardTeksterApi.update(params.standardtekstId, {
+    title: params.title,
+    category: params.category,
+    content: params.content,
+    followUps: params.followUps,
+  });
+}
