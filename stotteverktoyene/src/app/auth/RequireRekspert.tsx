@@ -9,8 +9,8 @@ export default function RequireRekspert() {
     return null;
   }
 
-  // Allow rekspert, admin and owner
-  if (role === "rekspert" || role === "admin" || role === "owner") {
+  // Allow rekspert and owner
+  if (role === "rekspert" || role === "owner") {
     return <Outlet />;
   }
 
