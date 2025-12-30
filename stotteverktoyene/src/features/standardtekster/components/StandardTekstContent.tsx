@@ -19,6 +19,7 @@ import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { logUsage } from "../../../shared/services/usage";
+import { STANDARDTEKST_TOKEN_DEFS } from "../utils/preparat";
 
 type Props = {
   selected: StandardTekst | null;
@@ -88,16 +89,7 @@ export default function StandardTekstContent({
   });
   const [tokenActiveIndex, setTokenActiveIndex] = useState(0);
 
-  const TOKEN_OPTIONS = useMemo(
-    () => [
-      { label: "PREPARAT1", insert: "PREPARAT1", help: "Første preparat" },
-      { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat" },
-      { label: "TALL", insert: "TALL", help: "Tall (uten indeks)" },
-      { label: "TALL1", insert: "TALL1", help: "Tall med indeks 1" },
-      { label: "TALL2", insert: "TALL2", help: "Tall med indeks 2" },
-    ],
-    []
-  );
+  const TOKEN_OPTIONS = useMemo(() => STANDARDTEKST_TOKEN_DEFS, []);
 
   const filteredTokenOptions = useMemo(() => {
     const q = tokenQuery.trim().toLowerCase();
@@ -424,41 +416,50 @@ export default function StandardTekstContent({
                       Innsettingsfelt:
                     </Typography>
 
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label="PREPARAT1 – første preparat"
-                      clickable
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => insertTokenFromTextareaSelection("PREPARAT1")}
-                    />
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label="PREPARAT2 – andre preparat"
-                      clickable
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => insertTokenFromTextareaSelection("PREPARAT2")}
-                    />
+                    {TOKEN_OPTIONS.filter((t) => t.group === "PREPARAT").map((t) => (
+                      <Chip
+                        key={t.label}
+                        size="small"
+                        variant="outlined"
+                        label={`${t.label} – ${t.help ?? ""}`.trim()}
+                        clickable
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertTokenFromTextareaSelection(t.insert)}
+                      />
+                    ))}
 
-                    <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} />
+                    {TOKEN_OPTIONS.some((t) => t.group === "TALL" || t.group === "VARE") ? (
+                      <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} />
+                    ) : null}
 
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label="TALL – første tall"
-                      clickable
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => insertTokenFromTextareaSelection("TALL")}
-                    />
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label="TALL1 – andre tall"
-                      clickable
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => insertTokenFromTextareaSelection("TALL1")}
-                    />
+                    {TOKEN_OPTIONS.filter((t) => t.group === "TALL").map((t) => (
+                      <Chip
+                        key={t.label}
+                        size="small"
+                        variant="outlined"
+                        label={`${t.label} – ${t.help ?? ""}`.trim()}
+                        clickable
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertTokenFromTextareaSelection(t.insert)}
+                      />
+                    ))}
+
+                    {TOKEN_OPTIONS.some((t) => t.group === "TALL") &&
+                    TOKEN_OPTIONS.some((t) => t.group === "VARE") ? (
+                      <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} />
+                    ) : null}
+
+                    {TOKEN_OPTIONS.filter((t) => t.group === "VARE").map((t) => (
+                      <Chip
+                        key={t.label}
+                        size="small"
+                        variant="outlined"
+                        label={`${t.label}`.trim()}
+                        clickable
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertTokenFromTextareaSelection(t.insert)}
+                      />
+                    ))}
                   </Stack>
                 </Box>
 

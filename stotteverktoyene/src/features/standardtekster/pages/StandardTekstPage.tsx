@@ -688,7 +688,14 @@ export default function StandardTekstPage() {
       </Collapse>
 
       <Box className={styles.grid}>
-        <Box className={autoFocusGlowTarget === "standard" ? styles.autoFocusGlow : undefined}>
+        <Box
+          className={[
+            styles.sidebar,
+            autoFocusGlowTarget === "standard" ? styles.autoFocusGlow : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           <StandardTekstSidebar
             disabled={lockBeforeEdit}
             isAdmin={isAdmin}
