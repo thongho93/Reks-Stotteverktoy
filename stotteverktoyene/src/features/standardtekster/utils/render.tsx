@@ -3,7 +3,12 @@ import { Box } from "@mui/material";
 export function renderContentWithPreparatHighlight(
   text: string,
   pickedPreparats: Array<string | null | undefined>,
-  opts?: { enableSecondaryHighlight?: boolean; tallValues?: string[] }
+  opts?: {
+    enableSecondaryHighlight?: boolean;
+    tallValues?: string[];
+    datoValue?: string;
+    datoMndValue?: string;
+  }
 ) {
   const tokenSx = {
     display: "inline-flex",
@@ -37,6 +42,13 @@ export function renderContentWithPreparatHighlight(
     fontFamily: "monospace",
   } as const;
 
+  const placeholderDatoSx = {
+    ...tokenSx,
+    bgcolor: "secondary.light",
+    color: "secondary.contrastText",
+    fontFamily: "monospace",
+  } as const;
+
   const pickedPrimarySx = {
     ...tokenSx,
     bgcolor: "warning.light",
@@ -51,67 +63,66 @@ export function renderContentWithPreparatHighlight(
     fontWeight: 600,
   } as const;
 
-  const renderTallInText = (t: string) => {
+  const renderTokensInText = (t: string) => {
     if (!t) return t;
 
-    // First, render any remaining TALL placeholders with chip styling
-    const tokenParts = t.split(/(\{\{\s*TALL\d*\s*\}\})/gi);
-    const hasTallToken = tokenParts.length > 1;
+    // Match both legacy {{...}} and plain tokens (no braces)
+    // Supports: TALL, TALL1, TALL2... and DATO and DATO_MND
+    const parts = t.split(
+      /(\{\{\s*(?:TALL\d*|DATO_MND|DATO)\s*\}\}|\b(?:TALL\d*|DATO_MND|DATO)\b)/gi
+    );
+    if (parts.length <= 1) return t;
 
-    const tallNeedles = (opts?.tallValues ?? []).map((v) => (v ?? "").trim()).filter(Boolean);
+    return (
+      <>
+        {parts.map((part, i) => {
+          // TALL / {{TALL}} / TALL1 / {{TALL1}} ...
+          const tallMatch = part.match(/^(?:\{\{\s*)?TALL(\d*)(?:\s*\}\})?$/i);
+          if (tallMatch) {
+            const rawIdx = (tallMatch[1] ?? "").trim();
+            const idx = rawIdx ? Number(rawIdx) : 0;
 
-    const wrapNeedles = (s: string) => {
-      if (!s) return s;
-      if (tallNeedles.length === 0) return s;
+            const v = (opts?.tallValues?.[idx] ?? "").trim();
+            const tokenLabel = idx === 0 ? "TALL" : `TALL${idx}`;
+            const label = v || tokenLabel;
 
-      // Prefer longest first to avoid partial matches (e.g. "10" inside "100")
-      const uniqTall = Array.from(new Set(tallNeedles)).sort((a, b) => b.length - a.length);
-      const escapeRegExp = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const pattern = new RegExp(`(${uniqTall.map(escapeRegExp).join("|")})`, "g");
-      const parts = s.split(pattern);
-      if (parts.length <= 1) return s;
-
-      return (
-        <>
-          {parts.map((part, i) => {
-            const matched = uniqTall.find((u) => u === part);
-            if (matched) {
-              return (
-                <Box key={i} component="span" sx={placeholderTallSx}>
-                  {part}
-                </Box>
-              );
-            }
-            return <span key={i}>{part}</span>;
-          })}
-        </>
-      );
-    };
-
-    if (hasTallToken) {
-      return (
-        <>
-          {tokenParts.map((part, i) => {
-            if (/^\{\{\s*TALL\d*\s*\}\}$/i.test(part)) {
-              return (
-                <Box key={i} component="span" sx={placeholderTallSx}>
-                  {part}
-                </Box>
-              );
-            }
-
-            const wrapped = wrapNeedles(part);
-            return typeof wrapped === "string" ? (
-              <span key={i}>{wrapped}</span>
-            ) : (
-              <span key={i}>{wrapped}</span>
+            return (
+              <Box key={i} component="span" sx={placeholderTallSx}>
+                {label}
+              </Box>
             );
-          })}
-        </>
-      );
-    }
+          }
 
-    return wrapNeedles(t);
+          // DATO_MND / {{DATO_MND}}
+          const datoMndMatch = part.match(/^(?:\{\{\s*)?DATO_MND(?:\s*\}\})?$/i);
+          if (datoMndMatch) {
+            const v = (opts?.datoMndValue ?? "").trim();
+            const label = v || "DATO_MND";
+
+            return (
+              <Box key={i} component="span" sx={placeholderDatoSx}>
+                {label}
+              </Box>
+            );
+          }
+
+          // DATO / {{DATO}}
+          const datoMatch = part.match(/^(?:\{\{\s*)?DATO(?:\s*\}\})?$/i);
+          if (datoMatch) {
+            const v = (opts?.datoValue ?? "").trim();
+            const label = v || "DATO";
+
+            return (
+              <Box key={i} component="span" sx={placeholderDatoSx}>
+                {label}
+              </Box>
+            );
+          }
+
+          return <span key={i}>{part}</span>;
+        })}
+      </>
+    );
   };
 
   const placeholder0 = "PREPARAT1";
@@ -204,7 +215,7 @@ export function renderContentWithPreparatHighlight(
             );
           }
 
-          return <span key={i}>{renderTallInText(part)}</span>;
+          return <span key={i}>{renderTokensInText(part)}</span>;
         })}
       </>
     );
@@ -244,12 +255,12 @@ export function renderContentWithPreparatHighlight(
                 </Box>
               );
             }
-            return <span key={i}>{part}</span>;
+            return <span key={i}>{renderTokensInText(part)}</span>;
           })}
         </>
       );
     }
   }
 
-  return renderTallInText(text);
+  return renderTokensInText(text);
 }

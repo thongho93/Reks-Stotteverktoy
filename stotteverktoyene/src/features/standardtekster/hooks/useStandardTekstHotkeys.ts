@@ -4,6 +4,7 @@ import type React from "react";
 type UseStandardTekstHotkeysArgs = {
   preparatRows: Array<{ picked?: string | null }>;
   clearPreparats: () => void;
+  clearNumbersAndDate?: () => void;
   preparatSearchInputRef: React.RefObject<HTMLInputElement | null>;
   standardTekstSearchInputRef: React.RefObject<HTMLInputElement | null>;
 };
@@ -11,22 +12,32 @@ type UseStandardTekstHotkeysArgs = {
 export function useStandardTekstHotkeys({
   preparatRows,
   clearPreparats,
+  clearNumbersAndDate,
   preparatSearchInputRef,
   standardTekstSearchInputRef,
 }: UseStandardTekstHotkeysArgs) {
-  // Escape -> clear all picked preparats (if any)
+  // Escape -> clear picked preparats (if any) and optionally clear numbers/date
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (!preparatRows.some((r) => r.picked)) return;
+
+      const hadPickedPreparats = preparatRows.some((r) => r.picked);
+
+      // Nothing to do
+      if (!hadPickedPreparats && !clearNumbersAndDate) return;
 
       e.preventDefault();
-      clearPreparats();
+
+      if (hadPickedPreparats) {
+        clearPreparats();
+      }
+
+      clearNumbersAndDate?.();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [clearPreparats, preparatRows]);
+  }, [clearPreparats, clearNumbersAndDate, preparatRows]);
 
   // Ctrl/Cmd + F -> focus preparat search (override browser find)
   useEffect(() => {
