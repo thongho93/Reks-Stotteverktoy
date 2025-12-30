@@ -61,6 +61,8 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
   const userRef = doc(db, "usage_daily", dateKey, "users", user.uid);
   const totalsRef = doc(db, "usage_daily", dateKey, "totals", "all");
 
+  const standardtekstId = data?.standardtekstId;
+
   const firstName = await getFirstName(user.uid);
 
   const meta: Record<string, unknown> = {};
@@ -73,10 +75,20 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
     meta.lastSearchLen = Math.max(0, Math.floor(data.searchLen));
   }
 
-  if (data?.standardtekstId) {
+  if (standardtekstId) {
     // Store as "last opened" id only (bounded field count)
-    meta.lastStandardtekstId = data.standardtekstId;
+    meta.lastStandardtekstId = standardtekstId;
   }
+
+  const standardtekstRef =
+    event === "standardtekst_open" && standardtekstId
+      ? doc(db, "usage_daily", dateKey, "standardtekster", standardtekstId)
+      : null;
+
+  const standardtekstUserRef =
+    event === "standardtekst_open" && standardtekstId
+      ? doc(db, "usage_daily", dateKey, "users", user.uid, "standardtekster", standardtekstId)
+      : null;
 
   await Promise.all([
     setDoc(
@@ -98,5 +110,29 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
       },
       { merge: true }
     ),
+    ...(standardtekstRef
+      ? [
+          setDoc(
+            standardtekstRef,
+            {
+              opens: increment(1),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          ),
+        ]
+      : []),
+    ...(standardtekstUserRef
+      ? [
+          setDoc(
+            standardtekstUserRef,
+            {
+              opens: increment(1),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          ),
+        ]
+      : []),
   ]);
 }
