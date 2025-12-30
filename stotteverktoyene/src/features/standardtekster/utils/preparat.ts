@@ -294,37 +294,47 @@ export function replaceNextPreparatToken(text: string, value: string) {
 export const replaceVareTokenByCount = (text: string, count: number): string => {
   if (!text) return text;
 
-  const replacement = count === 1 ? "varen" : "varene";
+  const replacement = count <= 1 ? "varen" : "varene";
 
-  return text
-    .replace(/\{\{\s*VAREN\s*\}\}/gi, replacement)
-    .replace(/\{\{\s*VARENE\s*\}\}/gi, replacement)
-    .replace(/\{\{\s*VARE\(N?E?\)\s*\}\}/gi, replacement);
+  return (
+    text
+      // Ny anbefalt syntaks
+      .replace(
+        /(^|[^A-Z0-9_])VAREN\(E\)(?=[^A-Z0-9_]|$)/gi,
+        (_m, p1: string) => `${p1}${replacement}`
+      )
+      .replace(/\{\{\s*VAREN\(E\)\s*\}\}/gi, replacement)
+
+      // Bakoverkompatibilitet
+      .replace(/\{\{\s*VAREN\s*\}\}/gi, replacement)
+      .replace(/\{\{\s*VARENE\s*\}\}/gi, replacement)
+      .replace(/\{\{\s*VARE\(N?E?\)\s*\}\}/gi, replacement)
+  );
 };
 
 export function replaceNextTallToken(text: string, value: string) {
-  // Replace ONLY the next (first) placeholder occurrence.
-  // Supports both {{TALL}} and indexed variants like {{TALL1}}, {{TALL2}}, ...
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}/i, value);
+  // Replace ONLY the next (first) occurrence.
+  // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
+  return text.replace(/\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i, value);
 }
 
 export function replaceTallTokens(text: string, value: string) {
   // Replace ALL occurrences.
-  // Supports both {{TALL}} and indexed variants like {{TALL1}}, {{TALL2}}, ...
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}/gi, value);
+  // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
+  return text.replace(/\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/gi, value);
 }
 
 export function templateHasTallToken(text: string): boolean {
-  return /\{\{\s*TALL\d*\s*\}\}/i.test(text);
+  return /\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i.test(text);
 }
 
 export function getTallTokenIndices(text: string): number[] {
   const indices = new Set<number>();
 
-  const re = /\{\{\s*TALL(\d*)\s*\}\}/gi;
+  const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    const raw = (m[1] ?? "").trim();
+    const raw = (m[1] ?? m[2] ?? "").trim();
     if (!raw) {
       indices.add(0);
     } else {
@@ -341,12 +351,11 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   const safeValue = value ?? "";
 
   if (index === 0) {
-    // Only replace the unindexed token {{TALL}}
-    return text.replace(/\{\{\s*TALL\s*\}\}/gi, safeValue);
+    return text.replace(/\{\{\s*TALL\s*\}\}|\bTALL\b/gi, safeValue);
   }
 
-  // Only replace the specific indexed token (e.g. {{TALL1}})
-  const re = new RegExp(`\\{\\{\\s*TALL${index}\\s*\\}\\}`, "gi");
+  const re = new RegExp(`\\{\\{\\s*TALL${index}\\s*\\}\\}|\\bTALL${index}\\b`, "gi");
+
   return text.replace(re, safeValue);
 }
 
@@ -442,3 +451,22 @@ export function replacePreparatTokensPrimarySecondary(
 
   return out;
 }
+
+export type StandardTekstTokenGroup = "PREPARAT" | "TALL" | "VARE" | "ANNET";
+
+export type StandardTekstTokenDef = {
+  label: string;
+  insert: string;
+  help?: string;
+  group?: StandardTekstTokenGroup;
+};
+
+export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
+  { label: "PREPARAT1", insert: "PREPARAT1", help: "Første preparat", group: "PREPARAT" },
+  { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat", group: "PREPARAT" },
+
+  { label: "TALL", insert: "TALL", help: "Første tall", group: "TALL" },
+  { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
+
+  { label: "VAREN(E)", insert: "VAREN(E)", group: "VARE" },
+];
