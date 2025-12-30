@@ -23,10 +23,11 @@ import IconButton from "@mui/material/IconButton";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/Auth";
 import { logUsage } from "../../../shared/services/usage";
+import { standardTeksterApi } from "../services/standardTeksterApi";
 
 const storageKey = (base: string, uid?: string | null) =>
   uid ? `standardtekster:${uid}:${base}` : `standardtekster:${base}`;
@@ -174,6 +175,43 @@ export default function StandardTekstSidebar({
   const { user } = useAuthUser();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [favoritesHydrated, setFavoritesHydrated] = useState(false);
+  const [usageById, setUsageById] = useState<Record<string, number>>({});
+  // Load per-user standardtekst usage (click counts) for sorting favorites
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const uid = user?.uid;
+        if (!uid) {
+          if (!cancelled) setUsageById({});
+          return;
+        }
+
+        const colRef = collection(db, "users", uid, "standardtekstUsage");
+        const snap = await getDocs(colRef);
+
+        const next: Record<string, number> = {};
+        snap.forEach((d) => {
+          const data = d.data() as any;
+          const clicks = typeof data?.clicks === "number" ? data.clicks : 0;
+          next[d.id] = clicks;
+        });
+
+        if (!cancelled) setUsageById(next);
+      } catch {
+        if (!cancelled) setUsageById({});
+      } finally {
+        // no hydrated flag needed
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
   // Category expand/collapse state (persisted locally)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -277,16 +315,27 @@ export default function StandardTekstSidebar({
     setFavorites((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  // Sort items: favorites on top (alphabetically), then by category and title
+  // Sort items: favorites on top. Favorites are ordered by most used (clicks desc), then title.
+  // Non-favorites are ordered by title.
   const sortedItems = useMemo(() => {
     return [...filtered].sort((a, b) => {
       const aFav = favorites.includes(a.id);
       const bFav = favorites.includes(b.id);
+
       if (aFav && !bFav) return -1;
       if (!aFav && bFav) return 1;
+
+      // If both are favorites, sort by usage desc (fallback to title)
+      if (aFav && bFav) {
+        const aClicks = usageById[a.id] ?? 0;
+        const bClicks = usageById[b.id] ?? 0;
+        if (aClicks !== bClicks) return bClicks - aClicks;
+        return a.title.localeCompare(b.title, "nb");
+      }
+
       return a.title.localeCompare(b.title, "nb");
     });
-  }, [filtered, favorites]);
+  }, [filtered, favorites, usageById]);
 
   // Group items by category, with favorites as a separate group on top
   const groupedByCategory = useMemo(() => {
@@ -660,6 +709,23 @@ export default function StandardTekstSidebar({
                             selected={it.id === selectedId}
                             onClick={() => {
                               logUsage("standardtekst_open", { standardtekstId: it.id });
+
+                              const uid = user?.uid;
+                              if (uid) {
+                                // Optimistic local increment so favorites re-sort immediately
+                                setUsageById((prev) => ({
+                                  ...prev,
+                                  [it.id]: (prev[it.id] ?? 0) + 1,
+                                }));
+
+                                // Firestore per-user usage: /users/{uid}/standardtekstUsage/{standardtekstId}
+                                standardTeksterApi
+                                  .trackUsage({ uid, standardtekstId: it.id })
+                                  .catch(() => {
+                                    // ignore logging errors
+                                  });
+                              }
+
                               setSelectedId(it.id);
                             }}
                             className={styles.sidebarItem}
