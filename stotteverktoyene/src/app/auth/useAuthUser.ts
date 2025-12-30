@@ -73,15 +73,17 @@ export function useAuthUser() {
 
           const shouldFetchRootOwner = rootOwnerDocId && rootOwnerDocId !== u.uid;
 
-          const [ownerSnap, adminSnap, rootOwnerSnap] = await Promise.all([
-            getDoc(doc(db, "owners", u.uid)),
+          const [adminSnap, rootOwnerSnap] = await Promise.all([
             getDoc(doc(db, "admins", u.uid)),
             shouldFetchRootOwner
               ? getDoc(doc(db, "owners", rootOwnerDocId))
               : Promise.resolve(null as any),
           ]);
 
-          const owner = ownerSnap.exists();
+          // Root owner is determined strictly by configured UID
+          const owner = u.uid === rootOwnerDocId;
+
+          // Admin is determined by admins/{uid} OR being the root owner
           const admin = owner || adminSnap.exists();
 
           // Determine rekspert:

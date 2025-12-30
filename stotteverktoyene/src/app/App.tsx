@@ -61,7 +61,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   ];
 
   const adminItems =
-    role === "rekspert" || role === "admin" || role === "owner"
+    role === "rekspert" || role === "owner"
       ? [
           {
             label: "Rekspert",

@@ -63,15 +63,6 @@ export default function StandardTekstContent({
 }: Props) {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
-  const draftContentPlaceholder =
-    "Bruk {{PREPARAT}} der preparatnavn skal settes inn.\n" +
-    "Hvis ulike preparatnavn skal vises flere steder i teksten, bruk f.eks. {{PREPARAT}} og {{PREPARAT1}}.\n" +
-    "Bruk {{TALL}} der tall skal settes inn.\n\n" +
-    "På slutten av teksten: \n" +
-    "Vennlig hilsen\n" +
-    "XX, farmasøyt\n" +
-    "Farmasiet";
-
   useEffect(() => {
     if (!isEditing) return;
 
@@ -242,7 +233,6 @@ export default function StandardTekstContent({
                   minRows={10}
                   label="Tekst"
                   value={draftContent}
-                  placeholder={isEditing ? draftContentPlaceholder : undefined}
                   onChange={(e) => onDraftContentChange(e.target.value)}
                 />
 
