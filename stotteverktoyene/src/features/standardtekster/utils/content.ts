@@ -44,7 +44,7 @@ export const buildPreviewContent = ({ template, firstName, picked }: BuildArgs):
 
   text = replaceFirstName(text, firstName);
 
-  // Keep {{PREPARAT}} / {{PREPARAT1}} placeholders for preview rendering (chips/colors),
+  // Keep PREPARAT1 / PREPARAT2 placeholders for preview rendering (chips/colors),
   // but still apply dynamic grammar tokens like varen/varene.
   text = replaceVareTokenByCount(text, picked.length);
 

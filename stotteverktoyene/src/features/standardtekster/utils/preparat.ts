@@ -286,9 +286,9 @@ export function formatPreparatForTemplate(med: {
 }
 
 export function replaceNextPreparatToken(text: string, value: string) {
-  // Replace ONLY the next (first) placeholder occurrence.
-  // Supports both {{PREPARAT}} and {{PREPARAT1}}.
-  return text.replace(/\{\{\s*(PREPARAT1|PREPARAT)\s*\}\}/, value);
+  // Replace ONLY the next (first) occurrence.
+  // Supports PREPARAT1, PREPARAT2, PREPARAT1, PREPARAT2
+  return text.replace(/\b(PREPARAT2|PREPARAT1)\b/, value);
 }
 
 export const replaceVareTokenByCount = (text: string, count: number): string => {
@@ -422,7 +422,7 @@ export function formatPreparatList(values: Array<string | null | undefined>): st
 }
 
 export function replacePreparatTokenWithList(text: string, listValue: string) {
-  return text.replace(/\{\{\s*PREPARAT\s*\}\}/g, listValue);
+  return text.replace(/\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g, listValue);
 }
 
 export function replacePreparatTokensPrimarySecondary(
@@ -433,11 +433,11 @@ export function replacePreparatTokensPrimarySecondary(
   let out = text;
 
   if (primary) {
-    out = out.replace(/\{\{\s*PREPARAT\s*\}\}/g, primary);
+    out = out.replace(/\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g, primary);
   }
 
   if (secondary) {
-    out = out.replace(/\{\{\s*PREPARAT1\s*\}\}/g, secondary);
+    out = out.replace(/\{\{\s*PREPARAT2\s*\}\}|\bPREPARAT2\b/g, secondary);
   }
 
   return out;

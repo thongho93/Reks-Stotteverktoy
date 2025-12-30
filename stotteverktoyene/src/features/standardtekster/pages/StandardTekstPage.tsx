@@ -675,7 +675,7 @@ export default function StandardTekstPage() {
 
           <Box component="ul" className={styles.guideList}>
             <li>Søk i listen til venstre og velg en standardtekst.</li>
-            <li>Bruk "Søk etter preparat" for å erstatte {"{{PREPARAT}}"} automatisk.</li>
+            <li>Bruk "Søk etter preparat" for å erstatte {"PREPARAT"} automatisk.</li>
             <li>Legg til flere preparater (+). De settes inn med komma, og "og" før siste.</li>
             <li>Sjekk at navnet ditt står riktig i slutten.</li>
             <li>Klikk i teksten for å kopiere.</li>
