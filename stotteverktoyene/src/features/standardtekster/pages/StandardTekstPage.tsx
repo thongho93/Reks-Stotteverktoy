@@ -186,7 +186,8 @@ export default function StandardTekstPage() {
 
   // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
-    setIsEditing(false);
+    const shouldAutoEditNew = Boolean(isAdmin && selected && selected.title === "Ny standardtekst");
+    setIsEditing(shouldAutoEditNew);
     setDraftTitle(selected?.title ?? "");
     setDraftCategory(selected?.category ?? "");
     setDraftContent(selected?.content ?? "");
@@ -204,7 +205,9 @@ export default function StandardTekstPage() {
         setTallByIndex({ 0: "" });
       }
 
-      if (selected) {
+      // Når vi åpner en helt ny standardtekst i edit mode, skal fokus gå til overskrift-feltet
+      // (StandardTekstContent håndterer dette via titleInputRef).
+      if (selected && !shouldAutoEditNew) {
         requestAnimationFrame(() => {
           preparatSearchInputRef.current?.focus();
           preparatSearchInputRef.current?.select();
@@ -215,7 +218,7 @@ export default function StandardTekstPage() {
 
     // Always clear the flag after handling a selection change
     preserveInputsOnNextSelectRef.current = false;
-  }, [selectedId, resetPreparatRows, selected]);
+  }, [selectedId, resetPreparatRows, selected, isAdmin]);
 
   // Auto-focus standardtekst search on first load when no template is selected
   useEffect(() => {

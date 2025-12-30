@@ -1,6 +1,20 @@
-import { Box, Button, Paper, Typography, TextField, Stack, Autocomplete } from "@mui/material";
+import {
+  Box,
+  Button,
+  Paper,
+  Typography,
+  TextField,
+  Stack,
+  Autocomplete,
+  Popper,
+  List,
+  ListItemButton,
+  ListItemText,
+  Chip,
+  Divider,
+} from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
@@ -63,6 +77,36 @@ export default function StandardTekstContent({
 }: Props) {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
+  const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const [tokenPickerOpen, setTokenPickerOpen] = useState(false);
+  const [tokenPickerAnchor, setTokenPickerAnchor] = useState<HTMLElement | null>(null);
+  const [tokenQuery, setTokenQuery] = useState("");
+  const [tokenCursor, setTokenCursor] = useState<{ start: number; end: number }>({
+    start: 0,
+    end: 0,
+  });
+  const [tokenActiveIndex, setTokenActiveIndex] = useState(0);
+
+  const TOKEN_OPTIONS = useMemo(
+    () => [
+      { label: "PREPARAT1", insert: "PREPARAT1", help: "Første preparat" },
+      { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat" },
+      { label: "TALL", insert: "TALL", help: "Tall (uten indeks)" },
+      { label: "TALL1", insert: "TALL1", help: "Tall med indeks 1" },
+      { label: "TALL2", insert: "TALL2", help: "Tall med indeks 2" },
+    ],
+    []
+  );
+
+  const filteredTokenOptions = useMemo(() => {
+    const q = tokenQuery.trim().toLowerCase();
+    if (!q) return TOKEN_OPTIONS;
+    return TOKEN_OPTIONS.filter(
+      (t) => t.label.toLowerCase().includes(q) || (t.help ?? "").toLowerCase().includes(q)
+    );
+  }, [TOKEN_OPTIONS, tokenQuery]);
+
   useEffect(() => {
     if (!isEditing) return;
 
@@ -72,6 +116,106 @@ export default function StandardTekstContent({
     });
   }, [isEditing]);
 
+  const closeTokenPicker = () => {
+    setTokenPickerOpen(false);
+    setTokenQuery("");
+    setTokenActiveIndex(0);
+    // re-focus the textarea
+    requestAnimationFrame(() => {
+      contentInputRef.current?.focus();
+    });
+  };
+
+  // Helper: Insert token at an explicit range (start, end), replacing selection
+  const insertTokenAtRange = (tokenText: string, start: number, end: number) => {
+    const textarea = contentInputRef.current;
+    if (!textarea) return;
+
+    const safeStart = Math.max(0, Math.min(start ?? 0, draftContent.length));
+    const safeEnd = Math.max(safeStart, Math.min(end ?? safeStart, draftContent.length));
+
+    const before = draftContent.slice(0, safeStart);
+    const after = draftContent.slice(safeEnd);
+
+    // Insert token with a leading space if needed, and trailing space for nicer flow.
+    const needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
+    const needsTrailingSpace = after.length > 0 && !/^\s/.test(after);
+
+    const insert = `${needsLeadingSpace ? " " : ""}${tokenText}${needsTrailingSpace ? " " : ""}`;
+    const next = `${before}${insert}${after}`;
+
+    onDraftContentChange(next);
+
+    // Restore caret right after inserted token
+    const nextPos = safeStart + insert.length;
+    requestAnimationFrame(() => {
+      contentInputRef.current?.focus();
+      contentInputRef.current?.setSelectionRange(nextPos, nextPos);
+    });
+
+    if (tokenPickerOpen) closeTokenPicker();
+  };
+
+  const insertTokenAtCursor = (tokenText: string) => {
+    const textarea = contentInputRef.current;
+    if (!textarea) return;
+
+    const start = tokenCursor.start ?? textarea.selectionStart ?? 0;
+    const end = tokenCursor.end ?? textarea.selectionEnd ?? start;
+
+    insertTokenAtRange(tokenText, start, end);
+  };
+
+  // Helper for inserting token at current textarea selection (not using tokenCursor)
+  const insertTokenFromTextareaSelection = (tokenText: string) => {
+    const textarea = contentInputRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? start;
+
+    // Update tokenCursor for consistency, but do NOT rely on it for the insert
+    setTokenCursor({ start, end });
+
+    insertTokenAtRange(tokenText, start, end);
+  };
+
+  const openTokenPickerFromEvent = (anchor: HTMLElement) => {
+    const textarea = contentInputRef.current;
+    setTokenPickerAnchor(anchor);
+    setTokenPickerOpen(true);
+    setTokenQuery("");
+    setTokenActiveIndex(0);
+
+    setTokenCursor({
+      start: textarea?.selectionStart ?? 0,
+      end: textarea?.selectionEnd ?? 0,
+    });
+
+    // Let popper render, then focus its search input (we'll identify it via id)
+    requestAnimationFrame(() => {
+      const el = document.getElementById("token-picker-input") as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    });
+  };
+
+  useEffect(() => {
+    if (!tokenPickerOpen) return;
+
+    const onDocMouseDown = (ev: MouseEvent) => {
+      const target = ev.target as Node | null;
+      const popperEl = document
+        .getElementById("token-picker-input")
+        ?.closest("[data-popper-placement]");
+      if (popperEl && target && popperEl.contains(target)) return;
+      closeTokenPicker();
+    };
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [tokenPickerOpen]);
+
   const handleCopy = () => {
     // Log copy without storing sensitive text
     logUsage("standardtekst_copy");
@@ -79,6 +223,14 @@ export default function StandardTekstContent({
   };
 
   const lockBeforeEdit = Boolean(selected && !isEditing && selected.title === "Ny standardtekst");
+
+  const isEmptyNewDraft = Boolean(
+    selected &&
+      selected.title === "Ny standardtekst" &&
+      (draftTitle.trim() === "Ny standardtekst" ||
+        draftCategory.trim() === "" ||
+        draftContent.trim() === "")
+  );
 
   return (
     <Paper
@@ -232,9 +384,159 @@ export default function StandardTekstContent({
                   multiline
                   minRows={10}
                   label="Tekst"
+                  helperText="Tips: Ctrl+Space for søk av innsettingsfelt – eller bruk hurtigvalgene under."
                   value={draftContent}
+                  inputRef={contentInputRef}
                   onChange={(e) => onDraftContentChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    const isCmd = e.metaKey;
+                    const isCtrl = e.ctrlKey;
+
+                    const isSpace = e.code === "Space" || e.key === " ";
+                    const isK = (e.key || "").toLowerCase() === "k";
+
+                    // Primary shortcuts:
+                    // - Ctrl+Space (works in browsers on all platforms)
+                    // - Cmd/Ctrl + K (works on Mac where Cmd+Space is typically reserved for Spotlight)
+                    const openToken = (isCtrl && isSpace) || ((isCmd || isCtrl) && isK);
+
+                    if (openToken) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openTokenPickerFromEvent(e.currentTarget as HTMLElement);
+                      return;
+                    }
+
+                    if (tokenPickerOpen) {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeTokenPicker();
+                        return;
+                      }
+                    }
+                  }}
                 />
+
+                <Box sx={{ mt: 0.5 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Typography variant="caption" color="text.secondary">
+                      Innsettingsfelt:
+                    </Typography>
+
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label="PREPARAT1 – første preparat"
+                      clickable
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => insertTokenFromTextareaSelection("PREPARAT1")}
+                    />
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label="PREPARAT2 – andre preparat"
+                      clickable
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => insertTokenFromTextareaSelection("PREPARAT2")}
+                    />
+
+                    <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} />
+
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label="TALL – første tall"
+                      clickable
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => insertTokenFromTextareaSelection("TALL")}
+                    />
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label="TALL1 – andre tall"
+                      clickable
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => insertTokenFromTextareaSelection("TALL1")}
+                    />
+                  </Stack>
+                </Box>
+
+                <Popper
+                  open={tokenPickerOpen}
+                  anchorEl={tokenPickerAnchor}
+                  placement="bottom-start"
+                  disablePortal
+                  sx={{ zIndex: 2000, width: 360, maxWidth: "90vw" }}
+                >
+                  <Paper
+                    elevation={8}
+                    sx={{ p: 1 }}
+                    onMouseDown={(e) => {
+                      // Prevent textarea from losing selection/caret on click inside popper
+                      e.preventDefault();
+                    }}
+                  >
+                    <TextField
+                      id="token-picker-input"
+                      size="small"
+                      fullWidth
+                      autoComplete="off"
+                      placeholder="Søk etter innsettingsfelt..."
+                      value={tokenQuery}
+                      onChange={(e) => {
+                        setTokenQuery(e.target.value);
+                        setTokenActiveIndex(0);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          closeTokenPicker();
+                          return;
+                        }
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setTokenActiveIndex((i) =>
+                            Math.min(i + 1, Math.max(filteredTokenOptions.length - 1, 0))
+                          );
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setTokenActiveIndex((i) => Math.max(i - 1, 0));
+                          return;
+                        }
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault();
+                          const choice = filteredTokenOptions[tokenActiveIndex];
+                          if (choice) insertTokenAtCursor(choice.insert);
+                          return;
+                        }
+                      }}
+                    />
+
+                    <List dense sx={{ maxHeight: 220, overflow: "auto", mt: 0.5 }}>
+                      {filteredTokenOptions.length === 0 ? (
+                        <ListItemText
+                          primary="Ingen treff"
+                          secondary="Prøv et annet søk"
+                          sx={{ px: 1, py: 1 }}
+                        />
+                      ) : (
+                        filteredTokenOptions.map((t, idx) => (
+                          <ListItemButton
+                            key={t.label}
+                            selected={idx === tokenActiveIndex}
+                            onClick={() => insertTokenAtCursor(t.insert)}
+                            onMouseEnter={() => setTokenActiveIndex(idx)}
+                          >
+                            <ListItemText primary={t.label} secondary={t.help} />
+                          </ListItemButton>
+                        ))
+                      )}
+                    </List>
+                  </Paper>
+                </Popper>
 
                 {belowContent}
               </Stack>
@@ -244,6 +546,11 @@ export default function StandardTekstContent({
                   variant="text"
                   onClick={(e) => {
                     e.stopPropagation();
+                    // Hvis dette er en helt ny standardtekst uten innhold, spør om å slette den
+                    if (isAdmin && isEmptyNewDraft) {
+                      onDelete();
+                      return;
+                    }
                     onCancel();
                   }}
                   disabled={saving}

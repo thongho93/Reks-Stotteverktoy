@@ -303,28 +303,34 @@ export const replaceVareTokenByCount = (text: string, count: number): string => 
 };
 
 export function replaceNextTallToken(text: string, value: string) {
-  // Replace ONLY the next (first) placeholder occurrence.
-  // Supports both {{TALL}} and indexed variants like {{TALL1}}, {{TALL2}}, ...
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}/i, value);
+  // Replace ONLY the next (first) occurrence.
+  // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
+  return text.replace(
+    /\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i,
+    value
+  );
 }
 
 export function replaceTallTokens(text: string, value: string) {
   // Replace ALL occurrences.
-  // Supports both {{TALL}} and indexed variants like {{TALL1}}, {{TALL2}}, ...
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}/gi, value);
+  // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
+  return text.replace(
+    /\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/gi,
+    value
+  );
 }
 
 export function templateHasTallToken(text: string): boolean {
-  return /\{\{\s*TALL\d*\s*\}\}/i.test(text);
+  return /\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i.test(text);
 }
 
 export function getTallTokenIndices(text: string): number[] {
   const indices = new Set<number>();
 
-  const re = /\{\{\s*TALL(\d*)\s*\}\}/gi;
+  const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    const raw = (m[1] ?? "").trim();
+    const raw = (m[1] ?? m[2] ?? "").trim();
     if (!raw) {
       indices.add(0);
     } else {
@@ -341,12 +347,17 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   const safeValue = value ?? "";
 
   if (index === 0) {
-    // Only replace the unindexed token {{TALL}}
-    return text.replace(/\{\{\s*TALL\s*\}\}/gi, safeValue);
+    return text.replace(
+      /\{\{\s*TALL\s*\}\}|\bTALL\b/gi,
+      safeValue
+    );
   }
 
-  // Only replace the specific indexed token (e.g. {{TALL1}})
-  const re = new RegExp(`\\{\\{\\s*TALL${index}\\s*\\}\\}`, "gi");
+  const re = new RegExp(
+    `\\{\\{\\s*TALL${index}\\s*\\}\\}|\\bTALL${index}\\b`,
+    "gi"
+  );
+
   return text.replace(re, safeValue);
 }
 
