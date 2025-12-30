@@ -68,8 +68,11 @@
 }
 
 .sidebar {
+  height: 100%;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* hele panelet scroller ikke */
 }
 
 /* Sidebar readability improvements */

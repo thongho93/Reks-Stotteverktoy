@@ -13,6 +13,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -47,31 +48,52 @@ type Props = {
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
 };
 
-const CATEGORY_COLOR_PALETTE = [
-  "#1E88E5", // blue
-  "#43A047", // green
-  "#E53935", // red
-  "#8E24AA", // purple
-  "#00ACC1", // cyan
-  "#FB8C00", // orange
-  "#6D4C41", // brown
-  "#546E7A", // blue grey
-];
-
-function hashStringToIndex(input: string, modulo: number) {
-  let h = 0;
+function stableHash(input: string) {
+  // djb2-ish hash for stable distribution
+  let h = 5381;
   for (let i = 0; i < input.length; i++) {
-    h = (h * 31 + input.charCodeAt(i)) >>> 0;
+    h = ((h << 5) + h + input.charCodeAt(i)) >>> 0;
   }
-  return modulo === 0 ? 0 : h % modulo;
+  return h >>> 0;
 }
 
-function getCategoryMarkerColor(category: string) {
+function buildCategoryColorMap(categories: string[]) {
+  const uniq = Array.from(
+    new Set((categories ?? []).map((c) => (c ?? "").trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, "nb"));
+
+  // Deterministic rotation offset so the whole palette doesn't always start at the same hue.
+  const seed = stableHash(uniq.join("|"));
+  const offset = seed % 360;
+
+  const n = Math.max(uniq.length, 1);
+
+  const map = new Map<string, string>();
+
+  for (let i = 0; i < uniq.length; i++) {
+    const name = uniq[i];
+
+    // Evenly spaced hues -> maximum separation
+    const hue = (offset + (i * 360) / n) % 360;
+
+    // Alternate S/L for better adjacent contrast
+    const variant: 0 | 1 = i % 2 === 1 ? 1 : 0;
+    const saturation = variant === 0 ? 70 : 62;
+    const lightness = variant === 0 ? 42 : 56;
+
+    map.set(name.toLowerCase(), `hsl(${hue.toFixed(0)} ${saturation}% ${lightness}%)`);
+  }
+
+  return map;
+}
+
+function getCategoryMarkerColor(category: string, colorMap: Map<string, string>) {
   const c = (category ?? "").trim();
   if (!c) return "#9E9E9E";
-  if (c.toLowerCase() === "favoritter") return "#F9A825";
-  if (c.toLowerCase() === "uten kategori") return "#78909C";
-  return CATEGORY_COLOR_PALETTE[hashStringToIndex(c.toLowerCase(), CATEGORY_COLOR_PALETTE.length)];
+  const lower = c.toLowerCase();
+  if (lower === "favoritter") return "#F9A825";
+  if (lower === "uten kategori") return "#78909C";
+  return colorMap.get(lower) ?? "#9E9E9E";
 }
 
 function isUtenKategori(category: string) {
@@ -373,6 +395,11 @@ export default function StandardTekstSidebar({
 
   const isSearching = search.trim().length > 0;
 
+  const categoryColorMap = useMemo(() => {
+    const cats = groupedByCategory.map((g) => g.category);
+    return buildCategoryColorMap(cats);
+  }, [groupedByCategory]);
+
   // Ensure the category containing the selected item is expanded
   // Only do this when selection changes due to user interaction, not on initial load.
   useEffect(() => {
@@ -540,7 +567,9 @@ export default function StandardTekstSidebar({
                 const isHidden = !!hiddenCategories[group.category];
                 if (isHidden && !isSearching) return null;
 
-                const isExpanded = isSearching ? true : expandedCategories[group.category] !== false;
+                const isExpanded = isSearching
+                  ? true
+                  : expandedCategories[group.category] !== false;
 
                 return (
                   <Box key={group.category}>
@@ -569,7 +598,7 @@ export default function StandardTekstSidebar({
                           height: 22,
                           borderRadius: 1,
                           mr: 1,
-                          bgcolor: getCategoryMarkerColor(group.category),
+                          bgcolor: getCategoryMarkerColor(group.category, categoryColorMap),
                           flexShrink: 0,
                         }}
                       />
@@ -634,7 +663,25 @@ export default function StandardTekstSidebar({
                               setSelectedId(it.id);
                             }}
                             className={styles.sidebarItem}
-                            sx={{ pl: 2.25 }}
+                            sx={(theme) => ({
+                              pl: 2.25,
+                              position: "relative",
+                              borderLeft: "4px solid transparent",
+                              transition: "background-color 120ms ease, border-color 120ms ease",
+
+                              "&.Mui-selected": {
+                                bgcolor: alpha(theme.palette.primary.main, 0.22),
+                                borderLeftColor: theme.palette.primary.main,
+                              },
+
+                              "&.Mui-selected:hover": {
+                                bgcolor: alpha(theme.palette.primary.main, 0.26),
+                              },
+
+                              "&:hover": {
+                                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                              },
+                            })}
                           >
                             <ListItemText
                               primary={<TruncatedTitle title={it.title} />}
@@ -701,7 +748,7 @@ export default function StandardTekstSidebar({
                               height: 18,
                               borderRadius: 1,
                               mr: 1,
-                              bgcolor: getCategoryMarkerColor(cat),
+                              bgcolor: getCategoryMarkerColor(cat, categoryColorMap),
                               flexShrink: 0,
                             }}
                           />
