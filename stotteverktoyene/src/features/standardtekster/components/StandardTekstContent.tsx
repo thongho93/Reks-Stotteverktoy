@@ -382,7 +382,11 @@ export default function StandardTekstContent({
                     fullWidth
                     size="small"
                     label="Overskrift"
-                    value={selected && selected.title === "Ny standardtekst" ? "" : draftTitle}
+                    value={
+                      selected?.title === "Ny standardtekst" && draftTitle.trim() === "Ny standardtekst"
+                        ? ""
+                        : draftTitle
+                    }
                     placeholder="F.eks. Hyppig uttak…"
                     onChange={(e) => onDraftTitleChange(e.target.value)}
                     inputRef={titleInputRef}
