@@ -27,7 +27,10 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 
-import { CreateStandardtekstDialog, EditStandardtekstDialog } from "../components/CreateStandardtekstDialog";
+import {
+  CreateStandardtekstDialog,
+  EditStandardtekstDialog,
+} from "../components/CreateStandardtekstDialog";
 import { useInteractions } from "../services/useInteractions";
 import { useStandardtekster } from "../hooks/useStandardtekster";
 import {
@@ -57,10 +60,16 @@ export default function InteraksjonerPage() {
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const { user, isAdmin } = useAuthUser();
+  const lastKnownUidRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (user?.uid) lastKnownUidRef.current = user.uid;
+  }, [user?.uid]);
+
   const firstName = (user?.firstName ?? null) as string | null;
 
   const historyKey = React.useMemo(() => {
-    const uid = user?.uid;
+    const uid = user?.uid ?? lastKnownUidRef.current;
     return uid ? `${HISTORY_KEY_PREFIX}:${uid}` : `${HISTORY_KEY_PREFIX}:anon`;
   }, [user?.uid]);
 
@@ -96,8 +105,7 @@ export default function InteraksjonerPage() {
       })
       .filter(Boolean);
 
-    const prefillTitle =
-      names.length === 2 ? `${names[0]} × ${names[1]}` : "Interaksjon";
+    const prefillTitle = names.length === 2 ? `${names[0]} × ${names[1]}` : "Interaksjon";
 
     return { r, it, interactionId, prefillTitle };
   }, [index, results, activeResult]);
@@ -227,9 +235,7 @@ export default function InteraksjonerPage() {
       };
 
       setHistory((prev) => {
-        const withoutDup = prev.filter(
-          (x) => x.interactionIndex !== item.interactionIndex
-        );
+        const withoutDup = prev.filter((x) => x.interactionIndex !== item.interactionIndex);
         return [item, ...withoutDup].slice(0, 5);
       });
     },
@@ -1098,7 +1104,14 @@ export default function InteraksjonerPage() {
                                           <Typography sx={{ fontWeight: 800, mb: 0.75 }}>
                                             {activeLinkedStd.title || "Standardtekst"}
                                           </Typography>
-                                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: 1 }}>
+                                          <Box
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 0.5,
+                                              ml: 1,
+                                            }}
+                                          >
                                             {isAdmin ? (
                                               <IconButton
                                                 onClick={(e) => {
@@ -1159,7 +1172,7 @@ export default function InteraksjonerPage() {
           {copySnackMsg}
         </Alert>
       </Snackbar>
-     <CreateStandardtekstDialog
+      <CreateStandardtekstDialog
         open={createOpen}
         interactionId={activeCtx?.interactionId ?? null}
         prefillTitle={activeCtx?.prefillTitle ?? "Interaksjon"}
