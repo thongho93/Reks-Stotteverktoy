@@ -33,6 +33,8 @@ import {
   getTallTokenIndices,
   replaceNextPreparatToken,
   replaceTallTokenByIndex,
+  templateHasDatoMndToken,
+  templateHasDatoToken,
   templateHasTallToken,
   usePreparatRows,
 } from "../utils/preparat";
@@ -93,6 +95,13 @@ export default function StandardTekstPage() {
   const standardTekstSearchInputRef = useRef<HTMLInputElement | null>(null);
   const preserveInputsOnNextSelectRef = useRef(false);
 
+  const DEFAULT_NEW_STANDARDTEKST_CONTENT =
+    "Hei, og takk for at du har valgt Farmasiet til å levere dine reseptvarer.\n\n" +
+    "\n" +
+    "Vennlig hilsen\n" +
+    "XX, farmasøyt\n" +
+    "Farmasiet";
+
   // For auto-focus glow effect on preparat / standardtekst search inputs
   const [autoFocusGlowTarget, setAutoFocusGlowTarget] = useState<"standard" | "preparat" | null>(
     null
@@ -109,9 +118,24 @@ export default function StandardTekstPage() {
     clearPreparats,
     preparatSearchInputRef,
     standardTekstSearchInputRef,
+    clearNumbersAndDate: () => {
+      // Reset tall fields based on the currently selected template
+      const indices = getTallTokenIndices(selected?.content ?? "");
+      if (indices.length) {
+        const next: Record<number, string> = {};
+        for (const i of indices) next[i] = "";
+        setTallByIndex(next);
+      } else {
+        setTallByIndex({ 0: "" });
+      }
+
+      // Reset date input
+      setDatoInput("");
+    },
   });
 
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
+  const [datoInput, setDatoInput] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [clearOnCopy, setClearOnCopy] = useState<boolean>(() => {
     try {
@@ -139,6 +163,70 @@ export default function StandardTekstPage() {
     [preparatRows]
   );
 
+  const normalizedDato = useMemo(() => {
+    const digits = (datoInput ?? "").replace(/\D/g, "");
+    return digits.length === 8 ? digits : "";
+  }, [datoInput]);
+
+  const formattedDato = useMemo(() => {
+    if (!normalizedDato) return "";
+    const dd = normalizedDato.slice(0, 2);
+    const mm = normalizedDato.slice(2, 4);
+    const yyyy = normalizedDato.slice(4, 8);
+    return `${dd}.${mm}.${yyyy}`;
+  }, [normalizedDato]);
+
+  const normalizedDatoMnd = useMemo(() => {
+    const digits = (datoInput ?? "").replace(/\D/g, "");
+    // accept MMYYYY (6 digits)
+    if (digits.length !== 6) return "";
+    const mm = digits.slice(0, 2);
+    const yyyy = digits.slice(2, 6);
+    const m = Number(mm);
+    if (!Number.isFinite(m) || m < 1 || m > 12) return "";
+    return `${mm}${yyyy}`;
+  }, [datoInput]);
+
+  const formattedDatoMnd = useMemo(() => {
+    if (!normalizedDatoMnd) return "";
+    const mm = normalizedDatoMnd.slice(0, 2);
+    const yyyy = normalizedDatoMnd.slice(2, 6);
+    return `${mm}.${yyyy}`;
+  }, [normalizedDatoMnd]);
+
+  const formattedDatoMndName = useMemo(() => {
+    if (!normalizedDatoMnd) return "";
+    const mm = Number(normalizedDatoMnd.slice(0, 2));
+    const yyyy = normalizedDatoMnd.slice(2, 6);
+    const months = [
+      "januar",
+      "februar",
+      "mars",
+      "april",
+      "mai",
+      "juni",
+      "juli",
+      "august",
+      "september",
+      "oktober",
+      "november",
+      "desember",
+    ];
+    const name = months[mm - 1];
+    if (!name) return "";
+    return `${name} ${yyyy}`;
+  }, [normalizedDatoMnd]);
+
+  // DATO-token: prefer full dato (DD.MM.YYYY), fall back to month name (e.g. "juni 2025")
+  const effectiveDato = formattedDato || formattedDatoMndName;
+
+  const handleDatoPicker = (iso: string) => {
+    const m = (iso ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return;
+    const [, yyyy, mm, dd] = m;
+    setDatoInput(`${dd}.${mm}.${yyyy}`);
+  };
+
   // Bygg innhold med preparater og tall
   const displayContent = useMemo(() => {
     if (!selected) return "";
@@ -147,6 +235,8 @@ export default function StandardTekstPage() {
       template: selected.content,
       firstName,
       picked: pickedPreparats,
+      dato: effectiveDato,
+      datoMnd: formattedDatoMnd,
     });
 
     if (!templateHasTallToken(selected.content)) return base;
@@ -161,28 +251,32 @@ export default function StandardTekstPage() {
     }
 
     return out;
-  }, [selected, firstName, pickedPreparats, tallByIndex]);
+  }, [
+    selected,
+    firstName,
+    pickedPreparats,
+    tallByIndex,
+    formattedDato,
+    formattedDatoMnd,
+    formattedDatoMndName,
+    effectiveDato,
+    normalizedDato,
+    normalizedDatoMnd,
+  ]);
 
   // Preview content with preparats and tall
   const previewContent = useMemo(() => {
     if (!selected) return "";
 
-    const base = buildPreviewContent({
+    // IMPORTANT: Do NOT replace TALL tokens here.
+    // We keep tokens (TALL/TALL1/...) intact so renderContentWithPreparatHighlight
+    // can render them as blue chips using `tallValues`.
+    return buildPreviewContent({
       template: selected.content,
       firstName,
       picked: pickedPreparats,
     });
-
-    if (!templateHasTallToken(selected.content)) return base;
-
-    let out = base;
-    for (const idx of getTallTokenIndices(selected.content)) {
-      const v = (tallByIndex[idx] ?? "").trim();
-      out = replaceTallTokenByIndex(out, idx, v ? v : "____");
-    }
-
-    return out;
-  }, [selected, firstName, pickedPreparats, tallByIndex]);
+  }, [selected, firstName, pickedPreparats]);
 
   // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
@@ -190,7 +284,12 @@ export default function StandardTekstPage() {
     setIsEditing(shouldAutoEditNew);
     setDraftTitle(selected?.title ?? "");
     setDraftCategory(selected?.category ?? "");
-    setDraftContent(selected?.content ?? "");
+    if (shouldAutoEditNew) {
+      const base = selected?.content ?? "";
+      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
+    } else {
+      setDraftContent(selected?.content ?? "");
+    }
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
@@ -204,6 +303,7 @@ export default function StandardTekstPage() {
       } else {
         setTallByIndex({ 0: "" });
       }
+      setDatoInput("");
 
       // Når vi åpner en helt ny standardtekst i edit mode, skal fokus gå til overskrift-feltet
       // (StandardTekstContent håndterer dette via titleInputRef).
@@ -236,7 +336,12 @@ export default function StandardTekstPage() {
     if (!selected) return;
     setDraftTitle(selected.title ?? "");
     setDraftCategory(selected.category ?? "");
-    setDraftContent(selected.content ?? "");
+    if (selected.title === "Ny standardtekst") {
+      const base = selected.content ?? "";
+      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
+    } else {
+      setDraftContent(selected.content ?? "");
+    }
     setDraftFollowUps((selected.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
@@ -326,7 +431,8 @@ export default function StandardTekstPage() {
       // Start editing right away
       setDraftTitle(localItem.title);
       setDraftCategory(localItem.category ?? "");
-      setDraftContent(localItem.content);
+      const base = localItem.content ?? "";
+      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
       setIsEditing(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved opprettelse";
@@ -501,8 +607,21 @@ export default function StandardTekstPage() {
       const indices = getTallTokenIndices(selected.content);
       const missing = indices.filter((i) => !(tallByIndex[i] ?? "").trim());
       if (missing.length) {
-        const label = missing.map((i) => (i === 0 ? "{{TALL}}" : `{{TALL${i}}}`)).join(", ");
+        const label = missing.map((i) => (i === 0 ? "TALL" : `TALL${i}`)).join(", ");
         setErrorLocal(`Fyll inn tallfeltet før du kopierer teksten: ${label}.`);
+        return;
+      }
+    }
+    if (templateHasDatoToken(selected.content)) {
+      if (!normalizedDato && !normalizedDatoMnd) {
+        setErrorLocal("Fyll inn dato eller måned (DATO) før du kopierer teksten.");
+        return;
+      }
+    }
+
+    if (templateHasDatoMndToken(selected.content)) {
+      if (!normalizedDatoMnd) {
+        setErrorLocal("Fyll inn måned/år (DATO_MND) før du kopierer teksten.");
         return;
       }
     }
@@ -761,34 +880,149 @@ export default function StandardTekstPage() {
                   Tall i teksten
                 </Typography>
 
-                <Box sx={{ display: "grid", gap: 1 }}>
-                  {getTallTokenIndices(selected.content).map((idx) => {
-                    const v = tallByIndex[idx] ?? "";
-                    const tokenLabel = idx === 0 ? "Tall" : `Tall ${idx}`;
+                {(() => {
+                  const tallIndices = getTallTokenIndices(selected.content);
 
-                    return (
-                      <TextField
-                        key={idx}
-                        label={tokenLabel}
-                        value={v}
-                        onChange={(e) =>
-                          setTallByIndex((prev) => ({ ...prev, [idx]: e.target.value }))
-                        }
-                        size="small"
-                        type="number"
-                        inputProps={{ inputMode: "numeric" }}
-                        helperText={
-                          v.trim()
-                            ? `Tallet settes inn der ${tokenLabel} står i teksten.`
-                            : "Plasseringen vises som ____ i teksten til du fyller inn et tall."
-                        }
-                        fullWidth
-                      />
-                    );
-                  })}
-                </Box>
+                  return (
+                    <>
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gap: 1,
+                          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                          alignItems: "start",
+                        }}
+                      >
+                        {tallIndices.map((idx) => {
+                          const v = tallByIndex[idx] ?? "";
+                          const tokenLabel = idx === 0 ? "Tall" : `Tall ${idx}`;
+
+                          return (
+                            <TextField
+                              key={idx}
+                              label={tokenLabel}
+                              value={v}
+                              onChange={(e) =>
+                                setTallByIndex((prev) => ({ ...prev, [idx]: e.target.value }))
+                              }
+                              size="small"
+                              type="number"
+                              inputProps={{ inputMode: "numeric" }}
+                              helperText={
+                                v.trim()
+                                  ? `Tallet settes inn der ${tokenLabel} står i teksten.`
+                                  : " "
+                              }
+                            />
+                          );
+                        })}
+                      </Box>
+                    </>
+                  );
+                })()}
               </Paper>
             )}
+            {selected &&
+              (templateHasDatoToken(selected.content) ||
+                templateHasDatoMndToken(selected.content)) && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mt: 1,
+                    mb: 1.5,
+                    p: 1.25,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                    Dato i teksten
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gap: 1,
+                      gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) 170px 170px" },
+                      alignItems: "start",
+                    }}
+                  >
+                    <TextField
+                      label="Dato eller Måned"
+                      value={datoInput}
+                      onChange={(e) => {
+                        const nextRaw = e.target.value;
+                        const digits = nextRaw.replace(/\D/g, "");
+
+                        if (digits.length === 8) {
+                          const dd = digits.slice(0, 2);
+                          const mm = digits.slice(2, 4);
+                          const yyyy = digits.slice(4, 8);
+                          setDatoInput(`${dd}.${mm}.${yyyy}`);
+                          return;
+                        }
+
+                        if (digits.length === 6) {
+                          const mm = digits.slice(0, 2);
+                          const yyyy = digits.slice(2, 6);
+                          setDatoInput(`${mm}.${yyyy}`);
+                          return;
+                        }
+
+                        setDatoInput(nextRaw);
+                      }}
+                      placeholder="f.eks. 30.12.2025 eller 12.2025"
+                      size="small"
+                      inputProps={{ inputMode: "numeric" }}
+                      helperText={"Tips: Skriv eller velg dato / måned."}
+                    />
+                    <TextField
+                      label="Velg dato"
+                      type="date"
+                      size="small"
+                      value={
+                        normalizedDato
+                          ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
+                              2,
+                              4
+                            )}-${normalizedDato.slice(0, 2)}`
+                          : ""
+                      }
+                      onChange={(e) => handleDatoPicker(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                    <TextField
+                      label="Velg måned"
+                      type="month"
+                      size="small"
+                      value={
+                        formattedDatoMnd
+                          ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const iso = e.target.value; // YYYY-MM
+                        const m = (iso ?? "").match(/^(\d{4})-(\d{2})$/);
+                        if (!m) return;
+                        const [, yyyy, mm] = m;
+                        setDatoInput(`${mm}.${yyyy}`);
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Box>
+
+                  {!normalizedDato && !normalizedDatoMnd && datoInput.trim() ? (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mt: 0.75 }}
+                    >
+                      Ugyldig datoformat. Bruk DDMMYYYY (8 siffer) eller MMYYYY (6 siffer).
+                    </Typography>
+                  ) : null}
+                </Paper>
+              )}
           </Box>
 
           {lockBeforeEdit && (
@@ -822,8 +1056,10 @@ export default function StandardTekstPage() {
                 enableSecondaryHighlight: templateUsesPreparat1(selected?.content ?? ""),
                 tallValues: getTallTokenIndices(selected?.content ?? "").map((i) => {
                   const v = (tallByIndex[i] ?? "").trim();
-                  return v ? v : "____";
+                  return v;
                 }),
+                datoValue: effectiveDato,
+                datoMndValue: formattedDatoMnd,
               }
             )}
             editorTools={

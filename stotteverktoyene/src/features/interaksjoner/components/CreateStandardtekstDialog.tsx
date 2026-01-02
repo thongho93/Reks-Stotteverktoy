@@ -27,8 +27,7 @@ type Props = {
 
 const FIXED_CATEGORY = "Interaksjon";
 
-const TEMPLATE_TOP =
-  "Hei, og takk for at du har valgt Farmasiet for levering av reseptbelagte medisiner.";
+const TEMPLATE_TOP = "Hei, og takk for at du har valgt oss for å få levert reseptvarer. ";
 
 const TEMPLATE_BOTTOM =
   "Det er mulig at legen allerede har vurdert denne kombinasjonen. Derfor er det viktig at du følger legens forskrivning nøye, og ikke gjør endringer i behandlingen uten å ha avklart det med legen.\n\nTa gjerne kontakt med legen din hvis du er usikker eller ønsker å få videre vurdering.\n\nDenne meldingen er kun ment som informasjon og kan ikke besvares. For praktiske spørsmål, kontakt gjerne vår kundeservice.\n\nVennlig hilsen\nXX, farmasøyt\nFarmasiet";
@@ -48,12 +47,60 @@ function extractInteractionTextFromComposed(composed: string) {
   if (!rawNorm.startsWith(topNorm)) return raw;
   if (!rawNorm.endsWith(bottomNorm)) return raw;
 
-  const middle = rawNorm
-    .slice(topNorm.length, rawNorm.length - bottomNorm.length)
-    .trim();
+  const middle = rawNorm.slice(topNorm.length, rawNorm.length - bottomNorm.length).trim();
 
   // Middle may include leading/trailing blank lines.
   return middle.replace(/^\n+/, "").replace(/\n+$/, "").trim();
+}
+
+function stripCommonGreetingAndSignature(middle: string) {
+  const raw = (middle ?? "").replace(/\r\n/g, "\n").trim();
+  if (!raw) return "";
+
+  let s = raw;
+
+  // Remove common greeting variants (keep it conservative: only remove if it's clearly the first paragraph)
+  const greetingVariants = [
+    "Hei, og takk for at du har valgt Farmasiet til å levere dine reseptvarer.",
+    "Hei, og takk for at du har valgt Farmasiet for levering av reseptbelagte medisiner.",
+    "Hei, og takk for at du har valgt Farmasiet for levering av reseptbelagte medisiner",
+    "Hei, og takk for at du har valgt Farmasiet for levering av reseptvarer.",
+    "Hei, og takk for at du har valgt Farmasiet for levering av reseptvarer",
+  ];
+
+  for (const g of greetingVariants) {
+    const gNorm = g.replace(/\r\n/g, "\n").trim();
+    if (s.startsWith(gNorm)) {
+      s = s.slice(gNorm.length).replace(/^\s*\n+/, "").trim();
+      break;
+    }
+  }
+
+  // If the user pasted the full message into the middle, strip the boilerplate that belongs to TEMPLATE_BOTTOM.
+  // We remove from the first known boilerplate marker to the end (keeps only the truly interaction-specific part).
+  const bottomMarkers = [
+    "Det er mulig at legen allerede har vurdert denne kombinasjonen.",
+    "Ta gjerne kontakt med legen din hvis du er usikker eller ønsker å få videre vurdering.",
+    "Denne meldingen er kun ment som informasjon og kan ikke besvares.",
+    "Denne meldingen er kun ment som informasjon og kan ikke besvares",
+  ];
+
+  for (const m of bottomMarkers) {
+    const idx = s.indexOf(m);
+    if (idx > -1) {
+      s = s.slice(0, idx).replace(/\n+\s*$/g, "").trim();
+      break;
+    }
+  }
+
+  // Remove common signature block variants at the end of the middle
+  const signatureRegex =
+    /\n*\s*Vennlig hilsen\s*\n\s*.+?,\s*farmasøyt\s*\n\s*Farmasiet\s*$/i;
+  if (signatureRegex.test(s)) {
+    s = s.replace(signatureRegex, "").replace(/\n+\s*$/g, "").trim();
+  }
+
+  return s;
 }
 
 export function CreateStandardtekstDialog(props: Props) {
@@ -67,18 +114,15 @@ export function CreateStandardtekstDialog(props: Props) {
 
   React.useEffect(() => {
     if (!open) return;
-    setTitle((prev) => prev || prefillTitle || "");
+    setTitle(prefillTitle?.trim() ? prefillTitle : "");
     setInteractionText("");
     setSaving(false);
     setError(null);
     setCopied(false);
-  }, [open, prefillTitle]);
+  }, [open, prefillTitle, interactionId]);
 
   const canSave =
-    !!interactionId &&
-    title.trim().length > 0 &&
-    interactionText.trim().length > 0 &&
-    !saving;
+    !!interactionId && title.trim().length > 0 && interactionText.trim().length > 0 && !saving;
 
   const previewText = React.useMemo(() => {
     const body = interactionText.trim();
@@ -139,13 +183,12 @@ export function CreateStandardtekstDialog(props: Props) {
       fullWidth
       maxWidth="md"
     >
-      <DialogTitle sx={{ fontSize: 34, fontWeight: 900, pb: 1 }}>
-        Ny standardtekst
-      </DialogTitle>
+      <DialogTitle sx={{ fontSize: 34, fontWeight: 900, pb: 1 }}>Ny standardtekst</DialogTitle>
 
       <DialogContent>
         <Typography color="text.secondary" sx={{ mb: 2, fontSize: 16 }}>
-          Denne standardteksten lagres i standardtekst-biblioteket og knyttes automatisk til interaksjonen.
+          Denne standardteksten lagres i standardtekst-biblioteket og knyttes automatisk til
+          interaksjonen.
         </Typography>
 
         <Typography color="text.secondary" sx={{ mb: 2, fontSize: 13 }}>
@@ -228,19 +271,11 @@ export function CreateStandardtekstDialog(props: Props) {
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button
-          onClick={onClose}
-          disabled={saving}
-          variant="text"
-        >
+        <Button onClick={onClose} disabled={saving} variant="text">
           Avbryt
         </Button>
 
-        <Button
-          onClick={handleSave}
-          disabled={!canSave}
-          variant="contained"
-        >
+        <Button onClick={handleSave} disabled={!canSave} variant="contained">
           {saving ? "Lagrer..." : "Lagre standardtekst"}
         </Button>
       </DialogActions>
@@ -275,17 +310,14 @@ export function EditStandardtekstDialog(props: EditProps) {
     const t = (standardtekst?.title ?? "").trim();
     const c = standardtekst?.content ?? "";
     setTitle(t);
-    setInteractionText(extractInteractionTextFromComposed(c));
+    setInteractionText(stripCommonGreetingAndSignature(extractInteractionTextFromComposed(c)));
     setSaving(false);
     setError(null);
     setCopied(false);
   }, [open, standardtekst]);
 
   const canSave =
-    !!standardtekst?.id &&
-    title.trim().length > 0 &&
-    interactionText.trim().length > 0 &&
-    !saving;
+    !!standardtekst?.id && title.trim().length > 0 && interactionText.trim().length > 0 && !saving;
 
   const previewText = React.useMemo(() => {
     const body = interactionText.trim();
@@ -344,9 +376,7 @@ export function EditStandardtekstDialog(props: EditProps) {
       fullWidth
       maxWidth="md"
     >
-      <DialogTitle sx={{ fontSize: 34, fontWeight: 900, pb: 1 }}>
-        Rediger standardtekst
-      </DialogTitle>
+      <DialogTitle sx={{ fontSize: 34, fontWeight: 900, pb: 1 }}>Rediger standardtekst</DialogTitle>
 
       <DialogContent>
         <Typography color="text.secondary" sx={{ mb: 2, fontSize: 16 }}>

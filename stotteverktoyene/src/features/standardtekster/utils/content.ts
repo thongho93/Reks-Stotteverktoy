@@ -1,5 +1,7 @@
 import {
   formatPreparatList,
+  replaceDatoMndTokens,
+  replaceDatoTokens,
   replacePreparatTokenWithList,
   replacePreparatTokensPrimarySecondary,
   replaceVareTokenByCount,
@@ -9,6 +11,8 @@ type BuildArgs = {
   template: string;
   firstName?: string | null;
   picked: string[];
+  dato?: string | null;
+  datoMnd?: string | null;
 };
 
 export const replaceFirstName = (text: string, firstName?: string | null) => {
@@ -18,7 +22,7 @@ export const replaceFirstName = (text: string, firstName?: string | null) => {
 
 const usesSecondaryToken = (text: string) => /\{\{\s*PREPARAT1\s*\}\}/.test(text);
 
-export const buildDisplayContent = ({ template, firstName, picked }: BuildArgs): string => {
+export const buildDisplayContent = ({ template, firstName, picked, dato, datoMnd }: BuildArgs): string => {
   let text = template ?? "";
 
   text = replaceFirstName(text, firstName);
@@ -35,6 +39,16 @@ export const buildDisplayContent = ({ template, firstName, picked }: BuildArgs):
   }
 
   text = replaceVareTokenByCount(text, picked.length);
+
+  const d = (dato ?? "").trim();
+  if (d) {
+    text = replaceDatoTokens(text, d);
+  }
+
+  const dm = (datoMnd ?? "").trim();
+  if (dm) {
+    text = replaceDatoMndTokens(text, dm);
+  }
 
   return text;
 };

@@ -15,8 +15,15 @@ import {
   ToggleButtonGroup,
   Switch,
   FormControlLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
 } from "@mui/material";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 
 type TotalsRow = {
@@ -31,6 +38,7 @@ type UserAggRow = {
   uid: string;
   firstName?: string;
   email?: string;
+  displayName?: string;
   pageViews: number;
   standardtekstOpens: number;
   copies: number;
@@ -194,10 +202,94 @@ export default function StatistikkPage() {
   const [showAllUsers, setShowAllUsers] = React.useState(false);
 
   const [rows, setRows] = React.useState<TotalsRow[]>([]);
+  const [topStandardtekster, setTopStandardtekster] = React.useState<
+    { title: string; opens: number }[]
+  >([]);
+  const [topDialogOpen, setTopDialogOpen] = React.useState(false);
   const [aggregatedUsers, setAggregatedUsers] = React.useState<UserAggRow[]>([]);
   const [loadingTotals, setLoadingTotals] = React.useState(false);
   const [loadingUsers, setLoadingUsers] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [userTopDialogOpen, setUserTopDialogOpen] = React.useState(false);
+  const [userTopDialogTitle, setUserTopDialogTitle] = React.useState<string>("");
+  const [userTopLoading, setUserTopLoading] = React.useState(false);
+  const [userTopError, setUserTopError] = React.useState<string | null>(null);
+  const [userTopItems, setUserTopItems] = React.useState<{ title: string; opens: number }[]>([]);
+
+  const getUserTopDateKeys = React.useCallback(() => {
+    const fromDate = parseDateKey(from);
+    const toDate = parseDateKey(to);
+    if (!isValidDate(fromDate) || !isValidDate(toDate)) return [] as string[];
+
+    const rangeStart = viewMode === "week" ? startOfIsoWeekMonday(fromDate) : fromDate;
+    const rangeEnd = viewMode === "week" ? endOfIsoWeekSunday(toDate) : toDate;
+
+    const all = listDateKeysInclusive(toDateKey(rangeStart), toDateKey(rangeEnd));
+    if (userViewMode === "day") {
+      return [toDateKey(toDate)];
+    }
+    return all;
+  }, [from, to, viewMode, userViewMode]);
+
+  const openUserTopDialog = React.useCallback(
+    async (uid: string, label: string) => {
+      setUserTopDialogTitle(label);
+      setUserTopItems([]);
+      setUserTopError(null);
+      setUserTopDialogOpen(true);
+
+      const dateKeys = getUserTopDateKeys();
+      if (dateKeys.length === 0) {
+        setUserTopError("Ingen gyldig periode valgt.");
+        return;
+      }
+
+      setUserTopLoading(true);
+      try {
+        const opensById = new Map<string, number>();
+
+        await Promise.all(
+          dateKeys.map(async (dateKey) => {
+            const ref = collection(db, "usage_daily", dateKey, "users", uid, "standardtekster");
+            const snap = await getDocs(ref);
+            snap.forEach((d) => {
+              const data = d.data() as any;
+              const opens = Number(data.opens ?? 0);
+              if (!opens) return;
+              opensById.set(d.id, (opensById.get(d.id) ?? 0) + opens);
+            });
+          })
+        );
+
+        const topEntries = [...opensById.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+
+        const items = await Promise.all(
+          topEntries.map(async ([id, opens]) => {
+            try {
+              const ref = doc(db, "Standardtekster", id);
+              const s = await getDoc(ref);
+              const data = s.exists() ? (s.data() as any) : null;
+              const title = typeof data?.title === "string" ? data.title.trim() : "";
+              return { title: title || id, opens };
+            } catch {
+              return { title: id, opens };
+            }
+          })
+        );
+
+        setUserTopItems(items);
+      } catch (e: any) {
+        const message = typeof e?.message === "string" ? e.message : "Kunne ikke hente topp 5.";
+        setUserTopError(message);
+        setUserTopItems([]);
+      } finally {
+        setUserTopLoading(false);
+      }
+    },
+    [getUserTopDateKeys]
+  );
 
   const fetchStats = React.useCallback(async () => {
     setLoadingTotals(true);
@@ -208,6 +300,13 @@ export default function StatistikkPage() {
       if (!from || !to) {
         setRows([]);
         setAggregatedUsers([]);
+        setTopStandardtekster([]);
+        setTopDialogOpen(false);
+        setUserTopDialogOpen(false);
+        setUserTopItems([]);
+        setUserTopError(null);
+        setUserTopLoading(false);
+        setUserTopDialogTitle("");
         setLoadingTotals(false);
         setLoadingUsers(false);
         return;
@@ -216,6 +315,13 @@ export default function StatistikkPage() {
       if (from > to) {
         setRows([]);
         setAggregatedUsers([]);
+        setTopStandardtekster([]);
+        setTopDialogOpen(false);
+        setUserTopDialogOpen(false);
+        setUserTopItems([]);
+        setUserTopError(null);
+        setUserTopLoading(false);
+        setUserTopDialogTitle("");
         setError("Fra-dato kan ikke være etter til-dato.");
         setLoadingTotals(false);
         setLoadingUsers(false);
@@ -228,6 +334,13 @@ export default function StatistikkPage() {
       if (!isValidDate(fromDate) || !isValidDate(toDate)) {
         setRows([]);
         setAggregatedUsers([]);
+        setTopStandardtekster([]);
+        setTopDialogOpen(false);
+        setUserTopDialogOpen(false);
+        setUserTopItems([]);
+        setUserTopError(null);
+        setUserTopLoading(false);
+        setUserTopDialogTitle("");
         setError("Ugyldig datoformat. Bruk dato-velgeren (yyyy-mm-dd).");
         setLoadingTotals(false);
         setLoadingUsers(false);
@@ -238,6 +351,43 @@ export default function StatistikkPage() {
       const rangeEnd = viewMode === "week" ? endOfIsoWeekSunday(toDate) : toDate;
 
       const dateKeys = listDateKeysInclusive(toDateKey(rangeStart), toDateKey(rangeEnd));
+
+      // 0) Top 10 standardtekster (sum opens per standardtekstId over perioden)
+      const standardtekstOpensById = new Map<string, number>();
+
+      await Promise.all(
+        dateKeys.map(async (dateKey) => {
+          const stRef = collection(db, "usage_daily", dateKey, "standardtekster");
+          const snap = await getDocs(stRef);
+          snap.forEach((d) => {
+            const data = d.data() as any;
+            const opens = Number(data.opens ?? 0);
+            if (!opens) return;
+            standardtekstOpensById.set(d.id, (standardtekstOpensById.get(d.id) ?? 0) + opens);
+          });
+        })
+      );
+
+      const topEntries = [...standardtekstOpensById.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      // Fetch titles for the top IDs (fallback to id if missing)
+      const items = await Promise.all(
+        topEntries.map(async ([id, opens]) => {
+          try {
+            const ref = doc(db, "Standardtekster", id);
+            const s = await getDoc(ref);
+            const data = s.exists() ? (s.data() as any) : null;
+            const title = typeof data?.title === "string" ? data.title.trim() : "";
+            return { title: title || id, opens };
+          } catch {
+            return { title: id, opens };
+          }
+        })
+      );
+
+      setTopStandardtekster(items);
 
       // Per-user aggregation can be either the full selected range (total) or only the selected "Til" day.
       const userDayKey = toDateKey(toDate);
@@ -307,6 +457,8 @@ export default function StatistikkPage() {
             const updatedAt = data.updatedAt;
             const firstName = typeof data.firstName === "string" ? data.firstName.trim() : "";
             const email = typeof data.email === "string" ? data.email.trim() : "";
+            const displayName = firstName || email || `${uid.slice(0, 6)}…${uid.slice(-4)}`;
+            prev.displayName = displayName;
             if (
               !prev.updatedAt ||
               (updatedAt &&
@@ -360,6 +512,13 @@ export default function StatistikkPage() {
       setError(message);
       setRows([]);
       setAggregatedUsers([]);
+      setTopStandardtekster([]);
+      setTopDialogOpen(false);
+      setUserTopDialogOpen(false);
+      setUserTopItems([]);
+      setUserTopError(null);
+      setUserTopLoading(false);
+      setUserTopDialogTitle("");
       setLoadingTotals(false);
       setLoadingUsers(false);
     } finally {
@@ -407,6 +566,7 @@ export default function StatistikkPage() {
           sx={{
             p: 3,
             flex: "1 1 auto",
+            minHeight: 0,
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
@@ -415,186 +575,253 @@ export default function StatistikkPage() {
           <Typography variant="h2" gutterBottom>
             Statistikk
           </Typography>
-
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
-            <TextField
-              label="Fra"
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Til"
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Button
-              variant="outlined"
-              onClick={fetchStats}
-              disabled={loadingTotals || loadingUsers}
-              sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
-            >
-              Oppdater
-            </Button>
-          </Stack>
-
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <ToggleButtonGroup
-                size="small"
-                exclusive
-                value={viewMode}
-                onChange={(_, next) => {
-                  if (next) setViewMode(next);
-                }}
+          <Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+              <TextField
+                label="Fra"
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Til"
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+              <Button
+                variant="outlined"
+                onClick={fetchStats}
+                disabled={loadingTotals || loadingUsers}
+                sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
               >
-                <ToggleButton value="day">Dag</ToggleButton>
-                <ToggleButton value="week">Uke</ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-          </Stack>
+                Oppdater
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setTopDialogOpen(true)}
+                disabled={loadingTotals || loadingUsers || topStandardtekster.length === 0}
+                sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
+              >
+                Topp standardtekster
+              </Button>
+            </Stack>
 
-          {error && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {error}
-            </Typography>
-          )}
-
-          <Table size="small" aria-label="statistikk">
-            <TableHead>
-              <TableRow>
-                <TableCell>{viewMode === "week" ? "Uke" : "Dato"}</TableCell>
-                <TableCell align="center">Sider vist</TableCell>
-                <TableCell align="center">Tekst kopiert</TableCell>
-                <TableCell align="center">Tekst søkt</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.key}>
-                  <TableCell>{r.label}</TableCell>
-                  <TableCell align="center">{r.pageViews}</TableCell>
-                  <TableCell align="center">{r.copies}</TableCell>
-                  <TableCell align="center">{r.searches}</TableCell>
-                </TableRow>
-              ))}
-
-              {viewMode === "week" && (
-                <TableRow
-                  sx={{
-                    backgroundColor: "rgba(0,0,0,0.03)",
-                    "& td": {
-                      fontWeight: 700,
-                      borderTop: "2px solid rgba(0,0,0,0.12)",
-                    },
-                  }}
-                >
-                  <TableCell>Sum</TableCell>
-                  <TableCell align="center">{totals.pageViews}</TableCell>
-                  <TableCell align="center">{totals.copies}</TableCell>
-                  <TableCell align="center">{totals.searches}</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-
-          {!loadingTotals && !error && rows.length === 0 && (
-            <Typography color="text.secondary" sx={{ mt: 2 }}>
-              Ingen data i valgt periode.
-            </Typography>
-          )}
-
-          <Box
-            sx={{
-              mt: 2,
-              flex: "1 1 auto",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                mb: 1,
-                mt: 4,
-              }}
-            >
-              {" "}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <ToggleButtonGroup
                   size="small"
                   exclusive
-                  value={userViewMode}
+                  value={viewMode}
                   onChange={(_, next) => {
-                    if (next) setUserViewMode(next);
+                    if (next) setViewMode(next);
                   }}
                 >
                   <ToggleButton value="day">Dag</ToggleButton>
-                  <ToggleButton value="total">Totalt</ToggleButton>
+                  <ToggleButton value="week">Uke</ToggleButton>
                 </ToggleButtonGroup>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography>
-                  {showAllUsers ? "Per bruker (alle)" : "Per bruker (topp 5)"}
-                </Typography>
-                <FormControlLabel
-                  sx={{ ml: 1 }}
-                  control={
-                    <Switch
-                      size="small"
-                      checked={showAllUsers}
-                      onChange={(e) => setShowAllUsers(e.target.checked)}
-                    />
-                  }
-                  label={showAllUsers ? "Alle" : "Topp 5"}
-                />
-              </Box>{" "}
-            </Box>
+            </Stack>
 
-            <Box sx={{ flex: "1 1 auto", overflow: "hidden" }}>
-              <Table size="small" aria-label="statistikk per bruker">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Bruker</TableCell>
-                    <TableCell align="center">Sider vist</TableCell>
-                    <TableCell align="center">Standardtekst åpnet</TableCell>
-                    <TableCell align="center">Tekst kopiert</TableCell>
-                    <TableCell align="center">Tekst søkt</TableCell>
+            {error && (
+              <Typography color="error" sx={{ mb: 2 }}>
+                {error}
+              </Typography>
+            )}
+
+            <Table size="small" aria-label="statistikk">
+              <TableHead>
+                <TableRow>
+                  <TableCell>{viewMode === "week" ? "Uke" : "Dato"}</TableCell>
+                  <TableCell align="center">Sider vist</TableCell>
+                  <TableCell align="center">Tekst kopiert</TableCell>
+                  <TableCell align="center">Tekst søkt</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.key}>
+                    <TableCell>{r.label}</TableCell>
+                    <TableCell align="center">{r.pageViews}</TableCell>
+                    <TableCell align="center">{r.copies}</TableCell>
+                    <TableCell align="center">{r.searches}</TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {visibleUsers.map((u) => (
-                    <TableRow key={u.uid}>
-                      <TableCell>
-                        {u.firstName ?? u.email ?? `${u.uid.slice(0, 6)}…${u.uid.slice(-4)}`}
-                      </TableCell>
-                      <TableCell align="center">{u.pageViews}</TableCell>
-                      <TableCell align="center">{u.standardtekstOpens}</TableCell>
-                      <TableCell align="center">{u.copies}</TableCell>
-                      <TableCell align="center">{u.searches}</TableCell>
-                    </TableRow>
-                  ))}
+                ))}
 
-                  {!loadingUsers && !error && visibleUsers.length === 0 && (
+                {viewMode === "week" && (
+                  <TableRow
+                    sx={{
+                      backgroundColor: "rgba(0,0,0,0.03)",
+                      "& td": {
+                        fontWeight: 700,
+                        borderTop: "2px solid rgba(0,0,0,0.12)",
+                      },
+                    }}
+                  >
+                    <TableCell>Sum</TableCell>
+                    <TableCell align="center">{totals.pageViews}</TableCell>
+                    <TableCell align="center">{totals.copies}</TableCell>
+                    <TableCell align="center">{totals.searches}</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+
+            {!loadingTotals && !error && rows.length === 0 && (
+              <Typography color="text.secondary" sx={{ mt: 2 }}>
+                Ingen data i valgt periode.
+              </Typography>
+            )}
+
+            <Box
+              sx={{
+                mt: 2,
+                flex: "1 1 auto",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 1,
+                  mt: 4,
+                }}
+              >
+                {" "}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={userViewMode}
+                    onChange={(_, next) => {
+                      if (next) setUserViewMode(next);
+                    }}
+                  >
+                    <ToggleButton value="day">Dag</ToggleButton>
+                    <ToggleButton value="total">Totalt</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography>
+                    {showAllUsers ? "Per bruker (alle)" : "Per bruker (topp 5)"}
+                  </Typography>
+                  <FormControlLabel
+                    sx={{ ml: 1 }}
+                    control={
+                      <Switch
+                        size="small"
+                        checked={showAllUsers}
+                        onChange={(e) => setShowAllUsers(e.target.checked)}
+                      />
+                    }
+                    label={showAllUsers ? "Alle" : "Topp 5"}
+                  />
+                </Box>{" "}
+              </Box>
+
+              <Box sx={{ flex: "1 1 auto" }}>
+                <Table size="small" aria-label="statistikk per bruker">
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={7}>
-                        <Typography color="text.secondary">
-                          Ingen brukerdata i valgt periode.
-                        </Typography>
-                      </TableCell>
+                      <TableCell>Bruker</TableCell>
+                      <TableCell align="center">Sider vist</TableCell>
+                      <TableCell align="center">Standardtekst åpnet</TableCell>
+                      <TableCell align="center">Tekst kopiert</TableCell>
+                      <TableCell align="center">Tekst søkt</TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: "nowrap", width: 72 }}></TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHead>
+                  <TableBody>
+                    {visibleUsers.map((u) => (
+                      <TableRow key={u.uid}>
+                        <TableCell>{u.displayName}</TableCell>
+                        <TableCell align="center">{u.pageViews}</TableCell>
+                        <TableCell align="center">{u.standardtekstOpens}</TableCell>
+                        <TableCell align="center">{u.copies}</TableCell>
+                        <TableCell align="center">{u.searches}</TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap", width: 72 }}>
+                          <Button
+                            size="small"
+                            variant="text"
+                            onClick={() => openUserTopDialog(u.uid, u.displayName || "Bruker")}
+                            sx={{ whiteSpace: "nowrap", minWidth: 0 }}
+                          >
+                            Topp 5
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {!loadingUsers && !error && visibleUsers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6}>
+                          <Typography color="text.secondary">
+                            Ingen brukerdata i valgt periode.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </Box>
             </Box>
           </Box>
 
+          <Dialog open={topDialogOpen} onClose={() => setTopDialogOpen(false)} fullWidth maxWidth="sm">
+            <DialogTitle>Topp 10 standardtekster</DialogTitle>
+            <DialogContent dividers>
+              {topStandardtekster.length === 0 ? (
+                <Typography color="text.secondary">Ingen data i valgt periode.</Typography>
+              ) : (
+                <List dense>
+                  {topStandardtekster.map((it, idx) => (
+                    <ListItem key={`${idx}-${it.title}`} disableGutters>
+                      <ListItemText primary={`${idx + 1}. ${it.title} (${it.opens})`} />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setTopDialogOpen(false)}>Lukk</Button>
+            </DialogActions>
+          </Dialog>
+          <Dialog
+            open={userTopDialogOpen}
+            onClose={() => setUserTopDialogOpen(false)}
+            fullWidth
+            maxWidth="sm"
+          >
+            <DialogTitle>
+              Topp 5 standardtekster – {userTopDialogTitle}
+            </DialogTitle>
+            <DialogContent dividers>
+              {userTopLoading ? (
+                <Typography color="text.secondary">Laster…</Typography>
+              ) : userTopError ? (
+                <Typography color="error">{userTopError}</Typography>
+              ) : userTopItems.length === 0 ? (
+                <Typography color="text.secondary">Ingen data i valgt periode.</Typography>
+              ) : (
+                <List dense>
+                  {userTopItems.map((it, idx) => (
+                    <ListItem key={`${idx}-${it.title}`} disableGutters>
+                      <ListItemText primary={`${idx + 1}. ${it.title} (${it.opens})`} />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setUserTopDialogOpen(false)}>Lukk</Button>
+            </DialogActions>
+          </Dialog>
           <Typography color="text.secondary" sx={{ mt: 2 }}>
             Kun administratorer kan lese disse dataene.
           </Typography>

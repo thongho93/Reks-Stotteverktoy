@@ -359,6 +359,37 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   return text.replace(re, safeValue);
 }
 
+// New helpers for DATO tokens
+export function replaceNextDatoToken(text: string, value: string) {
+  // Replace ONLY the next (first) occurrence.
+  // Supports {{DATO}} and DATO
+  return text.replace(/\{\{\s*DATO\s*\}\}|\bDATO\b/i, value);
+}
+
+export function replaceDatoTokens(text: string, value: string) {
+  // Replace ALL occurrences.
+  // Supports {{DATO}} and DATO
+  return text.replace(/\{\{\s*DATO\s*\}\}|\bDATO\b/gi, value);
+}
+
+export function templateHasDatoToken(text: string): boolean {
+  return /\{\{\s*DATO\s*\}\}|\bDATO\b/i.test(text);
+}
+
+export function templateHasDatoMndToken(text: string): boolean {
+  return /\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/i.test(text ?? "");
+}
+
+export function replaceDatoMndTokens(text: string, value: string) {
+  if (!text) return text;
+  return text.replace(/\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/gi, value);
+}
+
+export function replaceNextDatoMndToken(text: string, value: string) {
+  if (!text) return text;
+  return text.replace(/\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/i, value);
+}
+
 export function usePreparatRows() {
   const [preparatRows, setPreparatRows] = useState<PreparatRow[]>([{ id: 0, picked: null }]);
 
@@ -469,4 +500,7 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
 
   { label: "VAREN(E)", insert: "VAREN(E)", group: "VARE" },
+
+  { label: "DATO", insert: "DATO", help: "Dato (DD.MM.YYYY)", group: "ANNET" },
+  { label: "DATO_MND", insert: "DATO_MND", help: "Måned/år (MM.YYYY)", group: "ANNET" },
 ];

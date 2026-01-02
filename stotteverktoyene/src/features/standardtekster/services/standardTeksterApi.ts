@@ -7,6 +7,8 @@ import {
   serverTimestamp,
   updateDoc,
   deleteDoc,
+  setDoc,
+  increment,
 } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import type { StandardTekst, UpdateStandardTekstDto } from "../types";
@@ -67,6 +69,30 @@ export const standardTeksterApi = {
   async remove(id: string): Promise<void> {
     const ref = doc(db, COL_NAME, id);
     await deleteDoc(ref);
+  },
+
+  async trackUsage(params: {
+    uid: string;
+    standardtekstId: string;
+  }): Promise<void> {
+    const { uid, standardtekstId } = params;
+
+    const ref = doc(
+      db,
+      "users",
+      uid,
+      "standardtekstUsage",
+      standardtekstId
+    );
+
+    await setDoc(
+      ref,
+      {
+        clicks: increment(1),
+        lastUsedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
   },
 };
 
