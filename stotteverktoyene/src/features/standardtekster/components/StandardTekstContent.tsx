@@ -79,6 +79,7 @@ export default function StandardTekstContent({
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const didInitNewStandardtekstContentRef = useRef(false);
 
   const [tokenPickerOpen, setTokenPickerOpen] = useState(false);
   const [tokenPickerAnchor, setTokenPickerAnchor] = useState<HTMLElement | null>(null);
@@ -90,6 +91,49 @@ export default function StandardTekstContent({
   const [tokenActiveIndex, setTokenActiveIndex] = useState(0);
 
   const TOKEN_OPTIONS = useMemo(() => STANDARDTEKST_TOKEN_DEFS, []);
+
+  const DEFAULT_NEW_STANDARDTEKST_CONTENT =
+    "Hei, og takk for at du har valgt Farmasiet til å levere dine reseptvarer.\n\n" +
+    "\n" +
+    "Vennlig hilsen\n" +
+    "XX, farmasøyt\n" +
+    "Farmasiet";
+  const DEFAULT_NEW_STANDARDTEKST_CURSOR_POS = Math.max(
+    0,
+    DEFAULT_NEW_STANDARDTEKST_CONTENT.indexOf("\n\n") + 2
+  );
+
+  useEffect(() => {
+    // Reset the one-time flag when we leave editing or change selection away from "Ny standardtekst"
+    if (!isEditing || !selected || selected.title !== "Ny standardtekst") {
+      didInitNewStandardtekstContentRef.current = false;
+    }
+  }, [isEditing, selected]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    if (!selected || selected.title !== "Ny standardtekst") return;
+    if (didInitNewStandardtekstContentRef.current) return;
+    if (draftContent.trim().length > 0) {
+      // Don't overwrite existing content, but still consider this "initialized"
+      didInitNewStandardtekstContentRef.current = true;
+      return;
+    }
+
+    didInitNewStandardtekstContentRef.current = true;
+    onDraftContentChange(DEFAULT_NEW_STANDARDTEKST_CONTENT);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = contentInputRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(
+          DEFAULT_NEW_STANDARDTEKST_CURSOR_POS,
+          DEFAULT_NEW_STANDARDTEKST_CURSOR_POS
+        );
+      });
+    });
+  }, [isEditing, selected, draftContent, onDraftContentChange]);
 
   const filteredTokenOptions = useMemo(() => {
     const q = tokenQuery.trim().toLowerCase();
@@ -338,7 +382,8 @@ export default function StandardTekstContent({
                     fullWidth
                     size="small"
                     label="Overskrift"
-                    value={draftTitle}
+                    value={selected && selected.title === "Ny standardtekst" ? "" : draftTitle}
+                    placeholder="F.eks. Hyppig uttak…"
                     onChange={(e) => onDraftTitleChange(e.target.value)}
                     inputRef={titleInputRef}
                     className={styles.editorTitleField}

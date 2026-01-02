@@ -95,6 +95,13 @@ export default function StandardTekstPage() {
   const standardTekstSearchInputRef = useRef<HTMLInputElement | null>(null);
   const preserveInputsOnNextSelectRef = useRef(false);
 
+  const DEFAULT_NEW_STANDARDTEKST_CONTENT =
+    "Hei, og takk for at du har valgt Farmasiet til å levere dine reseptvarer.\n\n" +
+    "\n" +
+    "Vennlig hilsen\n" +
+    "XX, farmasøyt\n" +
+    "Farmasiet";
+
   // For auto-focus glow effect on preparat / standardtekst search inputs
   const [autoFocusGlowTarget, setAutoFocusGlowTarget] = useState<"standard" | "preparat" | null>(
     null
@@ -244,7 +251,18 @@ export default function StandardTekstPage() {
     }
 
     return out;
-  }, [selected, firstName, pickedPreparats, tallByIndex, formattedDato, formattedDatoMnd, formattedDatoMndName, effectiveDato, normalizedDato, normalizedDatoMnd]);
+  }, [
+    selected,
+    firstName,
+    pickedPreparats,
+    tallByIndex,
+    formattedDato,
+    formattedDatoMnd,
+    formattedDatoMndName,
+    effectiveDato,
+    normalizedDato,
+    normalizedDatoMnd,
+  ]);
 
   // Preview content with preparats and tall
   const previewContent = useMemo(() => {
@@ -266,7 +284,12 @@ export default function StandardTekstPage() {
     setIsEditing(shouldAutoEditNew);
     setDraftTitle(selected?.title ?? "");
     setDraftCategory(selected?.category ?? "");
-    setDraftContent(selected?.content ?? "");
+    if (shouldAutoEditNew) {
+      const base = selected?.content ?? "";
+      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
+    } else {
+      setDraftContent(selected?.content ?? "");
+    }
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
@@ -313,7 +336,12 @@ export default function StandardTekstPage() {
     if (!selected) return;
     setDraftTitle(selected.title ?? "");
     setDraftCategory(selected.category ?? "");
-    setDraftContent(selected.content ?? "");
+    if (selected.title === "Ny standardtekst") {
+      const base = selected.content ?? "";
+      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
+    } else {
+      setDraftContent(selected.content ?? "");
+    }
     setDraftFollowUps((selected.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
@@ -403,7 +431,8 @@ export default function StandardTekstPage() {
       // Start editing right away
       setDraftTitle(localItem.title);
       setDraftCategory(localItem.category ?? "");
-      setDraftContent(localItem.content);
+      const base = localItem.content ?? "";
+      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
       setIsEditing(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved opprettelse";
@@ -893,102 +922,107 @@ export default function StandardTekstPage() {
                 })()}
               </Paper>
             )}
-            {selected && (templateHasDatoToken(selected.content) || templateHasDatoMndToken(selected.content)) && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mt: 1,
-                  mb: 1.5,
-                  p: 1.25,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 2,
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                  Dato i teksten
-                </Typography>
-
-                <Box
+            {selected &&
+              (templateHasDatoToken(selected.content) ||
+                templateHasDatoMndToken(selected.content)) && (
+                <Paper
+                  elevation={0}
                   sx={{
-                    display: "grid",
-                    gap: 1,
-                    gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) 170px 170px" },
-                    alignItems: "start",
+                    mt: 1,
+                    mb: 1.5,
+                    p: 1.25,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 2,
                   }}
                 >
-                  <TextField
-                    label="Dato eller Måned"
-                    value={datoInput}
-                    onChange={(e) => {
-                      const nextRaw = e.target.value;
-                      const digits = nextRaw.replace(/\D/g, "");
-
-                      if (digits.length === 8) {
-                        const dd = digits.slice(0, 2);
-                        const mm = digits.slice(2, 4);
-                        const yyyy = digits.slice(4, 8);
-                        setDatoInput(`${dd}.${mm}.${yyyy}`);
-                        return;
-                      }
-
-                      if (digits.length === 6) {
-                        const mm = digits.slice(0, 2);
-                        const yyyy = digits.slice(2, 6);
-                        setDatoInput(`${mm}.${yyyy}`);
-                        return;
-                      }
-
-                      setDatoInput(nextRaw);
-                    }}
-                    placeholder="f.eks. 30.12.2025 eller 12.2025"
-                    size="small"
-                    inputProps={{ inputMode: "numeric" }}
-                    helperText={"Tips: Skriv eller velg dato / måned." }
-                  />
-                  <TextField
-                    label="Velg dato"
-                    type="date"
-                    size="small"
-                    value={
-                      normalizedDato
-                        ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(2, 4)}-${normalizedDato.slice(0, 2)}`
-                        : ""
-                    }
-                    onChange={(e) => handleDatoPicker(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField
-                    label="Velg måned"
-                    type="month"
-                    size="small"
-                    value={
-                      formattedDatoMnd
-                        ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const iso = e.target.value; // YYYY-MM
-                      const m = (iso ?? "").match(/^(\d{4})-(\d{2})$/);
-                      if (!m) return;
-                      const [, yyyy, mm] = m;
-                      setDatoInput(`${mm}.${yyyy}`);
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Box>
-
-                {!normalizedDato && !normalizedDatoMnd && datoInput.trim() ? (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mt: 0.75 }}
-                  >
-                    Ugyldig datoformat. Bruk DDMMYYYY (8 siffer) eller MMYYYY (6 siffer).
+                  <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                    Dato i teksten
                   </Typography>
-                ) : null}
-              </Paper>
-            )}
+
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gap: 1,
+                      gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) 170px 170px" },
+                      alignItems: "start",
+                    }}
+                  >
+                    <TextField
+                      label="Dato eller Måned"
+                      value={datoInput}
+                      onChange={(e) => {
+                        const nextRaw = e.target.value;
+                        const digits = nextRaw.replace(/\D/g, "");
+
+                        if (digits.length === 8) {
+                          const dd = digits.slice(0, 2);
+                          const mm = digits.slice(2, 4);
+                          const yyyy = digits.slice(4, 8);
+                          setDatoInput(`${dd}.${mm}.${yyyy}`);
+                          return;
+                        }
+
+                        if (digits.length === 6) {
+                          const mm = digits.slice(0, 2);
+                          const yyyy = digits.slice(2, 6);
+                          setDatoInput(`${mm}.${yyyy}`);
+                          return;
+                        }
+
+                        setDatoInput(nextRaw);
+                      }}
+                      placeholder="f.eks. 30.12.2025 eller 12.2025"
+                      size="small"
+                      inputProps={{ inputMode: "numeric" }}
+                      helperText={"Tips: Skriv eller velg dato / måned."}
+                    />
+                    <TextField
+                      label="Velg dato"
+                      type="date"
+                      size="small"
+                      value={
+                        normalizedDato
+                          ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
+                              2,
+                              4
+                            )}-${normalizedDato.slice(0, 2)}`
+                          : ""
+                      }
+                      onChange={(e) => handleDatoPicker(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                    <TextField
+                      label="Velg måned"
+                      type="month"
+                      size="small"
+                      value={
+                        formattedDatoMnd
+                          ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const iso = e.target.value; // YYYY-MM
+                        const m = (iso ?? "").match(/^(\d{4})-(\d{2})$/);
+                        if (!m) return;
+                        const [, yyyy, mm] = m;
+                        setDatoInput(`${mm}.${yyyy}`);
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Box>
+
+                  {!normalizedDato && !normalizedDatoMnd && datoInput.trim() ? (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mt: 0.75 }}
+                    >
+                      Ugyldig datoformat. Bruk DDMMYYYY (8 siffer) eller MMYYYY (6 siffer).
+                    </Typography>
+                  ) : null}
+                </Paper>
+              )}
           </Box>
 
           {lockBeforeEdit && (
