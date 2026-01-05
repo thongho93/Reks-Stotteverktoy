@@ -20,12 +20,19 @@ function TabPanel(props: { children?: React.ReactNode; index: number; value: num
   return (
     <div
       role="tabpanel"
-      hidden={value !== index}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: value === index ? "flex" : "none",
+        flexDirection: "column",
+      }}
       id={`rekspert-tabpanel-${index}`}
       aria-labelledby={`rekspert-tab-${index}`}
       {...other}
     >
-      {value === index ? <Box sx={{ pt: 2 }}>{children}</Box> : null}
+      <Box sx={{ pt: 2, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {children}
+      </Box>
     </div>
   );
 }
@@ -34,7 +41,17 @@ export default function RekspertPage() {
   const [tab, setTab] = React.useState(0);
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box
+      sx={{
+        width: "100%",
+        height: "95vh",
+        flex: 1,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+      }}
+    >
       <Typography variant="h4" sx={{ mb: 2 }}>
         Rekspert
       </Typography>
@@ -68,7 +85,10 @@ export default function RekspertPage() {
           <Box
             sx={{
               width: "100%",
-              height: "calc(100vh - 240px)",
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
               borderRadius: 2,
               overflow: "hidden",
               border: "1px solid",
@@ -79,7 +99,7 @@ export default function RekspertPage() {
             <iframe
               title="Rekspert spreadsheet"
               src={SPREADSHEET_IFRAME_SRC}
-              style={{ width: "100%", height: "100%", border: 0 }}
+              style={{ width: "100%", flex: 1, border: 0 }}
             />
           </Box>
         ) : (

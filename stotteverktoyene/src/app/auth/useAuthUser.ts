@@ -94,8 +94,7 @@ export function useAuthUser() {
           if (!owner && rootOwnerSnap && typeof rootOwnerSnap.data === "function") {
             const rootData = rootOwnerSnap.exists() ? (rootOwnerSnap.data() as any) : null;
             const rolesMap = rootData?.roles;
-            const roleValue =
-              rolesMap && typeof rolesMap === "object" ? rolesMap[u.uid] : undefined;
+            const roleValue = rolesMap && typeof rolesMap === "object" ? rolesMap[u.uid] : undefined;
             rekspert = roleValue === "rekspert";
           }
 

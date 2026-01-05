@@ -36,12 +36,13 @@ import ConstructionIcon from "@mui/icons-material/Construction";
 import RekspertPage from "../features/rekspert/RekspertPage";
 import MsalProviderWrapper from "./auth/MsalProviderWrapper";
 import TeamsChatPage from "../features/teamsChat/page/TeamsChatPage";
+import RequireRekspert from "./auth/RequireRekspert";
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const { role } = useAuthUser();
+  const { isOwner, isRekspert } = useAuthUser();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -61,7 +62,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   ];
 
   const adminItems =
-    role === "rekspert" || role === "owner"
+    isRekspert || isOwner
       ? [
           {
             label: "Rekspert",
@@ -223,12 +224,10 @@ function Layout() {
 
   const location = useLocation();
 
-  // Log one app_open per successful authenticated app load
   React.useEffect(() => {
     logUsage("app_open");
   }, []);
 
-  // Log page views on route changes
   React.useEffect(() => {
     const pathname = location.pathname;
     const page = pathname.startsWith("/standardtekster")
@@ -257,7 +256,9 @@ function Layout() {
           <Route path="/statistikk" element={<StatistikkPage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
           <Route path="/anbrudd" element={<AndbruddPage />} />
-          <Route path="/rekspert" element={<RekspertPage />} />
+          <Route element={<RequireRekspert />}>
+            <Route path="/rekspert" element={<RekspertPage />} />
+          </Route>
           <Route
             path="/teams-chat"
             element={
