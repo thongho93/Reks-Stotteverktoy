@@ -287,8 +287,11 @@ export function formatPreparatForTemplate(med: {
 
 export function replaceNextPreparatToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
-  // Supports PREPARAT1, PREPARAT2, PREPARAT1, PREPARAT2
-  return text.replace(/\b(PREPARAT2|PREPARAT1)\b/, value);
+  // Supports both raw tokens and moustache tokens:
+  //  - PREPARAT, PREPARAT1, PREPARAT2
+  //  - {{ PREPARAT }}, {{ PREPARAT1 }}, {{ PREPARAT2 }}
+  // NOTE: We intentionally keep this as a *single* replacement (no /g).
+  return text.replace(/\{\{\s*(PREPARAT2|PREPARAT1|PREPARAT)\s*\}\}|\b(PREPARAT2|PREPARAT1|PREPARAT)\b/i, value);
 }
 
 export const replaceVareTokenByCount = (text: string, count: number): string => {

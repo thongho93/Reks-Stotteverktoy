@@ -20,20 +20,40 @@ type BuildArgs = {
 const usesPrimarySecondaryTokens = (text: string) =>
   /\{\{\s*PREPARAT[12]\s*\}\}|\bPREPARAT[12]\b/.test(text);
 
+const hasPreparat2Token = (text: string) => /\{\{\s*PREPARAT2\s*\}\}|\bPREPARAT2\b/.test(text);
+
 export const replaceFirstName = (text: string, firstName?: string | null) => {
   if (!firstName) return text;
   return text.replace(/\bXX\b/g, firstName);
 };
 
-export const buildDisplayContent = ({ template, firstName, picked, dato, datoMnd }: BuildArgs): string => {
+export const buildDisplayContent = ({
+  template,
+  firstName,
+  picked,
+  dato,
+  datoMnd,
+}: BuildArgs): string => {
   let text = template ?? "";
 
   text = replaceFirstName(text, firstName);
 
   if (usesPrimarySecondaryTokens(text)) {
-    const primary = picked[0] ?? null;
-    const secondary = picked[1] ?? null;
-    text = replacePreparatTokensPrimarySecondary(text, primary, secondary);
+    // Only use primary/secondary split if the template actually contains PREPARAT2.
+    if (hasPreparat2Token(text)) {
+      // PREPARAT2 = siste, PREPARAT1 = resten (liste)
+      const secondary = picked.length ? (picked[picked.length - 1] ?? null) : null;
+      const primaryList = picked.length > 1 ? picked.slice(0, -1) : picked;
+      const primary = primaryList.length ? formatPreparatList(primaryList) : null;
+
+      text = replacePreparatTokensPrimarySecondary(text, primary, secondary);
+    } else {
+      // Template uses PREPARAT1 only. In that case PREPARAT1 should represent the full list.
+      const list = formatPreparatList(picked);
+      if (list) {
+        text = replacePreparatTokenWithList(text, list);
+      }
+    }
   } else {
     const list = formatPreparatList(picked);
     if (list) {
@@ -69,4 +89,4 @@ export const buildPreviewContent = ({ template, firstName, picked }: BuildArgs):
 };
 
 export const templateUsesPreparat1 = (template: string): boolean =>
-  usesPrimarySecondaryTokens(template ?? "");
+  hasPreparat2Token(template ?? "");

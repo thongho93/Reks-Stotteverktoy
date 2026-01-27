@@ -231,43 +231,6 @@ export default function StandardTekstPage() {
     }
   };
 
-  // Bygg innhold med preparater og tall
-  const displayContent = useMemo(() => {
-    if (!selected) return "";
-
-    const base = buildDisplayContent({
-      template: selected.content,
-      firstName,
-      picked: pickedPreparats,
-      dato: effectiveDato,
-      datoMnd: formattedDatoMnd,
-    });
-
-    if (!templateHasTallToken(selected.content)) return base;
-
-    // Replace each TALL token individually (TALL, TALL1, TALL2...)
-    let out = base;
-    for (const idx of getTallTokenIndices(selected.content)) {
-      const v = (tallByIndex[idx] ?? "").trim();
-      // If user hasn't filled it, keep token in place (copy will be blocked)
-      if (!v) continue;
-      out = replaceTallTokenByIndex(out, idx, v);
-    }
-
-    return out;
-  }, [
-    selected,
-    firstName,
-    pickedPreparats,
-    tallByIndex,
-    formattedDato,
-    formattedDatoMnd,
-    formattedDatoMndName,
-    effectiveDato,
-    normalizedDato,
-    normalizedDatoMnd,
-  ]);
-
   // Preview content with preparats and tall
   const previewContent = useMemo(() => {
     if (!selected) return "";
@@ -630,7 +593,25 @@ export default function StandardTekstPage() {
       }
     }
 
-    const text = (displayContent ?? "").trim();
+    // Build the text fresh at copy-time to avoid stale memoized content.
+    let text = buildDisplayContent({
+      template: selected.content,
+      firstName,
+      picked: pickedPreparats,
+      dato: effectiveDato,
+      datoMnd: formattedDatoMnd,
+    });
+
+    // Replace each TALL token individually (TALL, TALL1, TALL2…)
+    if (templateHasTallToken(selected.content)) {
+      for (const idx of getTallTokenIndices(selected.content)) {
+        const v = (tallByIndex[idx] ?? "").trim();
+        if (!v) continue;
+        text = replaceTallTokenByIndex(text, idx, v);
+      }
+    }
+
+    text = (text ?? "").trim();
     if (!text) return;
 
     try {
