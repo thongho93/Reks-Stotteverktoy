@@ -462,7 +462,7 @@ export function formatPreparatList(values: Array<string | null | undefined>): st
 }
 
 export function replacePreparatTokenWithList(text: string, listValue: string) {
-  return text.replace(/\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g, listValue);
+  return text.replace(/\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b|\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g, listValue);
 }
 
 export function replacePreparatTokensPrimarySecondary(
