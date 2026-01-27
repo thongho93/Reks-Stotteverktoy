@@ -15,19 +15,22 @@ type BuildArgs = {
   datoMnd?: string | null;
 };
 
+// We consider the template to be in "primary/secondary" mode if it contains PREPARAT1 or PREPARAT2,
+// either as raw tokens (PREPARAT1) or moustache tokens ({{ PREPARAT1 }}).
+const usesPrimarySecondaryTokens = (text: string) =>
+  /\{\{\s*PREPARAT[12]\s*\}\}|\bPREPARAT[12]\b/.test(text);
+
 export const replaceFirstName = (text: string, firstName?: string | null) => {
   if (!firstName) return text;
   return text.replace(/\bXX\b/g, firstName);
 };
-
-const usesSecondaryToken = (text: string) => /\{\{\s*PREPARAT1\s*\}\}/.test(text);
 
 export const buildDisplayContent = ({ template, firstName, picked, dato, datoMnd }: BuildArgs): string => {
   let text = template ?? "";
 
   text = replaceFirstName(text, firstName);
 
-  if (usesSecondaryToken(text)) {
+  if (usesPrimarySecondaryTokens(text)) {
     const primary = picked[0] ?? null;
     const secondary = picked[1] ?? null;
     text = replacePreparatTokensPrimarySecondary(text, primary, secondary);
@@ -66,4 +69,4 @@ export const buildPreviewContent = ({ template, firstName, picked }: BuildArgs):
 };
 
 export const templateUsesPreparat1 = (template: string): boolean =>
-  usesSecondaryToken(template ?? "");
+  usesPrimarySecondaryTokens(template ?? "");

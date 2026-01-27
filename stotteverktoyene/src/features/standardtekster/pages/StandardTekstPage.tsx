@@ -104,7 +104,7 @@ export default function StandardTekstPage() {
 
   // For auto-focus glow effect on preparat / standardtekst search inputs
   const [autoFocusGlowTarget, setAutoFocusGlowTarget] = useState<"standard" | "preparat" | null>(
-    null
+    null,
   );
 
   const triggerGlow = (target: "standard" | "preparat") => {
@@ -160,7 +160,7 @@ export default function StandardTekstPage() {
 
   const pickedPreparats = useMemo(
     () => preparatRows.map((r) => r.picked).filter(Boolean) as string[],
-    [preparatRows]
+    [preparatRows],
   );
 
   const normalizedDato = useMemo(() => {
@@ -225,6 +225,10 @@ export default function StandardTekstPage() {
     if (!m) return;
     const [, yyyy, mm, dd] = m;
     setDatoInput(`${dd}.${mm}.${yyyy}`);
+
+    if (errorLocal?.startsWith("Fyll inn dato") || errorLocal?.startsWith("Fyll inn måned/år")) {
+      setErrorLocal(null);
+    }
   };
 
   // Bygg innhold med preparater og tall
@@ -393,8 +397,8 @@ export default function StandardTekstPage() {
                 followUps: followUpsToSave,
                 updatedAt: new Date(),
               }
-            : it
-        )
+            : it,
+        ),
       );
 
       // Sync local draft + clear add-form
@@ -451,7 +455,7 @@ export default function StandardTekstPage() {
       "Kunden har spørsmål",
       "Annet",
     ],
-    []
+    [],
   );
 
   const followUpOptions = useMemo(() => {
@@ -902,9 +906,18 @@ export default function StandardTekstPage() {
                               key={idx}
                               label={tokenLabel}
                               value={v}
-                              onChange={(e) =>
-                                setTallByIndex((prev) => ({ ...prev, [idx]: e.target.value }))
-                              }
+                              onChange={(e) => {
+                                const nextValue = e.target.value;
+                                setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+
+                                if (
+                                  errorLocal?.startsWith(
+                                    "Fyll inn tallfeltet før du kopierer teksten",
+                                  )
+                                ) {
+                                  setErrorLocal(null);
+                                }
+                              }}
                               size="small"
                               type="number"
                               inputProps={{ inputMode: "numeric" }}
@@ -955,6 +968,13 @@ export default function StandardTekstPage() {
                         const nextRaw = e.target.value;
                         const digits = nextRaw.replace(/\D/g, "");
 
+                        if (
+                          errorLocal?.startsWith("Fyll inn dato") ||
+                          errorLocal?.startsWith("Fyll inn måned/år")
+                        ) {
+                          setErrorLocal(null);
+                        }
+
                         if (digits.length === 8) {
                           const dd = digits.slice(0, 2);
                           const mm = digits.slice(2, 4);
@@ -985,7 +1005,7 @@ export default function StandardTekstPage() {
                         normalizedDato
                           ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
                               2,
-                              4
+                              4,
                             )}-${normalizedDato.slice(0, 2)}`
                           : ""
                       }
@@ -1007,6 +1027,13 @@ export default function StandardTekstPage() {
                         if (!m) return;
                         const [, yyyy, mm] = m;
                         setDatoInput(`${mm}.${yyyy}`);
+
+                        if (
+                          errorLocal?.startsWith("Fyll inn dato") ||
+                          errorLocal?.startsWith("Fyll inn måned/år")
+                        ) {
+                          setErrorLocal(null);
+                        }
                       }}
                       InputLabelProps={{ shrink: true }}
                     />
@@ -1060,7 +1087,7 @@ export default function StandardTekstPage() {
                 }),
                 datoValue: effectiveDato,
                 datoMndValue: formattedDatoMnd,
-              }
+              },
             )}
             editorTools={
               isAdmin ? (
