@@ -154,6 +154,50 @@ export default function StandardTekstPage() {
     }
   }, [clearOnCopy]);
   const [showGuide, setShowGuide] = useState(false);
+
+  const [includeManufacturerInPreparatText, setIncludeManufacturerInPreparatText] =
+    useState<boolean>(() => {
+      try {
+        const raw = localStorage.getItem("standardtekster.includeManufacturerInPreparatText");
+        return raw === "true";
+      } catch {
+        return false;
+      }
+    });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "standardtekster.includeManufacturerInPreparatText",
+        String(includeManufacturerInPreparatText),
+      );
+    } catch {
+      // ignore
+    }
+  }, [includeManufacturerInPreparatText]);
+
+  const [includePackSizeInPreparatText, setIncludePackSizeInPreparatText] = useState<boolean>(
+    () => {
+      try {
+        const raw = localStorage.getItem("standardtekster.includePackSizeInPreparatText");
+        return raw === "true";
+      } catch {
+        return false;
+      }
+    },
+  );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "standardtekster.includePackSizeInPreparatText",
+        String(includePackSizeInPreparatText),
+      );
+    } catch {
+      // ignore
+    }
+  }, [includePackSizeInPreparatText]);
+
   const [draftFollowUps, setDraftFollowUps] = useState<StandardTekstFollowUp[]>([]);
   const [followUpPick, setFollowUpPick] = useState<{ id: string; title: string } | null>(null);
   const [followUpLabel, setFollowUpLabel] = useState<string>("");
@@ -755,6 +799,32 @@ export default function StandardTekstPage() {
               label={<Typography variant="caption">Tøm etter kopiering</Typography>}
             />
           </Tooltip>
+          <Tooltip title="Når dette er på, settes produsentnavn inn i teksten (f.eks. Metformin Sandoz).">
+            <FormControlLabel
+              sx={{ ml: 1 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={includeManufacturerInPreparatText}
+                  onChange={(e) => setIncludeManufacturerInPreparatText(e.target.checked)}
+                />
+              }
+              label={<Typography variant="caption">Vis produsent i tekst</Typography>}
+            />
+          </Tooltip>
+          <Tooltip title="Når dette er på, tas pakningsstørrelse med i teksten (f.eks. ... 60).">
+            <FormControlLabel
+              sx={{ ml: 1 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={includePackSizeInPreparatText}
+                  onChange={(e) => setIncludePackSizeInPreparatText(e.target.checked)}
+                />
+              }
+              label={<Typography variant="caption">Vis pakningsstørrelse</Typography>}
+            />
+          </Tooltip>
           <Button
             variant="text"
             size="small"
@@ -837,9 +907,15 @@ export default function StandardTekstPage() {
             >
               <PreparatPanel
                 preparatRows={preparatRows}
+                includeManufacturerInText={includeManufacturerInPreparatText}
+                includePackSizeInText={includePackSizeInPreparatText}
                 inputRef={preparatSearchInputRef}
-                onPickText={(text) => {
-                  addPickedPreparat(text);
+                onPickText={(pick) => {
+                  const text = typeof pick === "string" ? pick : pick.text;
+                  const key = typeof pick === "string" ? pick : pick.key;
+
+                  addPickedPreparat(text, key);
+
                   if (isEditing) {
                     setDraftContent((prev) => replaceNextPreparatToken(prev, text));
                   }

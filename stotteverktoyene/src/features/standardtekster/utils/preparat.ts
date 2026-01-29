@@ -44,7 +44,7 @@ const MANUFACTURER_TOKENS = new Set(
     "abbvie",
     "bms",
     "boehringer",
-  ].map((s) => s.toLowerCase())
+  ].map((s) => s.toLowerCase()),
 );
 
 const COMPANY_SUFFIX_TOKENS = new Set(
@@ -66,7 +66,7 @@ const COMPANY_SUFFIX_TOKENS = new Set(
     "inc",
     "gmbh",
     "ag",
-  ].map((s) => s.toLowerCase())
+  ].map((s) => s.toLowerCase()),
 );
 
 const DOSAGE_FORM_TOKENS = new Set(
@@ -101,7 +101,7 @@ const DOSAGE_FORM_TOKENS = new Set(
     "enterodepottab",
     "enterokaps",
     "spr",
-  ].map((s) => s.toLowerCase())
+  ].map((s) => s.toLowerCase()),
 );
 
 function stripDosageFormFromName(name: string): string {
@@ -130,7 +130,7 @@ function stripManufacturerFromName(name: string, producer?: string | null): stri
       .trim()
       .split(" ")
       .map((t) => t.replace(/[()\[\]{},.;:&]+/g, "").toLowerCase())
-      .filter(Boolean)
+      .filter(Boolean),
   );
 
   const isProducerToken = (key: string) => producerTokens.has(key);
@@ -163,12 +163,59 @@ function stripManufacturerFromName(name: string, producer?: string | null): stri
   return result || name.trim();
 }
 
+export function formatPreparatRowText(
+  row: {
+    baseText: string | null;
+    fullName: string | null;
+    manufacturer: string | null;
+    packSize: string | null;
+  },
+  opts: { includeManufacturer: boolean; includePackSize: boolean },
+): string {
+  const baseText = (row.baseText ?? "").trim();
+  if (!baseText) return "";
+
+  const manufacturer = (row.manufacturer ?? "").trim();
+  const fullName = (row.fullName ?? "").trim();
+  const packSize = (row.packSize ?? "").trim();
+
+  let out = baseText;
+
+  // Manufacturer toggle (independent)
+  if (opts.includeManufacturer) {
+    if (manufacturer) {
+      const baseLower = baseText.toLowerCase();
+      const mLower = manufacturer.toLowerCase();
+      if (!baseLower.includes(mLower)) out = `${out} ${manufacturer}`.trim();
+    } else if (fullName) {
+      // Some sources only expose manufacturer inside the full name.
+      out = fullName;
+    }
+  }
+
+  // Pack size toggle (independent)
+  if (opts.includePackSize && packSize) {
+    if (!new RegExp(`\\s${packSize}\\s*$`).test(out)) {
+      out = `${out} ${packSize}`.trim();
+    }
+  }
+
+  // If pack size is OFF and we ended up using fullName, strip trailing pack size
+  if (!opts.includePackSize && fullName && out === fullName) {
+    out = out.replace(/\s+\d+\s*$/g, "").trim();
+  }
+
+  return out;
+}
+
 export function formatPreparatForTemplate(med: {
   varenavn: string | null;
-  navnFormStyrke: string | null;
+  // Sources differ; support both spellings.
+  navnForStyrke?: string | null;
+  navnFormStyrke?: string | null;
   produsent?: string | null;
 }): string {
-  const nfsRaw = (med.navnFormStyrke ?? "").trim();
+  const nfsRaw = (med.navnForStyrke ?? med.navnFormStyrke ?? "").trim();
   const nfs = nfsRaw.replace(/\s+/g, " ").trim();
 
   // Try to extract the first strength-like fragment.
@@ -184,12 +231,12 @@ export function formatPreparatForTemplate(med: {
 
   // 1) Ratio strength where unit comes after the second number, e.g. "80/4,5mcg"
   const ratioTrailingUnit = nfs.match(
-    new RegExp(`(\\d+[.,]?\\d*\\s*\\/\\s*\\d+[.,]?\\d*\\s*(?:${unit}))(?:\\b)?(?=,\\s|$)`, "i")
+    new RegExp(`(\\d+[.,]?\\d*\\s*\\/\\s*\\d+[.,]?\\d*\\s*(?:${unit}))(?:\\b)?(?=,\\s|$)`, "i"),
   );
 
   // 2) Regular pattern where the first number has a unit, optionally followed by "/..."
   const regular = nfs.match(
-    new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*[^;\\)\\n]+?)?)(?=,\\s|$)`, "i")
+    new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*[^;\\)\\n]+?)?)(?=,\\s|$)`, "i"),
   );
 
   // 0) Percentage strengths like "40 % w/v" / "40% w/v" / "5 % v/v"
@@ -291,7 +338,10 @@ export function replaceNextPreparatToken(text: string, value: string) {
   //  - PREPARAT, PREPARAT1, PREPARAT2
   //  - {{ PREPARAT }}, {{ PREPARAT1 }}, {{ PREPARAT2 }}
   // NOTE: We intentionally keep this as a *single* replacement (no /g).
-  return text.replace(/\{\{\s*(PREPARAT2|PREPARAT1|PREPARAT)\s*\}\}|\b(PREPARAT2|PREPARAT1|PREPARAT)\b/i, value);
+  return text.replace(
+    /\{\{\s*(PREPARAT2|PREPARAT1|PREPARAT)\s*\}\}|\b(PREPARAT2|PREPARAT1|PREPARAT)\b/i,
+    value,
+  );
 }
 
 export const replaceVareTokenByCount = (text: string, count: number): string => {
@@ -304,7 +354,7 @@ export const replaceVareTokenByCount = (text: string, count: number): string => 
       // Ny anbefalt syntaks
       .replace(
         /(^|[^A-Z0-9_])VAREN\(E\)(?=[^A-Z0-9_]|$)/gi,
-        (_m, p1: string) => `${p1}${replacement}`
+        (_m, p1: string) => `${p1}${replacement}`,
       )
       .replace(/\{\{\s*VAREN\(E\)\s*\}\}/gi, replacement)
 
@@ -394,53 +444,70 @@ export function replaceNextDatoMndToken(text: string, value: string) {
 }
 
 export function usePreparatRows() {
-  const [preparatRows, setPreparatRows] = useState<PreparatRow[]>([{ id: 0, picked: null }]);
+  const [preparatRows, setPreparatRows] = useState<PreparatRow[]>([
+    { id: 0, picked: null, pickedKey: null },
+  ]);
 
   const addPreparatRow = useCallback(() => {
     setPreparatRows((prev) => {
       const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
-      return [...prev, { id: nextId, picked: null }];
+      return [...prev, { id: nextId, picked: null, pickedKey: null }];
     });
   }, []);
 
   const removePreparatRow = useCallback((id: number) => {
     setPreparatRows((prev) => {
       const next = prev.filter((r) => r.id !== id);
-      return next.length ? next : [{ id: 0, picked: null }];
+      return next.length ? next : [{ id: 0, picked: null, pickedKey: null }];
     });
   }, []);
 
-  const setPickedForRow = useCallback((id: number, picked: string | null) => {
-    setPreparatRows((prev) => prev.map((r) => (r.id === id ? { ...r, picked } : r)));
-  }, []);
+  const setPickedForRow = useCallback(
+    (id: number, picked: string | null, pickedKey?: string | null) => {
+      setPreparatRows((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                picked,
+                pickedKey: picked ? (pickedKey ?? r.pickedKey ?? picked) : null,
+              }
+            : r,
+        ),
+      );
+    },
+    [],
+  );
 
   const resetPreparatRows = useCallback(() => {
-    setPreparatRows([{ id: 0, picked: null }]);
+    setPreparatRows([{ id: 0, picked: null, pickedKey: null }]);
   }, []);
 
   const clearPreparats = useCallback(() => {
-    setPreparatRows([{ id: 0, picked: null }]);
+    setPreparatRows([{ id: 0, picked: null, pickedKey: null }]);
   }, []);
 
-  const addPickedPreparat = useCallback((picked: string) => {
+  const addPickedPreparat = useCallback((picked: string, pickedKey?: string | null) => {
     setPreparatRows((prev) => {
+      const key = String((pickedKey ?? picked).trim());
+
       const alreadyPicked = prev
-        .map((r) => r.picked)
+        .map((r) => r.pickedKey ?? r.picked)
         .filter(Boolean)
-        .includes(picked);
+        .includes(key);
 
       if (alreadyPicked) return prev;
 
       const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
       const kept = prev.filter((r) => r.picked);
-      return [...kept, { id: nextId, picked }];
+      return [...kept, { id: nextId, picked, pickedKey: key }];
     });
   }, []);
 
   const removePreparatById = useCallback((id: number) => {
     setPreparatRows((prev) => {
       const remaining = prev.filter((r) => r.id !== id);
-      return remaining.length > 0 ? remaining : [{ id: 0, picked: null }];
+      return remaining.length > 0 ? remaining : [{ id: 0, picked: null, pickedKey: null }];
     });
   }, []);
 
@@ -465,13 +532,16 @@ export function formatPreparatList(values: Array<string | null | undefined>): st
 }
 
 export function replacePreparatTokenWithList(text: string, listValue: string) {
-  return text.replace(/\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b|\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g, listValue);
+  return text.replace(
+    /\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b|\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g,
+    listValue,
+  );
 }
 
 export function replacePreparatTokensPrimarySecondary(
   text: string,
   primary: string | null | undefined,
-  secondary: string | null | undefined
+  secondary: string | null | undefined,
 ) {
   let out = text;
 

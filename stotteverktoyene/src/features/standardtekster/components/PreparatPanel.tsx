@@ -4,7 +4,6 @@ import MedicationSearch from "../../fest/components/MedicationSearch";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { formatPreparatForTemplate } from "../utils/preparat";
 
-
 type PreparatRowId = string | number;
 
 type PreparatRowLike = {
@@ -14,14 +13,18 @@ type PreparatRowLike = {
 
 type Props = {
   preparatRows: PreparatRowLike[];
+  includeManufacturerInText?: boolean;
+  includePackSizeInText?: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  onPickText: (text: string) => void;
+  onPickText: (pick: string | { text: string; key: string }) => void;
   onClear: () => void;
   onRemove: (id: PreparatRowId) => void;
 };
 
 export default function PreparatPanel({
   preparatRows,
+  includeManufacturerInText = false,
+  includePackSizeInText = false,
   inputRef,
   onPickText,
   onClear,
@@ -37,14 +40,97 @@ export default function PreparatPanel({
         </Typography>
       </Box>
 
-      <Stack direction="row" spacing={1} alignItems="flex-start" className={styles.preparatSearchRow}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="flex-start"
+        className={styles.preparatSearchRow}
+      >
         <Box className={styles.preparatSingleSearch} style={{ flex: 1 }}>
           <MedicationSearch
             inputRef={inputRef}
             onPick={(med) => {
-              const text = formatPreparatForTemplate(med);
-              if (!text) return;
-              onPickText(text);
+              const baseText = formatPreparatForTemplate(med);
+              if (!baseText) return;
+
+              // Manufacturer can be missing depending on source. When the toggle is on,
+              // fall back to using a full display name (often includes manufacturer) from the med object.
+              const manufacturer = String(
+                (med as any)?.produsent ??
+                  (med as any)?.manufacturer ??
+                  (med as any)?.leverandor ??
+                  (med as any)?.marketingAuthorizationHolder ??
+                  "",
+              ).trim();
+
+              const fullName = String(
+                (med as any)?.navnForStyrke ??
+                  (med as any)?.varenavn ??
+                  (med as any)?.name ??
+                  (med as any)?.displayName ??
+                  (med as any)?.label ??
+                  "",
+              ).trim();
+
+              const text = (() => {
+                // Helper: normalize full name (keeps manufacturer if present in the name)
+                const cleanedFullName = fullName
+                  ? fullName
+                      .replace(/(\d)\s*(mg|mcg|µg|g|ml)\b/gi, "$1 $2") // 1000mg -> 1000 mg
+                      .replace(
+                        /\b(tab|tbl|tablett|kapsel|mikstur|depottablett|depot)\b/gi,
+                        "",
+                      )
+                      .replace(/\s{2,}/g, " ")
+                      .trim()
+                  : "";
+
+                // Pack size is typically a trailing number in PIM/HV varenavn/navnForStyrke, e.g. " ... 60".
+                const packSizeMatch = cleanedFullName.match(/\s(\d+)\s*$/);
+                const packSize = packSizeMatch?.[1] ?? "";
+
+                const baseLower = baseText.toLowerCase();
+
+                let out = baseText;
+
+                // 1) Manufacturer toggle (independent)
+                if (includeManufacturerInText) {
+                  if (manufacturer) {
+                    const mLower = manufacturer.toLowerCase();
+                    if (!baseLower.includes(mLower)) {
+                      out = `${out} ${manufacturer}`.trim();
+                    }
+                  } else if (cleanedFullName) {
+                    // If we don't have a manufacturer field, prefer the cleaned full name
+                    // (it often contains manufacturer, e.g. "metformin sandoz ...").
+                    out = cleanedFullName;
+                  }
+                }
+
+                // 2) Pack size toggle (independent)
+                if (includePackSizeInText && packSize) {
+                  const outLower = out.toLowerCase();
+                  // Only append if the output doesn't already end with the pack size.
+                  if (!outLower.match(new RegExp(`\\s${packSize}\\s*$`))) {
+                    out = `${out} ${packSize}`.trim();
+                  }
+                }
+
+                // If pack size toggle is OFF and we ended up using the full name, strip trailing pack size.
+                if (!includePackSizeInText && cleanedFullName && out === cleanedFullName) {
+                  out = out.replace(/\s+\d+\s*$/g, "").trim();
+                }
+
+                return out;
+              })();
+
+              // Stabil ident for dedupe:
+              // - PIM/HV: farmaloggNumber (f.eks. 440704)
+              // - FEST: med.id (er allerede "FEST:...")
+              // Fallback til baseText kun hvis alt annet mangler.
+              const key = String((med as any)?.farmaloggNumber ?? (med as any)?.id ?? baseText);
+
+              onPickText({ text, key });
             }}
           />
         </Box>

@@ -28,4 +28,12 @@ export type StandardTekst = {
   updatedAt?: Date | null;
 };
 
-export type PreparatRow = { id: number; picked: string | null };
+export type PreparatRow = {
+  id: number;
+  // Teksten som settes inn i template (kan være produsent-strippet)
+  picked: string | null;
+
+  // Stabil ident (f.eks. varenummer) brukt til dedupe.
+  // Gjør at to ulike produkter kan ha samme picked-tekst.
+  pickedKey: string | null;
+};
