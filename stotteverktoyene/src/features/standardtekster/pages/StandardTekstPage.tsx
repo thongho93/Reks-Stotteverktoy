@@ -93,6 +93,8 @@ export default function StandardTekstPage() {
   const preparatSectionRef = useRef<HTMLDivElement | null>(null);
   const preparatSearchInputRef = useRef<HTMLInputElement | null>(null);
   const standardTekstSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const datoPickerInputRef = useRef<HTMLInputElement | null>(null);
+  const datoMndPickerInputRef = useRef<HTMLInputElement | null>(null);
   const preserveInputsOnNextSelectRef = useRef(false);
 
   const DEFAULT_NEW_STANDARDTEKST_CONTENT =
@@ -586,7 +588,7 @@ export default function StandardTekstPage() {
   // Preview for follow-up texts
   const followUpsPreview = selected?.followUps?.length ? (
     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-      {selected.followUps.map((fu) => (
+      {(selected.followUps as StandardTekstFollowUp[]).map((fu: StandardTekstFollowUp) => (
         <Chip
           key={fu.id}
           label={fu.label}
@@ -623,27 +625,14 @@ export default function StandardTekstPage() {
         return;
       }
     }
-    if (templateHasDatoToken(selected.content)) {
-      if (!normalizedDato && !normalizedDatoMnd) {
-        setErrorLocal("Fyll inn dato eller måned (DATO) før du kopierer teksten.");
-        return;
-      }
-    }
-
-    if (templateHasDatoMndToken(selected.content)) {
-      if (!normalizedDatoMnd) {
-        setErrorLocal("Fyll inn måned/år (DATO_MND) før du kopierer teksten.");
-        return;
-      }
-    }
 
     // Build the text fresh at copy-time to avoid stale memoized content.
     let text = buildDisplayContent({
       template: selected.content,
       firstName,
       picked: pickedPreparats,
-      dato: effectiveDato,
-      datoMnd: formattedDatoMnd,
+      dato: effectiveDato || undefined,
+      datoMnd: formattedDatoMnd || undefined,
     });
 
     // Replace each TALL token individually (TALL, TALL1, TALL2…)
@@ -679,6 +668,7 @@ export default function StandardTekstPage() {
         }
 
         setSearch("");
+        setDatoInput("");
       }
 
       // Focus back to preparat search for fast next use
@@ -719,6 +709,7 @@ export default function StandardTekstPage() {
           }
 
           setSearch("");
+          setDatoInput("");
         }
 
         requestAnimationFrame(() => {
@@ -1014,50 +1005,17 @@ export default function StandardTekstPage() {
                     sx={{
                       display: "grid",
                       gap: 1,
-                      gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) 170px 170px" },
+                      gridTemplateColumns: { xs: "1fr", sm: "170px 170px" },
                       alignItems: "start",
                     }}
                   >
                     <TextField
-                      label="Dato eller Måned"
-                      value={datoInput}
-                      onChange={(e) => {
-                        const nextRaw = e.target.value;
-                        const digits = nextRaw.replace(/\D/g, "");
-
-                        if (
-                          errorLocal?.startsWith("Fyll inn dato") ||
-                          errorLocal?.startsWith("Fyll inn måned/år")
-                        ) {
-                          setErrorLocal(null);
-                        }
-
-                        if (digits.length === 8) {
-                          const dd = digits.slice(0, 2);
-                          const mm = digits.slice(2, 4);
-                          const yyyy = digits.slice(4, 8);
-                          setDatoInput(`${dd}.${mm}.${yyyy}`);
-                          return;
-                        }
-
-                        if (digits.length === 6) {
-                          const mm = digits.slice(0, 2);
-                          const yyyy = digits.slice(2, 6);
-                          setDatoInput(`${mm}.${yyyy}`);
-                          return;
-                        }
-
-                        setDatoInput(nextRaw);
-                      }}
-                      placeholder="f.eks. 30.12.2025 eller 12.2025"
-                      size="small"
-                      inputProps={{ inputMode: "numeric" }}
-                      helperText={"Tips: Skriv eller velg dato / måned."}
-                    />
-                    <TextField
                       label="Velg dato"
                       type="date"
                       size="small"
+                      inputRef={datoPickerInputRef}
+                      onClick={() => datoPickerInputRef.current?.showPicker?.()}
+                      onFocus={() => datoPickerInputRef.current?.showPicker?.()}
                       value={
                         normalizedDato
                           ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
@@ -1073,6 +1031,9 @@ export default function StandardTekstPage() {
                       label="Velg måned"
                       type="month"
                       size="small"
+                      inputRef={datoMndPickerInputRef}
+                      onClick={() => datoMndPickerInputRef.current?.showPicker?.()}
+                      onFocus={() => datoMndPickerInputRef.current?.showPicker?.()}
                       value={
                         formattedDatoMnd
                           ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
@@ -1095,16 +1056,6 @@ export default function StandardTekstPage() {
                       InputLabelProps={{ shrink: true }}
                     />
                   </Box>
-
-                  {!normalizedDato && !normalizedDatoMnd && datoInput.trim() ? (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 0.75 }}
-                    >
-                      Ugyldig datoformat. Bruk DDMMYYYY (8 siffer) eller MMYYYY (6 siffer).
-                    </Typography>
-                  ) : null}
                 </Paper>
               )}
           </Box>
