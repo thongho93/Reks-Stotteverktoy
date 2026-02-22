@@ -433,6 +433,35 @@ export function templateHasDatoMndToken(text: string): boolean {
   return /\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/i.test(text ?? "");
 }
 
+export function getFormuleringTokenIndices(text: string): number[] {
+  const indices = new Set<number>();
+
+  const re = /\{\{\s*FORMULERING(\d*)\s*\}\}|\bFORMULERING(\d*)\b/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const raw = (m[1] ?? m[2] ?? "").trim();
+    if (!raw) indices.add(0);
+    else {
+      const n = Number(raw);
+      if (Number.isFinite(n)) indices.add(n);
+    }
+  }
+
+  return Array.from(indices).sort((a, b) => a - b);
+}
+
+export function replaceFormuleringTokenByIndex(text: string, index: number, value: string): string {
+  if (!text) return text;
+  const safeValue = value ?? "";
+
+  if (index === 0) {
+    return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, safeValue);
+  }
+
+  const re = new RegExp(`\\{\\{\\s*FORMULERING${index}\\s*\\}\\}|\\bFORMULERING${index}\\b`, "gi");
+  return text.replace(re, safeValue);
+}
+
 export function replaceDatoMndTokens(text: string, value: string) {
   if (!text) return text;
   return text.replace(/\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/gi, value);
@@ -568,6 +597,8 @@ export type StandardTekstTokenDef = {
 export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "PREPARAT1", insert: "PREPARAT1", help: "Første preparat", group: "PREPARAT" },
   { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat", group: "PREPARAT" },
+  { label: "VIRKESTOFF", insert: "VIRKESTOFF", help: "Virkestoff fra valgt preparat", group: "PREPARAT" },
+  { label: "FORMULERING", insert: "FORMULERING", help: "Fri tekst (f.eks. tablett/kapsel/nesespray)", group: "ANNET" },
 
   { label: "TALL", insert: "TALL", help: "Første tall", group: "TALL" },
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },

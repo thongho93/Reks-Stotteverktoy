@@ -16,7 +16,7 @@ type Props = {
   includeManufacturerInText?: boolean;
   includePackSizeInText?: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  onPickText: (pick: string | { text: string; key: string }) => void;
+  onPickText: (pick: string | { text: string; key: string; virkestoff?: string }) => void;
   onClear: () => void;
   onRemove: (id: PreparatRowId) => void;
 };
@@ -130,7 +130,14 @@ export default function PreparatPanel({
               // Fallback til baseText kun hvis alt annet mangler.
               const key = String((med as any)?.farmaloggNumber ?? (med as any)?.id ?? baseText);
 
-              onPickText({ text, key });
+              const virkestoff = String(
+                (med as any)?.virkestoff ??
+                  (med as any)?.substance ??
+                  (med as any)?.activeSubstance ??
+                  "",
+              ).trim();
+
+              onPickText({ text, key, virkestoff: virkestoff || undefined });
             }}
           />
         </Box>

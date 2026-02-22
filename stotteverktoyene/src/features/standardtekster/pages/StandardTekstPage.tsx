@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Alert,
   Autocomplete,
@@ -93,7 +93,71 @@ export default function StandardTekstPage() {
   const preparatSectionRef = useRef<HTMLDivElement | null>(null);
   const preparatSearchInputRef = useRef<HTMLInputElement | null>(null);
   const standardTekstSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const datoPickerInputRef = useRef<HTMLInputElement | null>(null);
+  const datoMndPickerInputRef = useRef<HTMLInputElement | null>(null);
   const preserveInputsOnNextSelectRef = useRef(false);
+
+  const gridRef = useRef<HTMLDivElement | null>(null);
+
+  const SIDEBAR_WIDTH_STORAGE_KEY = "standardtekster.sidebarWidth";
+  const SIDEBAR_MIN = 240;
+  const SIDEBAR_MAX = 640;
+  const SIDEBAR_DEFAULT = 340;
+
+  const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      const v = raw ? Number(raw) : NaN;
+      if (!Number.isFinite(v)) return SIDEBAR_DEFAULT;
+      return clamp(v, SIDEBAR_MIN, SIDEBAR_MAX);
+    } catch {
+      return SIDEBAR_DEFAULT;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+    } catch {
+      // ignore
+    }
+  }, [sidebarWidth]);
+
+  const isResizingSidebarRef = useRef(false);
+
+  const beginResizeSidebar = useCallback((e: React.MouseEvent) => {
+    if ((e as any).button !== 0) return; // kun venstreklikk
+    e.preventDefault();
+    e.stopPropagation();
+
+    isResizingSidebarRef.current = true;
+    document.body.classList.add("sidebar-resizing");
+
+    const move = (ev: MouseEvent) => {
+      if (!isResizingSidebarRef.current) return;
+      const rect = gridRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const next = clamp(ev.clientX - rect.left, SIDEBAR_MIN, SIDEBAR_MAX);
+      setSidebarWidth(next);
+    };
+
+    const up = () => {
+      isResizingSidebarRef.current = false;
+      document.body.classList.remove("sidebar-resizing");
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }, []);
+
+  const resetSidebarWidth = useCallback(() => {
+    setSidebarWidth(SIDEBAR_DEFAULT);
+  }, []);
 
   const DEFAULT_NEW_STANDARDTEKST_CONTENT =
     "Hei, og takk for at du har valgt Farmasiet til å levere dine reseptvarer.\n\n" +
@@ -131,11 +195,76 @@ export default function StandardTekstPage() {
 
       // Reset date input
       setDatoInput("");
+      // Reset formulering fields based on the currently selected template
+      const fIndices = getFormuleringTokenIndices(selected?.content ?? "");
+      if (fIndices.length) {
+        const nextF: Record<number, string> = {};
+        for (const i of fIndices) nextF[i] = "";
+        setFormuleringByIndex(nextF);
+      } else {
+        setFormuleringByIndex({ 0: "" });
+      }
     },
   });
 
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
   const [datoInput, setDatoInput] = useState<string>("");
+  const [formuleringByIndex, setFormuleringByIndex] = useState<Record<number, string>>({ 0: "" });
+  const templateHasVirkestoffToken = (template: string) => /\bVIRKESTOFF\b/.test(template ?? "");
+  const templateHasFormuleringTokens = (template: string) =>
+    /\{\{\s*FORMULERING\d*\s*\}\}|\bFORMULERING\d*\b/i.test(template ?? "");
+
+  const getFormuleringTokenIndices = (template: string): number[] => {
+    const indices = new Set<number>();
+    const re = /\{\{\s*FORMULERING(\d*)\s*\}\}|\bFORMULERING(\d*)\b/gi;
+    let m: RegExpExecArray | null;
+
+    while ((m = re.exec(template ?? ""))) {
+      const raw = (m[1] ?? m[2] ?? "").trim();
+      if (!raw) indices.add(0);
+      else {
+        const n = Number(raw);
+        if (Number.isFinite(n)) indices.add(n);
+      }
+    }
+
+    return Array.from(indices).sort((a, b) => a - b);
+  };
+
+  const replaceFormuleringTokenByIndex = (text: string, index: number, value: string): string => {
+    if (!text) return text;
+    const safeValue = value ?? "";
+
+    if (index === 0) {
+      return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, safeValue);
+    }
+
+    const re = new RegExp(
+      `\\{\\{\\s*FORMULERING${index}\\s*\\}\\}|\\bFORMULERING${index}\\b`,
+      "gi",
+    );
+    return text.replace(re, safeValue);
+  };
+
+  // Lagrer virkestoff knyttet til valgt preparat (mappes på selve picked-teksten)
+  const [virkestoffByPicked, setVirkestoffByPicked] = useState<Record<string, string>>({});
+
+  const resolvedVirkestoff = useMemo(() => {
+    for (const r of preparatRows as any[]) {
+      const picked = String(r?.picked ?? "").trim();
+      if (!picked) continue;
+      const v = (virkestoffByPicked[picked] ?? "").trim();
+      if (v) return v;
+    }
+
+    for (const v of Object.values(virkestoffByPicked)) {
+      const s = (v ?? "").trim();
+      if (s) return s;
+    }
+
+    return "";
+  }, [preparatRows, virkestoffByPicked]);
+
   const [copied, setCopied] = useState(false);
   const [clearOnCopy, setClearOnCopy] = useState<boolean>(() => {
     try {
@@ -280,14 +409,18 @@ export default function StandardTekstPage() {
     if (!selected) return "";
 
     // IMPORTANT: Do NOT replace TALL tokens here.
-    // We keep tokens (TALL/TALL1/...) intact so renderContentWithPreparatHighlight
-    // can render them as blue chips using `tallValues`.
-    return buildPreviewContent({
+    // We keep tokens (TALL/TALL1/…) intact so renderContentWithPreparatHighlight
+    // can render them as blue chips using tallValues.
+    let next = buildPreviewContent({
       template: selected.content,
       firstName,
       picked: pickedPreparats,
     });
-  }, [selected, firstName, pickedPreparats]);
+
+    // Do NOT replace VIRKESTOFF in previewContent; leave the token for renderer.
+
+    return next;
+  }, [selected, firstName, pickedPreparats, resolvedVirkestoff]);
 
   // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
@@ -306,6 +439,7 @@ export default function StandardTekstPage() {
     setFollowUpLabel("");
     if (!preserveInputsOnNextSelectRef.current) {
       resetPreparatRows();
+      setVirkestoffByPicked({});
       const indices = getTallTokenIndices(selected?.content ?? "");
       if (indices.length) {
         const next: Record<number, string> = {};
@@ -315,7 +449,14 @@ export default function StandardTekstPage() {
         setTallByIndex({ 0: "" });
       }
       setDatoInput("");
-
+      const fIndices = getFormuleringTokenIndices(selected?.content ?? "");
+      if (fIndices.length) {
+        const nextF: Record<number, string> = {};
+        for (const i of fIndices) nextF[i] = "";
+        setFormuleringByIndex(nextF);
+      } else {
+        setFormuleringByIndex({ 0: "" });
+      }
       // Når vi åpner en helt ny standardtekst i edit mode, skal fokus gå til overskrift-feltet
       // (StandardTekstContent håndterer dette via titleInputRef).
       if (selected && !shouldAutoEditNew) {
@@ -465,6 +606,46 @@ export default function StandardTekstPage() {
     [],
   );
 
+  const formuleringSuggestions = useMemo(
+    () => [
+      "tablett",
+      "tabletter",
+      "kapsel",
+      "kapsler",
+      "nesespray",
+      "øyedråper",
+      "ørerdråper",
+      "mikstur",
+      "sirup",
+      "dråper",
+      "sprøyte",
+      "injeksjon",
+      "inhalasjonspulver",
+      "inhalasjonsvæske",
+      "inhalator",
+      "pulver til mikstur",
+      "brusetablett",
+      "smeltetablett",
+      "depottablett",
+      "sublingvaltablett",
+      "stikkpille",
+      "krem",
+      "salve",
+      "gel",
+      "liniment",
+      "plaster",
+      "depotplaster",
+      "spray",
+      "munnskyllevæske",
+      "munnspray",
+      "sugetablett",
+      "vaginaltablett",
+      "vaginalkrem",
+      "vaginalring",
+    ],
+    [],
+  );
+
   const followUpOptions = useMemo(() => {
     // We only have access to the currently filtered list from the hook.
     // This is OK for now: users can search in the sidebar first, then add from the list.
@@ -586,7 +767,7 @@ export default function StandardTekstPage() {
   // Preview for follow-up texts
   const followUpsPreview = selected?.followUps?.length ? (
     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-      {selected.followUps.map((fu) => (
+      {(selected.followUps as StandardTekstFollowUp[]).map((fu: StandardTekstFollowUp) => (
         <Chip
           key={fu.id}
           label={fu.label}
@@ -623,16 +804,17 @@ export default function StandardTekstPage() {
         return;
       }
     }
-    if (templateHasDatoToken(selected.content)) {
-      if (!normalizedDato && !normalizedDatoMnd) {
-        setErrorLocal("Fyll inn dato eller måned (DATO) før du kopierer teksten.");
-        return;
-      }
-    }
 
-    if (templateHasDatoMndToken(selected.content)) {
-      if (!normalizedDatoMnd) {
-        setErrorLocal("Fyll inn måned/år (DATO_MND) før du kopierer teksten.");
+    if (templateHasVirkestoffToken(selected.content) && !resolvedVirkestoff) {
+      setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
+      return;
+    }
+    if (templateHasFormuleringTokens(selected.content)) {
+      const indices = getFormuleringTokenIndices(selected.content);
+      const missing = indices.filter((i) => !(formuleringByIndex[i] ?? "").trim());
+      if (missing.length) {
+        const label = missing.map((i) => (i === 0 ? "FORMULERING" : `FORMULERING${i}`)).join(", ");
+        setErrorLocal(`Fyll inn formulering før du kopierer teksten: ${label}.`);
         return;
       }
     }
@@ -642,8 +824,8 @@ export default function StandardTekstPage() {
       template: selected.content,
       firstName,
       picked: pickedPreparats,
-      dato: effectiveDato,
-      datoMnd: formattedDatoMnd,
+      dato: effectiveDato || undefined,
+      datoMnd: formattedDatoMnd || undefined,
     });
 
     // Replace each TALL token individually (TALL, TALL1, TALL2…)
@@ -652,6 +834,20 @@ export default function StandardTekstPage() {
         const v = (tallByIndex[idx] ?? "").trim();
         if (!v) continue;
         text = replaceTallTokenByIndex(text, idx, v);
+      }
+    }
+
+    // Replace VIRKESTOFF token (based on picked preparat)
+    if (templateHasVirkestoffToken(selected.content) && resolvedVirkestoff) {
+      text = text.replace(/\bVIRKESTOFF\b/g, resolvedVirkestoff);
+    }
+
+    // Replace FORMULERING tokens (free text) by index (FORMULERING, FORMULERING1, ...)
+    if (templateHasFormuleringTokens(selected.content)) {
+      for (const idx of getFormuleringTokenIndices(selected.content)) {
+        const v = (formuleringByIndex[idx] ?? "").trim();
+        if (!v) continue;
+        text = replaceFormuleringTokenByIndex(text, idx, v);
       }
     }
 
@@ -664,6 +860,7 @@ export default function StandardTekstPage() {
 
       if (clearOnCopy) {
         clearPreparats();
+        setVirkestoffByPicked({});
 
         if (templateHasTallToken(selected.content)) {
           const indices = getTallTokenIndices(selected.content);
@@ -679,6 +876,19 @@ export default function StandardTekstPage() {
         }
 
         setSearch("");
+        setDatoInput("");
+        if (templateHasFormuleringTokens(selected.content)) {
+          const fIndices = getFormuleringTokenIndices(selected.content);
+          if (fIndices.length) {
+            const nextF: Record<number, string> = {};
+            for (const i of fIndices) nextF[i] = "";
+            setFormuleringByIndex(nextF);
+          } else {
+            setFormuleringByIndex({ 0: "" });
+          }
+        } else {
+          setFormuleringByIndex({ 0: "" });
+        }
       }
 
       // Focus back to preparat search for fast next use
@@ -704,6 +914,7 @@ export default function StandardTekstPage() {
 
         if (clearOnCopy) {
           clearPreparats();
+          setVirkestoffByPicked({});
 
           if (templateHasTallToken(selected.content)) {
             const indices = getTallTokenIndices(selected.content);
@@ -719,6 +930,19 @@ export default function StandardTekstPage() {
           }
 
           setSearch("");
+          setDatoInput("");
+          if (templateHasFormuleringTokens(selected.content)) {
+            const fIndices = getFormuleringTokenIndices(selected.content);
+            if (fIndices.length) {
+              const nextF: Record<number, string> = {};
+              for (const i of fIndices) nextF[i] = "";
+              setFormuleringByIndex(nextF);
+            } else {
+              setFormuleringByIndex({ 0: "" });
+            }
+          } else {
+            setFormuleringByIndex({ 0: "" });
+          }
         }
 
         requestAnimationFrame(() => {
@@ -861,7 +1085,11 @@ export default function StandardTekstPage() {
         </Paper>
       </Collapse>
 
-      <Box className={styles.grid}>
+      <Box
+        ref={gridRef}
+        className={styles.grid}
+        style={{ ["--sidebar-width" as any]: `${sidebarWidth}px` }}
+      >
         <Box
           className={[
             styles.sidebar,
@@ -884,6 +1112,37 @@ export default function StandardTekstPage() {
             searchInputRef={standardTekstSearchInputRef}
           />
         </Box>
+        <Box
+          className={styles.sidebarResizeHandle}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Juster bredde på sidepanel"
+          tabIndex={0}
+          onMouseDown={beginResizeSidebar}
+          onDoubleClick={resetSidebarWidth}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              setSidebarWidth((w) => clamp(w - 16, SIDEBAR_MIN, SIDEBAR_MAX));
+            }
+            if (e.key === "ArrowRight") {
+              e.preventDefault();
+              setSidebarWidth((w) => clamp(w + 16, SIDEBAR_MIN, SIDEBAR_MAX));
+            }
+            if (e.key === "Home") {
+              e.preventDefault();
+              setSidebarWidth(SIDEBAR_MIN);
+            }
+            if (e.key === "End") {
+              e.preventDefault();
+              setSidebarWidth(SIDEBAR_MAX);
+            }
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              resetSidebarWidth();
+            }
+          }}
+        />
 
         <Box className={styles.main}>
           <Box sx={{ position: "relative" }}>
@@ -916,12 +1175,47 @@ export default function StandardTekstPage() {
 
                   addPickedPreparat(text, key);
 
+                  // Hvis pick har virkestoff (FEST har vanligvis dette), lagre det for VIRKESTOFF-tokenet
+                  if (typeof pick !== "string") {
+                    const vRaw =
+                      (pick as any)?.virkestoff ??
+                      (pick as any)?.original?.virkestoff ??
+                      (pick as any)?.med?.virkestoff ??
+                      (pick as any)?.data?.virkestoff;
+                    const v = typeof vRaw === "string" ? vRaw.trim() : "";
+                    if (text && v) {
+                      setVirkestoffByPicked((prev) => ({ ...prev, [String(text)]: v }));
+
+                      if (errorLocal?.startsWith("Velg et preparat med virkestoff")) {
+                        setErrorLocal(null);
+                      }
+                    }
+                  }
+
                   if (isEditing) {
                     setDraftContent((prev) => replaceNextPreparatToken(prev, text));
                   }
                 }}
-                onClear={clearPreparats}
-                onRemove={(id) => removePreparatById(typeof id === "number" ? id : Number(id))}
+                onClear={() => {
+                  clearPreparats();
+                  setVirkestoffByPicked({});
+                }}
+                onRemove={(id) => {
+                  const numericId = typeof id === "number" ? id : Number(id);
+
+                  // Fjern evt lagret virkestoff knyttet til denne raden før vi fjerner raden
+                  const row = (preparatRows as any[]).find((r) => Number(r?.id) === numericId);
+                  const picked = String(row?.picked ?? "").trim();
+                  if (picked) {
+                    setVirkestoffByPicked((prev) => {
+                      const next = { ...prev };
+                      delete next[picked];
+                      return next;
+                    });
+                  }
+
+                  removePreparatById(numericId);
+                }}
               />
             </Box>
 
@@ -977,12 +1271,9 @@ export default function StandardTekstPage() {
                               }}
                               size="small"
                               type="number"
-                              inputProps={{ inputMode: "numeric" }}
-                              helperText={
-                                v.trim()
-                                  ? `Tallet settes inn der ${tokenLabel} står i teksten.`
-                                  : " "
-                              }
+                              onWheel={(e) => {
+                                (e.target as HTMLInputElement).blur();
+                              }}
                             />
                           );
                         })}
@@ -1014,50 +1305,17 @@ export default function StandardTekstPage() {
                     sx={{
                       display: "grid",
                       gap: 1,
-                      gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) 170px 170px" },
+                      gridTemplateColumns: { xs: "1fr", sm: "170px 170px" },
                       alignItems: "start",
                     }}
                   >
                     <TextField
-                      label="Dato eller Måned"
-                      value={datoInput}
-                      onChange={(e) => {
-                        const nextRaw = e.target.value;
-                        const digits = nextRaw.replace(/\D/g, "");
-
-                        if (
-                          errorLocal?.startsWith("Fyll inn dato") ||
-                          errorLocal?.startsWith("Fyll inn måned/år")
-                        ) {
-                          setErrorLocal(null);
-                        }
-
-                        if (digits.length === 8) {
-                          const dd = digits.slice(0, 2);
-                          const mm = digits.slice(2, 4);
-                          const yyyy = digits.slice(4, 8);
-                          setDatoInput(`${dd}.${mm}.${yyyy}`);
-                          return;
-                        }
-
-                        if (digits.length === 6) {
-                          const mm = digits.slice(0, 2);
-                          const yyyy = digits.slice(2, 6);
-                          setDatoInput(`${mm}.${yyyy}`);
-                          return;
-                        }
-
-                        setDatoInput(nextRaw);
-                      }}
-                      placeholder="f.eks. 30.12.2025 eller 12.2025"
-                      size="small"
-                      inputProps={{ inputMode: "numeric" }}
-                      helperText={"Tips: Skriv eller velg dato / måned."}
-                    />
-                    <TextField
                       label="Velg dato"
                       type="date"
                       size="small"
+                      inputRef={datoPickerInputRef}
+                      onClick={() => datoPickerInputRef.current?.showPicker?.()}
+                      onFocus={() => datoPickerInputRef.current?.showPicker?.()}
                       value={
                         normalizedDato
                           ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
@@ -1073,6 +1331,9 @@ export default function StandardTekstPage() {
                       label="Velg måned"
                       type="month"
                       size="small"
+                      inputRef={datoMndPickerInputRef}
+                      onClick={() => datoMndPickerInputRef.current?.showPicker?.()}
+                      onFocus={() => datoMndPickerInputRef.current?.showPicker?.()}
                       value={
                         formattedDatoMnd
                           ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
@@ -1095,18 +1356,69 @@ export default function StandardTekstPage() {
                       InputLabelProps={{ shrink: true }}
                     />
                   </Box>
-
-                  {!normalizedDato && !normalizedDatoMnd && datoInput.trim() ? (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 0.75 }}
-                    >
-                      Ugyldig datoformat. Bruk DDMMYYYY (8 siffer) eller MMYYYY (6 siffer).
-                    </Typography>
-                  ) : null}
                 </Paper>
               )}
+            {selected && templateHasFormuleringTokens(selected.content) && (
+              <Paper
+                elevation={0}
+                sx={{
+                  mt: 1,
+                  mb: 1.5,
+                  p: 1.25,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                  Formulering i teksten
+                </Typography>
+
+                <Box sx={{ display: "grid", gap: 1 }}>
+                  {getFormuleringTokenIndices(selected.content).map((idx) => {
+                    const fieldLabel = idx === 0 ? "Formulering" : `Formulering ${idx}`;
+                    const tokenLabel = idx === 0 ? "FORMULERING" : `FORMULERING${idx}`;
+                    const value = formuleringByIndex[idx] ?? "";
+
+                    return (
+                      <Autocomplete
+                        key={tokenLabel}
+                        freeSolo
+                        options={formuleringSuggestions}
+                        value={null}
+                        inputValue={value}
+                        onChange={(_, v) => {
+                          const nextValue = typeof v === "string" ? v : "";
+                          setFormuleringByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+
+                          if (errorLocal?.startsWith("Fyll inn formulering")) {
+                            setErrorLocal(null);
+                          }
+                        }}
+                        onInputChange={(_, v) => {
+                          setFormuleringByIndex((prev) => ({ ...prev, [idx]: v }));
+
+                          if (errorLocal?.startsWith("Fyll inn formulering")) {
+                            setErrorLocal(null);
+                          }
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label={fieldLabel}
+                            size="small"
+                            placeholder={
+                              idx === 0 ? "F.eks. tablett, kapsel, nesespray" : "F.eks. tablett"
+                            }
+                            fullWidth
+                          />
+                        )}
+                      />
+                    );
+                  })}
+                </Box>
+              </Paper>
+            )}
           </Box>
 
           {lockBeforeEdit && (
@@ -1144,6 +1456,15 @@ export default function StandardTekstPage() {
                 }),
                 datoValue: effectiveDato,
                 datoMndValue: formattedDatoMnd,
+                virkestoffValue: resolvedVirkestoff,
+                formuleringValues: (() => {
+                  const indices = getFormuleringTokenIndices(selected?.content ?? "");
+                  const arr: string[] = [];
+                  for (const i of indices) {
+                    arr[i] = (formuleringByIndex[i] ?? "").trim();
+                  }
+                  return arr;
+                })(),
               },
             )}
             editorTools={

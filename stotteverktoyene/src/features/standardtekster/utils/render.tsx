@@ -8,6 +8,9 @@ export function renderContentWithPreparatHighlight(
     tallValues?: string[];
     datoValue?: string;
     datoMndValue?: string;
+    virkestoffValue?: string;
+    formuleringValue?: string;
+    formuleringValues?: string[];
   }
 ) {
   const tokenSx = {
@@ -49,6 +52,49 @@ export function renderContentWithPreparatHighlight(
     fontFamily: "monospace",
   } as const;
 
+  const placeholderVirkestoffSx = {
+    ...tokenSx,
+    bgcolor: "primary.light",
+    color: "primary.contrastText",
+    fontFamily: "monospace",
+  } as const;
+
+  const pickedVirkestoffSx = {
+    ...tokenSx,
+    bgcolor: "primary.light",
+    color: "primary.contrastText",
+    fontWeight: 600,
+  } as const;
+
+  const placeholderFormuleringSx = {
+    ...tokenSx,
+    bgcolor: "secondary.light",
+    color: "secondary.contrastText",
+    fontFamily: "monospace",
+  } as const;
+
+  const pickedFormuleringSx = {
+    ...tokenSx,
+    bgcolor: "secondary.light",
+    color: "secondary.contrastText",
+    fontWeight: 600,
+  } as const;
+
+  const placeholderFormuleringNumberedSx = {
+    ...tokenSx,
+    bgcolor: "secondary.main",
+    color: "secondary.contrastText",
+    fontFamily: "monospace",
+    opacity: 0.9,
+  } as const;
+
+  const pickedFormuleringNumberedSx = {
+    ...tokenSx,
+    bgcolor: "secondary.dark",
+    color: "secondary.contrastText",
+    fontWeight: 600,
+  } as const;
+
   const pickedPrimarySx = {
     ...tokenSx,
     bgcolor: "warning.light",
@@ -67,9 +113,9 @@ export function renderContentWithPreparatHighlight(
     if (!t) return t;
 
     // Match both legacy {{...}} and plain tokens (no braces)
-    // Supports: TALL, TALL1, TALL2... and DATO and DATO_MND
+    // Supports: TALL, TALL1, TALL2... and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{\s*(?:TALL\d*|DATO_MND|DATO)\s*\}\}|\b(?:TALL\d*|DATO_MND|DATO)\b)/gi
+      /(\{\{\s*(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/gi
     );
     if (parts.length <= 1) return t;
 
@@ -101,6 +147,53 @@ export function renderContentWithPreparatHighlight(
 
             return (
               <Box key={i} component="span" sx={placeholderDatoSx}>
+                {label}
+              </Box>
+            );
+          }
+
+          // VIRKESTOFF / {{VIRKESTOFF}}
+          const virkestoffMatch = part.match(/^(?:\{\{\s*)?VIRKESTOFF(?:\s*\}\})?$/i);
+          if (virkestoffMatch) {
+            const v = (opts?.virkestoffValue ?? "").trim();
+            const label = v || "VIRKESTOFF";
+
+            return (
+              <Box
+                key={i}
+                component="span"
+                sx={v ? pickedVirkestoffSx : placeholderVirkestoffSx}
+              >
+                {label}
+              </Box>
+            );
+          }
+
+          // FORMULERING / {{FORMULERING}} / FORMULERING1 / {{FORMULERING1}} ...
+          const formuleringMatch = part.match(/^(?:\{\{\s*)?FORMULERING(\d*)(?:\s*\}\})?$/i);
+          if (formuleringMatch) {
+            const rawIdx = (formuleringMatch[1] ?? "").trim();
+            const idx = rawIdx ? Number(rawIdx) : 0;
+
+            const listValue = (opts?.formuleringValues?.[idx] ?? "").trim();
+            const singleValue = idx === 0 ? (opts?.formuleringValue ?? "").trim() : "";
+            const v = listValue || singleValue;
+
+            const tokenLabel = idx === 0 ? "FORMULERING" : `FORMULERING${idx}`;
+            const label = v || tokenLabel;
+
+            const isNumbered = idx > 0;
+
+            const sx = isNumbered
+              ? v
+                ? pickedFormuleringNumberedSx
+                : placeholderFormuleringNumberedSx
+              : v
+              ? pickedFormuleringSx
+              : placeholderFormuleringSx;
+
+            return (
+              <Box key={i} component="span" sx={sx}>
                 {label}
               </Box>
             );
