@@ -44,6 +44,12 @@ export function useAuthUser() {
         const userSnap = await getDoc(doc(db, "users", u.uid));
         const data = userSnap.exists() ? (userSnap.data() as any) : null;
 
+        // Some installs store role info directly on the user document.
+        // Keep this as a fallback so removing admin does not accidentally remove rekspert access.
+        const userRoleRaw = typeof data?.role === "string" ? data.role.trim().toLowerCase() : "";
+        const rekspertFromUserDoc =
+          userRoleRaw === "rekspert" || data?.isRekspert === true || data?.rekspert === true;
+
         const name = typeof data?.firstName === "string" ? data.firstName.trim() : "";
         const resolvedFirstName = name.length > 0 ? name : null;
         setFirstName(resolvedFirstName);
@@ -87,11 +93,10 @@ export function useAuthUser() {
           const admin = owner || adminSnap.exists();
 
           // Determine rekspert:
-          // - If you are the root owner, you may also be listed in roles map, but owner already implies full access.
-          // - Otherwise, check owners/{OWNER_UID}.roles[uid] === "rekspert"
-          let rekspert = false;
+          // Prefer the flag on the user doc (if present), otherwise fall back to the roles map on the root owner doc.
+          let rekspert = rekspertFromUserDoc;
 
-          if (!owner && rootOwnerSnap && typeof rootOwnerSnap.data === "function") {
+          if (!rekspert && !owner && rootOwnerSnap && typeof rootOwnerSnap.data === "function") {
             const rootData = rootOwnerSnap.exists() ? (rootOwnerSnap.data() as any) : null;
             const rolesMap = rootData?.roles;
             const roleValue = rolesMap && typeof rolesMap === "object" ? rolesMap[u.uid] : undefined;
@@ -114,8 +119,8 @@ export function useAuthUser() {
         } catch {
           setIsOwner(false);
           setIsAdmin(false);
-          setIsRekspert(false);
-          setRole("user");
+          setIsRekspert(rekspertFromUserDoc);
+          setRole(rekspertFromUserDoc ? "rekspert" : "user");
         }
       } catch {
         setIsAdmin(false);

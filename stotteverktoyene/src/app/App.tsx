@@ -42,7 +42,8 @@ const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const { isOwner, isRekspert } = useAuthUser();
+  const { isOwner, isRekspert, role } = useAuthUser() as any;
+  const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -62,7 +63,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   ];
 
   const adminItems =
-    isRekspert || isOwner
+    hasRekspertAccess
       ? [
           {
             label: "Rekspert",

@@ -77,8 +77,10 @@ export default function RequireRekspert({ children }: RequireRekspertProps) {
 
   // Allow rekspert and owner (admin alone should NOT pass)
   // NOTE: `role` is a single string and can be "admin" even when the user is ALSO rekspert.
-  // Therefore, rely on the boolean flags.
-  if (isRekspert || isOwner) {
+  // Therefore, rely on boolean flags, but keep a small safety net for `role === "rekspert"`.
+  const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
+
+  if (hasRekspertAccess) {
     return children ? <>{children}</> : <Outlet />;
   }
 
