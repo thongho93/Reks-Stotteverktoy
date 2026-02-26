@@ -200,7 +200,11 @@ export function ProfilePage() {
           const emailLower = email ? email.toLowerCase() : "";
           const isOwnerRow = ownerIds.has(d.id);
           const isAdminRow = adminIds.has(d.id) || (emailLower && adminEmails.has(emailLower));
-          const isRekspertRow = rolesMap?.[d.id] === "rekspert";
+          const userRoleRaw = typeof data?.role === "string" ? data.role.trim().toLowerCase() : "";
+          const isRekspertFromUserDoc =
+            userRoleRaw === "rekspert" || data?.isRekspert === true || data?.rekspert === true;
+          const isRekspertFromOwnerMap = rolesMap?.[d.id] === "rekspert";
+          const isRekspertRow = Boolean(isRekspertFromUserDoc || isRekspertFromOwnerMap);
 
           const role: RegisteredUserRow["role"] = isOwnerRow
             ? "Eier"
@@ -444,13 +448,31 @@ export function ProfilePage() {
     setRekspertError(null);
 
     try {
+      // Source of truth: users/{uid}
+      await setDoc(
+        doc(db, "users", target.uid),
+        {
+          role: "rekspert",
+          isRekspert: true,
+          rekspertAt: serverTimestamp(),
+          rekspertBy: user.uid,
+        },
+        { merge: true }
+      );
+
+      // Back-compat: also keep the root owner roles map in sync
       await updateDoc(doc(db, "owners", OWNER_UID), {
         [`roles.${target.uid}`]: "rekspert",
       });
+
       setRegisteredUsers((prev) =>
         prev.map((u) =>
           u.uid === target.uid
-            ? { ...u, role: u.role === "Eier" ? "Eier" : u.role, isRekspert: true }
+            ? {
+                ...u,
+                role: u.role === "Eier" ? "Eier" : "Rekspert",
+                isRekspert: true,
+              }
             : u
         )
       );
@@ -470,11 +492,33 @@ export function ProfilePage() {
     setRekspertError(null);
 
     try {
+      // Source of truth: users/{uid}
+      await setDoc(
+        doc(db, "users", target.uid),
+        {
+          role: "user",
+          isRekspert: false,
+          rekspertRemovedAt: serverTimestamp(),
+          rekspertRemovedBy: user.uid,
+        },
+        { merge: true }
+      );
+
+      // Back-compat: also remove from the root owner roles map
       await updateDoc(doc(db, "owners", OWNER_UID), {
         [`roles.${target.uid}`]: deleteField(),
       });
+
       setRegisteredUsers((prev) =>
-        prev.map((u) => (u.uid === target.uid ? { ...u, isRekspert: false } : u))
+        prev.map((u) =>
+          u.uid === target.uid
+            ? {
+                ...u,
+                isRekspert: false,
+                role: u.role === "Eier" ? "Eier" : "Bruker",
+              }
+            : u
+        )
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Kunne ikke fjerne rekspert-rollen.";
@@ -768,7 +812,7 @@ export function ProfilePage() {
                                   </Button>
                                 )}
 
-                                {u.role === "Bruker" && (
+                                {u.role !== "Admin" && u.role !== "Eier" && (
                                   <Button
                                     size="small"
                                     variant="outlined"
