@@ -115,7 +115,7 @@ export function renderContentWithPreparatHighlight(
     // Match both legacy {{...}} and plain tokens (no braces)
     // Supports: TALL, TALL1, TALL2... and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{\s*(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/gi
+      /(\{\{\s*(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
     );
     if (parts.length <= 1) return t;
 
@@ -153,7 +153,7 @@ export function renderContentWithPreparatHighlight(
           }
 
           // VIRKESTOFF / {{VIRKESTOFF}}
-          const virkestoffMatch = part.match(/^(?:\{\{\s*)?VIRKESTOFF(?:\s*\}\})?$/i);
+          const virkestoffMatch = part.match(/^(?:\{\{\s*)?VIRKESTOFF(?:\s*\}\})?$/);
           if (virkestoffMatch) {
             const v = (opts?.virkestoffValue ?? "").trim();
             const label = v || "VIRKESTOFF";
