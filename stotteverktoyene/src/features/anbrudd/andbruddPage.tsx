@@ -1,13 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import { Box, Button, Paper, Tab, Tabs, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Paper,
+  Tab,
+  Tabs,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
 
 const officeFormUrl = import.meta.env.VITE_ANBRUDD_OFFICE_FORM_URL as string | undefined;
 const sharepointEmbedUrl = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
   import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
 
 export default function AndbruddPage() {
-  const [tab, setTab] = useState<"form" | "sharepoint">("form");
+  const [tab, setTab] = useState<"form" | "sharepoint">("sharepoint");
   const [iframeError, setIframeError] = useState(false);
+  const [iframeKey, setIframeKey] = useState(0);
+  const [showLoginHelp, setShowLoginHelp] = useState(false);
 
   const current = useMemo(() => {
     if (tab === "form") {
@@ -23,7 +36,8 @@ export default function AndbruddPage() {
     return {
       title: "Oversikt (SharePoint)",
       src: sharepointEmbedUrl,
-      missing: "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
+      missing:
+        "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
       iframeTitle: "SharePoint Excel",
       height: 860,
     };
@@ -32,6 +46,10 @@ export default function AndbruddPage() {
   useEffect(() => {
     setIframeError(false);
   }, [tab]);
+
+  useEffect(() => {
+    setShowLoginHelp(true);
+  }, []);
 
   return (
     <Paper sx={{ p: 2, borderRadius: 2 }}>
@@ -44,12 +62,19 @@ export default function AndbruddPage() {
           mb: 1,
         }}
       >
-        <Typography variant="h1">{current.title}</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="h1">{current.title}</Typography>
+          {tab === "sharepoint" && (
+            <Button size="small" variant="outlined" onClick={() => setIframeKey((k) => k + 1)}>
+              Oppdater
+            </Button>
+          )}
+        </Box>
       </Box>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} aria-label="Anbrudd tabs">
-        <Tab value="form" label="Skjema" />
         <Tab value="sharepoint" label="Oversikt" />
+        <Tab value="form" label="Skjema" />
       </Tabs>
 
       {current.src ? (
@@ -67,6 +92,7 @@ export default function AndbruddPage() {
           )}
 
           <Box
+            key={iframeKey}
             component="iframe"
             title={current.iframeTitle}
             src={current.src}
@@ -82,6 +108,30 @@ export default function AndbruddPage() {
       ) : (
         <Typography color="error">{current.missing}</Typography>
       )}
+
+      <Dialog
+        open={showLoginHelp}
+        onClose={() => {
+          setShowLoginHelp(false);
+        }}
+      >
+        <DialogTitle>Innlogging til SharePoint</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Hvis innlogging kreves, fullfør dette før du bruker oversikten eller meldeskjema.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setShowLoginHelp(false);
+            }}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }
