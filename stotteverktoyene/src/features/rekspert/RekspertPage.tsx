@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Typography } from "@mui/material";
 
 const SPREADSHEET_IFRAME_SRC = import.meta.env.VITE_REKSPERT_SPREADSHEET_IFRAME_SRC as
@@ -7,39 +6,7 @@ const SPREADSHEET_IFRAME_SRC = import.meta.env.VITE_REKSPERT_SPREADSHEET_IFRAME_
 
 const hasSpreadsheet = Boolean(SPREADSHEET_IFRAME_SRC);
 
-function a11yProps(index: number) {
-  return {
-    id: `rekspert-tab-${index}`,
-    "aria-controls": `rekspert-tabpanel-${index}`,
-  };
-}
-
-function TabPanel(props: { children?: React.ReactNode; index: number; value: number }) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      style={{
-        flex: 1,
-        minHeight: 0,
-        display: value === index ? "flex" : "none",
-        flexDirection: "column",
-      }}
-      id={`rekspert-tabpanel-${index}`}
-      aria-labelledby={`rekspert-tab-${index}`}
-      {...other}
-    >
-      <Box sx={{ pt: 2, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {children}
-      </Box>
-    </div>
-  );
-}
-
 export default function RekspertPage() {
-  const [tab, setTab] = React.useState(0);
-
   return (
     <Box
       sx={{
@@ -52,7 +19,6 @@ export default function RekspertPage() {
         minHeight: 0,
       }}
     >
-
       {hasSpreadsheet ? (
         <Box
           sx={{

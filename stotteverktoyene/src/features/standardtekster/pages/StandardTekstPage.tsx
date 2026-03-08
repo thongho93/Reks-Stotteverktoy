@@ -1033,7 +1033,7 @@ export default function StandardTekstPage() {
                   onChange={(e) => setIncludeManufacturerInPreparatText(e.target.checked)}
                 />
               }
-              label={<Typography variant="caption">Vis produsent i tekst</Typography>}
+              label={<Typography variant="caption">Vis produsent</Typography>}
             />
           </Tooltip>
           <Tooltip title="Når dette er på, tas pakningsstørrelse med i teksten (f.eks. ... 60).">
