@@ -77,10 +77,7 @@ export default function PreparatPanel({
                 const cleanedFullName = fullName
                   ? fullName
                       .replace(/(\d)\s*(mg|mcg|µg|g|ml)\b/gi, "$1 $2") // 1000mg -> 1000 mg
-                      .replace(
-                        /\b(tab|tbl|tablett|kapsel|mikstur|depottablett|depot)\b/gi,
-                        "",
-                      )
+                      .replace(/\b(tab|tbl|tablett|kapsel|mikstur|depottablett|depot)\b/gi, "")
                       .replace(/\s{2,}/g, " ")
                       .trim()
                   : "";
@@ -130,12 +127,54 @@ export default function PreparatPanel({
               // Fallback til baseText kun hvis alt annet mangler.
               const key = String((med as any)?.farmaloggNumber ?? (med as any)?.id ?? baseText);
 
-              const virkestoff = String(
-                (med as any)?.virkestoff ??
-                  (med as any)?.substance ??
-                  (med as any)?.activeSubstance ??
-                  "",
-              ).trim();
+              const deriveVirkestoff = (m: any): string => {
+                // 1) Common explicit fields (FEST / internal)
+                const direct = [
+                  m?.virkestoff,
+                  m?.virkestoffNavn,
+                  m?.virkestoffName,
+                  m?.activeSubstance,
+                  m?.activeSubstanceName,
+                  m?.substance,
+                  m?.substanceName,
+                  m?.aktivtStoff,
+                  m?.aktiveStoff,
+                ]
+                  .map((v) => (typeof v === "string" ? v.trim() : ""))
+                  .filter(Boolean);
+                if (direct.length) return direct[0];
+
+                // 2) Arrays of substances/active substances
+                const arrCandidates: any[] = (Array.isArray(m?.virkestoffer) ? m.virkestoffer : [])
+                  .concat(Array.isArray(m?.substances) ? m.substances : [])
+                  .concat(Array.isArray(m?.activeSubstances) ? m.activeSubstances : []);
+
+                for (const item of arrCandidates) {
+                  if (!item) continue;
+                  const name =
+                    (typeof item === "string" ? item : "") ||
+                    (typeof item?.name === "string" ? item.name : "") ||
+                    (typeof item?.navn === "string" ? item.navn : "") ||
+                    (typeof item?.substance === "string" ? item.substance : "") ||
+                    (typeof item?.activeSubstance === "string" ? item.activeSubstance : "");
+                  if (name?.trim()) return name.trim();
+                }
+
+                // 3) PIM/HV often renders 'Virkestoff: X · ATC: ...' in a subtitle/secondary text.
+                // Try to parse it from any string field on the object.
+                const allStringValues = Object.values(m ?? {}).filter(
+                  (v) => typeof v === "string" && v.trim().length,
+                ) as string[];
+
+                for (const s of allStringValues) {
+                  const match = s.match(/\bvirkestoff\s*:\s*([^·\n\r,]+)/i);
+                  if (match?.[1]?.trim()) return match[1].trim();
+                }
+
+                return "";
+              };
+
+              const virkestoff = deriveVirkestoff(med);
 
               onPickText({ text, key, virkestoff: virkestoff || undefined });
             }}

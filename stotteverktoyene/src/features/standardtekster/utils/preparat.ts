@@ -333,15 +333,14 @@ export function formatPreparatForTemplate(med: {
 }
 
 export function replaceNextPreparatToken(text: string, value: string) {
-  // Replace ONLY the next (first) occurrence.
-  // Supports both raw tokens and moustache tokens:
-  //  - PREPARAT, PREPARAT1, PREPARAT2
-  //  - {{ PREPARAT }}, {{ PREPARAT1 }}, {{ PREPARAT2 }}
-  // NOTE: We intentionally keep this as a *single* replacement (no /g).
-  return text.replace(
-    /\{\{\s*(PREPARAT2|PREPARAT1|PREPARAT)\s*\}\}|\b(PREPARAT2|PREPARAT1|PREPARAT)\b/i,
-    value,
-  );
+  if (!text) return text;
+
+  // Deterministic rule:
+  // - Only replace the generic PREPARAT token
+  // - Never touch PREPARAT1 or PREPARAT2
+  // This guarantees PREPARAT1 can never end up inside PREPARAT2
+  // when only one preparat is selected.
+  return text.replace(/\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b/i, value);
 }
 
 export const replaceVareTokenByCount = (text: string, count: number): string => {
@@ -561,10 +560,14 @@ export function formatPreparatList(values: Array<string | null | undefined>): st
 }
 
 export function replacePreparatTokenWithList(text: string, listValue: string) {
-  return text.replace(
-    /\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b|\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g,
-    listValue,
-  );
+  if (!text) return text;
+
+  // Only replace generic PREPARAT tokens.
+  // IMPORTANT: do NOT touch PREPARAT1 / PREPARAT2 here, otherwise
+  // PREPARAT2 may accidentally become PREPARAT1 when only one
+  // preparat is present (the issue seen when pasting text back
+  // into the editor).
+  return text.replace(/\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b/g, listValue);
 }
 
 export function replacePreparatTokensPrimarySecondary(
@@ -574,12 +577,22 @@ export function replacePreparatTokensPrimarySecondary(
 ) {
   let out = text;
 
-  if (primary) {
-    out = out.replace(/\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g, primary);
+  const p = (primary ?? "").trim();
+  let s = (secondary ?? "").trim();
+
+  // If only one preparat is selected some pipelines accidentally
+  // pass the same value twice. In that case we MUST treat secondary
+  // as missing so PREPARAT2 remains visible in the template.
+  if (p && s && p === s) {
+    s = "";
   }
 
-  if (secondary) {
-    out = out.replace(/\{\{\s*PREPARAT2\s*\}\}|\bPREPARAT2\b/g, secondary);
+  if (p) {
+    out = out.replace(/\{\{\s*PREPARAT1\s*\}\}|\bPREPARAT1\b/g, p);
+  }
+
+  if (s) {
+    out = out.replace(/\{\{\s*PREPARAT2\s*\}\}|\bPREPARAT2\b/g, s);
   }
 
   return out;

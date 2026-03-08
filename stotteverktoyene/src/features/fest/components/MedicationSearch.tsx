@@ -172,6 +172,17 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
           ((p as any).nameFormStrength && String((p as any).nameFormStrength).trim().length > 0
             ? (p as any).nameFormStrength
             : (p as any).name) ?? undefined,
+        // Optional enrichment (some PIM exports include these)
+        atc: (p as any).atc ?? undefined,
+        substance:
+          (p as any).virkestoff ??
+          (p as any).virkestoffNavn ??
+          (p as any).substance ??
+          (p as any).activeSubstance ??
+          (p as any).activeSubstanceName ??
+          undefined,
+        prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
+        manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
       }))
     );
 
@@ -182,6 +193,17 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         farmaloggNumber: String(p.farmaloggNumber),
         name: p.name ?? undefined,
         nameFormStrength: p.name ?? undefined,
+        // Optional enrichment (some HV exports include these)
+        atc: (p as any).atc ?? undefined,
+        substance:
+          (p as any).virkestoff ??
+          (p as any).virkestoffNavn ??
+          (p as any).substance ??
+          (p as any).activeSubstance ??
+          (p as any).activeSubstanceName ??
+          undefined,
+        prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
+        manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
       }))
     ).map((item) => ({
       ...item,
@@ -197,6 +219,62 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     for (const m of festRaw) {
       festByKey.set(`FEST:${String(m.id)}`, m);
     }
+
+    // --- FEST fallback lookup for PIM/HV virkestoff ---
+    const normalizeForKey = (s: string) =>
+      normalizeForSearch(String(s ?? ""))
+        // remove common separators
+        .replace(/[\s\-]+/g, " ")
+        .trim();
+
+    // 1) Fast fallback by ATC -> virkestoff
+    const festVirkestoffByAtc = new Map<string, string>();
+    for (const m of festRaw) {
+      const atc = String((m as any)?.atc ?? "").trim();
+      const v = String((m as any)?.virkestoff ?? "").trim();
+      if (!atc || !v) continue;
+      if (!festVirkestoffByAtc.has(atc)) festVirkestoffByAtc.set(atc, v);
+    }
+
+    // 2) Fallback by normalized name (varenavn/navnFormStyrke) -> virkestoff
+    const festVirkestoffByNameKey = new Map<string, string>();
+    for (const m of festRaw) {
+      const v = String((m as any)?.virkestoff ?? "").trim();
+      if (!v) continue;
+      const n1 = String((m as any)?.varenavn ?? "").trim();
+      const n2 = String((m as any)?.navnFormStyrke ?? "").trim();
+      const k1 = n1 ? normalizeForKey(n1) : "";
+      const k2 = n2 ? normalizeForKey(n2) : "";
+      if (k1 && !festVirkestoffByNameKey.has(k1)) festVirkestoffByNameKey.set(k1, v);
+      if (k2 && !festVirkestoffByNameKey.has(k2)) festVirkestoffByNameKey.set(k2, v);
+    }
+
+    const fallbackVirkestoffForPimHv = (item: SearchIndexItem) => {
+      // Prefer ATC match (most stable)
+      const atc = String((item as any)?.atc ?? "").trim();
+      if (atc) {
+        const v = festVirkestoffByAtc.get(atc);
+        if (v) return v;
+      }
+
+      // Otherwise try by name key (displayName/name/nameFormStrength)
+      const nameCandidates = [
+        (item as any)?.nameFormStrength,
+        (item as any)?.name,
+        (item as any)?.displayName,
+      ]
+        .filter(Boolean)
+        .map((s: any) => String(s).trim())
+        .filter(Boolean);
+
+      for (const n of nameCandidates) {
+        const k = normalizeForKey(n);
+        const v = festVirkestoffByNameKey.get(k);
+        if (v) return v;
+      }
+
+      return null;
+    };
 
     // Convert SearchIndexItem -> Med (the rest of this component continues to work on Med[])
     return searchIndex.map((item) => {
@@ -226,10 +304,10 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         farmaloggNumber: item.farmaloggNumber ?? String(item.id),
         varenavn: item.name ?? item.displayName ?? null,
         navnFormStyrke: item.nameFormStrength ?? item.displayName ?? item.name ?? null,
-        atc: null,
-        virkestoff: null,
-        produsent: null,
-        reseptgruppe: null,
+        atc: item.atc ?? null,
+        virkestoff: item.substance ?? fallbackVirkestoffForPimHv(item),
+        produsent: (item as any).manufacturer ?? null,
+        reseptgruppe: item.prescriptionGroup ?? null,
         searchText: item.searchText,
       } satisfies Med;
     });
@@ -495,6 +573,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     setOpen(false);
     setHighlightedIndex(-1);
   };
+
 
   useEffect(() => {
     if (!open || results.length === 0) {
