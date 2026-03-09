@@ -1,13 +1,33 @@
 [
   {
     "farmaloggNumber": "124347",
-    "name": "Ventoline inhpulv 0,2mg diskus 60",
+    "name": "Ventoline inhpulv 0,2mg 60",
     "nameFormStrength": "Ventoline inh pulv, disp 0,2 mg/dose"
   },
   {
     "farmaloggNumber": "7424",
-    "name": "Zyvoxid tab 600mg 30x1",
+    "name": "Zyvoxid tab 600mg 30",
     "nameFormStrength": "Zyvoxid tab 600 mg"
+  },
+  {
+    "farmaloggNumber": "128923",
+    "name": "Budenofalk Stikkpille 4mg 30",
+    "nameFormStrength": "Budenofalk Stikkpille 4 mg"
+  },
+  {
+    "farmaloggNumber": "384770",
+    "name": "Litfulo kaps 50mg 30",
+    "nameFormStrength": "Litfulo kaps 50 mg"
+  },
+  {
+    "farmaloggNumber": "344590",
+    "name": "Atomoxetine Stada kaps 40mg 30",
+    "nameFormStrength": "Atomoxetine Stada kaps 40 mg"
+  },
+   {
+    "farmaloggNumber": "273969",
+    "name": "IsoGalen kaps 10mg 30",
+    "nameFormStrength": "IsoGalen kaps 10 mg"
   },
   {
     "farmaloggNumber": "440704",
@@ -16,12 +36,12 @@
   },
   {
     "farmaloggNumber": "53157",
-    "name": "Flutide inh pulv  50mcg diskus 60",
-    "nameFormStrength": "Flutide inh pulv, disp 50 mcg/dose"
+    "name": "Flutide 50mcg diskus 60",
+    "nameFormStrength": "Flutide 50 mcg/dose"
   },
   {
     "farmaloggNumber": "3111",
-    "name": "Paracet tab  500mg 100",
+    "name": "Paracet tab 500mg 100",
     "nameFormStrength": "Paracet tab 500 mg"
   },
   {
@@ -46,7 +66,7 @@
   },
   {
     "farmaloggNumber": "268009",
-    "name": "Nurofen Junior stikkpil  60mg 10",
+    "name": "Nurofen Junior stikkpil 60mg 10",
     "nameFormStrength": "Nurofen Junior stikkpille 60 mg"
   },
   {
