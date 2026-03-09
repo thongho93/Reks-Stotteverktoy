@@ -38,7 +38,7 @@ import {
   templateHasTallToken,
   usePreparatRows,
 } from "../utils/preparat";
-import { buildDisplayContent, buildPreviewContent, templateUsesPreparat1 } from "../utils/content";
+import { buildPreviewContent, templateUsesPreparat1 } from "../utils/content";
 import { renderContentWithPreparatHighlight } from "../utils/render";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { useStandardTekster } from "../hooks/useStandardTekster";
@@ -819,14 +819,44 @@ export default function StandardTekstPage() {
       }
     }
 
-    // Build the text fresh at copy-time to avoid stale memoized content.
-    let text = buildDisplayContent({
+    // Build base text
+    let text = buildPreviewContent({
       template: selected.content,
       firstName,
       picked: pickedPreparats,
-      dato: effectiveDato || undefined,
-      datoMnd: formattedDatoMnd || undefined,
     });
+
+    // Ensure PREPARAT tokens are actually resolved in the copied text.
+    // Preview replaces them in the renderer, but clipboard needs real text.
+    if (pickedPreparats.length) {
+      const list =
+        pickedPreparats.length === 1
+          ? pickedPreparats[0]
+          : pickedPreparats.length === 2
+            ? `${pickedPreparats[0]} og ${pickedPreparats[1]}`
+            : `${pickedPreparats.slice(0, -1).join(", ")} og ${pickedPreparats.slice(-1)}`;
+
+      // Replace PREPARAT (list) always
+      text = text.replace(/\bPREPARAT\b/g, list);
+
+      // Replace PREPARAT1 only if we actually have a first preparat
+      if (pickedPreparats[0]) {
+        text = text.replace(/\bPREPARAT1\b/g, pickedPreparats[0]);
+      }
+
+      // Replace PREPARAT2 only if we actually have a second preparat
+      if (pickedPreparats[1]) {
+        text = text.replace(/\bPREPARAT2\b/g, pickedPreparats[1]);
+      }
+    }
+
+    // Apply date replacements afterwards
+    if (effectiveDato) {
+      text = text.replace(/\bDATO\b/g, effectiveDato);
+    }
+    if (formattedDatoMnd) {
+      text = text.replace(/\bDATOMND\b/g, formattedDatoMnd);
+    }
 
     // Replace each TALL token individually (TALL, TALL1, TALL2…)
     if (templateHasTallToken(selected.content)) {
