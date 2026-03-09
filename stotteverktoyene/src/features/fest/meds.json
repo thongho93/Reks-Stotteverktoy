@@ -9,6 +9,42 @@
     "reseptgruppe": "C"
   },
   {
+    "id": "ID_EACB20F6-8D1B-47B5-9F70-1C27013BFFA4",
+    "varenavn": "Budenofalk",
+    "navnFormStyrke": "Budenofalk stikkpille 4mg",
+    "atc": "A07EA06",
+    "virkestoff": "Budesonid",
+    "produsent": "Vifor Pharma Nordiska AB",
+    "reseptgruppe": "C"
+  },
+  {
+    "id": "ID_6FCA0818-8EE8-4163-88F3-7790D235BD81",
+    "varenavn": "IsoGalen",
+    "navnFormStyrke": "IsoGalen kaps 10mg 30",
+    "atc": "D10BA01",
+    "virkestoff": "Isotretinoin",
+    "produsent": "Galen Pharma",
+    "reseptgruppe": "C"
+  },
+  {
+    "id": "ID_112ED061-90E8-4691-B66E-477F596A36CC",
+    "varenavn": "Atomoxetine Stada",
+    "navnFormStyrke": "Atomoxetine Stada kaps 40mg",
+    "atc": "N06BA09",
+    "virkestoff": "Atomoksetin",
+    "produsent": "Stada",
+    "reseptgruppe": "C"
+  },
+  {
+    "id": "ID_04281A28-7562-4771-BC97-91DB122F0D8F",
+    "varenavn": "Litfulo",
+    "navnFormStyrke": "Litfulo kaps 50mg",
+    "atc": "L04AF08",
+    "virkestoff": "Ritlecitinib",
+    "produsent": "Pfizer",
+    "reseptgruppe": "C"
+  },
+  {
     "id": "ID_000A27B8-3930-4264-80F9-CDB14C895662",
     "varenavn": "Kodimagnyl Ikke-stoppende dak",
     "navnFormStyrke": "Kodimagnyl Ikke-stoppende dak tab 9,6 mg/500 mg/150 mg",
