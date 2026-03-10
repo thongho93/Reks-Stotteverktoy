@@ -839,8 +839,12 @@ export default function StandardTekstPage() {
       // Replace PREPARAT (list) always
       text = text.replace(/\bPREPARAT\b/g, list);
 
-      // Replace PREPARAT1 only if we actually have a first preparat
-      if (pickedPreparats[0]) {
+      // Replace PREPARAT1.
+      // If the template only uses PREPARAT1 but multiple preparater are chosen,
+      // we insert the full list (same behaviour as preview).
+      if (pickedPreparats.length > 1 && !/\bPREPARAT2\b/.test(selected.content)) {
+        text = text.replace(/\bPREPARAT1\b/g, list);
+      } else if (pickedPreparats[0]) {
         text = text.replace(/\bPREPARAT1\b/g, pickedPreparats[0]);
       }
 
