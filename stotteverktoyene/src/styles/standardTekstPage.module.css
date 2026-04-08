@@ -21,11 +21,11 @@
   outline-offset: 2px;
 }
 .page {
-  height: 100vh;
+  min-height: calc(100vh - 24px);
   padding: 12px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .header {
@@ -53,17 +53,18 @@
 
 .grid {
   flex: 1;
-  min-height: 0;
+  min-height: auto;
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
   align-items: stretch;
-  overflow: hidden;
+  overflow: visible;
 }
 
 @media (min-width: 900px) {
   .grid {
     grid-template-columns: var(--sidebar-width, 340px) 10px 1fr;
+    align-items: start;
   }
 }
 
@@ -80,12 +81,25 @@
 }
 
 @media (min-width: 900px) {
+  .sidebar {
+    position: sticky;
+    top: 12px;
+    align-self: start;
+    justify-self: stretch;
+    width: 100%;
+    box-sizing: border-box;
+    max-height: calc(100vh - 24px);
+  }
+
   .sidebarResizeHandle {
     display: block;
-    height: 100%;
-    min-height: 0;
+    align-self: start;
+    justify-self: stretch;
+    position: sticky;
+    top: 12px;
+    height: calc(100vh - 24px);
+    min-height: calc(100vh - 24px);
     cursor: col-resize;
-    position: relative;
     user-select: none;
     touch-action: none;
     border-radius: 999px;
@@ -201,8 +215,8 @@
 
 .main {
   flex: 1;
-  min-height: 0;
-  overflow: auto;
+  min-height: auto;
+  overflow: visible;
 }
 
 .preparatPaper {
@@ -407,6 +421,13 @@
 
 .preparatClearButton {
   text-transform: none !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  align-self: flex-start;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding-left: 18px !important;
+  padding-right: 18px !important;
 }
 
 .preparatSingleSearch {

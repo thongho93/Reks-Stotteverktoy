@@ -68,8 +68,16 @@ export function useStandardTekster(): UseStandardTeksterResult {
     if (!s) return items;
 
     return items.filter((it) => {
-      const haystack = `${it.title} ${it.category ?? ""} ${it.content}`.toLowerCase();
-      return haystack.includes(s);
+      const category = (it.category ?? "").toLowerCase();
+      const title = it.title.toLowerCase();
+      const content = it.content.toLowerCase();
+      const isInteraksjon = category === "interaksjon";
+
+      if (isInteraksjon) {
+        return title.includes(s);
+      }
+
+      return category.includes(s) || title.includes(s) || content.includes(s);
     });
   }, [items, search]);
 

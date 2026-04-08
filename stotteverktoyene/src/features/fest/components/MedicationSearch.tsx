@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   ClickAwayListener,
@@ -38,6 +38,21 @@ type Med = {
 
   // Search backing text (normalized in mapper)
   searchText: string;
+
+  normalizedName: string;
+  normalizedVarenavn: string;
+  normalizedSubstance: string;
+  normalizedSearchText: string;
+  nameTokens: string[];
+  varenavnTokens: string[];
+  substanceTokens: string[];
+  hayTokens: string[];
+  dedupKey: string;
+};
+
+type ScoredMed = {
+  med: Med;
+  score: number;
 };
 
 type Props = {
@@ -85,6 +100,20 @@ const NOISE_TOKENS = new Set([
   "fri",
 ]);
 
+const SEARCH_UNIT_TOKENS = new Set([
+  "mg",
+  "g",
+  "mcg",
+  "ug",
+  "µg",
+  "mikrog",
+  "mikrogram",
+  "ml",
+  "dose",
+  "t",
+  "time",
+]);
+
 const normalizeForSearch = (value: string) =>
   value
     .toLowerCase()
@@ -127,6 +156,106 @@ const toTokens = (value: string) => {
 
 const isNumberToken = (t: string) => /^\d+(?:\.\d+)?$/.test(t);
 
+const normalizeIdToken = (value: string) => {
+  const trimmed = String(value ?? "").trim();
+  const stripped = trimmed.replace(/^0+/, "");
+  return stripped || "0";
+};
+
+const buildDedupKeyFromFields = (nameText: string, substanceText: string) => {
+  const rawTokens = normalizeForSearch(nameText)
+    .split(" ")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .filter((t) => !NOISE_TOKENS.has(t));
+
+  if (rawTokens.length === 0) {
+    return normalizeForSearch([nameText, substanceText].filter(Boolean).join(" ")) || "unknown";
+  }
+
+  const textTokens = rawTokens.filter((t) => !isNumberToken(t) && !SEARCH_UNIT_TOKENS.has(t));
+  const strengthTokens: string[] = [];
+
+  for (let i = 0; i < rawTokens.length - 1; i++) {
+    const a = rawTokens[i];
+    const b = rawTokens[i + 1];
+    if (isNumberToken(a) && SEARCH_UNIT_TOKENS.has(b)) {
+      strengthTokens.push(`${a}${b}`);
+      i++;
+    }
+  }
+
+  const substanceTokens = toTokens(substanceText).filter(
+    (t) => !isNumberToken(t) && !SEARCH_UNIT_TOKENS.has(t),
+  );
+
+  const keyParts = dedupe([...textTokens, ...strengthTokens, ...substanceTokens.slice(0, 2)]);
+  return (
+    keyParts.length > 0
+      ? keyParts.join("|")
+      : normalizeForSearch([nameText, substanceText].filter(Boolean).join(" ")) || "unknown"
+  );
+};
+
+const sourcePriority = (source: Med["source"]) => {
+  switch (source) {
+    case "PIM":
+      return 3;
+    case "HV":
+      return 2;
+    case "FEST":
+    default:
+      return 1;
+  }
+};
+
+const collapseSimilarResults = (items: ScoredMed[]): ScoredMed[] => {
+  const groups = new Map<string, ScoredMed[]>();
+
+  for (const item of items) {
+    const key = item.med.dedupKey;
+    const existing = groups.get(key) ?? [];
+    existing.push(item);
+    groups.set(key, existing);
+  }
+
+  return Array.from(groups.values()).map((group) => {
+    const ranked = [...group].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+
+      const aHasFarmalogg = Boolean(a.med.farmaloggNumber);
+      const bHasFarmalogg = Boolean(b.med.farmaloggNumber);
+      if (aHasFarmalogg !== bHasFarmalogg) return aHasFarmalogg ? -1 : 1;
+
+      const sourceDiff = sourcePriority(b.med.source) - sourcePriority(a.med.source);
+      if (sourceDiff !== 0) return sourceDiff;
+
+      const aName = a.med.navnFormStyrke ?? a.med.varenavn ?? "";
+      const bName = b.med.navnFormStyrke ?? b.med.varenavn ?? "";
+      return aName.localeCompare(bName, "nb");
+    });
+
+    const best = ranked[0];
+    const firstWithFarmalogg = ranked.find((item) => item.med.farmaloggNumber)?.med ?? null;
+    const firstWithVirkestoff = ranked.find((item) => item.med.virkestoff)?.med ?? null;
+    const firstWithAtc = ranked.find((item) => item.med.atc)?.med ?? null;
+    const firstWithProdusent = ranked.find((item) => item.med.produsent)?.med ?? null;
+    const firstWithReseptgruppe = ranked.find((item) => item.med.reseptgruppe)?.med ?? null;
+
+    return {
+      score: best.score,
+      med: {
+        ...best.med,
+        farmaloggNumber: best.med.farmaloggNumber ?? firstWithFarmalogg?.farmaloggNumber ?? null,
+        virkestoff: best.med.virkestoff ?? firstWithVirkestoff?.virkestoff ?? null,
+        atc: best.med.atc ?? firstWithAtc?.atc ?? null,
+        produsent: best.med.produsent ?? firstWithProdusent?.produsent ?? null,
+        reseptgruppe: best.med.reseptgruppe ?? firstWithReseptgruppe?.reseptgruppe ?? null,
+      },
+    };
+  });
+};
+
 const tokenMatches = (hayTokens: string[], needleRaw: string) => {
   const needle = needleRaw.replace(",", ".");
 
@@ -141,12 +270,44 @@ const tokenMatches = (hayTokens: string[], needleRaw: string) => {
 
 export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: Props) {
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const anchorRef = useRef<HTMLDivElement | null>(null);
 
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const effectiveInputRef = inputRef ?? internalInputRef;
+
+  const finalizeMed = (input: {
+    id: string;
+    source: "FEST" | "PIM" | "HV";
+    varenavn: string | null;
+    navnFormStyrke: string | null;
+    atc: string | null;
+    virkestoff: string | null;
+    produsent: string | null;
+    reseptgruppe: string | null;
+    farmaloggNumber?: string | null;
+    searchText: string;
+  }): Med => {
+    const nameText = input.navnFormStyrke ?? input.varenavn ?? "";
+    const varenavnText = input.varenavn ?? input.navnFormStyrke ?? "";
+    const substanceText = input.virkestoff ?? "";
+    const searchText = input.searchText || nameText || varenavnText || substanceText;
+
+    return {
+      ...input,
+      normalizedName: normalizeForSearch(nameText),
+      normalizedVarenavn: normalizeForSearch(varenavnText),
+      normalizedSubstance: normalizeForSearch(substanceText),
+      normalizedSearchText: normalizeForSearch(searchText),
+      nameTokens: toTokens(nameText),
+      varenavnTokens: toTokens(varenavnText),
+      substanceTokens: toTokens(substanceText),
+      hayTokens: toTokens(searchText),
+      dedupKey: buildDedupKeyFromFields(nameText, substanceText),
+    };
+  };
 
   const allItems: Med[] = useMemo(() => {
     const festRaw = (meds as any[]) ?? [];
@@ -236,25 +397,39 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       if (!festVirkestoffByAtc.has(atc)) festVirkestoffByAtc.set(atc, v);
     }
 
-    // 2) Fallback by normalized name (varenavn/navnFormStyrke) -> virkestoff
-    const festVirkestoffByNameKey = new Map<string, string>();
+    // 2) Fallback by normalized name (varenavn/navnFormStyrke) -> metadata
+    const festMetaByNameKey = new Map<
+      string,
+      { virkestoff: string; atc: string; reseptgruppe: string }
+    >();
     for (const m of festRaw) {
-      const v = String((m as any)?.virkestoff ?? "").trim();
-      if (!v) continue;
+      const meta = {
+        virkestoff: String((m as any)?.virkestoff ?? "").trim(),
+        atc: String((m as any)?.atc ?? "").trim(),
+        reseptgruppe: String((m as any)?.reseptgruppe ?? "").trim(),
+      };
+      if (!meta.virkestoff && !meta.atc && !meta.reseptgruppe) continue;
+
       const n1 = String((m as any)?.varenavn ?? "").trim();
       const n2 = String((m as any)?.navnFormStyrke ?? "").trim();
       const k1 = n1 ? normalizeForKey(n1) : "";
       const k2 = n2 ? normalizeForKey(n2) : "";
-      if (k1 && !festVirkestoffByNameKey.has(k1)) festVirkestoffByNameKey.set(k1, v);
-      if (k2 && !festVirkestoffByNameKey.has(k2)) festVirkestoffByNameKey.set(k2, v);
+      if (k1 && !festMetaByNameKey.has(k1)) festMetaByNameKey.set(k1, meta);
+      if (k2 && !festMetaByNameKey.has(k2)) festMetaByNameKey.set(k2, meta);
     }
 
-    const fallbackVirkestoffForPimHv = (item: SearchIndexItem) => {
+    const fallbackMetaForPimHv = (item: SearchIndexItem) => {
       // Prefer ATC match (most stable)
       const atc = String((item as any)?.atc ?? "").trim();
       if (atc) {
-        const v = festVirkestoffByAtc.get(atc);
-        if (v) return v;
+        const virkestoff = festVirkestoffByAtc.get(atc) ?? "";
+        if (virkestoff || atc) {
+          return {
+            virkestoff,
+            atc,
+            reseptgruppe: "",
+          };
+        }
       }
 
       // Otherwise try by name key (displayName/name/nameFormStrength)
@@ -269,11 +444,15 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
       for (const n of nameCandidates) {
         const k = normalizeForKey(n);
-        const v = festVirkestoffByNameKey.get(k);
-        if (v) return v;
+        const meta = festMetaByNameKey.get(k);
+        if (meta) return meta;
       }
 
-      return null;
+      return {
+        virkestoff: "",
+        atc: "",
+        reseptgruppe: "",
+      };
     };
 
     // Convert SearchIndexItem -> Med (the rest of this component continues to work on Med[])
@@ -283,7 +462,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       if (item.source === "FEST") {
         const original = festByKey.get(key);
 
-        return {
+        return finalizeMed({
           id: key,
           source: "FEST",
           varenavn: original?.varenavn ?? null,
@@ -294,46 +473,33 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
           produsent: original?.produsent ?? null,
           reseptgruppe: original?.reseptgruppe ?? item.prescriptionGroup ?? null,
           searchText: item.searchText,
-        } satisfies Med;
+        });
       }
 
       // PIM / HV
-      return {
+      const fallbackMeta = fallbackMetaForPimHv(item);
+      return finalizeMed({
         id: key,
         source: item.source as "PIM" | "HV",
         farmaloggNumber: item.farmaloggNumber ?? String(item.id),
         varenavn: item.name ?? item.displayName ?? null,
         navnFormStyrke: item.nameFormStrength ?? item.displayName ?? item.name ?? null,
-        atc: item.atc ?? null,
-        virkestoff: item.substance ?? fallbackVirkestoffForPimHv(item),
+        atc: item.atc ?? fallbackMeta.atc ?? null,
+        virkestoff: item.substance ?? fallbackMeta.virkestoff ?? null,
         produsent: (item as any).manufacturer ?? null,
-        reseptgruppe: item.prescriptionGroup ?? null,
+        reseptgruppe: item.prescriptionGroup ?? fallbackMeta.reseptgruppe ?? null,
         searchText: item.searchText,
-      } satisfies Med;
+      });
     });
   }, []);
 
   const results = useMemo(() => {
-    const tokens = toTokens(query);
+    const tokens = toTokens(deferredQuery);
     if (tokens.length === 0) return [];
 
     // number + unit pair like "75 mg" or "1.25 ml"
-    const unitSet = new Set([
-      "mg",
-      "g",
-      "mcg",
-      "ug",
-      "µg",
-      "mikrog",
-      "mikrogram",
-      "ml",
-      "dose",
-      "t",
-      "time",
-    ]);
-
     // Split into meaningful text vs number tokens
-    const textTokens = tokens.filter((t) => !isNumberToken(t) && !unitSet.has(t));
+    const textTokens = tokens.filter((t) => !isNumberToken(t) && !SEARCH_UNIT_TOKENS.has(t));
 
     // If the user pasted a long string, we want the match to be more specific.
     // Avoid short/partial tokens like "atin" from becoming required.
@@ -354,6 +520,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       .filter((t) => isNumberToken(t))
       .filter((t) => !t.includes("."))
       .filter((t) => t.length >= 4);
+    const normalizedIdNumberTokens = idNumberTokens.map(normalizeIdToken);
 
     // (computed after `numberWithUnit` is defined)
 
@@ -376,13 +543,22 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       for (let i = 0; i < tokens.length - 1; i++) {
         const a = tokens[i];
         const b = tokens[i + 1];
-        if (isNumberToken(a) && unitSet.has(b)) return a;
+        if (isNumberToken(a) && SEARCH_UNIT_TOKENS.has(b)) return a;
       }
       return null;
     })();
     const isLikelyIdSearch =
       idNumberTokens.length > 0 && meaningfulTextTokens.length === 0 && !numberWithUnit;
     const restrictToPimOnly = isLikelyIdSearch;
+    const normalizedQuery = normalizeForSearch(deferredQuery);
+    const exactStrengthPhrase = (() => {
+      for (let i = 0; i < tokens.length - 1; i++) {
+        const a = tokens[i];
+        const b = tokens[i + 1];
+        if (isNumberToken(a) && SEARCH_UNIT_TOKENS.has(b)) return `${a} ${b}`;
+      }
+      return null;
+    })();
 
     // Collect "meaningful" number tokens until we hit pack-size indicators.
     // Also drop numbers that sit right next to pack-size tokens.
@@ -426,9 +602,9 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       return [];
     })();
 
-    const out: { med: Med; score: number }[] = [];
+    const out: ScoredMed[] = [];
 
-    const rawQueryLower = query.toLowerCase();
+    const rawQueryLower = deferredQuery.toLowerCase();
     const queryIndicatesCombo = rawQueryLower.includes("/") || rawQueryLower.includes(" og ");
     let hasNonComboMatch = false;
 
@@ -451,13 +627,13 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
       // If query looks like an identifier search, match against farmaloggNumber for PIM/HV
       if (isPimLike && idNumberTokens.length > 0) {
-        const id = String(m.farmaloggNumber ?? "");
-        const okId = idNumberTokens.every((t) => id.startsWith(t) || id === t);
+        const id = normalizeIdToken(String(m.farmaloggNumber ?? ""));
+        const okId = normalizedIdNumberTokens.every((t) => id.startsWith(t) || id === t);
         if (!okId) continue;
       }
 
-      const hay = normalizeForSearch(hayText);
-      const hayTokens = toTokens(hayText);
+      const hay = m.normalizedSearchText;
+      const hayTokens = m.hayTokens;
 
       // Må matche viktige tekst-tokens (typisk preparatnavn + ev. produsent/variant fra pasted tekst).
       if (requiredTextTokens.length > 0) {
@@ -479,26 +655,76 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
       // Score = hvor godt den matcher query. Tall teller mer. "required" teksttokens teller ekstra.
       let score = 0;
+      const nameNorm = m.normalizedName;
+      const varenavnNorm = m.normalizedVarenavn;
+      const substanceNorm = m.normalizedSubstance;
+
+      const nameTokens = m.nameTokens;
+      const varenavnTokens = m.varenavnTokens;
+      const substanceTokens = m.substanceTokens;
 
       for (const t of tokens) {
         if (isNumberToken(t)) {
-          if (hayTokens.includes(t)) score += 2;
+          if (nameTokens.includes(t)) score += 4;
+          else if (varenavnTokens.includes(t)) score += 3;
+          else if (hayTokens.includes(t)) score += 2;
         } else {
-          if (hay.includes(t)) score += 1;
+          if (tokenMatches(nameTokens, t) || nameNorm.includes(t)) score += 3;
+          else if (tokenMatches(varenavnTokens, t) || varenavnNorm.includes(t)) score += 2.5;
+          else if (tokenMatches(substanceTokens, t) || substanceNorm.includes(t)) score += 1.5;
+          else if (hay.includes(t)) score += 1;
         }
       }
 
       for (const t of requiredTextTokens) {
-        if (tokenMatches(hayTokens, t) || hay.includes(t)) score += 3;
+        if (tokenMatches(nameTokens, t) || nameNorm.includes(t)) score += 8;
+        else if (tokenMatches(varenavnTokens, t) || varenavnNorm.includes(t)) score += 6;
+        else if (tokenMatches(substanceTokens, t) || substanceNorm.includes(t)) score += 4;
+        else if (tokenMatches(hayTokens, t) || hay.includes(t)) score += 2;
       }
 
       for (const t of requiredStrengthTokens) {
-        if (hayTokens.includes(t)) score += 3;
+        if (nameTokens.includes(t)) score += 6;
+        else if (varenavnTokens.includes(t)) score += 5;
+        else if (hayTokens.includes(t)) score += 3;
+      }
+
+      // Favor actual product names over indirect substance-only matches.
+      if (!isLikelyIdSearch && normalizedQuery && meaningfulTextTokens.length > 0) {
+        if (nameNorm === normalizedQuery) score += 20;
+        else if (nameNorm.startsWith(normalizedQuery)) score += 14;
+        else if (varenavnNorm.startsWith(normalizedQuery)) score += 10;
+        else if (substanceNorm.startsWith(normalizedQuery)) score += 5;
+      }
+
+      // Stronger boost when the first meaningful query token matches the beginning of the product name.
+      const firstMeaningfulTextToken = meaningfulTextTokens[0];
+      if (!isLikelyIdSearch && firstMeaningfulTextToken) {
+        if ((nameTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 10;
+        else if ((varenavnTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 7;
+        else if ((substanceTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 3;
+      }
+
+      // Stronger boost for exact strength matches in the visible product name.
+      if (requiredStrengthTokens.length > 0) {
+        const allStrengthsInName = requiredStrengthTokens.every((t) => nameTokens.includes(t));
+        const allStrengthsInVarenavn = requiredStrengthTokens.every((t) =>
+          varenavnTokens.includes(t),
+        );
+
+        if (allStrengthsInName) score += 10;
+        else if (allStrengthsInVarenavn) score += 8;
+      }
+
+      if (exactStrengthPhrase) {
+        if (nameNorm.includes(exactStrengthPhrase)) score += 8;
+        else if (varenavnNorm.includes(exactStrengthPhrase)) score += 6;
+        else if (hay.includes(exactStrengthPhrase)) score += 3;
       }
 
       if (isPimLike && idNumberTokens.length > 0) {
-        const id = String(m.farmaloggNumber ?? "");
-        for (const t of idNumberTokens) {
+        const id = normalizeIdToken(String(m.farmaloggNumber ?? ""));
+        for (const t of normalizedIdNumberTokens) {
           if (id === t) score += 20;
           else if (id.startsWith(t)) score += 10;
         }
@@ -510,15 +736,15 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       if (requiredStrengthTokens.length === 1 && numberWithUnit) {
         const t = requiredStrengthTokens[0];
         const unitPattern = "mg|g|mcg|ug|µg|mikrog|mikrogram|ml";
-        const combinedStrengthRe = new RegExp(`\\b${t}\\s*(?:${unitPattern})\\s*/`, "i");
-        if (combinedStrengthRe.test(hayText)) {
-          score += 4;
+          const combinedStrengthRe = new RegExp(`\\b${t}\\s*(?:${unitPattern})\\s*/`, "i");
+          if (combinedStrengthRe.test(m.searchText)) {
+            score += 4;
+          }
         }
-      }
 
-      // Bonus when the candidate contains most of the (normalized) query text.
-      // Helps when the user pastes a long product line.
-      const qNorm = normalizeForSearch(query);
+        // Bonus when the candidate contains most of the (normalized) query text.
+        // Helps when the user pastes a long product line.
+      const qNorm = normalizeForSearch(deferredQuery);
       if (qNorm.length >= 8 && hay.includes(qNorm)) score += 6;
 
       out.push({ med: m, score });
@@ -534,18 +760,20 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       }
     }
 
+    const collapsedOut = collapseSimilarResults(out);
+
     // Identifier-only searches: show prefix matches while the user is still typing.
     // Only prefer exact farmaloggNumber matches once the input looks like a *full* id
     // (so short prefixes like "8446" don't immediately collapse to the exact "8446" hit).
     if (restrictToPimOnly && idNumberTokens.length > 0) {
-      const qNormDigits = normalizeForSearch(query).replace(/\s+/g, "");
+      const qNormDigits = normalizeIdToken(normalizeForSearch(deferredQuery).replace(/\s+/g, ""));
       const looksLikeFullId = /^\d{5,}$/.test(qNormDigits);
 
       if (looksLikeFullId) {
-        const exact = out.filter(({ med }) => {
+        const exact = collapsedOut.filter(({ med }) => {
           if (med.source !== "PIM" && med.source !== "HV") return false;
-          const id = String(med.farmaloggNumber ?? "");
-          return idNumberTokens.some((t) => id === t);
+          const id = normalizeIdToken(String(med.farmaloggNumber ?? ""));
+          return normalizedIdNumberTokens.some((t) => id === t);
         });
 
         if (exact.length > 0) {
@@ -557,12 +785,12 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       }
     }
 
-    if (restrictToPimOnly && out.length === 0) return [];
+    if (restrictToPimOnly && collapsedOut.length === 0) return [];
 
-    out.sort((a, b) => b.score - a.score);
+    collapsedOut.sort((a, b) => b.score - a.score);
 
-    return out.slice(0, maxResults).map((x) => x.med);
-  }, [query, maxResults, allItems]);
+    return collapsedOut.slice(0, maxResults).map((x) => x.med);
+  }, [deferredQuery, maxResults, allItems]);
 
   const pickResult = (m: Med) => {
     onPick?.(m);
@@ -601,19 +829,20 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     if (!isNumeric) return;
 
     const only = results[0];
-    const id = String(only.farmaloggNumber ?? "");
+    const id = normalizeIdToken(String(only.farmaloggNumber ?? ""));
     if (!id) return;
-    if (!(id === qNorm || id.startsWith(qNorm))) return;
+    const normalizedQueryId = normalizeIdToken(qNorm);
+    if (!(id === normalizedQueryId || id.startsWith(normalizedQueryId))) return;
 
     const isPimLike = (m: Med) => m.source === "PIM" || m.source === "HV";
 
     // If ANY other PIM/HV id starts with the same prefix, don't auto-pick (user may be typing a longer id).
     const hasOtherWithSamePrefix = allItems.some((m) => {
       if (!isPimLike(m)) return false;
-      const mid = String(m.farmaloggNumber ?? "");
+      const mid = normalizeIdToken(String(m.farmaloggNumber ?? ""));
       if (!mid) return false;
       if (mid === id) return false;
-      return mid.startsWith(qNorm);
+      return mid.startsWith(normalizedQueryId);
     });
 
     if (hasOtherWithSamePrefix) return;
@@ -720,17 +949,17 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
                 >
                   {(() => {
                     const secondaryParts = [
-                      m.virkestoff ? `Virkestoff: ${m.virkestoff}` : null,
-                      m.atc ? `ATC: ${m.atc}` : null,
-                      m.reseptgruppe ? `Reseptgruppe: ${m.reseptgruppe}` : null,
-                    ].filter(Boolean) as string[];
+                      `Virkestoff: ${m.virkestoff?.trim() || "-"}`,
+                      `ATC: ${m.atc?.trim() || "-"}`,
+                      `Reseptgruppe: ${m.reseptgruppe?.trim() || "-"}`,
+                    ];
 
                     return (
                       <ListItemText
                         primary={`${m.navnFormStyrke ?? m.varenavn ?? "(uten navn)"}${
                           m.farmaloggNumber ? ` (${m.farmaloggNumber})` : ""
                         }`}
-                        secondary={secondaryParts.length ? secondaryParts.join(" • ") : undefined}
+                        secondary={secondaryParts.join(" • ")}
                       />
                     );
                   })()}

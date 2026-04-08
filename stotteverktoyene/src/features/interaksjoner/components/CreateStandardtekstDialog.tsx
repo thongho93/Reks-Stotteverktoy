@@ -16,6 +16,7 @@ import {
   createStandardtekstForInteraction,
   updateStandardtekst,
 } from "../../standardtekster/services/standardTeksterApi";
+import { useAuthUser } from "../../../app/auth/Auth";
 
 type Props = {
   open: boolean;
@@ -105,6 +106,14 @@ function stripCommonGreetingAndSignature(middle: string) {
 
 export function CreateStandardtekstDialog(props: Props) {
   const { open, interactionId, prefillTitle, onClose, onCreated } = props;
+  const { user, firstName } = useAuthUser();
+  const actorName = (firstName ?? "").trim() || user?.displayName?.trim() || user?.email?.trim() || "";
+  const actor = user
+    ? {
+        uid: user.uid,
+        name: actorName || null,
+      }
+    : undefined;
 
   const [title, setTitle] = React.useState("");
   const [interactionText, setInteractionText] = React.useState("");
@@ -152,6 +161,7 @@ export function CreateStandardtekstDialog(props: Props) {
         content: previewText,
         interactionId,
         followUps: [],
+        actor,
       });
 
       onCreated?.(createdId);
@@ -161,7 +171,7 @@ export function CreateStandardtekstDialog(props: Props) {
     } finally {
       setSaving(false);
     }
-  }, [interactionId, title, interactionText, previewText, onCreated, onClose]);
+  }, [interactionId, title, interactionText, previewText, onCreated, onClose, actor]);
 
   const handleCopyPreview = React.useCallback(async () => {
     try {
@@ -298,6 +308,14 @@ type EditProps = {
 
 export function EditStandardtekstDialog(props: EditProps) {
   const { open, standardtekst, onClose, onSaved } = props;
+  const { user, firstName } = useAuthUser();
+  const actorName = (firstName ?? "").trim() || user?.displayName?.trim() || user?.email?.trim() || "";
+  const actor = user
+    ? {
+        uid: user.uid,
+        name: actorName || null,
+      }
+    : undefined;
 
   const [title, setTitle] = React.useState("");
   const [interactionText, setInteractionText] = React.useState("");
@@ -355,6 +373,7 @@ export function EditStandardtekstDialog(props: EditProps) {
         category: standardtekst.category || FIXED_CATEGORY,
         content: previewText,
         followUps: (standardtekst.followUps ?? []) as any,
+        actor,
       });
 
       onSaved?.();
@@ -364,7 +383,7 @@ export function EditStandardtekstDialog(props: EditProps) {
     } finally {
       setSaving(false);
     }
-  }, [standardtekst, title, interactionText, previewText, onSaved, onClose]);
+  }, [standardtekst, title, interactionText, previewText, onSaved, onClose, actor]);
 
   return (
     <Dialog

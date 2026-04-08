@@ -13,6 +13,20 @@ export function mapDocToStandardTekst(id: string, data: Record<string, unknown>)
     pickFirstNonEmptyString(data["content"], data["Body"], data["tekst"], data["body"]) ?? "";
 
   const updatedAt = toDateMaybe(data["updatedAt"] ?? data["updated_at"] ?? data["sistOppdatert"]);
+  const createdByName =
+    pickFirstNonEmptyString(
+      data["createdByName"],
+      data["created_by_name"],
+      data["createdByDisplayName"],
+      data["createdBy"],
+    ) ?? undefined;
+  const updatedByName =
+    pickFirstNonEmptyString(
+      data["updatedByName"],
+      data["updated_by_name"],
+      data["updatedByDisplayName"],
+      data["updatedBy"],
+    ) ?? undefined;
 
   const followUpsRaw = data["followUps"] ?? data["follow_ups"];
   const followUps = Array.isArray(followUpsRaw) ? (followUpsRaw as unknown[]) : undefined;
@@ -23,6 +37,8 @@ export function mapDocToStandardTekst(id: string, data: Record<string, unknown>)
     category: category || undefined,
     content,
     followUps: followUps as any,
+    createdByName,
+    updatedByName,
     updatedAt,
   };
 }

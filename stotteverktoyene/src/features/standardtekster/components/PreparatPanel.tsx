@@ -1,4 +1,14 @@
-import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Chip,
+  FormControlLabel,
+  Paper,
+  Stack,
+  Switch,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
 import MedicationSearch from "../../fest/components/MedicationSearch";
 import styles from "../../../styles/standardTekstPage.module.css";
@@ -13,8 +23,12 @@ type PreparatRowLike = {
 
 type Props = {
   preparatRows: PreparatRowLike[];
+  clearOnCopy?: boolean;
   includeManufacturerInText?: boolean;
   includePackSizeInText?: boolean;
+  onClearOnCopyChange?: (value: boolean) => void;
+  onIncludeManufacturerInTextChange?: (value: boolean) => void;
+  onIncludePackSizeInTextChange?: (value: boolean) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onPickText: (pick: string | { text: string; key: string; virkestoff?: string }) => void;
   onClear: () => void;
@@ -23,8 +37,12 @@ type Props = {
 
 export default function PreparatPanel({
   preparatRows,
+  clearOnCopy = false,
   includeManufacturerInText = false,
   includePackSizeInText = false,
+  onClearOnCopyChange,
+  onIncludeManufacturerInTextChange,
+  onIncludePackSizeInTextChange,
   inputRef,
   onPickText,
   onClear,
@@ -183,7 +201,16 @@ export default function PreparatPanel({
 
         <Button
           variant="outlined"
-          size="small"
+          className={styles.preparatClearButton}
+          sx={{
+            height: 56,
+            minHeight: 56,
+            boxSizing: "border-box",
+            alignSelf: "flex-start",
+            flexShrink: 0,
+            px: 2.25,
+            whiteSpace: "nowrap",
+          }}
           onClick={onClear}
           disabled={!hasPicked}
           startIcon={<ClearAllIcon fontSize="small" />}
@@ -192,6 +219,58 @@ export default function PreparatPanel({
           Tøm
         </Button>
       </Stack>
+
+      <Box
+        sx={{
+          mt: 1,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 1.5,
+          alignItems: "center",
+        }}
+      >
+        <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Switch
+                size="small"
+                checked={clearOnCopy}
+                onChange={(e) => onClearOnCopyChange?.(e.target.checked)}
+              />
+            }
+            label={<Typography variant="caption">Tøm etter kopiering</Typography>}
+          />
+        </Tooltip>
+
+        <Tooltip title="Når dette er på, settes produsentnavn inn i teksten (f.eks. Metformin Sandoz).">
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Switch
+                size="small"
+                checked={includeManufacturerInText}
+                onChange={(e) => onIncludeManufacturerInTextChange?.(e.target.checked)}
+              />
+            }
+            label={<Typography variant="caption">Vis produsent</Typography>}
+          />
+        </Tooltip>
+
+        <Tooltip title="Når dette er på, tas pakningsstørrelse med i teksten (f.eks. ... 60).">
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Switch
+                size="small"
+                checked={includePackSizeInText}
+                onChange={(e) => onIncludePackSizeInTextChange?.(e.target.checked)}
+              />
+            }
+            label={<Typography variant="caption">Vis pakningsstørrelse</Typography>}
+          />
+        </Tooltip>
+      </Box>
 
       <Box className={styles.preparatChipsWrap}>
         {preparatRows
