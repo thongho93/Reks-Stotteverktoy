@@ -11,14 +11,12 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  MenuItem,
   Paper,
   Snackbar,
   Stack,
   TextField,
   Typography,
-  FormControlLabel,
-  Switch,
-  Tooltip,
 } from "@mui/material";
 import StandardTekstSidebar from "../components/StandardTekstSidebar";
 import StandardTekstContent from "../components/StandardTekstContent";
@@ -46,6 +44,68 @@ import { useStandardTekstHotkeys } from "../hooks/useStandardTekstHotkeys";
 import PreparatPanel from "../components/PreparatPanel";
 import { deleteStandardTekst } from "../utils/deleteStandardTekst";
 import type { StandardTekstFollowUp } from "../types";
+
+type ClockTallDay = "today" | "tomorrow";
+const CLOCK_TALL_OPTIONS = ["11:00", "14:00", "15:00"] as const;
+
+function getTallTokenRegex(index: number) {
+  if (index === 0) {
+    return /\{\{\s*TALL\s*\}\}|\bTALL\b/gi;
+  }
+
+  return new RegExp(`\\{\\{\\s*TALL${index}\\s*\\}\\}|\\bTALL${index}\\b`, "gi");
+}
+
+function templateTallTokenLooksLikeClock(template: string, index: number): boolean {
+  const regex = getTallTokenRegex(index);
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(template ?? ""))) {
+    const before = template.slice(Math.max(0, match.index - 24), match.index).toLowerCase();
+    const after = template
+      .slice(regex.lastIndex, Math.min((template ?? "").length, regex.lastIndex + 20))
+      .toLowerCase();
+
+    if (/\b(klokken|kl)\.?\s*$/.test(before)) return true;
+    if (/^\s*i\s+(dag|morgen)\b/.test(after)) return true;
+  }
+
+  return false;
+}
+
+function parseClockTallValue(value: string): { time: string; day: ClockTallDay } | null {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/^(\d{1,2}:\d{2})(?:\s+i\s+(dag|morgen))?$/i);
+  if (!match) return null;
+
+  return {
+    time: match[1],
+    day: match[2]?.toLowerCase() === "morgen" ? "tomorrow" : "today",
+  };
+}
+
+function formatClockTallValue(time: string, day: ClockTallDay): string {
+  const trimmedTime = (time ?? "").trim();
+  if (!trimmedTime) return "";
+  return `${trimmedTime} ${day === "tomorrow" ? "i morgen" : "i dag"}`;
+}
+
+function getAutomaticClockTallDay(time: string, now = new Date()): ClockTallDay {
+  const trimmedTime = (time ?? "").trim();
+  const match = trimmedTime.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return "today";
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return "today";
+
+  const selectedMinutes = hours * 60 + minutes;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return selectedMinutes > currentMinutes ? "today" : "tomorrow";
+}
 
 export default function StandardTekstPage() {
   const {
@@ -75,7 +135,14 @@ export default function StandardTekstPage() {
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
   const errorToShow = errorLocal ?? error;
 
-  const { isAdmin, firstName } = useAuthUser();
+  const { user, isAdmin, firstName } = useAuthUser();
+  const actorName = (firstName ?? "").trim() || user?.displayName?.trim() || user?.email?.trim() || "";
+  const actor = user
+    ? {
+        uid: user.uid,
+        name: actorName || null,
+      }
+    : undefined;
 
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [draftTitle, setDraftTitle] = useState<string>("");
@@ -246,6 +313,24 @@ export default function StandardTekstPage() {
     );
     return text.replace(re, safeValue);
   };
+
+  const getTallFieldLabel = useCallback((template: string, index: number) => {
+    const isClock = templateTallTokenLooksLikeClock(template, index);
+    if (isClock) {
+      return index === 0 ? "Klokkeslett" : `Klokkeslett ${index}`;
+    }
+
+    return index === 0 ? "Tall" : `Tall ${index}`;
+  }, []);
+
+  const getTallSectionTitle = useCallback((template: string) => {
+    const indices = getTallTokenIndices(template);
+    const clockCount = indices.filter((index) => templateTallTokenLooksLikeClock(template, index)).length;
+
+    if (clockCount === 0) return "Tall i teksten";
+    if (clockCount === indices.length) return "Tid i teksten";
+    return "Tall og tid i teksten";
+  }, []);
 
   // Lagrer virkestoff knyttet til valgt preparat (mappes på selve picked-teksten)
   const [virkestoffByPicked, setVirkestoffByPicked] = useState<Record<string, string>>({});
@@ -527,12 +612,16 @@ export default function StandardTekstPage() {
         return [...draftFollowUps, { id: followUpPick.id, label }];
       })();
 
-      await standardTeksterApi.update(selected.id, {
-        title: draftTitle,
-        category: draftCategory.trim() || undefined,
-        content: draftContent,
-        followUps: followUpsToSave,
-      });
+      await standardTeksterApi.update(
+        selected.id,
+        {
+          title: draftTitle,
+          category: draftCategory.trim() || undefined,
+          content: draftContent,
+          followUps: followUpsToSave,
+        },
+        actor,
+      );
 
       // Oppdater lokalt state så UI viser ny tekst uten refresh
       setItems((prev) =>
@@ -544,6 +633,7 @@ export default function StandardTekstPage() {
                 category: draftCategory.trim() || undefined,
                 content: draftContent,
                 followUps: followUpsToSave,
+                updatedByName: actor?.name ?? it.updatedByName,
                 updatedAt: new Date(),
               }
             : it,
@@ -571,7 +661,7 @@ export default function StandardTekstPage() {
     setErrorLocal(null);
 
     try {
-      const localItem = await standardTeksterApi.createEmpty();
+      const localItem = await standardTeksterApi.createEmpty(actor);
 
       // Add to local list and select it immediately
       setItems((prev) => {
@@ -798,8 +888,8 @@ export default function StandardTekstPage() {
       const indices = getTallTokenIndices(selected.content);
       const missing = indices.filter((i) => !(tallByIndex[i] ?? "").trim());
       if (missing.length) {
-        const label = missing.map((i) => (i === 0 ? "TALL" : `TALL${i}`)).join(", ");
-        setErrorLocal(`Fyll inn tallfeltet før du kopierer teksten: ${label}.`);
+        const label = missing.map((i) => getTallFieldLabel(selected.content, i)).join(", ");
+        setErrorLocal(`Fyll inn feltet før du kopierer teksten: ${label}.`);
         return;
       }
     }
@@ -1043,45 +1133,6 @@ export default function StandardTekstPage() {
               <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
             </span>
           </Typography>
-          <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
-            <FormControlLabel
-              sx={{ ml: 1 }}
-              control={
-                <Switch
-                  size="small"
-                  checked={clearOnCopy}
-                  onChange={(e) => setClearOnCopy(e.target.checked)}
-                />
-              }
-              label={<Typography variant="caption">Tøm etter kopiering</Typography>}
-            />
-          </Tooltip>
-          <Tooltip title="Når dette er på, settes produsentnavn inn i teksten (f.eks. Metformin Sandoz).">
-            <FormControlLabel
-              sx={{ ml: 1 }}
-              control={
-                <Switch
-                  size="small"
-                  checked={includeManufacturerInPreparatText}
-                  onChange={(e) => setIncludeManufacturerInPreparatText(e.target.checked)}
-                />
-              }
-              label={<Typography variant="caption">Vis produsent</Typography>}
-            />
-          </Tooltip>
-          <Tooltip title="Når dette er på, tas pakningsstørrelse med i teksten (f.eks. ... 60).">
-            <FormControlLabel
-              sx={{ ml: 1 }}
-              control={
-                <Switch
-                  size="small"
-                  checked={includePackSizeInPreparatText}
-                  onChange={(e) => setIncludePackSizeInPreparatText(e.target.checked)}
-                />
-              }
-              label={<Typography variant="caption">Vis pakningsstørrelse</Typography>}
-            />
-          </Tooltip>
           <Button
             variant="text"
             size="small"
@@ -1108,12 +1159,14 @@ export default function StandardTekstPage() {
           </Typography>
 
           <Box component="ul" className={styles.guideList}>
-            <li>Søk i listen til venstre og velg en standardtekst.</li>
-            <li>Bruk "Søk etter preparat" for å erstatte {"PREPARAT"} automatisk.</li>
-            <li>Legg til flere preparater (+). De settes inn med komma, og "og" før siste.</li>
-            <li>Sjekk at navnet ditt står riktig i slutten.</li>
-            <li>Klikk i teksten for å kopiere.</li>
-            {isAdmin && <li>Som admin kan du opprette, redigere og slette standardtekster.</li>}
+            <li>Søk i listen til venstre og velg en standardtekst. Trykk Enter i søkefeltet for å åpne øverste treff.</li>
+            <li>Bruk stjernen for å lagre standardtekster som favoritter.</li>
+            <li>Bruk "Søk etter preparat" for å sette inn PREPARAT automatisk. Du kan søke på navn eller varenummer.</li>
+            <li>Hvis teksten har egne felt, fyll inn tall, dato, formulering eller klokkeslett før du kopierer.</li>
+            <li>Klokkeslettfelt bruker faste valg og foreslår automatisk i dag eller i morgen ut fra lokal tid.</li>
+            <li>Velg om produsent og pakningsstørrelse skal tas med i preparatteksten via bryterne øverst.</li>
+            <li>Klikk i teksten for å kopiere. Hvis "Tøm etter kopiering" er på, nullstilles feltene automatisk etterpå.</li>
+            {isAdmin && <li>Som admin kan du opprette, redigere og slette standardtekster, og se hvem som opprettet og sist oppdaterte teksten.</li>}
           </Box>
         </Paper>
       </Collapse>
@@ -1199,8 +1252,12 @@ export default function StandardTekstPage() {
             >
               <PreparatPanel
                 preparatRows={preparatRows}
+                clearOnCopy={clearOnCopy}
                 includeManufacturerInText={includeManufacturerInPreparatText}
                 includePackSizeInText={includePackSizeInPreparatText}
+                onClearOnCopyChange={setClearOnCopy}
+                onIncludeManufacturerInTextChange={setIncludeManufacturerInPreparatText}
+                onIncludePackSizeInTextChange={setIncludePackSizeInPreparatText}
                 inputRef={preparatSearchInputRef}
                 onPickText={(pick) => {
                   const text = typeof pick === "string" ? pick : pick.text;
@@ -1265,7 +1322,7 @@ export default function StandardTekstPage() {
                 }}
               >
                 <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                  Tall i teksten
+                  {getTallSectionTitle(selected.content)}
                 </Typography>
 
                 {(() => {
@@ -1277,13 +1334,86 @@ export default function StandardTekstPage() {
                         sx={{
                           display: "grid",
                           gap: 1,
-                          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                          gridTemplateColumns: {
+                            xs: "1fr",
+                            sm: "repeat(auto-fit, minmax(180px, 220px))",
+                          },
                           alignItems: "start",
                         }}
                       >
                         {tallIndices.map((idx) => {
                           const v = tallByIndex[idx] ?? "";
-                          const tokenLabel = idx === 0 ? "Tall" : `Tall ${idx}`;
+                          const isClockField = templateTallTokenLooksLikeClock(selected.content, idx);
+                          const tokenLabel = getTallFieldLabel(selected.content, idx);
+
+                          if (isClockField) {
+                            const parsedClock = parseClockTallValue(v) ?? {
+                              time: "",
+                              day: "today" as ClockTallDay,
+                            };
+                            const selectedClockTime = CLOCK_TALL_OPTIONS.includes(
+                              parsedClock.time as (typeof CLOCK_TALL_OPTIONS)[number],
+                            )
+                              ? parsedClock.time
+                              : "";
+
+                            return (
+                              <Box
+                                key={idx}
+                                sx={{
+                                  display: "grid",
+                                  gap: 1,
+                                  gridTemplateColumns: { xs: "1fr", sm: "180px 140px" },
+                                  alignItems: "start",
+                                }}
+                              >
+                                <TextField
+                                  select
+                                  label={tokenLabel}
+                                  size="small"
+                                  value={selectedClockTime}
+                                  onChange={(e) => {
+                                    const nextDay = getAutomaticClockTallDay(e.target.value);
+                                    const nextValue = formatClockTallValue(
+                                      e.target.value,
+                                      nextDay,
+                                    );
+                                    setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+
+                                    if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
+                                      setErrorLocal(null);
+                                    }
+                                  }}
+                                >
+                                  <MenuItem value="">Velg klokkeslett</MenuItem>
+                                  {CLOCK_TALL_OPTIONS.map((time) => (
+                                    <MenuItem key={time} value={time}>
+                                      kl. {time.slice(0, 2)}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+
+                                <TextField
+                                  select
+                                  label="Dag"
+                                  size="small"
+                                  value={parsedClock.day}
+                                  onChange={(e) => {
+                                    const nextDay = e.target.value as ClockTallDay;
+                                    const nextValue = formatClockTallValue(parsedClock.time, nextDay);
+                                    setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+
+                                    if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
+                                      setErrorLocal(null);
+                                    }
+                                  }}
+                                >
+                                  <MenuItem value="today">I dag</MenuItem>
+                                  <MenuItem value="tomorrow">I morgen</MenuItem>
+                                </TextField>
+                              </Box>
+                            );
+                          }
 
                           return (
                             <TextField
@@ -1294,11 +1424,7 @@ export default function StandardTekstPage() {
                                 const nextValue = e.target.value;
                                 setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
 
-                                if (
-                                  errorLocal?.startsWith(
-                                    "Fyll inn tallfeltet før du kopierer teksten",
-                                  )
-                                ) {
+                                if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
                                   setErrorLocal(null);
                                 }
                               }}

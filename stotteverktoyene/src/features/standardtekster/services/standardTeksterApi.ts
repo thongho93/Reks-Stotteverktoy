@@ -16,6 +16,11 @@ import { mapDocToStandardTekst } from "../mappers/standardTekstMapper";
 
 const COL_NAME = "Standardtekster";
 
+type StandardTekstActor = {
+  uid?: string | null;
+  name?: string | null;
+};
+
 export const standardTeksterApi = {
   async fetchAll(): Promise<StandardTekst[]> {
     const q = query(collection(db, COL_NAME));
@@ -26,12 +31,14 @@ export const standardTeksterApi = {
       .sort((a, b) => a.title.localeCompare(b.title, "nb"));
   },
 
-  async update(id: string, patch: UpdateStandardTekstDto): Promise<void> {
+  async update(id: string, patch: UpdateStandardTekstDto, actor?: StandardTekstActor): Promise<void> {
     const ref = doc(db, COL_NAME, id);
 
     const payload: Record<string, unknown> = {
       updatedAt: serverTimestamp(),
     };
+    if (actor?.uid) payload.updatedByUid = actor.uid;
+    if (actor?.name) payload.updatedByName = actor.name;
 
     if (typeof patch.title === "string") payload.title = patch.title;
     if (typeof patch.category === "string") payload.category = patch.category;
@@ -41,7 +48,7 @@ export const standardTeksterApi = {
     await updateDoc(ref, payload);
   },
 
-  async createEmpty(): Promise<StandardTekst> {
+  async createEmpty(actor?: StandardTekstActor): Promise<StandardTekst> {
     const colRef = collection(db, COL_NAME);
     const now = serverTimestamp();
 
@@ -52,6 +59,10 @@ export const standardTeksterApi = {
       followUps: [] as const,
       updatedAt: now,
       createdAt: now,
+      createdByUid: actor?.uid ?? null,
+      createdByName: actor?.name ?? null,
+      updatedByUid: actor?.uid ?? null,
+      updatedByName: actor?.name ?? null,
     } as const;
 
     const docRef = await addDoc(colRef, newDoc);
@@ -62,6 +73,8 @@ export const standardTeksterApi = {
       category: undefined,
       content: newDoc.content,
       followUps: [],
+      createdByName: actor?.name ?? undefined,
+      updatedByName: actor?.name ?? undefined,
       updatedAt: new Date(),
     };
   },
@@ -102,6 +115,7 @@ export async function createStandardtekstForInteraction(params: {
   content: string;
   interactionId: string;
   followUps: any[];
+  actor?: StandardTekstActor;
 }) {
   const colRef = collection(db, "Standardtekster");
 
@@ -113,6 +127,10 @@ export async function createStandardtekstForInteraction(params: {
     interactionIds: [params.interactionId],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    createdByUid: params.actor?.uid ?? null,
+    createdByName: params.actor?.name ?? null,
+    updatedByUid: params.actor?.uid ?? null,
+    updatedByName: params.actor?.name ?? null,
   };
 
   const docRef = await addDoc(colRef, newDoc);
@@ -125,11 +143,12 @@ export async function updateStandardtekst(params: {
   category?: string;
   content: string;
   followUps: any[];
+  actor?: StandardTekstActor;
 }) {
   await standardTeksterApi.update(params.standardtekstId, {
     title: params.title,
     category: params.category,
     content: params.content,
     followUps: params.followUps,
-  });
+  }, params.actor);
 }

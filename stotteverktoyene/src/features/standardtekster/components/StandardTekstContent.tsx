@@ -374,6 +374,18 @@ export default function StandardTekstContent({
             </Typography>
           )}
 
+          {isAdmin && selected.createdByName ? (
+            <Typography variant="caption" color="text.secondary" className={styles.updatedAt}>
+              Opprettet av: {selected.createdByName}
+            </Typography>
+          ) : null}
+
+          {isAdmin && selected.updatedByName ? (
+            <Typography variant="caption" color="text.secondary" className={styles.updatedAt}>
+              Sist oppdatert av: {selected.updatedByName}
+            </Typography>
+          ) : null}
+
           {isEditing ? (
             <>
               <Stack spacing={2}>

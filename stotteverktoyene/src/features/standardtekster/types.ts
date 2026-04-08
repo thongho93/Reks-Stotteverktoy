@@ -25,6 +25,8 @@ export type StandardTekst = {
   category?: string;
   content: string;
   followUps?: StandardTekstFollowUp[];
+  createdByName?: string;
+  updatedByName?: string;
   updatedAt?: Date | null;
 };
 

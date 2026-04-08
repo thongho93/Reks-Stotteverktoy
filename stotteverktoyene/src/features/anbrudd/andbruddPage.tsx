@@ -1,32 +1,56 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
+  Dialog,
+  DialogContent,
+  DialogActions,
+  DialogTitle,
   Paper,
   Tab,
   Tabs,
   Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from "@mui/material";
 
 const officeFormUrl = import.meta.env.VITE_ANBRUDD_OFFICE_FORM_URL as string | undefined;
 const sharepointEmbedUrl = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
   import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
 
+const withRefreshParam = (src: string | undefined, refreshKey: number) => {
+  if (!src) return src;
+  const separator = src.includes("?") ? "&" : "?";
+  return `${src}${separator}reks_refresh=${refreshKey}`;
+};
+
+const formatRefreshTime = (value: string | null) => {
+  if (!value) return "Ikke oppdatert ennå";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Ikke oppdatert ennå";
+
+  return new Intl.DateTimeFormat("nb-NO", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(date);
+};
+
 export default function AndbruddPage() {
   const [tab, setTab] = useState<"form" | "sharepoint">("sharepoint");
   const [iframeError, setIframeError] = useState(false);
-  const [iframeKey, setIframeKey] = useState(0);
   const [showLoginHelp, setShowLoginHelp] = useState(false);
+  const [refreshKeys, setRefreshKeys] = useState({ form: 0, sharepoint: 0 });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState<{ form: string | null; sharepoint: string | null }>({
+    form: null,
+    sharepoint: null,
+  });
 
   const current = useMemo(() => {
     if (tab === "form") {
       return {
         title: "Anbruddskjema",
-        src: officeFormUrl,
+        src: withRefreshParam(officeFormUrl, refreshKeys.form),
         missing: "Office Form URL mangler (VITE_ANBRUDD_OFFICE_FORM_URL)",
         iframeTitle: "Office Form",
         height: 780,
@@ -35,21 +59,31 @@ export default function AndbruddPage() {
 
     return {
       title: "Oversikt (SharePoint)",
-      src: sharepointEmbedUrl,
+      src: withRefreshParam(sharepointEmbedUrl, refreshKeys.sharepoint),
       missing:
         "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
       iframeTitle: "SharePoint Excel",
       height: 860,
     };
-  }, [tab]);
+  }, [refreshKeys.form, refreshKeys.sharepoint, tab]);
 
   useEffect(() => {
     setIframeError(false);
+    setIsRefreshing(false);
   }, [tab]);
 
   useEffect(() => {
     setShowLoginHelp(true);
   }, []);
+
+  const refreshCurrent = () => {
+    setIframeError(false);
+    setIsRefreshing(true);
+    setRefreshKeys((prev) => ({
+      ...prev,
+      [tab]: Date.now(),
+    }));
+  };
 
   return (
     <Paper sx={{ p: 2, borderRadius: 2 }}>
@@ -64,12 +98,30 @@ export default function AndbruddPage() {
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography variant="h1">{current.title}</Typography>
-          {tab === "sharepoint" && (
-            <Button size="small" variant="outlined" onClick={() => setIframeKey((k) => k + 1)}>
-              Oppdater
+          <Button size="small" variant="outlined" onClick={refreshCurrent}>
+            Oppdater
+          </Button>
+          {current.src && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => window.open(current.src, "_blank", "noopener,noreferrer")}
+            >
+              Åpne i ny fane
             </Button>
           )}
         </Box>
+      </Box>
+
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center", mb: 1.5 }}>
+        <Typography variant="body2" color="text.secondary">
+          Sist oppdatert visning: {formatRefreshTime(lastLoadedAt[tab])}
+        </Typography>
+        {isRefreshing && (
+          <Typography variant="body2" color="text.secondary">
+            Oppdaterer visningen...
+          </Typography>
+        )}
       </Box>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} aria-label="Anbrudd tabs">
@@ -80,28 +132,28 @@ export default function AndbruddPage() {
       {current.src ? (
         <>
           {iframeError && (
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => window.open(current.src, "_blank", "noopener,noreferrer")}
-              >
-                Åpne i ny fane
-              </Button>
-            </Box>
+            <Alert severity="warning" sx={{ mb: 1.5 }}>
+              Innholdet kunne ikke lastes stabilt i appen. Prøv `Oppdater`, eller bruk `Åpne i ny
+              fane`.
+            </Alert>
           )}
 
           <Box
-            key={iframeKey}
+            key={current.src}
             component="iframe"
             title={current.iframeTitle}
             src={current.src}
-            onLoad={() => setIframeError(false)}
+            onLoad={() => {
+              setIframeError(false);
+              setIsRefreshing(false);
+              setLastLoadedAt((prev) => ({
+                ...prev,
+                [tab]: new Date().toISOString(),
+              }));
+            }}
             onError={() => setIframeError(true)}
             frameBorder={0}
             scrolling="no"
-            loading="lazy"
-            referrerPolicy="no-referrer"
             style={{ width: "100%", height: `${current.height}px`, border: 0 }}
           />
         </>
