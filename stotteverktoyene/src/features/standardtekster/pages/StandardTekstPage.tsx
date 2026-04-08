@@ -49,6 +49,7 @@ import type { StandardTekstFollowUp } from "../types";
 
 export default function StandardTekstPage() {
   const {
+    items,
     setItems,
     selectedId,
     setSelectedId,
@@ -647,17 +648,15 @@ export default function StandardTekstPage() {
   );
 
   const followUpOptions = useMemo(() => {
-    // We only have access to the currently filtered list from the hook.
-    // This is OK for now: users can search in the sidebar first, then add from the list.
-    return (filtered ?? [])
+    return (items ?? [])
       .filter((t) => t.id !== selected?.id)
       .map((t) => ({ id: t.id, title: t.title }));
-  }, [filtered, selected?.id]);
+  }, [items, selected?.id]);
 
   const categoryOptions = useMemo(() => {
     const categories = new Set<string>();
 
-    for (const t of filtered ?? []) {
+    for (const t of items ?? []) {
       const c = (t.category ?? "").trim();
       if (c) categories.add(c);
     }
@@ -668,7 +667,7 @@ export default function StandardTekstPage() {
     }
 
     return Array.from(categories).sort((a, b) => a.localeCompare(b, "nb"));
-  }, [filtered, selected?.category]);
+  }, [items, selected?.category]);
 
   const addFollowUp = () => {
     if (!followUpPick) return;

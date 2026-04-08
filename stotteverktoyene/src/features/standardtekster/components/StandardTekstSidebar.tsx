@@ -5,6 +5,7 @@ import {
   CircularProgress,
   Collapse,
   Divider,
+  InputAdornment,
   List,
   ListItemButton,
   ListItemText,
@@ -21,6 +22,7 @@ import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import IconButton from "@mui/material/IconButton";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import ClearIcon from "@mui/icons-material/Clear";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
@@ -99,6 +101,21 @@ function getCategoryMarkerColor(category: string, colorMap: Map<string, string>)
 
 function isUtenKategori(category: string) {
   return (category ?? "").trim().toLowerCase() === "uten kategori";
+}
+
+function getSearchRank(item: StandardTekst, rawQuery: string) {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return 0;
+
+  const category = (item.category ?? "").trim().toLowerCase();
+  const title = (item.title ?? "").trim().toLowerCase();
+  const content = (item.content ?? "").trim().toLowerCase();
+
+  if (category.includes(query)) return 0;
+  if (title.includes(query)) return 1;
+  if (content.includes(query)) return 2;
+
+  return 3;
 }
 
 // Component that shows a truncated title with ellipsis, and a tooltip on hover if truncated
@@ -315,10 +332,19 @@ export default function StandardTekstSidebar({
     setFavorites((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  const isSearching = search.trim().length > 0;
+
   // Sort items: favorites on top. Favorites are ordered by most used (clicks desc), then title.
   // Non-favorites are ordered by title.
   const sortedItems = useMemo(() => {
+    const isSearchingNow = search.trim().length > 0;
+
     return [...filtered].sort((a, b) => {
+      if (isSearchingNow) {
+        const rankDiff = getSearchRank(a, search) - getSearchRank(b, search);
+        if (rankDiff !== 0) return rankDiff;
+      }
+
       const aFav = favorites.includes(a.id);
       const bFav = favorites.includes(b.id);
 
@@ -335,16 +361,18 @@ export default function StandardTekstSidebar({
 
       return a.title.localeCompare(b.title, "nb");
     });
-  }, [filtered, favorites, usageById]);
+  }, [filtered, favorites, search, usageById]);
 
   // Group items by category, with favorites as a separate group on top
   const groupedByCategory = useMemo(() => {
-    const favoriteItems = sortedItems.filter((it) => favorites.includes(it.id));
-    const nonFavoriteItems = sortedItems.filter((it) => !favorites.includes(it.id));
+    const favoriteItems = isSearching ? [] : sortedItems.filter((it) => favorites.includes(it.id));
+    const visibleItems = isSearching
+      ? sortedItems
+      : sortedItems.filter((it) => !favorites.includes(it.id));
 
     const groups = new Map<string, StandardTekst[]>();
 
-    for (const it of nonFavoriteItems) {
+    for (const it of visibleItems) {
       const key = (it.category ?? "").trim() || "Uten kategori";
       const arr = groups.get(key) ?? [];
       arr.push(it);
@@ -354,6 +382,12 @@ export default function StandardTekstSidebar({
     const categoryGroups = Array.from(groups.entries())
       .map(([category, items]) => ({ category, items }))
       .sort((a, b) => {
+        if (isSearching) {
+          const aRank = Math.min(...a.items.map((item) => getSearchRank(item, search)));
+          const bRank = Math.min(...b.items.map((item) => getSearchRank(item, search)));
+          if (aRank !== bRank) return aRank - bRank;
+        }
+
         const aIsUncat = isUtenKategori(a.category);
         const bIsUncat = isUtenKategori(b.category);
         if (aIsUncat && !bIsUncat) return 1;
@@ -367,7 +401,7 @@ export default function StandardTekstSidebar({
     }
 
     return categoryGroups;
-  }, [sortedItems, favorites]);
+  }, [sortedItems, favorites, isSearching, search]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => {
@@ -439,15 +473,31 @@ export default function StandardTekstSidebar({
   }, [hiddenCategories, hiddenHydrated, user?.uid]);
 
   const prevSelectedIdRef = useRef<string | null>(null);
-  // Clear search on next focus if the user previously left the field with a value
-  const clearSearchOnNextFocusRef = useRef(false);
-
-  const isSearching = search.trim().length > 0;
 
   const categoryColorMap = useMemo(() => {
     const cats = groupedByCategory.map((g) => g.category);
     return buildCategoryColorMap(cats);
   }, [groupedByCategory]);
+
+  const selectStandardTekst = (item: StandardTekst) => {
+    logUsage("standardtekst_open", { standardtekstId: item.id });
+
+    const uid = user?.uid;
+    if (uid) {
+      // Optimistic local increment so favorites re-sort immediately
+      setUsageById((prev) => ({
+        ...prev,
+        [item.id]: (prev[item.id] ?? 0) + 1,
+      }));
+
+      // Firestore per-user usage: /users/{uid}/standardtekstUsage/{standardtekstId}
+      standardTeksterApi.trackUsage({ uid, standardtekstId: item.id }).catch(() => {
+        // ignore logging errors
+      });
+    }
+
+    setSelectedId(item.id);
+  };
 
   // Ensure the category containing the selected item is expanded
   // Only do this when selection changes due to user interaction, not on initial load.
@@ -528,16 +578,37 @@ export default function StandardTekstSidebar({
                 });
               }
             }}
-            onBlur={() => {
-              // If the user leaves the field after searching, clear on next focus to make it ready for a new search
-              clearSearchOnNextFocusRef.current = search.trim().length > 0;
-            }}
-            onFocus={() => {
-              if (!clearSearchOnNextFocusRef.current) return;
-              clearSearchOnNextFocusRef.current = false;
-              setSearch("");
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+
+              const topMatch = sortedItems[0];
+              if (!topMatch) return;
+
+              e.preventDefault();
+              selectStandardTekst(topMatch);
             }}
             disabled={disabled}
+            slotProps={{
+              input: {
+                endAdornment: search.trim() ? (
+                  <InputAdornment position="end">
+                    <Tooltip title="Tøm søk" placement="top" arrow>
+                      <span>
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          aria-label="Tøm søk"
+                          onClick={() => setSearch("")}
+                          disabled={disabled}
+                        >
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </InputAdornment>
+                ) : undefined,
+              },
+            }}
           />
         </Box>
 
@@ -707,27 +778,7 @@ export default function StandardTekstSidebar({
                           <ListItemButton
                             key={it.id}
                             selected={it.id === selectedId}
-                            onClick={() => {
-                              logUsage("standardtekst_open", { standardtekstId: it.id });
-
-                              const uid = user?.uid;
-                              if (uid) {
-                                // Optimistic local increment so favorites re-sort immediately
-                                setUsageById((prev) => ({
-                                  ...prev,
-                                  [it.id]: (prev[it.id] ?? 0) + 1,
-                                }));
-
-                                // Firestore per-user usage: /users/{uid}/standardtekstUsage/{standardtekstId}
-                                standardTeksterApi
-                                  .trackUsage({ uid, standardtekstId: it.id })
-                                  .catch(() => {
-                                    // ignore logging errors
-                                  });
-                              }
-
-                              setSelectedId(it.id);
-                            }}
+                            onClick={() => selectStandardTekst(it)}
                             className={styles.sidebarItem}
                             sx={(theme) => ({
                               pl: 2.25,
@@ -757,6 +808,11 @@ export default function StandardTekstSidebar({
                             <IconButton
                               size="small"
                               edge="end"
+                              aria-label={
+                                favorites.includes(it.id)
+                                  ? `Fjern ${it.title} fra favoritter`
+                                  : `Legg ${it.title} til favoritter`
+                              }
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleFavorite(it.id);

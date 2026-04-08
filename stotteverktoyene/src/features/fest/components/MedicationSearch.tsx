@@ -127,6 +127,12 @@ const toTokens = (value: string) => {
 
 const isNumberToken = (t: string) => /^\d+(?:\.\d+)?$/.test(t);
 
+const normalizeIdToken = (value: string) => {
+  const trimmed = String(value ?? "").trim();
+  const stripped = trimmed.replace(/^0+/, "");
+  return stripped || "0";
+};
+
 const tokenMatches = (hayTokens: string[], needleRaw: string) => {
   const needle = needleRaw.replace(",", ".");
 
@@ -354,6 +360,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       .filter((t) => isNumberToken(t))
       .filter((t) => !t.includes("."))
       .filter((t) => t.length >= 4);
+    const normalizedIdNumberTokens = idNumberTokens.map(normalizeIdToken);
 
     // (computed after `numberWithUnit` is defined)
 
@@ -383,6 +390,15 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     const isLikelyIdSearch =
       idNumberTokens.length > 0 && meaningfulTextTokens.length === 0 && !numberWithUnit;
     const restrictToPimOnly = isLikelyIdSearch;
+    const normalizedQuery = normalizeForSearch(query);
+    const exactStrengthPhrase = (() => {
+      for (let i = 0; i < tokens.length - 1; i++) {
+        const a = tokens[i];
+        const b = tokens[i + 1];
+        if (isNumberToken(a) && unitSet.has(b)) return `${a} ${b}`;
+      }
+      return null;
+    })();
 
     // Collect "meaningful" number tokens until we hit pack-size indicators.
     // Also drop numbers that sit right next to pack-size tokens.
@@ -451,8 +467,8 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
       // If query looks like an identifier search, match against farmaloggNumber for PIM/HV
       if (isPimLike && idNumberTokens.length > 0) {
-        const id = String(m.farmaloggNumber ?? "");
-        const okId = idNumberTokens.every((t) => id.startsWith(t) || id === t);
+        const id = normalizeIdToken(String(m.farmaloggNumber ?? ""));
+        const okId = normalizedIdNumberTokens.every((t) => id.startsWith(t) || id === t);
         if (!okId) continue;
       }
 
@@ -479,26 +495,80 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
       // Score = hvor godt den matcher query. Tall teller mer. "required" teksttokens teller ekstra.
       let score = 0;
+      const nameText = m.navnFormStyrke ?? m.varenavn ?? "";
+      const varenavnText = m.varenavn ?? m.navnFormStyrke ?? "";
+      const substanceText = m.virkestoff ?? "";
+
+      const nameNorm = normalizeForSearch(nameText);
+      const varenavnNorm = normalizeForSearch(varenavnText);
+      const substanceNorm = normalizeForSearch(substanceText);
+
+      const nameTokens = toTokens(nameText);
+      const varenavnTokens = toTokens(varenavnText);
+      const substanceTokens = toTokens(substanceText);
 
       for (const t of tokens) {
         if (isNumberToken(t)) {
-          if (hayTokens.includes(t)) score += 2;
+          if (nameTokens.includes(t)) score += 4;
+          else if (varenavnTokens.includes(t)) score += 3;
+          else if (hayTokens.includes(t)) score += 2;
         } else {
-          if (hay.includes(t)) score += 1;
+          if (tokenMatches(nameTokens, t) || nameNorm.includes(t)) score += 3;
+          else if (tokenMatches(varenavnTokens, t) || varenavnNorm.includes(t)) score += 2.5;
+          else if (tokenMatches(substanceTokens, t) || substanceNorm.includes(t)) score += 1.5;
+          else if (hay.includes(t)) score += 1;
         }
       }
 
       for (const t of requiredTextTokens) {
-        if (tokenMatches(hayTokens, t) || hay.includes(t)) score += 3;
+        if (tokenMatches(nameTokens, t) || nameNorm.includes(t)) score += 8;
+        else if (tokenMatches(varenavnTokens, t) || varenavnNorm.includes(t)) score += 6;
+        else if (tokenMatches(substanceTokens, t) || substanceNorm.includes(t)) score += 4;
+        else if (tokenMatches(hayTokens, t) || hay.includes(t)) score += 2;
       }
 
       for (const t of requiredStrengthTokens) {
-        if (hayTokens.includes(t)) score += 3;
+        if (nameTokens.includes(t)) score += 6;
+        else if (varenavnTokens.includes(t)) score += 5;
+        else if (hayTokens.includes(t)) score += 3;
+      }
+
+      // Favor actual product names over indirect substance-only matches.
+      if (!isLikelyIdSearch && normalizedQuery && meaningfulTextTokens.length > 0) {
+        if (nameNorm === normalizedQuery) score += 20;
+        else if (nameNorm.startsWith(normalizedQuery)) score += 14;
+        else if (varenavnNorm.startsWith(normalizedQuery)) score += 10;
+        else if (substanceNorm.startsWith(normalizedQuery)) score += 5;
+      }
+
+      // Stronger boost when the first meaningful query token matches the beginning of the product name.
+      const firstMeaningfulTextToken = meaningfulTextTokens[0];
+      if (!isLikelyIdSearch && firstMeaningfulTextToken) {
+        if ((nameTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 10;
+        else if ((varenavnTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 7;
+        else if ((substanceTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 3;
+      }
+
+      // Stronger boost for exact strength matches in the visible product name.
+      if (requiredStrengthTokens.length > 0) {
+        const allStrengthsInName = requiredStrengthTokens.every((t) => nameTokens.includes(t));
+        const allStrengthsInVarenavn = requiredStrengthTokens.every((t) =>
+          varenavnTokens.includes(t),
+        );
+
+        if (allStrengthsInName) score += 10;
+        else if (allStrengthsInVarenavn) score += 8;
+      }
+
+      if (exactStrengthPhrase) {
+        if (nameNorm.includes(exactStrengthPhrase)) score += 8;
+        else if (varenavnNorm.includes(exactStrengthPhrase)) score += 6;
+        else if (hay.includes(exactStrengthPhrase)) score += 3;
       }
 
       if (isPimLike && idNumberTokens.length > 0) {
-        const id = String(m.farmaloggNumber ?? "");
-        for (const t of idNumberTokens) {
+        const id = normalizeIdToken(String(m.farmaloggNumber ?? ""));
+        for (const t of normalizedIdNumberTokens) {
           if (id === t) score += 20;
           else if (id.startsWith(t)) score += 10;
         }
@@ -538,14 +608,14 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     // Only prefer exact farmaloggNumber matches once the input looks like a *full* id
     // (so short prefixes like "8446" don't immediately collapse to the exact "8446" hit).
     if (restrictToPimOnly && idNumberTokens.length > 0) {
-      const qNormDigits = normalizeForSearch(query).replace(/\s+/g, "");
+      const qNormDigits = normalizeIdToken(normalizeForSearch(query).replace(/\s+/g, ""));
       const looksLikeFullId = /^\d{5,}$/.test(qNormDigits);
 
       if (looksLikeFullId) {
         const exact = out.filter(({ med }) => {
           if (med.source !== "PIM" && med.source !== "HV") return false;
-          const id = String(med.farmaloggNumber ?? "");
-          return idNumberTokens.some((t) => id === t);
+          const id = normalizeIdToken(String(med.farmaloggNumber ?? ""));
+          return normalizedIdNumberTokens.some((t) => id === t);
         });
 
         if (exact.length > 0) {
@@ -601,19 +671,20 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     if (!isNumeric) return;
 
     const only = results[0];
-    const id = String(only.farmaloggNumber ?? "");
+    const id = normalizeIdToken(String(only.farmaloggNumber ?? ""));
     if (!id) return;
-    if (!(id === qNorm || id.startsWith(qNorm))) return;
+    const normalizedQueryId = normalizeIdToken(qNorm);
+    if (!(id === normalizedQueryId || id.startsWith(normalizedQueryId))) return;
 
     const isPimLike = (m: Med) => m.source === "PIM" || m.source === "HV";
 
     // If ANY other PIM/HV id starts with the same prefix, don't auto-pick (user may be typing a longer id).
     const hasOtherWithSamePrefix = allItems.some((m) => {
       if (!isPimLike(m)) return false;
-      const mid = String(m.farmaloggNumber ?? "");
+      const mid = normalizeIdToken(String(m.farmaloggNumber ?? ""));
       if (!mid) return false;
       if (mid === id) return false;
-      return mid.startsWith(qNorm);
+      return mid.startsWith(normalizedQueryId);
     });
 
     if (hasOtherWithSamePrefix) return;
