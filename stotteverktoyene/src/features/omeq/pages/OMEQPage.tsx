@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -25,6 +26,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import { alpha } from "@mui/material/styles";
 
 import styles from "../../../styles/app.module.css";
 
@@ -34,6 +36,10 @@ import { calculateOMEQ } from "../lib/calc";
 import { OPIOIDS } from "../data/opioids";
 
 type Row = OMEQRowValue & { id: string };
+const OMEQ_STANDARDTEKST_TITLE = "OMEQ overstiger vedtak";
+const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
+
+const stripProductNumberSuffix = (value: string) => value.replace(/\s*\(\d+\)\s*$/g, "").trim();
 
 const makeRow = (): Row => ({
   id: crypto.randomUUID(),
@@ -42,6 +48,7 @@ const makeRow = (): Row => ({
 });
 
 export default function OMEQPage() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([makeRow()]);
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
@@ -131,6 +138,38 @@ export default function OMEQPage() {
 
     return Math.round((sum + Number.EPSILON) * 100) / 100;
   }, [rows, productIndex]);
+
+  const selectedPreparats = useMemo(
+    () => rows.map((row) => stripProductNumberSuffix(row.medicationText.trim())).filter(Boolean),
+    [rows],
+  );
+
+  const totalOmeqText = useMemo(() => String(totalOmeq).replace(".", ","), [totalOmeq]);
+
+  const canOpenOmeqStandardtekst = selectedPreparats.length > 0 && totalOmeq > 0;
+
+  const openOmeqStandardtekst = useCallback(() => {
+    if (!canOpenOmeqStandardtekst) return;
+
+    const payload = {
+      requestId: Date.now(),
+      templateTitle: OMEQ_STANDARDTEKST_TITLE,
+      preparats: selectedPreparats,
+      totalOmeq: totalOmeqText,
+    };
+
+    try {
+      sessionStorage.setItem(OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+
+    navigate("/standardtekster", {
+      state: {
+        omeqPrefill: payload,
+      },
+    });
+  }, [canOpenOmeqStandardtekst, navigate, selectedPreparats, totalOmeqText]);
 
   const formatFactor = (n: number) => {
     // display with comma for decimals
@@ -380,13 +419,51 @@ export default function OMEQPage() {
 
             {idx === rows.length - 1 && (
               <Box className={styles.totalOmeqWrapper}>
-                <Box className={styles.totalOmeqBox}>
-                  <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
-                    Total OMEQ
-                  </Typography>
-                  <Typography variant="h5" className={styles.totalOmeqValue}>
-                    {totalOmeq}
-                  </Typography>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gap: 1.25,
+                    justifyItems: "center",
+                    width: "100%",
+                    maxWidth: 560,
+                  }}
+                >
+                  <Box className={styles.totalOmeqBox}>
+                    <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
+                      Total OMEQ
+                    </Typography>
+                    <Typography variant="h5" className={styles.totalOmeqValue}>
+                      {totalOmeq}
+                    </Typography>
+                  </Box>
+
+                  <Paper
+                    variant="outlined"
+                    sx={(theme) => ({
+                      width: "100%",
+                      p: 1.5,
+                      borderRadius: 2,
+                      borderColor: alpha(theme.palette.primary.main, 0.25),
+                      backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                    })}
+                  >
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                      Standardtekst ved for høy OMEQ
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.25 }}>
+                      Hvis total OMEQ overstiger det vedtaket dekker, kan du bruke denne knappen
+                      for å åpne standardteksten ferdig utfylt med preparat og total OMEQ.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={!canOpenOmeqStandardtekst}
+                      onClick={openOmeqStandardtekst}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Bruk standardtekst
+                    </Button>
+                  </Paper>
                 </Box>
               </Box>
             )}

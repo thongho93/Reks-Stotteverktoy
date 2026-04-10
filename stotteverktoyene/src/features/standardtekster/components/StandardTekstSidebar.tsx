@@ -34,6 +34,35 @@ import { standardTeksterApi } from "../services/standardTeksterApi";
 const storageKey = (base: string, uid?: string | null) =>
   uid ? `standardtekster:${uid}:${base}` : `standardtekster:${base}`;
 
+function readFavoritesBackup(uid?: string | null) {
+  try {
+    const perUserRaw = localStorage.getItem(storageKey("favoritesBackup", uid));
+    if (perUserRaw) {
+      const parsed = JSON.parse(perUserRaw);
+      if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === "string");
+    }
+
+    const legacyRaw = localStorage.getItem("standardtekster:favorites");
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === "string");
+    }
+  } catch {
+    // ignore
+  }
+
+  return [];
+}
+
+function writeFavoritesBackup(favorites: string[], uid?: string | null) {
+  try {
+    localStorage.setItem(storageKey("favoritesBackup", uid), JSON.stringify(favorites));
+    localStorage.setItem("standardtekster:favorites", JSON.stringify(favorites));
+  } catch {
+    // ignore
+  }
+}
+
 type Props = {
   disabled?: boolean;
   isAdmin: boolean;
@@ -284,10 +313,11 @@ export default function StandardTekstSidebar({
     setFavoritesHydrated(false);
 
     const load = async () => {
+      const backup = readFavoritesBackup(user?.uid);
+
       try {
         if (!favoritesDocRef) {
-          const stored = localStorage.getItem("standardtekster:favorites");
-          if (!cancelled) setFavorites(stored ? JSON.parse(stored) : []);
+          if (!cancelled) setFavorites(backup);
           return;
         }
 
@@ -295,10 +325,11 @@ export default function StandardTekstSidebar({
         const data = snap.exists() ? (snap.data() as any) : null;
         const fav = Array.isArray(data?.favorites)
           ? data.favorites.filter((x: any) => typeof x === "string")
-          : [];
+          : backup;
+        writeFavoritesBackup(fav, user?.uid);
         if (!cancelled) setFavorites(fav);
       } catch {
-        if (!cancelled) setFavorites([]);
+        if (!cancelled) setFavorites(backup);
       } finally {
         if (!cancelled) {
           setFavoritesHydrated(true);
@@ -318,15 +349,16 @@ export default function StandardTekstSidebar({
     // Do not write back until we've loaded existing favorites (prevents wiping on refresh)
     if (!favoritesHydrated) return;
 
+    writeFavoritesBackup(favorites, user?.uid);
+
     if (!favoritesDocRef) {
-      localStorage.setItem("standardtekster:favorites", JSON.stringify(favorites));
       return;
     }
 
     setDoc(favoritesDocRef, { favorites }, { merge: true }).catch(() => {
       // ignore
     });
-  }, [favorites, favoritesDocRef, favoritesHydrated]);
+  }, [favorites, favoritesDocRef, favoritesHydrated, user?.uid]);
 
   const toggleFavorite = (id: string) => {
     setFavorites((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
