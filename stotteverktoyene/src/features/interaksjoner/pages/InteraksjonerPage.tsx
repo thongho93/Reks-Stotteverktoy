@@ -59,6 +59,11 @@ export default function InteraksjonerPage() {
   const { index, loading, error, reload } = useInteractions();
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  const getEntityId = React.useCallback(
+    (entity: InteractionEntity) => entity.id ?? (entity.atc ? `atc:${entity.atc}` : `name:${entity.key}`),
+    []
+  );
+
   const { user, isAdmin } = useAuthUser();
   const lastKnownUidRef = React.useRef<string | null>(null);
 
@@ -441,7 +446,7 @@ export default function InteraksjonerPage() {
 
                 // Finn eksakt ATC-match
                 const exactAtcMatches = index.entities.filter(
-                  (e) => (e.atc ?? "").toUpperCase() === q
+                  (e) => e.kind !== "product" && (e.atc ?? "").toUpperCase() === q
                 );
 
                 if (exactAtcMatches.length !== 1) return;
@@ -450,8 +455,8 @@ export default function InteraksjonerPage() {
 
                 // Legg til hvis ikke allerede valgt
                 setSelected((prev) => {
-                  const id = match.atc ? `atc:${match.atc}` : `name:${match.key}`;
-                  const seen = new Set(prev.map((p) => (p.atc ? `atc:${p.atc}` : `name:${p.key}`)));
+                  const id = getEntityId(match);
+                  const seen = new Set(prev.map((p) => getEntityId(p)));
                   if (seen.has(id)) return prev;
                   return [...prev, match];
                 });
@@ -460,11 +465,11 @@ export default function InteraksjonerPage() {
                 setInputValue("");
               }}
               onChange={(_, values) => {
-                // Dedupe by ATC if present, else by name key
+                // Dedupe by entity identity so preparatnavn can coexist with substance/ATC inputs
                 const seen = new Set<string>();
                 const deduped: InteractionEntity[] = [];
                 for (const e of values) {
-                  const id = e.atc ? `atc:${e.atc}` : `name:${e.key}`;
+                  const id = getEntityId(e);
                   if (seen.has(id)) continue;
                   seen.add(id);
                   deduped.push(e);
@@ -472,11 +477,9 @@ export default function InteraksjonerPage() {
                 setSelected(deduped);
               }}
               isOptionEqualToValue={(a, b) => {
-                const ida = a.atc ? `atc:${a.atc}` : `name:${a.key}`;
-                const idb = b.atc ? `atc:${b.atc}` : `name:${b.key}`;
-                return ida === idb;
+                return getEntityId(a) === getEntityId(b);
               }}
-              getOptionLabel={(o) => (o.atc ? `${o.label} (${o.atc})` : o.label)}
+              getOptionLabel={(o) => (o.kind === "product" ? o.label : o.atc ? `${o.label} (${o.atc})` : o.label)}
               filterOptions={(options, state) => {
                 const q = state.inputValue.trim().toLowerCase();
                 if (!q) return [];
@@ -501,7 +504,7 @@ export default function InteraksjonerPage() {
               )}
             />
             <Typography variant="caption" color="text.secondary" sx={{ mt: -0.5 }}>
-              Tips: Lim inn ATC-kode/virkestoff direkte i søkefeltet.
+              Tips: Søk på preparatnavn, virkestoff eller ATC-kode direkte i søkefeltet.
             </Typography>
             {showHistory ? (
               <Box sx={{ pt: 1 }}>
@@ -589,8 +592,8 @@ export default function InteraksjonerPage() {
                 }}
               >
                 {selected.map((option) => {
-                  const key = option.atc ? `atc:${option.atc}` : `name:${option.key}`;
-                  const label = option.atc ? `${option.label} ${option.atc}` : option.label;
+                  const key = getEntityId(option);
+                  const label = option.kind === "product" ? option.label : option.atc ? `${option.label} ${option.atc}` : option.label;
 
                   return (
                     <Chip
@@ -598,7 +601,7 @@ export default function InteraksjonerPage() {
                       label={label}
                       onDelete={() =>
                         setSelected((prev) =>
-                          prev.filter((p) => (p.atc ? `atc:${p.atc}` : `name:${p.key}`) !== key)
+                          prev.filter((p) => getEntityId(p) !== key)
                         )
                       }
                       size="medium"

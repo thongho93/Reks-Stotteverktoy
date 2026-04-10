@@ -1644,8 +1644,6 @@ export default function StandardTekstPage() {
                       type="date"
                       size="small"
                       inputRef={datoPickerInputRef}
-                      onClick={() => datoPickerInputRef.current?.showPicker?.()}
-                      onFocus={() => datoPickerInputRef.current?.showPicker?.()}
                       value={
                         normalizedDato
                           ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
@@ -1662,8 +1660,6 @@ export default function StandardTekstPage() {
                       type="month"
                       size="small"
                       inputRef={datoMndPickerInputRef}
-                      onClick={() => datoMndPickerInputRef.current?.showPicker?.()}
-                      onFocus={() => datoMndPickerInputRef.current?.showPicker?.()}
                       value={
                         formattedDatoMnd
                           ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`

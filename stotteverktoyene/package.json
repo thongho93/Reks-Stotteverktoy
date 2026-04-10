@@ -11,7 +11,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "fest:meds": "tsx scripts/extractFestMeds.ts"
+    "fest:meds": "tsx scripts/extractFestMeds.ts",
+    "hv:sync": "tsx scripts/syncHvProductsFromCsv.ts"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.27.0",

@@ -215,6 +215,14 @@ export function formatPreparatForTemplate(med: {
   navnFormStyrke?: string | null;
   produsent?: string | null;
 }): string {
+  const normalizeStrengthComparable = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/\b(mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e)\b/g, "")
+      .replace(/\s+/g, "")
+      .replace(/\s*\/\s*/g, "/")
+      .trim();
+
   const nfsRaw = (med.navnForStyrke ?? med.navnFormStyrke ?? "").trim();
   const nfs = nfsRaw.replace(/\s+/g, " ").trim();
 
@@ -316,8 +324,14 @@ export function formatPreparatForTemplate(med: {
 
   if (name && strength) {
     const esc = strength.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const hasEquivalentStrengthInName =
+      normalizeStrengthComparable(name).endsWith(normalizeStrengthComparable(strength));
 
-    let result = `${name} ${strength}`.replace(/\s+/g, " ").trim();
+    let result = (hasEquivalentStrengthInName
+      ? `${name.replace(/\s+\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)+\s*$/i, "").trim()} ${strength}`
+      : `${name} ${strength}`)
+      .replace(/\s+/g, " ")
+      .trim();
 
     // Deduplicate identical strengths if they still end up adjacent (e.g. "0,75 % 0,75 %")
     result = result.replace(new RegExp(`${esc}\\s+${esc}`, "i"), strength);

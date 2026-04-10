@@ -722,26 +722,37 @@ export default function StandardTekstSidebar({
                 const isExpanded = isSearching
                   ? true
                   : expandedCategories[group.category] !== false;
+                const isFirstGroup = groupedByCategory[0]?.category === group.category;
 
                 return (
                   <Box key={group.category}>
                     <ListItemButton
                       onClick={() => toggleCategory(group.category)}
-                      sx={{
+                      sx={(theme) => ({
                         py: 0.75,
                         px: 1.25,
                         position: "sticky",
                         top: 0,
-                        zIndex: 1,
-                        backgroundColor: "background.paper",
+                        zIndex: 3,
+                        backgroundColor: theme.palette.background.paper,
+                        backgroundImage: "none",
+                        boxShadow: `0 1px 0 ${theme.palette.divider}`,
+                        borderTop: isFirstGroup ? "none" : `1px solid ${theme.palette.divider}`,
                         ...(isHidden
                           ? {
                               opacity: 0.9,
                             }
                           : {}),
+                        "&::before": {
+                          content: '""',
+                          position: "absolute",
+                          inset: 0,
+                          backgroundColor: theme.palette.background.paper,
+                          zIndex: -1,
+                        },
                         "&:hover .hide-category-btn": { opacity: 1 },
                         "&.Mui-selected .hide-category-btn": { opacity: 1 },
-                      }}
+                      })}
                     >
                       <Box
                         aria-hidden
@@ -861,7 +872,7 @@ export default function StandardTekstSidebar({
                       </List>
                     </Collapse>
 
-                    <Divider sx={{ opacity: 0.35 }} />
+                    <Divider sx={{ opacity: 0.35, display: isExpanded ? "block" : "none" }} />
                   </Box>
                 );
               })}

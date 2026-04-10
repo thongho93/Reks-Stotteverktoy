@@ -1,5 +1,6 @@
 // Builds a fast lookup index for FEST interaction data (interactions.json)
 // Goal: autocomplete + quick matching without scanning the whole JSON each time.
+import meds from "../meds.json";
 
 export type InteractionIndex = ReturnType<typeof buildInteractionsIndex>;
 
@@ -25,12 +26,14 @@ export type InteractionJson = {
 };
 
 export type InteractionEntity = {
+  id?: string;
   // What we show in the autocomplete list
   label: string;
   // Normalized key used for matching on name
   key: string;
   // Optional ATC code (normalized to upper-case, no spaces)
   atc?: string;
+  kind?: "substance" | "product";
 };
 
 export type InteractionOccurrence = {
@@ -86,6 +89,8 @@ export function buildInteractionsIndex(interactions: InteractionJson[]) {
   // Entities shown in autocomplete (deduped)
   const entities: InteractionEntity[] = [];
   const entitySeen = new Set<string>();
+  const searchableNameKeys = new Set<string>();
+  const searchableAtcs = new Set<string>();
 
   // Keep a UI-friendly interaction list
   const interactionList: BuiltInteraction[] = [];
@@ -132,13 +137,17 @@ export function buildInteractionsIndex(interactions: InteractionJson[]) {
 
         const key = normalizeText(label);
         const atc = s.atc ?? undefined;
+        searchableNameKeys.add(key);
+        if (atc) searchableAtcs.add(atc);
 
         // 1) Autocomplete entity (dedupe by ATC if present else by key)
         const entityUniqKey = atc ? `atc:${atc}` : `name:${key}`;
         uniqPush(entities, entitySeen, entityUniqKey, {
+          id: entityUniqKey,
           label,
           key,
           atc,
+          kind: "substance",
         });
 
         // 2) Occurrence for lookup
@@ -156,6 +165,34 @@ export function buildInteractionsIndex(interactions: InteractionJson[]) {
         // index by ATC, including prefixes (N, N0, N02, N02A, ...)
         if (atc) addAtcPrefixes(atc, occ);
       });
+    });
+  });
+
+  const medicationRows = Array.isArray(meds) ? (meds as Array<Record<string, unknown>>) : [];
+
+  medicationRows.forEach((med) => {
+    const productName = String(med.varenavn ?? "").trim();
+    if (!productName) return;
+
+    const substanceLabel = String(med.virkestoff ?? "").trim();
+    const substanceKey = substanceLabel ? normalizeText(substanceLabel) : "";
+    const atcRaw = String(med.atc ?? "").trim();
+    const atc = atcRaw ? normalizeAtc(atcRaw) : undefined;
+
+    const hasSubstanceMatch = substanceKey ? searchableNameKeys.has(substanceKey) : false;
+    const hasAtcMatch = atc ? searchableAtcs.has(atc) : false;
+    if (!hasSubstanceMatch && !hasAtcMatch) return;
+
+    const key = substanceKey || normalizeText(productName);
+    const normalizedProduct = normalizeText(productName);
+    const entityId = `product:${normalizedProduct}:${atc ?? key}`;
+
+    uniqPush(entities, entitySeen, entityId, {
+      id: entityId,
+      label: `${productName} (preparatnavn)`,
+      key,
+      atc,
+      kind: "product",
     });
   });
 
