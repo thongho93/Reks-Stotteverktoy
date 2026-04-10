@@ -16,6 +16,7 @@ import hvProducts from "./hvProducts.json";
 import { festToSearchIndex } from "../mappers/festToSearchIndex";
 import { pimToSearchIndex } from "../mappers/pimToSearchIndex";
 import type { SearchIndexItem } from "../../../utils/types";
+import { formatPreparatForTemplate } from "../../standardtekster/utils/preparat";
 
 type Med = {
   // Unique key used by UI (prefix with source to avoid collisions)
@@ -160,6 +161,42 @@ const normalizeIdToken = (value: string) => {
   const trimmed = String(value ?? "").trim();
   const stripped = trimmed.replace(/^0+/, "");
   return stripped || "0";
+};
+
+const normalizeStrengthComparable = (value: string) =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/\b(mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e)\b/g, "")
+    .replace(/\s+/g, "")
+    .replace(/\s*\/\s*/g, "/")
+    .trim();
+
+const getMedicationDisplayName = (med: Pick<Med, "varenavn" | "navnFormStyrke">) => {
+  const varenavn = String(med.varenavn ?? "").replace(/\s+/g, " ").trim();
+  const navnFormStyrke = String(med.navnFormStyrke ?? med.varenavn ?? "").replace(/\s+/g, " ").trim();
+  if (!navnFormStyrke) return varenavn || "(uten navn)";
+  if (!varenavn) return navnFormStyrke;
+
+  const trailingStrengthMatch = navnFormStyrke.match(
+    /(\d+(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e)(?:\s*\/\s*\d+(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e))*)\s*$/i,
+  );
+  const varenavnStrengthMatch = varenavn.match(
+    /(\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)+|\d+(?:[.,]\d+)?)\s*$/i,
+  );
+
+  if (!trailingStrengthMatch || !varenavnStrengthMatch) return navnFormStyrke;
+
+  const trailingComparable = normalizeStrengthComparable(trailingStrengthMatch[1]);
+  const varenavnComparable = normalizeStrengthComparable(varenavnStrengthMatch[1]);
+  if (!trailingComparable || trailingComparable !== varenavnComparable) return navnFormStyrke;
+  if (!navnFormStyrke.toLowerCase().startsWith(varenavn.toLowerCase())) return navnFormStyrke;
+
+  const suffixWithoutStrength = navnFormStyrke
+    .slice(varenavn.length, trailingStrengthMatch.index)
+    .replace(/^[,\s]+|[,\s]+$/g, "")
+    .trim();
+
+  return [varenavn, suffixWithoutStrength].filter(Boolean).join(" ").trim() || varenavn;
 };
 
 const buildDedupKeyFromFields = (nameText: string, substanceText: string) => {
@@ -956,7 +993,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
                     return (
                       <ListItemText
-                        primary={`${m.navnFormStyrke ?? m.varenavn ?? "(uten navn)"}${
+                        primary={`${formatPreparatForTemplate(m) || getMedicationDisplayName(m)}${
                           m.farmaloggNumber ? ` (${m.farmaloggNumber})` : ""
                         }`}
                         secondary={secondaryParts.join(" • ")}

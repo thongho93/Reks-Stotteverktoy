@@ -13,7 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 
-const officeFormUrl = import.meta.env.VITE_ANBRUDD_OFFICE_FORM_URL as string | undefined;
+const officeFormEmbedUrl = "https://forms.office.com/e/CC67JNYpcr?embed=true";
 const sharepointEmbedUrl = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
   import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
 
@@ -39,7 +39,10 @@ export default function AndbruddPage() {
   const [tab, setTab] = useState<"form" | "sharepoint">("sharepoint");
   const [iframeError, setIframeError] = useState(false);
   const [showLoginHelp, setShowLoginHelp] = useState(false);
-  const [refreshKeys, setRefreshKeys] = useState({ form: 0, sharepoint: 0 });
+  const [refreshKeys, setRefreshKeys] = useState(() => {
+    const now = Date.now();
+    return { form: now, sharepoint: now };
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastLoadedAt, setLastLoadedAt] = useState<{ form: string | null; sharepoint: string | null }>({
     form: null,
@@ -50,8 +53,8 @@ export default function AndbruddPage() {
     if (tab === "form") {
       return {
         title: "Anbruddskjema",
-        src: withRefreshParam(officeFormUrl, refreshKeys.form),
-        missing: "Office Form URL mangler (VITE_ANBRUDD_OFFICE_FORM_URL)",
+        src: officeFormEmbedUrl,
+        missing: "Office Form embed URL mangler",
         iframeTitle: "Office Form",
         height: 780,
       };
@@ -107,7 +110,7 @@ export default function AndbruddPage() {
               variant="outlined"
               onClick={() => window.open(current.src, "_blank", "noopener,noreferrer")}
             >
-              Åpne i ny fane
+              Åpne for redigering
             </Button>
           )}
         </Box>
@@ -133,8 +136,8 @@ export default function AndbruddPage() {
         <>
           {iframeError && (
             <Alert severity="warning" sx={{ mb: 1.5 }}>
-              Innholdet kunne ikke lastes stabilt i appen. Prøv `Oppdater`, eller bruk `Åpne i ny
-              fane`.
+              Innholdet kunne ikke lastes stabilt i appen. Prøv `Oppdater`, eller bruk `Åpne for
+              redigering`.
             </Alert>
           )}
 
@@ -154,6 +157,7 @@ export default function AndbruddPage() {
             onError={() => setIframeError(true)}
             frameBorder={0}
             scrolling="no"
+            allowFullScreen
             style={{ width: "100%", height: `${current.height}px`, border: 0 }}
           />
         </>

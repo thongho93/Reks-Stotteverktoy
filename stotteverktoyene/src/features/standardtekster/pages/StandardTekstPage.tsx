@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Alert,
   Autocomplete,
@@ -44,6 +45,14 @@ import { useStandardTekstHotkeys } from "../hooks/useStandardTekstHotkeys";
 import PreparatPanel from "../components/PreparatPanel";
 import { deleteStandardTekst } from "../utils/deleteStandardTekst";
 import type { StandardTekstFollowUp } from "../types";
+
+type OMEQStandardtekstPrefill = {
+  requestId: number;
+  templateTitle: string;
+  preparats: string[];
+  totalOmeq: string;
+};
+const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
 type ClockTallDay = "today" | "tomorrow";
 const CLOCK_TALL_OPTIONS = ["11:00", "14:00", "15:00"] as const;
@@ -132,7 +141,36 @@ function buildInitialTallValues(template: string, now = new Date()): Record<numb
   return next;
 }
 
+function parseOmeqStandardtekstPrefill(value: unknown): OMEQStandardtekstPrefill | null {
+  if (!value || typeof value !== "object") return null;
+
+  const candidate = value as Partial<OMEQStandardtekstPrefill>;
+  const preparats = Array.isArray(candidate.preparats)
+    ? candidate.preparats.filter(
+        (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+      )
+    : [];
+
+  if (
+    typeof candidate.requestId !== "number" ||
+    typeof candidate.templateTitle !== "string" ||
+    typeof candidate.totalOmeq !== "string" ||
+    !candidate.templateTitle.trim() ||
+    preparats.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    requestId: candidate.requestId,
+    templateTitle: candidate.templateTitle.trim(),
+    preparats,
+    totalOmeq: candidate.totalOmeq.trim(),
+  };
+}
+
 export default function StandardTekstPage() {
+  const location = useLocation();
   const {
     items,
     setItems,
@@ -146,7 +184,25 @@ export default function StandardTekstPage() {
     selected,
   } = useStandardTekster();
 
+  const omeqPrefill = useMemo<OMEQStandardtekstPrefill | null>(() => {
+    const fromLocation = parseOmeqStandardtekstPrefill(
+      (location.state as { omeqPrefill?: unknown } | null)?.omeqPrefill,
+    );
+    if (fromLocation) return fromLocation;
+
+    try {
+      const raw = sessionStorage.getItem(OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY);
+      if (!raw) return null;
+      return parseOmeqStandardtekstPrefill(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }, [location.state]);
+
   const clearedInitialSelectionRef = useRef(false);
+  const appliedOmeqPrefillRequestIdRef = useRef<number | null>(null);
+  const [pendingOmeqPrefill, setPendingOmeqPrefill] = useState<OMEQStandardtekstPrefill | null>(null);
+  const protectedOmeqSelectedIdRef = useRef<string | null>(null);
 
   // Start with no selected template after initial load (so the user actively selects one)
   useEffect(() => {
@@ -531,6 +587,13 @@ export default function StandardTekstPage() {
   // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
     const shouldAutoEditNew = Boolean(isAdmin && selected && selected.title === "Ny standardtekst");
+    const pending = pendingOmeqPrefill;
+    const shouldApplyOmeqPrefill =
+      Boolean(pending && selected) &&
+      selected!.title.trim().toLowerCase() === pending!.templateTitle.trim().toLowerCase();
+    const shouldProtectCurrentSelection =
+      Boolean(protectedOmeqSelectedIdRef.current) && protectedOmeqSelectedIdRef.current === selectedId;
+
     setIsEditing(shouldAutoEditNew);
     setDraftTitle(selected?.title ?? "");
     setDraftCategory(selected?.category ?? "");
@@ -543,7 +606,31 @@ export default function StandardTekstPage() {
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
-    if (!preserveInputsOnNextSelectRef.current) {
+
+    if (shouldApplyOmeqPrefill && selected && pending) {
+      resetPreparatRows();
+      setVirkestoffByPicked({});
+
+      for (const preparat of pending.preparats) {
+        addPickedPreparat(preparat, preparat);
+      }
+
+      const nextTallValues = buildInitialTallValues(selected.content);
+      nextTallValues[1] = pending.totalOmeq;
+      setTallByIndex(nextTallValues);
+      setCustomClockModeByIndex({});
+      setDatoInput("");
+      setErrorLocal(null);
+      protectedOmeqSelectedIdRef.current = selected.id;
+      setPendingOmeqPrefill(null);
+      appliedOmeqPrefillRequestIdRef.current = pending.requestId;
+
+      try {
+        sessionStorage.removeItem(OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    } else if (!shouldProtectCurrentSelection && !preserveInputsOnNextSelectRef.current) {
       resetPreparatRows();
       setVirkestoffByPicked({});
       setTallByIndex(buildInitialTallValues(selected?.content ?? ""));
@@ -570,7 +657,20 @@ export default function StandardTekstPage() {
 
     // Always clear the flag after handling a selection change
     preserveInputsOnNextSelectRef.current = false;
-  }, [selectedId, resetPreparatRows, selected, isAdmin]);
+  }, [
+    addPickedPreparat,
+    isAdmin,
+    pendingOmeqPrefill,
+    resetPreparatRows,
+    selected,
+    selectedId,
+  ]);
+
+  useEffect(() => {
+    if (!protectedOmeqSelectedIdRef.current) return;
+    if (protectedOmeqSelectedIdRef.current === selectedId) return;
+    protectedOmeqSelectedIdRef.current = null;
+  }, [selectedId]);
 
   // Auto-focus standardtekst search on first load when no template is selected
   useEffect(() => {
@@ -583,6 +683,23 @@ export default function StandardTekstPage() {
       triggerGlow("standard");
     });
   }, [loading, selected]);
+
+  useEffect(() => {
+    if (!omeqPrefill) return;
+    if (appliedOmeqPrefillRequestIdRef.current === omeqPrefill.requestId) return;
+    if (items.length === 0) return;
+
+    const normalizedTargetTitle = omeqPrefill.templateTitle.trim().toLowerCase();
+    const target = items.find((item) => item.title.trim().toLowerCase() === normalizedTargetTitle);
+    if (!target) return;
+
+    setPendingOmeqPrefill(omeqPrefill);
+
+    if (selectedId !== target.id) {
+      preserveInputsOnNextSelectRef.current = true;
+      setSelectedId(target.id);
+    }
+  }, [items, omeqPrefill, selected, selectedId, setSelectedId]);
 
   const startEdit = () => {
     if (!selected) return;
@@ -1478,7 +1595,12 @@ export default function StandardTekstPage() {
                                 }
                               }}
                               size="small"
-                              type="number"
+                              type="text"
+                              slotProps={{
+                                htmlInput: {
+                                  inputMode: "decimal",
+                                },
+                              }}
                               onWheel={(e) => {
                                 (e.target as HTMLInputElement).blur();
                               }}
@@ -1522,8 +1644,6 @@ export default function StandardTekstPage() {
                       type="date"
                       size="small"
                       inputRef={datoPickerInputRef}
-                      onClick={() => datoPickerInputRef.current?.showPicker?.()}
-                      onFocus={() => datoPickerInputRef.current?.showPicker?.()}
                       value={
                         normalizedDato
                           ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
@@ -1540,8 +1660,6 @@ export default function StandardTekstPage() {
                       type="month"
                       size="small"
                       inputRef={datoMndPickerInputRef}
-                      onClick={() => datoMndPickerInputRef.current?.showPicker?.()}
-                      onFocus={() => datoMndPickerInputRef.current?.showPicker?.()}
                       value={
                         formattedDatoMnd
                           ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
