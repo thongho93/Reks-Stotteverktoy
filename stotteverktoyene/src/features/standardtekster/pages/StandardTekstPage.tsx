@@ -47,6 +47,8 @@ import type { StandardTekstFollowUp } from "../types";
 
 type ClockTallDay = "today" | "tomorrow";
 const CLOCK_TALL_OPTIONS = ["11:00", "14:00", "15:00"] as const;
+const DEFAULT_CLOCK_TALL_TIME = "11:00";
+const CUSTOM_CLOCK_VALUE = "__custom__";
 
 function getTallTokenRegex(index: number) {
   if (index === 0) {
@@ -77,19 +79,28 @@ function parseClockTallValue(value: string): { time: string; day: ClockTallDay }
   const trimmed = (value ?? "").trim();
   if (!trimmed) return null;
 
-  const match = trimmed.match(/^(\d{1,2}:\d{2})(?:\s+i\s+(dag|morgen))?$/i);
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?:\s+i\s+(dag|morgen))?$/i);
   if (!match) return null;
 
+  const hours = Number(match[1]);
+  const minutes = match[2] ?? "00";
+  const normalizedTime = `${String(hours).padStart(2, "0")}:${minutes}`;
+
   return {
-    time: match[1],
-    day: match[2]?.toLowerCase() === "morgen" ? "tomorrow" : "today",
+    time: normalizedTime,
+    day: match[3]?.toLowerCase() === "morgen" ? "tomorrow" : "today",
   };
 }
 
 function formatClockTallValue(time: string, day: ClockTallDay): string {
   const trimmedTime = (time ?? "").trim();
   if (!trimmedTime) return "";
-  return `${trimmedTime} ${day === "tomorrow" ? "i morgen" : "i dag"}`;
+
+  const match = trimmedTime.match(/^(\d{1,2}):(\d{2})$/);
+  const displayTime =
+    match && match[2] === "00" ? String(Number(match[1])) : trimmedTime;
+
+  return `${displayTime} ${day === "tomorrow" ? "i morgen" : "i dag"}`;
 }
 
 function getAutomaticClockTallDay(time: string, now = new Date()): ClockTallDay {
@@ -105,6 +116,20 @@ function getAutomaticClockTallDay(time: string, now = new Date()): ClockTallDay 
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   return selectedMinutes > currentMinutes ? "today" : "tomorrow";
+}
+
+function buildInitialTallValues(template: string, now = new Date()): Record<number, string> {
+  const indices = getTallTokenIndices(template);
+  if (!indices.length) return { 0: "" };
+
+  const next: Record<number, string> = {};
+  for (const index of indices) {
+    next[index] = templateTallTokenLooksLikeClock(template, index)
+      ? formatClockTallValue(DEFAULT_CLOCK_TALL_TIME, getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME, now))
+      : "";
+  }
+
+  return next;
 }
 
 export default function StandardTekstPage() {
@@ -252,14 +277,8 @@ export default function StandardTekstPage() {
     standardTekstSearchInputRef,
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
-      const indices = getTallTokenIndices(selected?.content ?? "");
-      if (indices.length) {
-        const next: Record<number, string> = {};
-        for (const i of indices) next[i] = "";
-        setTallByIndex(next);
-      } else {
-        setTallByIndex({ 0: "" });
-      }
+      setTallByIndex(buildInitialTallValues(selected?.content ?? ""));
+      setCustomClockModeByIndex({});
 
       // Reset date input
       setDatoInput("");
@@ -276,6 +295,7 @@ export default function StandardTekstPage() {
   });
 
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
+  const [customClockModeByIndex, setCustomClockModeByIndex] = useState<Record<number, boolean>>({});
   const [datoInput, setDatoInput] = useState<string>("");
   const [formuleringByIndex, setFormuleringByIndex] = useState<Record<number, string>>({ 0: "" });
   const templateHasVirkestoffToken = (template: string) => /\bVIRKESTOFF\b/.test(template ?? "");
@@ -526,14 +546,8 @@ export default function StandardTekstPage() {
     if (!preserveInputsOnNextSelectRef.current) {
       resetPreparatRows();
       setVirkestoffByPicked({});
-      const indices = getTallTokenIndices(selected?.content ?? "");
-      if (indices.length) {
-        const next: Record<number, string> = {};
-        for (const i of indices) next[i] = "";
-        setTallByIndex(next);
-      } else {
-        setTallByIndex({ 0: "" });
-      }
+      setTallByIndex(buildInitialTallValues(selected?.content ?? ""));
+      setCustomClockModeByIndex({});
       setDatoInput("");
       const fIndices = getFormuleringTokenIndices(selected?.content ?? "");
       if (fIndices.length) {
@@ -986,17 +1000,11 @@ export default function StandardTekstPage() {
         setVirkestoffByPicked({});
 
         if (templateHasTallToken(selected.content)) {
-          const indices = getTallTokenIndices(selected.content);
-          if (indices.length) {
-            const next: Record<number, string> = {};
-            for (const i of indices) next[i] = "";
-            setTallByIndex(next);
-          } else {
-            setTallByIndex({ 0: "" });
-          }
+          setTallByIndex(buildInitialTallValues(selected.content));
         } else {
           setTallByIndex({ 0: "" });
         }
+        setCustomClockModeByIndex({});
 
         setSearch("");
         setDatoInput("");
@@ -1040,17 +1048,11 @@ export default function StandardTekstPage() {
           setVirkestoffByPicked({});
 
           if (templateHasTallToken(selected.content)) {
-            const indices = getTallTokenIndices(selected.content);
-            if (indices.length) {
-              const next: Record<number, string> = {};
-              for (const i of indices) next[i] = "";
-              setTallByIndex(next);
-            } else {
-              setTallByIndex({ 0: "" });
-            }
+            setTallByIndex(buildInitialTallValues(selected.content));
           } else {
             setTallByIndex({ 0: "" });
           }
+          setCustomClockModeByIndex({});
 
           setSearch("");
           setDatoInput("");
@@ -1351,11 +1353,20 @@ export default function StandardTekstPage() {
                               time: "",
                               day: "today" as ClockTallDay,
                             };
+                            const isCustomClockTime =
+                              Boolean(parsedClock.time) &&
+                              !CLOCK_TALL_OPTIONS.includes(
+                                parsedClock.time as (typeof CLOCK_TALL_OPTIONS)[number],
+                              );
+                            const isCustomClockMode =
+                              Boolean(customClockModeByIndex[idx]) || isCustomClockTime;
                             const selectedClockTime = CLOCK_TALL_OPTIONS.includes(
                               parsedClock.time as (typeof CLOCK_TALL_OPTIONS)[number],
                             )
                               ? parsedClock.time
-                              : "";
+                              : isCustomClockMode
+                                ? CUSTOM_CLOCK_VALUE
+                                : "";
 
                             return (
                               <Box
@@ -1363,7 +1374,10 @@ export default function StandardTekstPage() {
                                 sx={{
                                   display: "grid",
                                   gap: 1,
-                                  gridTemplateColumns: { xs: "1fr", sm: "180px 140px" },
+                                  gridTemplateColumns: {
+                                    xs: "1fr",
+                                    sm: isCustomClockMode ? "180px 140px 180px" : "180px 140px",
+                                  },
                                   alignItems: "start",
                                 }}
                               >
@@ -1373,12 +1387,17 @@ export default function StandardTekstPage() {
                                   size="small"
                                   value={selectedClockTime}
                                   onChange={(e) => {
-                                    const nextDay = getAutomaticClockTallDay(e.target.value);
-                                    const nextValue = formatClockTallValue(
-                                      e.target.value,
-                                      nextDay,
-                                    );
-                                    setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+                                    if (e.target.value === CUSTOM_CLOCK_VALUE) {
+                                      setCustomClockModeByIndex((prev) => ({ ...prev, [idx]: true }));
+                                      const nextTime = parsedClock.time || DEFAULT_CLOCK_TALL_TIME;
+                                      const nextValue = formatClockTallValue(nextTime, parsedClock.day);
+                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+                                    } else {
+                                      setCustomClockModeByIndex((prev) => ({ ...prev, [idx]: false }));
+                                      const nextDay = getAutomaticClockTallDay(e.target.value);
+                                      const nextValue = formatClockTallValue(e.target.value, nextDay);
+                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+                                    }
 
                                     if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
                                       setErrorLocal(null);
@@ -1391,6 +1410,7 @@ export default function StandardTekstPage() {
                                       kl. {time.slice(0, 2)}
                                     </MenuItem>
                                   ))}
+                                  <MenuItem value={CUSTOM_CLOCK_VALUE}>Skriv eget klokkeslett</MenuItem>
                                 </TextField>
 
                                 <TextField
@@ -1411,6 +1431,35 @@ export default function StandardTekstPage() {
                                   <MenuItem value="today">I dag</MenuItem>
                                   <MenuItem value="tomorrow">I morgen</MenuItem>
                                 </TextField>
+
+                                {isCustomClockMode && (
+                                  <TextField
+                                    label="Eget klokkeslett"
+                                    type="time"
+                                    size="small"
+                                    value={parsedClock.time}
+                                    onChange={(e) => {
+                                      const nextTime = e.target.value;
+                                      setCustomClockModeByIndex((prev) => ({ ...prev, [idx]: true }));
+
+                                      const nextValue = nextTime
+                                        ? formatClockTallValue(
+                                            nextTime,
+                                            getAutomaticClockTallDay(nextTime),
+                                          )
+                                        : "";
+                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+
+                                      if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
+                                        setErrorLocal(null);
+                                      }
+                                    }}
+                                    slotProps={{
+                                      inputLabel: { shrink: true },
+                                      htmlInput: { step: 300 },
+                                    }}
+                                  />
+                                )}
                               </Box>
                             );
                           }
