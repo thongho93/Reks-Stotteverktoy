@@ -11,11 +11,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Paper,
   Snackbar,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -23,17 +25,20 @@ import StandardTekstSidebar from "../components/StandardTekstSidebar";
 import StandardTekstContent from "../components/StandardTekstContent";
 import { standardTeksterApi } from "../services/standardTeksterApi";
 import { useAuthUser } from "../../../app/auth/Auth";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
+  formatPreparatRowText,
   getTallTokenIndices,
+  migrateLegacyClockTallTokens,
   replaceNextPreparatToken,
+  replaceKlokkeslettDagTokens,
   replaceTallTokenByIndex,
   templateHasDatoMndToken,
   templateHasDatoToken,
+  templateHasKlokkeslettDagToken,
   templateHasTallToken,
   usePreparatRows,
 } from "../utils/preparat";
@@ -59,46 +64,18 @@ const CLOCK_TALL_OPTIONS = ["11:00", "14:00", "15:00"] as const;
 const DEFAULT_CLOCK_TALL_TIME = "11:00";
 const CUSTOM_CLOCK_VALUE = "__custom__";
 
-function getTallTokenRegex(index: number) {
-  if (index === 0) {
-    return /\{\{\s*TALL\s*\}\}|\bTALL\b/gi;
-  }
+function sanitizeFarmasoytSignature(text: string): string {
+  if (!text) return text;
 
-  return new RegExp(`\\{\\{\\s*TALL${index}\\s*\\}\\}|\\bTALL${index}\\b`, "gi");
+  // Normalize pharmacist signature line so no personal name leaks into shared texts.
+  return text.replace(
+    /(^|\n)\s*[^\n]{0,80}?\s*,?\s*farmas[øo]yt\s*(?=\n|$)/gi,
+    (_m, prefix: string) => `${prefix}XX, farmasøyt`,
+  );
 }
 
-function templateTallTokenLooksLikeClock(template: string, index: number): boolean {
-  const regex = getTallTokenRegex(index);
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(template ?? ""))) {
-    const before = template.slice(Math.max(0, match.index - 24), match.index).toLowerCase();
-    const after = template
-      .slice(regex.lastIndex, Math.min((template ?? "").length, regex.lastIndex + 20))
-      .toLowerCase();
-
-    if (/\b(klokken|kl)\.?\s*$/.test(before)) return true;
-    if (/^\s*i\s+(dag|morgen)\b/.test(after)) return true;
-  }
-
-  return false;
-}
-
-function parseClockTallValue(value: string): { time: string; day: ClockTallDay } | null {
-  const trimmed = (value ?? "").trim();
-  if (!trimmed) return null;
-
-  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?:\s+i\s+(dag|morgen))?$/i);
-  if (!match) return null;
-
-  const hours = Number(match[1]);
-  const minutes = match[2] ?? "00";
-  const normalizedTime = `${String(hours).padStart(2, "0")}:${minutes}`;
-
-  return {
-    time: normalizedTime,
-    day: match[3]?.toLowerCase() === "morgen" ? "tomorrow" : "today",
-  };
+function normalizeTemplateContent(text: string): string {
+  return migrateLegacyClockTallTokens(sanitizeFarmasoytSignature(text));
 }
 
 function formatClockTallValue(time: string, day: ClockTallDay): string {
@@ -127,18 +104,87 @@ function getAutomaticClockTallDay(time: string, now = new Date()): ClockTallDay 
   return selectedMinutes > currentMinutes ? "today" : "tomorrow";
 }
 
-function buildInitialTallValues(template: string, now = new Date()): Record<number, string> {
+function buildInitialTallValues(template: string): Record<number, string> {
   const indices = getTallTokenIndices(template);
   if (!indices.length) return { 0: "" };
 
   const next: Record<number, string> = {};
   for (const index of indices) {
-    next[index] = templateTallTokenLooksLikeClock(template, index)
-      ? formatClockTallValue(DEFAULT_CLOCK_TALL_TIME, getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME, now))
-      : "";
+    next[index] = "";
   }
 
   return next;
+}
+
+const SINGULAR_TO_PLURAL_FORMULERING: Record<string, string> = {
+  tablett: "tabletter",
+  kapsel: "kapsler",
+  depottablett: "depottabletter",
+  smeltetablett: "smeltetabletter",
+  enterotablett: "enterotabletter",
+  sublingvaltablett: "sublingvaltabletter",
+  brusetablett: "brusetabletter",
+  depotkapsel: "depotkapsler",
+  nesespray: "nesesprayer",
+  oyedrape: "oyedraper",
+  oredrape: "oredraper",
+  drape: "draper",
+  stikkpille: "stikkpiller",
+  injeksjon: "injeksjoner",
+  infusjon: "infusjoner",
+  inhalasjonspulver: "inhalasjonspulvere",
+  inhalasjonsvaeske: "inhalasjonsvaesker",
+  mikstur: "miksturer",
+  granulat: "granulater",
+  plaster: "plastre",
+  depotplaster: "depotplastre",
+  salve: "salver",
+  krem: "kremer",
+  gel: "geler",
+  spray: "sprayer",
+  sirup: "siruper",
+  sugetablett: "sugetabletter",
+  vaginaltablett: "vaginaltabletter",
+  vaginalkrem: "vaginalkremer",
+  vaginalring: "vaginalringer",
+  munnspray: "munnsprayer",
+  munnskyllevaeske: "munnskyllevaesker",
+};
+
+const normalizeFormKey = (value: string) =>
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ø/g, "o")
+    .replace(/å/g, "a")
+    .replace(/æ/g, "ae");
+
+const PLURAL_TO_SINGULAR_FORMULERING = Object.entries(SINGULAR_TO_PLURAL_FORMULERING).reduce(
+  (acc, [singular, plural]) => {
+    acc[plural] = singular;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
+function toPluralFormulering(value: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  const key = normalizeFormKey(trimmed);
+  const mapped = SINGULAR_TO_PLURAL_FORMULERING[key];
+  if (mapped) return mapped;
+  if (trimmed.endsWith("er")) return trimmed;
+  return `${trimmed}er`;
+}
+
+function toSingularFormulering(value: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  const key = normalizeFormKey(trimmed);
+  const mapped = PLURAL_TO_SINGULAR_FORMULERING[key];
+  if (mapped) return mapped;
+  if (trimmed.endsWith("er") && trimmed.length > 2) return trimmed.slice(0, -2);
+  return trimmed;
 }
 
 function parseOmeqStandardtekstPrefill(value: unknown): OMEQStandardtekstPrefill | null {
@@ -217,6 +263,23 @@ export default function StandardTekstPage() {
   const errorToShow = errorLocal ?? error;
 
   const { user, isAdmin, firstName } = useAuthUser();
+  const [adminViewEnabled, setAdminViewEnabled] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem("standardtekster.adminViewEnabled");
+      return raw !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const canManageStandardTekster = isAdmin && adminViewEnabled;
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("standardtekster.adminViewEnabled", String(adminViewEnabled));
+    } catch {
+      // ignore
+    }
+  }, [adminViewEnabled]);
   const actorName = (firstName ?? "").trim() || user?.displayName?.trim() || user?.email?.trim() || "";
   const actor = user
     ? {
@@ -231,14 +294,22 @@ export default function StandardTekstPage() {
   const [draftContent, setDraftContent] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
-  const lockBeforeEdit = Boolean(selected && !isEditing && selected.title === "Ny standardtekst");
+  const lockBeforeEdit = Boolean(
+    canManageStandardTekster && selected && !isEditing && selected.title === "Ny standardtekst",
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [followUpsOpen, setFollowUpsOpen] = useState(false);
 
-  const { preparatRows, resetPreparatRows, clearPreparats, addPickedPreparat, removePreparatById } =
-    usePreparatRows();
+  const {
+    preparatRows,
+    resetPreparatRows,
+    clearPreparats,
+    addPickedPreparat,
+    removePreparatById,
+    reformatPickedPreparats,
+  } = usePreparatRows();
   const preparatSectionRef = useRef<HTMLDivElement | null>(null);
   const preparatSearchInputRef = useRef<HTMLInputElement | null>(null);
   const standardTekstSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -333,13 +404,15 @@ export default function StandardTekstPage() {
     standardTekstSearchInputRef,
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
-      setTallByIndex(buildInitialTallValues(selected?.content ?? ""));
-      setCustomClockModeByIndex({});
+      setTallByIndex(buildInitialTallValues(activeTemplateContent));
+      setClockTime(DEFAULT_CLOCK_TALL_TIME);
+      setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+      setClockCustomMode(false);
 
       // Reset date input
       setDatoInput("");
       // Reset formulering fields based on the currently selected template
-      const fIndices = getFormuleringTokenIndices(selected?.content ?? "");
+      const fIndices = getFormuleringTokenIndices(activeTemplateContent);
       if (fIndices.length) {
         const nextF: Record<number, string> = {};
         for (const i of fIndices) nextF[i] = "";
@@ -350,13 +423,26 @@ export default function StandardTekstPage() {
     },
   });
 
+  const activeTemplateContent = useMemo(
+    () => normalizeTemplateContent(selected?.content ?? ""),
+    [selected?.content],
+  );
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
-  const [customClockModeByIndex, setCustomClockModeByIndex] = useState<Record<number, boolean>>({});
+  const [clockTime, setClockTime] = useState<string>(DEFAULT_CLOCK_TALL_TIME);
+  const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
+    getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME),
+  );
+  const [clockCustomMode, setClockCustomMode] = useState<boolean>(false);
   const [datoInput, setDatoInput] = useState<string>("");
   const [formuleringByIndex, setFormuleringByIndex] = useState<Record<number, string>>({ 0: "" });
+  const [formuleringByPreparatKey, setFormuleringByPreparatKey] = useState<Record<string, string>>({});
   const templateHasVirkestoffToken = (template: string) => /\bVIRKESTOFF\b/.test(template ?? "");
   const templateHasFormuleringTokens = (template: string) =>
     /\{\{\s*FORMULERING\d*\s*\}\}|\bFORMULERING\d*\b/i.test(template ?? "");
+  const isTallValueValid = (value: string) => {
+    const trimmed = (value ?? "").trim();
+    return !trimmed || /^\d+(?:[.,]\d+)?$/.test(trimmed);
+  };
 
   const getFormuleringTokenIndices = (template: string): number[] => {
     const indices = new Set<number>();
@@ -390,42 +476,200 @@ export default function StandardTekstPage() {
     return text.replace(re, safeValue);
   };
 
-  const getTallFieldLabel = useCallback((template: string, index: number) => {
-    const isClock = templateTallTokenLooksLikeClock(template, index);
-    if (isClock) {
-      return index === 0 ? "Klokkeslett" : `Klokkeslett ${index}`;
+  const getTallNumericValue = useCallback(
+    (index: number): number | null => {
+      const candidate =
+        (tallByIndex[index] ?? "").trim() || (index !== 0 ? (tallByIndex[0] ?? "").trim() : "");
+      if (!candidate) return null;
+
+      const normalized = candidate.replace(",", ".");
+      const parsed = Number(normalized);
+      if (!Number.isFinite(parsed)) return null;
+      return parsed;
+    },
+    [tallByIndex],
+  );
+
+  const resolveFormuleringForPreviewAndCopy = useCallback(
+    (index: number, value: string, template: string): string => {
+      const raw = (value ?? "").trim();
+      if (!raw) return raw;
+      if (!templateHasTallToken(template)) return raw;
+
+      const numeric = getTallNumericValue(index);
+      if (numeric === null) return raw;
+      if (numeric === 1) return toSingularFormulering(raw);
+      if (numeric > 1) return toPluralFormulering(raw);
+      return raw;
+    },
+    [getTallNumericValue],
+  );
+
+  const getTallTokenOccurrences = useCallback((template: string): number[] => {
+    const occurrences: number[] = [];
+    const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
+    let m: RegExpExecArray | null;
+
+    while ((m = re.exec(template ?? ""))) {
+      const raw = (m[1] ?? m[2] ?? "").trim();
+      const idx = raw ? Number(raw) : 0;
+      occurrences.push(Number.isFinite(idx) ? idx : 0);
     }
 
+    return occurrences;
+  }, []);
+
+  const getUnnumberedFormuleringOccurrenceCount = useCallback((template: string): number => {
+    const re = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi;
+    let count = 0;
+    while (re.exec(template ?? "")) count += 1;
+    return count;
+  }, []);
+
+  const getUnnumberedFormuleringPreparatPositions = useCallback(
+    (template: string): Array<number | null> => {
+      const positions: Array<number | null> = [];
+      let currentPreparatPosition: number | null = null;
+      const re = /\{\{\s*(PREPARAT\d*|FORMULERING)\s*\}\}|\b(PREPARAT\d*|FORMULERING)\b/gi;
+      let m: RegExpExecArray | null;
+
+      while ((m = re.exec(template ?? ""))) {
+        const token = String(m[1] ?? m[2] ?? "").trim().toUpperCase();
+        if (!token) continue;
+
+        if (token.startsWith("PREPARAT")) {
+          const rawIndex = token.slice("PREPARAT".length).trim();
+          if (!rawIndex) {
+            currentPreparatPosition = 0;
+          } else {
+            const n = Number(rawIndex);
+            currentPreparatPosition = Number.isFinite(n) && n > 0 ? n - 1 : 0;
+          }
+          continue;
+        }
+
+        if (token === "FORMULERING") {
+          positions.push(currentPreparatPosition);
+        }
+      }
+
+      return positions;
+    },
+    [],
+  );
+
+  const buildUnnumberedFormuleringOccurrenceValues = useCallback(
+    (template: string): string[] => {
+      const manualRaw = (formuleringByIndex[0] ?? "").trim();
+      const occurrenceCount = getUnnumberedFormuleringOccurrenceCount(template);
+      if (!occurrenceCount) return [];
+      const formuleringPreparatPositions = getUnnumberedFormuleringPreparatPositions(template);
+
+      const hasTallTokens = templateHasTallToken(template);
+      const tallOccurrences = hasTallTokens ? getTallTokenOccurrences(template) : [];
+
+      const getRawFromPreparatPosition = (position: number | null | undefined): string => {
+        if (position === null || position === undefined || position < 0) return "";
+        const row = (preparatRows as any[])[position];
+        const key = String(row?.pickedKey ?? row?.picked ?? "").trim();
+        if (!key) return "";
+        return (formuleringByPreparatKey[key] ?? "").trim();
+      };
+
+      return Array.from({ length: occurrenceCount }, (_, occurrenceIdx) => {
+        const preparatPosition = formuleringPreparatPositions[occurrenceIdx] ?? null;
+        const raw =
+          getRawFromPreparatPosition(preparatPosition) ||
+          getRawFromPreparatPosition(occurrenceIdx) ||
+          manualRaw;
+        if (!raw) return "";
+
+        if (hasTallTokens) {
+          const tallIdx = tallOccurrences[occurrenceIdx];
+          if (typeof tallIdx === "number") {
+            const numeric = getTallNumericValue(tallIdx);
+            if (numeric === 1) return toSingularFormulering(raw);
+            if (numeric !== null && numeric > 1) return toPluralFormulering(raw);
+          }
+        }
+
+        return raw;
+      });
+    },
+    [
+      formuleringByIndex,
+      formuleringByPreparatKey,
+      getTallNumericValue,
+      getTallTokenOccurrences,
+      getUnnumberedFormuleringOccurrenceCount,
+      getUnnumberedFormuleringPreparatPositions,
+      preparatRows,
+    ],
+  );
+
+  const getFormuleringForPreparatPosition = useCallback(
+    (position: number): string => {
+      if (position < 0) return "";
+      const row = (preparatRows as any[])[position];
+      const key = String(row?.pickedKey ?? row?.picked ?? "").trim();
+      if (!key) return "";
+      return (formuleringByPreparatKey[key] ?? "").trim();
+    },
+    [formuleringByPreparatKey, preparatRows],
+  );
+
+  const resolveFormuleringTokenValue = useCallback(
+    (index: number, template: string): string => {
+      const manual = (formuleringByIndex[index] ?? "").trim();
+      const byPreparat = index === 0
+        ? getFormuleringForPreparatPosition(0)
+        : getFormuleringForPreparatPosition(index - 1);
+
+      const raw = manual || byPreparat;
+      if (!raw) return "";
+
+      return resolveFormuleringForPreviewAndCopy(index, raw, template);
+    },
+    [formuleringByIndex, getFormuleringForPreparatPosition, resolveFormuleringForPreviewAndCopy],
+  );
+
+  const replaceUnnumberedFormuleringTokensByOccurrence = useCallback(
+    (text: string, values: string[]): string => {
+      if (!text) return text;
+      if (!values.length) return text;
+
+      let cursor = 0;
+      return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, () => {
+        const value = values[cursor] ?? values[values.length - 1] ?? "";
+        cursor += 1;
+        return value;
+      });
+    },
+    [],
+  );
+
+  const getTallFieldLabel = useCallback((_template: string, index: number) => {
     return index === 0 ? "Tall" : `Tall ${index}`;
   }, []);
 
-  const getTallSectionTitle = useCallback((template: string) => {
-    const indices = getTallTokenIndices(template);
-    const clockCount = indices.filter((index) => templateTallTokenLooksLikeClock(template, index)).length;
-
-    if (clockCount === 0) return "Tall i teksten";
-    if (clockCount === indices.length) return "Tid i teksten";
-    return "Tall og tid i teksten";
-  }, []);
-
-  // Lagrer virkestoff knyttet til valgt preparat (mappes på selve picked-teksten)
-  const [virkestoffByPicked, setVirkestoffByPicked] = useState<Record<string, string>>({});
+  // Lagrer virkestoff knyttet til valgt preparat (mappes på stabil pickedKey)
+  const [virkestoffByKey, setVirkestoffByKey] = useState<Record<string, string>>({});
 
   const resolvedVirkestoff = useMemo(() => {
     for (const r of preparatRows as any[]) {
-      const picked = String(r?.picked ?? "").trim();
-      if (!picked) continue;
-      const v = (virkestoffByPicked[picked] ?? "").trim();
+      const key = String(r?.pickedKey ?? r?.picked ?? "").trim();
+      if (!key) continue;
+      const v = (virkestoffByKey[key] ?? "").trim();
       if (v) return v;
     }
 
-    for (const v of Object.values(virkestoffByPicked)) {
+    for (const v of Object.values(virkestoffByKey)) {
       const s = (v ?? "").trim();
       if (s) return s;
     }
 
     return "";
-  }, [preparatRows, virkestoffByPicked]);
+  }, [preparatRows, virkestoffByKey]);
 
   const [copied, setCopied] = useState(false);
   const [clearOnCopy, setClearOnCopy] = useState<boolean>(() => {
@@ -488,6 +732,39 @@ export default function StandardTekstPage() {
       // ignore
     }
   }, [includePackSizeInPreparatText]);
+
+  const reformatPickedRows = useCallback(
+    (includeManufacturer: boolean, includePackSize: boolean) => {
+      reformatPickedPreparats((row) =>
+        formatPreparatRowText(
+          {
+            baseText: row.baseText,
+            fullName: row.fullName,
+            manufacturer: row.manufacturer,
+            packSize: row.packSize,
+          },
+          { includeManufacturer, includePackSize },
+        ),
+      );
+    },
+    [reformatPickedPreparats],
+  );
+
+  const handleIncludeManufacturerInPreparatTextChange = useCallback(
+    (value: boolean) => {
+      setIncludeManufacturerInPreparatText(value);
+      reformatPickedRows(value, includePackSizeInPreparatText);
+    },
+    [includePackSizeInPreparatText, reformatPickedRows],
+  );
+
+  const handleIncludePackSizeInPreparatTextChange = useCallback(
+    (value: boolean) => {
+      setIncludePackSizeInPreparatText(value);
+      reformatPickedRows(includeManufacturerInPreparatText, value);
+    },
+    [includeManufacturerInPreparatText, reformatPickedRows],
+  );
 
   const [draftFollowUps, setDraftFollowUps] = useState<StandardTekstFollowUp[]>([]);
   const [followUpPick, setFollowUpPick] = useState<{ id: string; title: string } | null>(null);
@@ -556,6 +833,10 @@ export default function StandardTekstPage() {
   const effectiveDato = formattedDato || formattedDatoMndName;
 
   const handleDatoPicker = (iso: string) => {
+    if (!iso) {
+      setDatoInput("");
+      return;
+    }
     const m = (iso ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!m) return;
     const [, yyyy, mm, dd] = m;
@@ -566,15 +847,35 @@ export default function StandardTekstPage() {
     }
   };
 
+  const openDatoMndPicker = useCallback(() => {
+    const input = datoMndPickerInputRef.current;
+    if (!input) return;
+
+    try {
+      const withPicker = input as HTMLInputElement & { showPicker?: () => void };
+      if (typeof withPicker.showPicker === "function") {
+        withPicker.showPicker();
+      } else {
+        // Fallback for browsers without showPicker support
+        input.click();
+      }
+    } catch {
+      // showPicker is not supported in all browsers
+    }
+
+    input.focus();
+  }, []);
+
   // Preview content with preparats and tall
   const previewContent = useMemo(() => {
     if (!selected) return "";
+    const templateContent = activeTemplateContent;
 
     // IMPORTANT: Do NOT replace TALL tokens here.
     // We keep tokens (TALL/TALL1/…) intact so renderContentWithPreparatHighlight
     // can render them as blue chips using tallValues.
     let next = buildPreviewContent({
-      template: selected.content,
+      template: templateContent,
       firstName,
       picked: pickedPreparats,
     });
@@ -582,11 +883,13 @@ export default function StandardTekstPage() {
     // Do NOT replace VIRKESTOFF in previewContent; leave the token for renderer.
 
     return next;
-  }, [selected, firstName, pickedPreparats, resolvedVirkestoff]);
+  }, [selected, firstName, pickedPreparats, activeTemplateContent]);
 
   // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
-    const shouldAutoEditNew = Boolean(isAdmin && selected && selected.title === "Ny standardtekst");
+    const shouldAutoEditNew = Boolean(
+      canManageStandardTekster && selected && selected.title === "Ny standardtekst",
+    );
     const pending = pendingOmeqPrefill;
     const shouldApplyOmeqPrefill =
       Boolean(pending && selected) &&
@@ -599,9 +902,14 @@ export default function StandardTekstPage() {
     setDraftCategory(selected?.category ?? "");
     if (shouldAutoEditNew) {
       const base = selected?.content ?? "";
-      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
+      const normalized = normalizeTemplateContent(base);
+      setDraftContent(
+        normalized.trim().length
+          ? normalized
+          : sanitizeFarmasoytSignature(DEFAULT_NEW_STANDARDTEKST_CONTENT),
+      );
     } else {
-      setDraftContent(selected?.content ?? "");
+      setDraftContent(normalizeTemplateContent(selected?.content ?? ""));
     }
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
@@ -609,16 +917,19 @@ export default function StandardTekstPage() {
 
     if (shouldApplyOmeqPrefill && selected && pending) {
       resetPreparatRows();
-      setVirkestoffByPicked({});
+      setVirkestoffByKey({});
+      setFormuleringByPreparatKey({});
 
       for (const preparat of pending.preparats) {
         addPickedPreparat(preparat, preparat);
       }
 
-      const nextTallValues = buildInitialTallValues(selected.content);
+      const nextTallValues = buildInitialTallValues(normalizeTemplateContent(selected.content));
       nextTallValues[1] = pending.totalOmeq;
       setTallByIndex(nextTallValues);
-      setCustomClockModeByIndex({});
+      setClockTime(DEFAULT_CLOCK_TALL_TIME);
+      setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+      setClockCustomMode(false);
       setDatoInput("");
       setErrorLocal(null);
       protectedOmeqSelectedIdRef.current = selected.id;
@@ -632,11 +943,14 @@ export default function StandardTekstPage() {
       }
     } else if (!shouldProtectCurrentSelection && !preserveInputsOnNextSelectRef.current) {
       resetPreparatRows();
-      setVirkestoffByPicked({});
-      setTallByIndex(buildInitialTallValues(selected?.content ?? ""));
-      setCustomClockModeByIndex({});
+      setVirkestoffByKey({});
+      setFormuleringByPreparatKey({});
+      setTallByIndex(buildInitialTallValues(activeTemplateContent));
+      setClockTime(DEFAULT_CLOCK_TALL_TIME);
+      setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+      setClockCustomMode(false);
       setDatoInput("");
-      const fIndices = getFormuleringTokenIndices(selected?.content ?? "");
+      const fIndices = getFormuleringTokenIndices(activeTemplateContent);
       if (fIndices.length) {
         const nextF: Record<number, string> = {};
         for (const i of fIndices) nextF[i] = "";
@@ -659,12 +973,20 @@ export default function StandardTekstPage() {
     preserveInputsOnNextSelectRef.current = false;
   }, [
     addPickedPreparat,
-    isAdmin,
+    activeTemplateContent,
+    canManageStandardTekster,
     pendingOmeqPrefill,
     resetPreparatRows,
     selected,
     selectedId,
   ]);
+
+  useEffect(() => {
+    if (canManageStandardTekster) return;
+    if (!isEditing) return;
+    setIsEditing(false);
+    setFollowUpsOpen(false);
+  }, [canManageStandardTekster, isEditing]);
 
   useEffect(() => {
     if (!protectedOmeqSelectedIdRef.current) return;
@@ -702,14 +1024,20 @@ export default function StandardTekstPage() {
   }, [items, omeqPrefill, selected, selectedId, setSelectedId]);
 
   const startEdit = () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setDraftTitle(selected.title ?? "");
     setDraftCategory(selected.category ?? "");
     if (selected.title === "Ny standardtekst") {
       const base = selected.content ?? "";
-      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
+      const normalized = normalizeTemplateContent(base);
+      setDraftContent(
+        normalized.trim().length
+          ? normalized
+          : sanitizeFarmasoytSignature(DEFAULT_NEW_STANDARDTEKST_CONTENT),
+      );
     } else {
-      setDraftContent(selected.content ?? "");
+      setDraftContent(normalizeTemplateContent(selected.content ?? ""));
     }
     setDraftFollowUps((selected.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
@@ -720,7 +1048,7 @@ export default function StandardTekstPage() {
   const cancelEdit = () => {
     setDraftTitle(selected?.title ?? "");
     setDraftCategory(selected?.category ?? "");
-    setDraftContent(selected?.content ?? "");
+    setDraftContent(normalizeTemplateContent(selected?.content ?? ""));
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
@@ -728,10 +1056,12 @@ export default function StandardTekstPage() {
   };
 
   const saveEdit = async () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setSaving(true);
     setErrorLocal(null);
     try {
+      const sanitizedDraftContent = normalizeTemplateContent(draftContent);
       // If admin selected a follow-up but didn't press +, include it on save.
       const followUpsToSave: StandardTekstFollowUp[] = (() => {
         if (!followUpPick) return draftFollowUps;
@@ -748,7 +1078,7 @@ export default function StandardTekstPage() {
         {
           title: draftTitle,
           category: draftCategory.trim() || undefined,
-          content: draftContent,
+          content: sanitizedDraftContent,
           followUps: followUpsToSave,
         },
         actor,
@@ -762,7 +1092,7 @@ export default function StandardTekstPage() {
                 ...it,
                 title: draftTitle,
                 category: draftCategory.trim() || undefined,
-                content: draftContent,
+                content: sanitizedDraftContent,
                 followUps: followUpsToSave,
                 updatedByName: actor?.name ?? it.updatedByName,
                 updatedAt: new Date(),
@@ -772,6 +1102,7 @@ export default function StandardTekstPage() {
       );
 
       // Sync local draft + clear add-form
+      setDraftContent(sanitizedDraftContent);
       setDraftFollowUps(followUpsToSave);
       setFollowUpPick(null);
       setFollowUpLabel("");
@@ -786,7 +1117,7 @@ export default function StandardTekstPage() {
   };
 
   const createNewStandardTekst = async () => {
-    if (!isAdmin) return;
+    if (!canManageStandardTekster) return;
 
     setCreating(true);
     setErrorLocal(null);
@@ -806,7 +1137,12 @@ export default function StandardTekstPage() {
       setDraftTitle(localItem.title);
       setDraftCategory(localItem.category ?? "");
       const base = localItem.content ?? "";
-      setDraftContent(base.trim().length ? base : DEFAULT_NEW_STANDARDTEKST_CONTENT);
+      const normalized = normalizeTemplateContent(base);
+      setDraftContent(
+        normalized.trim().length
+          ? normalized
+          : sanitizeFarmasoytSignature(DEFAULT_NEW_STANDARDTEKST_CONTENT),
+      );
       setIsEditing(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved opprettelse";
@@ -926,8 +1262,8 @@ export default function StandardTekstPage() {
               key={fu.id}
               label={fu.label}
               onClick={() => openFollowUp(fu.id)}
-              onDelete={isAdmin && isEditing ? () => removeFollowUp(fu.id) : undefined}
-              deleteIcon={isAdmin && isEditing ? <DeleteOutlineIcon /> : undefined}
+              onDelete={canManageStandardTekster && isEditing ? () => removeFollowUp(fu.id) : undefined}
+              deleteIcon={canManageStandardTekster && isEditing ? <DeleteOutlineIcon /> : undefined}
               icon={<OpenInNewIcon />}
               variant="outlined"
             />
@@ -1006,6 +1342,7 @@ export default function StandardTekstPage() {
   const copyBodyToClipboard = async () => {
     if (!selected) return;
     if (isEditing) return;
+    const selectedContent = activeTemplateContent;
 
     // If the user has marked (selected) text, do NOT auto-copy the full template.
     // This keeps normal text selection + Ctrl/Cmd+C working.
@@ -1015,25 +1352,57 @@ export default function StandardTekstPage() {
     }
 
     // Prevent copying if the template requires a number and it hasn't been filled in.
-    if (templateHasTallToken(selected.content)) {
-      const indices = getTallTokenIndices(selected.content);
+    if (templateHasTallToken(selectedContent)) {
+      const indices = getTallTokenIndices(selectedContent);
       const missing = indices.filter((i) => !(tallByIndex[i] ?? "").trim());
       if (missing.length) {
-        const label = missing.map((i) => getTallFieldLabel(selected.content, i)).join(", ");
+        const label = missing.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
         setErrorLocal(`Fyll inn feltet før du kopierer teksten: ${label}.`);
+        return;
+      }
+
+      const invalid = indices.filter((i) => !isTallValueValid(tallByIndex[i] ?? ""));
+      if (invalid.length) {
+        const label = invalid.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
+        setErrorLocal(`Tallfelt må inneholde kun tall: ${label}.`);
         return;
       }
     }
 
-    if (templateHasVirkestoffToken(selected.content) && !resolvedVirkestoff) {
+    if (templateHasKlokkeslettDagToken(selectedContent)) {
+      const clockLabel = formatClockTallValue(clockTime, clockDay).trim();
+      if (!clockLabel) {
+        setErrorLocal("Velg klokkeslett før du kopierer teksten.");
+        return;
+      }
+    }
+
+    if (templateHasVirkestoffToken(selectedContent) && !resolvedVirkestoff) {
       setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
       return;
     }
-    if (templateHasFormuleringTokens(selected.content)) {
-      const indices = getFormuleringTokenIndices(selected.content);
-      const missing = indices.filter((i) => !(formuleringByIndex[i] ?? "").trim());
-      if (missing.length) {
-        const label = missing.map((i) => (i === 0 ? "FORMULERING" : `FORMULERING${i}`)).join(", ");
+    if (templateHasFormuleringTokens(selectedContent)) {
+      const indices = getFormuleringTokenIndices(selectedContent);
+      const missingLabels = new Set<string>();
+
+      for (const idx of indices.filter((i) => i > 0)) {
+        if (!resolveFormuleringTokenValue(idx, selectedContent)) {
+          missingLabels.add(`FORMULERING${idx}`);
+        }
+      }
+
+      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      if (hasUnnumberedToken) {
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        if (!occurrenceValues.length || occurrenceValues.some((value) => !value.trim())) {
+          missingLabels.add("FORMULERING");
+        }
+      } else if (indices.includes(0) && !resolveFormuleringTokenValue(0, selectedContent)) {
+        missingLabels.add("FORMULERING");
+      }
+
+      if (missingLabels.size) {
+        const label = Array.from(missingLabels).join(", ");
         setErrorLocal(`Fyll inn formulering før du kopierer teksten: ${label}.`);
         return;
       }
@@ -1041,7 +1410,7 @@ export default function StandardTekstPage() {
 
     // Build base text
     let text = buildPreviewContent({
-      template: selected.content,
+      template: selectedContent,
       firstName,
       picked: pickedPreparats,
     });
@@ -1062,7 +1431,7 @@ export default function StandardTekstPage() {
       // Replace PREPARAT1.
       // If the template only uses PREPARAT1 but multiple preparater are chosen,
       // we insert the full list (same behaviour as preview).
-      if (pickedPreparats.length > 1 && !/\bPREPARAT2\b/.test(selected.content)) {
+      if (pickedPreparats.length > 1 && !/\bPREPARAT2\b/.test(selectedContent)) {
         text = text.replace(/\bPREPARAT1\b/g, list);
       } else if (pickedPreparats[0]) {
         text = text.replace(/\bPREPARAT1\b/g, pickedPreparats[0]);
@@ -1082,9 +1451,13 @@ export default function StandardTekstPage() {
       text = text.replace(/\bDATOMND\b/g, formattedDatoMnd);
     }
 
+    if (templateHasKlokkeslettDagToken(selectedContent)) {
+      text = replaceKlokkeslettDagTokens(text, formatClockTallValue(clockTime, clockDay));
+    }
+
     // Replace each TALL token individually (TALL, TALL1, TALL2…)
-    if (templateHasTallToken(selected.content)) {
-      for (const idx of getTallTokenIndices(selected.content)) {
+    if (templateHasTallToken(selectedContent)) {
+      for (const idx of getTallTokenIndices(selectedContent)) {
         const v = (tallByIndex[idx] ?? "").trim();
         if (!v) continue;
         text = replaceTallTokenByIndex(text, idx, v);
@@ -1092,16 +1465,34 @@ export default function StandardTekstPage() {
     }
 
     // Replace VIRKESTOFF token (based on picked preparat)
-    if (templateHasVirkestoffToken(selected.content) && resolvedVirkestoff) {
+    if (templateHasVirkestoffToken(selectedContent) && resolvedVirkestoff) {
       text = text.replace(/\bVIRKESTOFF\b/g, resolvedVirkestoff);
     }
 
     // Replace FORMULERING tokens (free text) by index (FORMULERING, FORMULERING1, ...)
-    if (templateHasFormuleringTokens(selected.content)) {
-      for (const idx of getFormuleringTokenIndices(selected.content)) {
-        const v = (formuleringByIndex[idx] ?? "").trim();
-        if (!v) continue;
-        text = replaceFormuleringTokenByIndex(text, idx, v);
+    if (templateHasFormuleringTokens(selectedContent)) {
+      const indices = getFormuleringTokenIndices(selectedContent);
+      const hasNumbered = indices.some((idx) => idx > 0);
+
+      if (hasNumbered) {
+        for (const idx of indices.filter((i) => i > 0)) {
+          const v = resolveFormuleringTokenValue(idx, selectedContent);
+          if (!v) continue;
+          text = replaceFormuleringTokenByIndex(text, idx, v);
+        }
+      }
+
+      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      if (hasUnnumberedToken) {
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        if (occurrenceValues.length > 0) {
+          text = replaceUnnumberedFormuleringTokensByOccurrence(text, occurrenceValues);
+        } else {
+          const v0 = resolveFormuleringTokenValue(0, selectedContent);
+          if (v0) {
+            text = replaceFormuleringTokenByIndex(text, 0, v0);
+          }
+        }
       }
     }
 
@@ -1114,19 +1505,22 @@ export default function StandardTekstPage() {
 
       if (clearOnCopy) {
         clearPreparats();
-        setVirkestoffByPicked({});
+        setVirkestoffByKey({});
+        setFormuleringByPreparatKey({});
 
-        if (templateHasTallToken(selected.content)) {
-          setTallByIndex(buildInitialTallValues(selected.content));
+        if (templateHasTallToken(selectedContent)) {
+          setTallByIndex(buildInitialTallValues(selectedContent));
         } else {
           setTallByIndex({ 0: "" });
         }
-        setCustomClockModeByIndex({});
+        setClockTime(DEFAULT_CLOCK_TALL_TIME);
+        setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+        setClockCustomMode(false);
 
         setSearch("");
         setDatoInput("");
-        if (templateHasFormuleringTokens(selected.content)) {
-          const fIndices = getFormuleringTokenIndices(selected.content);
+        if (templateHasFormuleringTokens(selectedContent)) {
+          const fIndices = getFormuleringTokenIndices(selectedContent);
           if (fIndices.length) {
             const nextF: Record<number, string> = {};
             for (const i of fIndices) nextF[i] = "";
@@ -1162,19 +1556,22 @@ export default function StandardTekstPage() {
 
         if (clearOnCopy) {
           clearPreparats();
-          setVirkestoffByPicked({});
+          setVirkestoffByKey({});
+          setFormuleringByPreparatKey({});
 
-          if (templateHasTallToken(selected.content)) {
-            setTallByIndex(buildInitialTallValues(selected.content));
+          if (templateHasTallToken(selectedContent)) {
+            setTallByIndex(buildInitialTallValues(selectedContent));
           } else {
             setTallByIndex({ 0: "" });
           }
-          setCustomClockModeByIndex({});
+          setClockTime(DEFAULT_CLOCK_TALL_TIME);
+          setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+          setClockCustomMode(false);
 
           setSearch("");
           setDatoInput("");
-          if (templateHasFormuleringTokens(selected.content)) {
-            const fIndices = getFormuleringTokenIndices(selected.content);
+          if (templateHasFormuleringTokens(selectedContent)) {
+            const fIndices = getFormuleringTokenIndices(selectedContent);
             if (fIndices.length) {
               const nextF: Record<number, string> = {};
               for (const i of fIndices) nextF[i] = "";
@@ -1198,6 +1595,7 @@ export default function StandardTekstPage() {
   };
 
   const requestDelete = () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setDeleteOpen(true);
   };
@@ -1208,6 +1606,7 @@ export default function StandardTekstPage() {
   };
 
   const confirmDelete = async () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setDeleting(true);
     setErrorLocal(null);
@@ -1233,39 +1632,24 @@ export default function StandardTekstPage() {
     }
   };
 
+  const toggleStandardTekstActive = async (id: string, isActive: boolean) => {
+    if (!canManageStandardTekster) return;
+
+    await standardTeksterApi.update(id, { isActive }, actor);
+
+    setItems((prev) => {
+      const next = prev.map((it) => (it.id === id ? { ...it, isActive } : it));
+      if (!isActive && selectedId === id) {
+        const nextActive = next.find((it) => it.id !== id && it.isActive !== false);
+        setSelectedId(nextActive?.id ?? null);
+        setIsEditing(false);
+      }
+      return next;
+    });
+  };
+
   return (
     <Box className={styles.page}>
-      <Box className={styles.header}>
-        <Box>
-          <Typography variant="h1">Standardtekster</Typography>
-        </Box>
-
-        <Box className={styles.headerActions}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "flex", alignItems: "center" }}
-          >
-            <span className={styles.preparatHintKeys}>
-              <span className={styles.preparatHintKeyLabel}>Søk tekst:</span> Ctrl+S ·{" "}
-              <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl+Shift+F ·{" "}
-              <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
-            </span>
-          </Typography>
-          <Button
-            variant="text"
-            size="small"
-            onClick={() => setShowGuide((v) => !v)}
-            className={styles.headerLinkButton}
-            endIcon={
-              <ExpandMoreIcon className={showGuide ? styles.expandIconOpen : styles.expandIcon} />
-            }
-          >
-            {showGuide ? "Skjul bruksanvisning" : "Vis bruksanvisning"}
-          </Button>
-        </Box>
-      </Box>
-
       {errorToShow && (
         <Alert severity="error" className={styles.error}>
           {errorToShow}
@@ -1285,7 +1669,12 @@ export default function StandardTekstPage() {
             <li>Klokkeslettfelt bruker faste valg og foreslår automatisk i dag eller i morgen ut fra lokal tid.</li>
             <li>Velg om produsent og pakningsstørrelse skal tas med i preparatteksten via bryterne øverst.</li>
             <li>Klikk i teksten for å kopiere. Hvis "Tøm etter kopiering" er på, nullstilles feltene automatisk etterpå.</li>
-            {isAdmin && <li>Som admin kan du opprette, redigere og slette standardtekster, og se hvem som opprettet og sist oppdaterte teksten.</li>}
+            {isAdmin && (
+              <li>
+                Som admin kan du opprette, redigere og slette standardtekster, og se hvem som
+                opprettet og sist oppdaterte teksten.
+              </li>
+            )}
           </Box>
         </Paper>
       </Collapse>
@@ -1305,13 +1694,14 @@ export default function StandardTekstPage() {
         >
           <StandardTekstSidebar
             disabled={lockBeforeEdit}
-            isAdmin={isAdmin}
+            isAdmin={canManageStandardTekster}
             creating={creating}
             onCreate={createNewStandardTekst}
             search={search}
             setSearch={setSearch}
             loading={loading}
             filtered={filtered}
+            onToggleActive={toggleStandardTekstActive}
             selectedId={selectedId}
             setSelectedId={(id) => setSelectedId(id)}
             searchInputRef={standardTekstSearchInputRef}
@@ -1375,14 +1765,15 @@ export default function StandardTekstPage() {
                 includeManufacturerInText={includeManufacturerInPreparatText}
                 includePackSizeInText={includePackSizeInPreparatText}
                 onClearOnCopyChange={setClearOnCopy}
-                onIncludeManufacturerInTextChange={setIncludeManufacturerInPreparatText}
-                onIncludePackSizeInTextChange={setIncludePackSizeInPreparatText}
+                onIncludeManufacturerInTextChange={handleIncludeManufacturerInPreparatTextChange}
+                onIncludePackSizeInTextChange={handleIncludePackSizeInPreparatTextChange}
                 inputRef={preparatSearchInputRef}
                 onPickText={(pick) => {
                   const text = typeof pick === "string" ? pick : pick.text;
                   const key = typeof pick === "string" ? pick : pick.key;
+                  const rowData = typeof pick === "string" ? undefined : pick.rowData;
 
-                  addPickedPreparat(text, key);
+                  addPickedPreparat(text, key, rowData);
 
                   // Hvis pick har virkestoff (FEST har vanligvis dette), lagre det for VIRKESTOFF-tokenet
                   if (typeof pick !== "string") {
@@ -1393,10 +1784,35 @@ export default function StandardTekstPage() {
                       (pick as any)?.data?.virkestoff;
                     const v = typeof vRaw === "string" ? vRaw.trim() : "";
                     if (text && v) {
-                      setVirkestoffByPicked((prev) => ({ ...prev, [String(text)]: v }));
+                      setVirkestoffByKey((prev) => ({ ...prev, [String(key)]: v }));
 
                       if (errorLocal?.startsWith("Velg et preparat med virkestoff")) {
                         setErrorLocal(null);
+                      }
+                    }
+
+                    const formulering = String((pick as any)?.formulering ?? "").trim();
+                    if (formulering && key) {
+                      setFormuleringByPreparatKey((prev) => ({
+                        ...prev,
+                        [String(key)]: formulering,
+                      }));
+                    }
+                    if (formulering && selected && templateHasFormuleringTokens(activeTemplateContent)) {
+                      const tokenIndices = getFormuleringTokenIndices(activeTemplateContent);
+                      if (tokenIndices.length > 0) {
+                        setFormuleringByIndex((prev) => {
+                          const next = { ...prev };
+                          const firstEmpty = tokenIndices.find((idx) => !(next[idx] ?? "").trim());
+                          if (firstEmpty !== undefined) {
+                            next[firstEmpty] = formulering;
+                          }
+                          return next;
+                        });
+
+                        if (errorLocal?.startsWith("Fyll inn formulering")) {
+                          setErrorLocal(null);
+                        }
                       }
                     }
                   }
@@ -1407,18 +1823,24 @@ export default function StandardTekstPage() {
                 }}
                 onClear={() => {
                   clearPreparats();
-                  setVirkestoffByPicked({});
+                  setVirkestoffByKey({});
+                  setFormuleringByPreparatKey({});
                 }}
                 onRemove={(id) => {
                   const numericId = typeof id === "number" ? id : Number(id);
 
                   // Fjern evt lagret virkestoff knyttet til denne raden før vi fjerner raden
                   const row = (preparatRows as any[]).find((r) => Number(r?.id) === numericId);
-                  const picked = String(row?.picked ?? "").trim();
-                  if (picked) {
-                    setVirkestoffByPicked((prev) => {
+                  const pickedKey = String(row?.pickedKey ?? row?.picked ?? "").trim();
+                  if (pickedKey) {
+                    setVirkestoffByKey((prev) => {
                       const next = { ...prev };
-                      delete next[picked];
+                      delete next[pickedKey];
+                      return next;
+                    });
+                    setFormuleringByPreparatKey((prev) => {
+                      const next = { ...prev };
+                      delete next[pickedKey];
                       return next;
                     });
                   }
@@ -1428,323 +1850,357 @@ export default function StandardTekstPage() {
               />
             </Box>
 
-            {selected && templateHasTallToken(selected.content) && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mt: 1,
-                  mb: 1.5,
-                  p: 1.25,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 2,
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                  {getTallSectionTitle(selected.content)}
-                </Typography>
+            {selected &&
+              (templateHasTallToken(activeTemplateContent) ||
+                templateHasKlokkeslettDagToken(activeTemplateContent) ||
+                templateHasDatoToken(activeTemplateContent) ||
+                templateHasDatoMndToken(activeTemplateContent) ||
+                templateHasFormuleringTokens(activeTemplateContent)) && (
+                <Box
+                  sx={{
+                    mt: 0.75,
+                    mb: 1,
+                    display: "grid",
+                    gap: 0.75,
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      lg: "repeat(2, minmax(280px, 1fr))",
+                      xl: "repeat(3, minmax(280px, 1fr))",
+                    },
+                    alignItems: "start",
+                  }}
+                >
+                  {templateHasTallToken(activeTemplateContent) && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 1,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1.5,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                        Tall i teksten
+                      </Typography>
 
-                {(() => {
-                  const tallIndices = getTallTokenIndices(selected.content);
+                      {(() => {
+                        const tallIndices = getTallTokenIndices(activeTemplateContent);
+                        const tallColumnsOnSm =
+                          tallIndices.length > 1
+                            ? "repeat(2, minmax(120px, 170px))"
+                            : "minmax(120px, 170px)";
 
-                  return (
-                    <>
+                        return (
+                          <>
+                            <Box
+                              sx={{
+                                display: "grid",
+                                gap: 0.75,
+                                gridTemplateColumns: {
+                                  xs: "1fr",
+                                  sm: tallColumnsOnSm,
+                                },
+                                alignItems: "start",
+                                alignContent: "start",
+                                gridAutoRows: "min-content",
+                              }}
+                            >
+                              {tallIndices.map((idx) => {
+                                const v = tallByIndex[idx] ?? "";
+                                const tokenLabel = getTallFieldLabel(activeTemplateContent, idx);
+                                const invalid = !isTallValueValid(v);
+
+                                return (
+                                  <TextField
+                                    key={idx}
+                                    label={tokenLabel}
+                                    value={v}
+                                    onChange={(e) => {
+                                      const nextValue = e.target.value.replace(/[^\d.,]/g, "");
+                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+
+                                      if (
+                                        errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten") ||
+                                        errorLocal?.startsWith("Tallfelt må inneholde kun tall")
+                                      ) {
+                                        setErrorLocal(null);
+                                      }
+                                    }}
+                                    size="small"
+                                    type="text"
+                                    error={invalid}
+                                    helperText={invalid ? "Kun tall (f.eks. 1, 2, 2,5)" : undefined}
+                                    slotProps={{
+                                      htmlInput: {
+                                        inputMode: "decimal",
+                                      },
+                                    }}
+                                    onWheel={(e) => {
+                                      (e.target as HTMLInputElement).blur();
+                                    }}
+                                  />
+                                );
+                              })}
+                            </Box>
+                          </>
+                        );
+                      })()}
+                    </Paper>
+                  )}
+
+                  {templateHasKlokkeslettDagToken(activeTemplateContent) && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 1,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1.5,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                        Tid i teksten
+                      </Typography>
+
+                      {(() => {
+                        const selectedClockTime = CLOCK_TALL_OPTIONS.includes(
+                          clockTime as (typeof CLOCK_TALL_OPTIONS)[number],
+                        )
+                          ? clockTime
+                          : clockCustomMode
+                            ? CUSTOM_CLOCK_VALUE
+                            : "";
+
+                        return (
+                          <Box
+                            sx={{
+                              display: "grid",
+                              gap: 1,
+                              gridTemplateColumns: {
+                                xs: "1fr",
+                                sm: clockCustomMode ? "170px 130px 170px" : "170px 130px",
+                              },
+                              alignItems: "start",
+                            }}
+                          >
+                            <TextField
+                              select
+                              label="Klokkeslett"
+                              size="small"
+                              value={selectedClockTime}
+                              onChange={(e) => {
+                                if (e.target.value === CUSTOM_CLOCK_VALUE) {
+                                  setClockCustomMode(true);
+                                  if (!clockTime) setClockTime(DEFAULT_CLOCK_TALL_TIME);
+                                  setClockDay((prev) => prev ?? getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+                                } else {
+                                  setClockCustomMode(false);
+                                  setClockTime(e.target.value);
+                                  setClockDay(getAutomaticClockTallDay(e.target.value));
+                                }
+
+                                if (
+                                  errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten") ||
+                                  errorLocal?.startsWith("Velg klokkeslett")
+                                ) {
+                                  setErrorLocal(null);
+                                }
+                              }}
+                            >
+                              <MenuItem value="">Velg klokkeslett</MenuItem>
+                              {CLOCK_TALL_OPTIONS.map((time) => (
+                                <MenuItem key={time} value={time}>
+                                  kl. {time.slice(0, 2)}
+                                </MenuItem>
+                              ))}
+                              <MenuItem value={CUSTOM_CLOCK_VALUE}>Skriv eget klokkeslett</MenuItem>
+                            </TextField>
+
+                            <TextField
+                              select
+                              label="Dag"
+                              size="small"
+                              value={clockDay}
+                              onChange={(e) => {
+                                setClockDay(e.target.value as ClockTallDay);
+                                if (errorLocal?.startsWith("Velg klokkeslett")) {
+                                  setErrorLocal(null);
+                                }
+                              }}
+                            >
+                              <MenuItem value="today">I dag</MenuItem>
+                              <MenuItem value="tomorrow">I morgen</MenuItem>
+                            </TextField>
+
+                            {clockCustomMode && (
+                              <TextField
+                                label="Eget klokkeslett"
+                                type="time"
+                                size="small"
+                                value={clockTime}
+                                onChange={(e) => {
+                                  const nextTime = e.target.value;
+                                  setClockCustomMode(true);
+                                  setClockTime(nextTime);
+                                  if (nextTime) setClockDay(getAutomaticClockTallDay(nextTime));
+
+                                  if (errorLocal?.startsWith("Velg klokkeslett")) {
+                                    setErrorLocal(null);
+                                  }
+                                }}
+                                slotProps={{
+                                  inputLabel: { shrink: true },
+                                  htmlInput: { step: 300 },
+                                }}
+                              />
+                            )}
+                          </Box>
+                        );
+                      })()}
+                    </Paper>
+                  )}
+
+                  {(templateHasDatoToken(activeTemplateContent) ||
+                    templateHasDatoMndToken(activeTemplateContent)) && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 1,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1.5,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                        Dato i teksten
+                      </Typography>
+
                       <Box
                         sx={{
                           display: "grid",
                           gap: 1,
-                          gridTemplateColumns: {
-                            xs: "1fr",
-                            sm: "repeat(auto-fit, minmax(180px, 220px))",
-                          },
+                          gridTemplateColumns: { xs: "1fr", sm: "170px 170px" },
                           alignItems: "start",
                         }}
                       >
-                        {tallIndices.map((idx) => {
-                          const v = tallByIndex[idx] ?? "";
-                          const isClockField = templateTallTokenLooksLikeClock(selected.content, idx);
-                          const tokenLabel = getTallFieldLabel(selected.content, idx);
-
-                          if (isClockField) {
-                            const parsedClock = parseClockTallValue(v) ?? {
-                              time: "",
-                              day: "today" as ClockTallDay,
-                            };
-                            const isCustomClockTime =
-                              Boolean(parsedClock.time) &&
-                              !CLOCK_TALL_OPTIONS.includes(
-                                parsedClock.time as (typeof CLOCK_TALL_OPTIONS)[number],
-                              );
-                            const isCustomClockMode =
-                              Boolean(customClockModeByIndex[idx]) || isCustomClockTime;
-                            const selectedClockTime = CLOCK_TALL_OPTIONS.includes(
-                              parsedClock.time as (typeof CLOCK_TALL_OPTIONS)[number],
-                            )
-                              ? parsedClock.time
-                              : isCustomClockMode
-                                ? CUSTOM_CLOCK_VALUE
-                                : "";
-
-                            return (
-                              <Box
-                                key={idx}
-                                sx={{
-                                  display: "grid",
-                                  gap: 1,
-                                  gridTemplateColumns: {
-                                    xs: "1fr",
-                                    sm: isCustomClockMode ? "180px 140px 180px" : "180px 140px",
-                                  },
-                                  alignItems: "start",
-                                }}
-                              >
-                                <TextField
-                                  select
-                                  label={tokenLabel}
-                                  size="small"
-                                  value={selectedClockTime}
-                                  onChange={(e) => {
-                                    if (e.target.value === CUSTOM_CLOCK_VALUE) {
-                                      setCustomClockModeByIndex((prev) => ({ ...prev, [idx]: true }));
-                                      const nextTime = parsedClock.time || DEFAULT_CLOCK_TALL_TIME;
-                                      const nextValue = formatClockTallValue(nextTime, parsedClock.day);
-                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
-                                    } else {
-                                      setCustomClockModeByIndex((prev) => ({ ...prev, [idx]: false }));
-                                      const nextDay = getAutomaticClockTallDay(e.target.value);
-                                      const nextValue = formatClockTallValue(e.target.value, nextDay);
-                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
-                                    }
-
-                                    if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
-                                      setErrorLocal(null);
-                                    }
-                                  }}
-                                >
-                                  <MenuItem value="">Velg klokkeslett</MenuItem>
-                                  {CLOCK_TALL_OPTIONS.map((time) => (
-                                    <MenuItem key={time} value={time}>
-                                      kl. {time.slice(0, 2)}
-                                    </MenuItem>
-                                  ))}
-                                  <MenuItem value={CUSTOM_CLOCK_VALUE}>Skriv eget klokkeslett</MenuItem>
-                                </TextField>
-
-                                <TextField
-                                  select
-                                  label="Dag"
-                                  size="small"
-                                  value={parsedClock.day}
-                                  onChange={(e) => {
-                                    const nextDay = e.target.value as ClockTallDay;
-                                    const nextValue = formatClockTallValue(parsedClock.time, nextDay);
-                                    setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
-
-                                    if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
-                                      setErrorLocal(null);
-                                    }
-                                  }}
-                                >
-                                  <MenuItem value="today">I dag</MenuItem>
-                                  <MenuItem value="tomorrow">I morgen</MenuItem>
-                                </TextField>
-
-                                {isCustomClockMode && (
-                                  <TextField
-                                    label="Eget klokkeslett"
-                                    type="time"
-                                    size="small"
-                                    value={parsedClock.time}
-                                    onChange={(e) => {
-                                      const nextTime = e.target.value;
-                                      setCustomClockModeByIndex((prev) => ({ ...prev, [idx]: true }));
-
-                                      const nextValue = nextTime
-                                        ? formatClockTallValue(
-                                            nextTime,
-                                            getAutomaticClockTallDay(nextTime),
-                                          )
-                                        : "";
-                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
-
-                                      if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
-                                        setErrorLocal(null);
-                                      }
-                                    }}
-                                    slotProps={{
-                                      inputLabel: { shrink: true },
-                                      htmlInput: { step: 300 },
-                                    }}
-                                  />
-                                )}
-                              </Box>
-                            );
+                        <TextField
+                          label="Velg dato"
+                          type="date"
+                          size="small"
+                          inputRef={datoPickerInputRef}
+                          value={
+                            normalizedDato
+                              ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
+                                  2,
+                                  4,
+                                )}-${normalizedDato.slice(0, 2)}`
+                              : ""
                           }
+                          onChange={(e) => handleDatoPicker(e.target.value)}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                          label="Velg måned"
+                          type="month"
+                          size="small"
+                          inputRef={datoMndPickerInputRef}
+                          onMouseDown={openDatoMndPicker}
+                          onClick={openDatoMndPicker}
+                          onKeyDown={(e) => {
+                            // Month picker should be mouse-driven; keep Tab navigation intact.
+                            if (e.key !== "Tab") e.preventDefault();
+                          }}
+                          value={
+                            formattedDatoMnd
+                              ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
+                              : ""
+                          }
+                          onChange={(e) => {
+                            const iso = e.target.value; // YYYY-MM
+                            if (!iso) {
+                              setDatoInput("");
+                              return;
+                            }
+                            const m = (iso ?? "").match(/^(\d{4})-(\d{2})$/);
+                            if (!m) return;
+                            const [, yyyy, mm] = m;
+                            setDatoInput(`${mm}.${yyyy}`);
+
+                            if (
+                              errorLocal?.startsWith("Fyll inn dato") ||
+                              errorLocal?.startsWith("Fyll inn måned/år")
+                            ) {
+                              setErrorLocal(null);
+                            }
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Box>
+                    </Paper>
+                  )}
+
+                  {templateHasFormuleringTokens(activeTemplateContent) && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 1,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1.5,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                        Formulering i teksten
+                      </Typography>
+
+                      <Box sx={{ display: "grid", gap: 1 }}>
+                        {getFormuleringTokenIndices(activeTemplateContent).map((idx) => {
+                          const fieldLabel = idx === 0 ? "Formulering" : `Formulering ${idx}`;
+                          const tokenLabel = idx === 0 ? "FORMULERING" : `FORMULERING${idx}`;
+                          const value = formuleringByIndex[idx] ?? "";
 
                           return (
-                            <TextField
-                              key={idx}
-                              label={tokenLabel}
-                              value={v}
-                              onChange={(e) => {
-                                const nextValue = e.target.value;
-                                setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+                            <Autocomplete
+                              key={tokenLabel}
+                              freeSolo
+                              options={formuleringSuggestions}
+                              value={null}
+                              inputValue={value}
+                              onChange={(_, v) => {
+                                const nextValue = typeof v === "string" ? v : "";
+                                setFormuleringByIndex((prev) => ({ ...prev, [idx]: nextValue }));
 
-                                if (errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten")) {
+                                if (errorLocal?.startsWith("Fyll inn formulering")) {
                                   setErrorLocal(null);
                                 }
                               }}
-                              size="small"
-                              type="text"
-                              slotProps={{
-                                htmlInput: {
-                                  inputMode: "decimal",
-                                },
+                              onInputChange={(_, v) => {
+                                setFormuleringByIndex((prev) => ({ ...prev, [idx]: v }));
+
+                                if (errorLocal?.startsWith("Fyll inn formulering")) {
+                                  setErrorLocal(null);
+                                }
                               }}
-                              onWheel={(e) => {
-                                (e.target as HTMLInputElement).blur();
-                              }}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label={fieldLabel}
+                                  size="small"
+                                  placeholder={
+                                    idx === 0 ? "F.eks. tablett, kapsel, nesespray" : "F.eks. tablett"
+                                  }
+                                  fullWidth
+                                />
+                              )}
                             />
                           );
                         })}
                       </Box>
-                    </>
-                  );
-                })()}
-              </Paper>
-            )}
-            {selected &&
-              (templateHasDatoToken(selected.content) ||
-                templateHasDatoMndToken(selected.content)) && (
-                <Paper
-                  elevation={0}
-                  sx={{
-                    mt: 1,
-                    mb: 1.5,
-                    p: 1.25,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: 2,
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                    Dato i teksten
-                  </Typography>
-
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gap: 1,
-                      gridTemplateColumns: { xs: "1fr", sm: "170px 170px" },
-                      alignItems: "start",
-                    }}
-                  >
-                    <TextField
-                      label="Velg dato"
-                      type="date"
-                      size="small"
-                      inputRef={datoPickerInputRef}
-                      value={
-                        normalizedDato
-                          ? `${normalizedDato.slice(4, 8)}-${normalizedDato.slice(
-                              2,
-                              4,
-                            )}-${normalizedDato.slice(0, 2)}`
-                          : ""
-                      }
-                      onChange={(e) => handleDatoPicker(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                    <TextField
-                      label="Velg måned"
-                      type="month"
-                      size="small"
-                      inputRef={datoMndPickerInputRef}
-                      value={
-                        formattedDatoMnd
-                          ? `${formattedDatoMnd.slice(3, 7)}-${formattedDatoMnd.slice(0, 2)}`
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const iso = e.target.value; // YYYY-MM
-                        const m = (iso ?? "").match(/^(\d{4})-(\d{2})$/);
-                        if (!m) return;
-                        const [, yyyy, mm] = m;
-                        setDatoInput(`${mm}.${yyyy}`);
-
-                        if (
-                          errorLocal?.startsWith("Fyll inn dato") ||
-                          errorLocal?.startsWith("Fyll inn måned/år")
-                        ) {
-                          setErrorLocal(null);
-                        }
-                      }}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Box>
-                </Paper>
-              )}
-            {selected && templateHasFormuleringTokens(selected.content) && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mt: 1,
-                  mb: 1.5,
-                  p: 1.25,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 2,
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                  Formulering i teksten
-                </Typography>
-
-                <Box sx={{ display: "grid", gap: 1 }}>
-                  {getFormuleringTokenIndices(selected.content).map((idx) => {
-                    const fieldLabel = idx === 0 ? "Formulering" : `Formulering ${idx}`;
-                    const tokenLabel = idx === 0 ? "FORMULERING" : `FORMULERING${idx}`;
-                    const value = formuleringByIndex[idx] ?? "";
-
-                    return (
-                      <Autocomplete
-                        key={tokenLabel}
-                        freeSolo
-                        options={formuleringSuggestions}
-                        value={null}
-                        inputValue={value}
-                        onChange={(_, v) => {
-                          const nextValue = typeof v === "string" ? v : "";
-                          setFormuleringByIndex((prev) => ({ ...prev, [idx]: nextValue }));
-
-                          if (errorLocal?.startsWith("Fyll inn formulering")) {
-                            setErrorLocal(null);
-                          }
-                        }}
-                        onInputChange={(_, v) => {
-                          setFormuleringByIndex((prev) => ({ ...prev, [idx]: v }));
-
-                          if (errorLocal?.startsWith("Fyll inn formulering")) {
-                            setErrorLocal(null);
-                          }
-                        }}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label={fieldLabel}
-                            size="small"
-                            placeholder={
-                              idx === 0 ? "F.eks. tablett, kapsel, nesespray" : "F.eks. tablett"
-                            }
-                            fullWidth
-                          />
-                        )}
-                      />
-                    );
-                  })}
+                    </Paper>
+                  )}
                 </Box>
-              </Paper>
-            )}
+              )}
           </Box>
 
           {lockBeforeEdit && (
@@ -1756,7 +2212,7 @@ export default function StandardTekstPage() {
           <StandardTekstContent
             selected={selected}
             loading={loading}
-            isAdmin={isAdmin}
+            isAdmin={canManageStandardTekster}
             isEditing={isEditing}
             draftTitle={draftTitle}
             draftCategory={draftCategory}
@@ -1775,26 +2231,36 @@ export default function StandardTekstPage() {
               previewContent || "(Tom tekst)",
               preparatRows.map((r) => r.picked),
               {
-                enableSecondaryHighlight: templateUsesPreparat1(selected?.content ?? ""),
-                tallValues: getTallTokenIndices(selected?.content ?? "").map((i) => {
-                  const v = (tallByIndex[i] ?? "").trim();
-                  return v;
-                }),
+                enableSecondaryHighlight: templateUsesPreparat1(activeTemplateContent),
+                tallValues: (() => {
+                  const indices = getTallTokenIndices(activeTemplateContent);
+                  const arr: string[] = [];
+                  for (const i of indices) {
+                    arr[i] = (tallByIndex[i] ?? "").trim();
+                  }
+                  return arr;
+                })(),
+                klokkeslettDagValue: templateHasKlokkeslettDagToken(activeTemplateContent)
+                  ? formatClockTallValue(clockTime, clockDay)
+                  : "",
                 datoValue: effectiveDato,
                 datoMndValue: formattedDatoMnd,
                 virkestoffValue: resolvedVirkestoff,
                 formuleringValues: (() => {
-                  const indices = getFormuleringTokenIndices(selected?.content ?? "");
+                  const indices = getFormuleringTokenIndices(activeTemplateContent);
                   const arr: string[] = [];
                   for (const i of indices) {
-                    arr[i] = (formuleringByIndex[i] ?? "").trim();
+                    arr[i] = resolveFormuleringTokenValue(i, activeTemplateContent);
                   }
                   return arr;
                 })(),
+                formuleringOccurrenceValues: buildUnnumberedFormuleringOccurrenceValues(
+                  activeTemplateContent,
+                ),
               },
             )}
             editorTools={
-              isAdmin ? (
+              canManageStandardTekster ? (
                 <Button
                   size="small"
                   variant="outlined"
@@ -1811,6 +2277,47 @@ export default function StandardTekstPage() {
             categoryOptions={categoryOptions}
           />
         </Box>
+      </Box>
+
+      <Box className={styles.pageFooter}>
+        {isAdmin && (
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Switch
+                size="small"
+                checked={adminViewEnabled}
+                onChange={(e) => setAdminViewEnabled(e.target.checked)}
+              />
+            }
+            label={
+              <Typography variant="caption" color="text.secondary">
+                {adminViewEnabled ? "Admin view" : "User view"}
+              </Typography>
+            }
+          />
+        )}
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "flex", alignItems: "center" }}
+        >
+          <span className={styles.preparatHintKeys}>
+            <span className={styles.preparatHintKeyLabel}>Søk tekst:</span> Ctrl+S ·{" "}
+            <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl+Shift+F ·{" "}
+            <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
+          </span>
+        </Typography>
+
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => setShowGuide((v) => !v)}
+          className={styles.headerLinkButton}
+        >
+          {showGuide ? "Skjul bruksanvisning" : "Vis bruksanvisning"}
+        </Button>
       </Box>
       <Dialog open={followUpsOpen} onClose={() => setFollowUpsOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Oppfølgingstekster</DialogTitle>

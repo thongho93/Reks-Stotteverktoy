@@ -428,6 +428,43 @@ export default function OMEQPage() {
                     maxWidth: 560,
                   }}
                 >
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                    <Tooltip title="Legg til ny linje">
+                      <IconButton
+                        aria-label="Legg til ny linje"
+                        onClick={addRow}
+                        sx={{
+                          backgroundColor: "primary.main",
+                          color: "white",
+                          "&:hover": {
+                            backgroundColor: "primary.main",
+                          },
+                        }}
+                        className={styles.addRowButton}
+                      >
+                        <AddIcon />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title="Nullstill beregning">
+                      <IconButton
+                        aria-label="Nullstill beregning"
+                        onClick={resetAll}
+                        sx={{
+                          border: "1px solid",
+                          borderColor: "primary.main",
+                          color: "primary.main",
+                          "&:hover": {
+                            backgroundColor: "action.hover",
+                          },
+                        }}
+                        className={styles.addRowButton}
+                      >
+                        <RestartAltIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+
                   <Box className={styles.totalOmeqBox}>
                     <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
                       Total OMEQ
@@ -464,48 +501,6 @@ export default function OMEQPage() {
                       Bruk standardtekst
                     </Button>
                   </Paper>
-                </Box>
-              </Box>
-            )}
-
-            {idx === rows.length - 1 && (
-              <Box className={styles.addRowGrid}>
-                <Box className={styles.addRowButtonCell} style={{ gap: 8 }}>
-                  <Tooltip title="Legg til ny linje">
-                    <IconButton
-                      aria-label="Legg til ny linje"
-                      onClick={addRow}
-                      sx={{
-                        backgroundColor: "primary.main",
-                        color: "white",
-                        "&:hover": {
-                          backgroundColor: "primary.main",
-                        },
-                      }}
-                      className={styles.addRowButton}
-                    >
-                      <AddIcon />
-                    </IconButton>
-                  </Tooltip>
-
-                  <Tooltip title="Nullstill beregning">
-                    <IconButton
-                      aria-label="Nullstill beregning"
-                      onClick={resetAll}
-                      sx={{
-                        ml: 2,
-                        border: "1px solid",
-                        borderColor: "primary.main",
-                        color: "primary.main",
-                        "&:hover": {
-                          backgroundColor: "action.hover",
-                        },
-                      }}
-                      className={styles.addRowButton}
-                    >
-                      <RestartAltIcon />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
               </Box>
             )}

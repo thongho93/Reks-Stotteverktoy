@@ -2,17 +2,22 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   ClickAwayListener,
+  Link,
   List,
   ListItemButton,
   ListItemText,
   Paper,
   Popper,
   TextField,
+  Typography,
 } from "@mui/material";
 
 import meds from "../meds.json";
 import pimProducts from "./pimProducts.json";
 import hvProducts from "./hvProducts.json";
+
+const SPREADSHEET_EDIT_URL =
+  "https://docs.google.com/spreadsheets/d/1rBMivx3lHY4CKrFev_On__YVendKv6O7i_Zzcoy9QYg/edit?gid=1369769996#gid=1369769996";
 import { festToSearchIndex } from "../mappers/festToSearchIndex";
 import { pimToSearchIndex } from "../mappers/pimToSearchIndex";
 import type { SearchIndexItem } from "../../../utils/types";
@@ -342,7 +347,9 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       varenavnTokens: toTokens(varenavnText),
       substanceTokens: toTokens(substanceText),
       hayTokens: toTokens(searchText),
-      dedupKey: buildDedupKeyFromFields(nameText, substanceText),
+      dedupKey: input.farmaloggNumber
+        ? `farmalogg:${normalizeIdToken(input.farmaloggNumber)}`
+        : buildDedupKeyFromFields(nameText, substanceText),
     };
   };
 
@@ -381,6 +388,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
           undefined,
         prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
         manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
+        externalId: (p as any).id ?? undefined,
       }))
     );
 
@@ -402,6 +410,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
           undefined,
         prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
         manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
+        externalId: (p as any).id ?? undefined,
       }))
     ).map((item) => ({
       ...item,
@@ -523,7 +532,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         navnFormStyrke: item.nameFormStrength ?? item.displayName ?? item.name ?? null,
         atc: item.atc ?? fallbackMeta.atc ?? null,
         virkestoff: item.substance ?? fallbackMeta.virkestoff ?? null,
-        produsent: (item as any).manufacturer ?? null,
+        produsent: item.manufacturer ?? null,
         reseptgruppe: item.prescriptionGroup ?? fallbackMeta.reseptgruppe ?? null,
         searchText: item.searchText,
       });
@@ -951,6 +960,17 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         InputProps={{}}
       />
 
+      {open && results.length === 0 && deferredQuery.trim().length >= 2 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+          <strong>Ingen treff.</strong>{" "}
+          Mangler preparatet?{" "}
+          <Link href={SPREADSHEET_EDIT_URL} target="_blank" rel="noopener noreferrer">
+            Legg det til i regnearket
+          </Link>
+          .
+        </Typography>
+      )}
+
       <Popper
         open={open && results.length > 0}
         anchorEl={anchorRef.current}
@@ -988,6 +1008,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
                     const secondaryParts = [
                       `Virkestoff: ${m.virkestoff?.trim() || "-"}`,
                       `ATC: ${m.atc?.trim() || "-"}`,
+                      `Produsent: ${m.produsent?.trim() || "-"}`,
                       `Reseptgruppe: ${m.reseptgruppe?.trim() || "-"}`,
                     ];
 

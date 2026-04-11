@@ -44,7 +44,11 @@ export function useStandardTekster(): UseStandardTeksterResult {
       if (runId !== runIdRef.current) return;
 
       setItems(mapped);
-      setSelectedId((prev) => prev ?? mapped[0]?.id ?? null);
+      setSelectedId((prev) => {
+        if (prev) return prev;
+        const firstActive = mapped.find((it) => it.isActive !== false);
+        return firstActive?.id ?? mapped[0]?.id ?? null;
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved henting fra Firebase";
       if (runId !== runIdRef.current) return;

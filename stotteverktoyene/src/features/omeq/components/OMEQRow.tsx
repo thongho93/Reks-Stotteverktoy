@@ -236,19 +236,12 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
 
   return (
     <Box className={styles.omeqRow}>
-      <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
+      <Box sx={{ width: "100%" }}>
         <MedicationInput
           value={value.medicationText}
           onChange={(text) => onChange({ ...value, medicationText: text })}
           autoFocus={autoFocusMedicationInput}
         />
-        <Typography
-          variant="overline"
-          color="text.secondary"
-          sx={{ mt: 0.05, visibility: substanceText ? "visible" : "hidden" }}
-        >
-          Virkestoff: {substanceText || "-"}
-        </Typography>
       </Box>
 
       <Box className={styles.ratioBox}>
@@ -410,32 +403,51 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
         }}
       />
 
+      {(!!substanceText || !!infoText) && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            minWidth: 0,
+            flexWrap: "nowrap",
+          }}
+        >
+          {!!substanceText && (
+            <Typography variant="overline" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+              Virkestoff: {substanceText}
+            </Typography>
+          )}
+
+          {!!infoText && (
+            <Alert
+              severity="info"
+              icon={false}
+              sx={{
+                width: "fit-content",
+                maxWidth: "100%",
+                px: 1,
+                py: 0.35,
+                borderRadius: 1.5,
+                backgroundColor: "rgba(25, 118, 210, 0.08)",
+                color: "text.primary",
+                fontSize: "0.7rem",
+                border: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {infoText}
+            </Alert>
+          )}
+        </Box>
+      )}
+
       {!!statusText && (
         <Typography variant="body2" color="text.secondary">
           {statusText}
         </Typography>
-      )}
-      {!!infoText && (
-        <Alert
-          severity="info"
-          icon={false}
-          sx={{
-            mt: 0.5,
-            width: "fit-content",
-            maxWidth: "100%",
-            px: 1,
-            py: 0.35,
-            borderRadius: 1.5,
-            backgroundColor: "rgba(25, 118, 210, 0.08)",
-            color: "text.primary",
-            fontSize: "0.7rem",
-            border: "none",
-            display: "inline-flex",
-            alignItems: "center",
-          }}
-        >
-          {infoText}
-        </Alert>
       )}
     </Box>
   );

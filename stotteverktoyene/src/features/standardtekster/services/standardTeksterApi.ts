@@ -44,6 +44,7 @@ export const standardTeksterApi = {
     if (typeof patch.category === "string") payload.category = patch.category;
     if (typeof patch.content === "string") payload.content = patch.content;
     if (patch.followUps !== undefined) payload.followUps = patch.followUps;
+    if (typeof patch.isActive === "boolean") payload.isActive = patch.isActive;
 
     await updateDoc(ref, payload);
   },
@@ -57,6 +58,7 @@ export const standardTeksterApi = {
       category: "",
       content: "",
       followUps: [] as const,
+      isActive: true,
       updatedAt: now,
       createdAt: now,
       createdByUid: actor?.uid ?? null,
@@ -73,6 +75,7 @@ export const standardTeksterApi = {
       category: undefined,
       content: newDoc.content,
       followUps: [],
+      isActive: true,
       createdByName: actor?.name ?? undefined,
       updatedByName: actor?.name ?? undefined,
       updatedAt: new Date(),
@@ -124,6 +127,7 @@ export async function createStandardtekstForInteraction(params: {
     category: params.category || undefined,
     content: params.content,
     followUps: params.followUps as any,
+    isActive: true,
     interactionIds: [params.interactionId],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

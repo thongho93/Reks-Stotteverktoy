@@ -10,6 +10,7 @@ export type UpdateStandardTekstDto = {
   category?: string;
   content?: string;
   followUps?: StandardTekstFollowUp[];
+  isActive?: boolean;
 };
 
 export type CreateStandardTekstDto = {
@@ -24,6 +25,7 @@ export type StandardTekst = {
   title: string;
   category?: string;
   content: string;
+  isActive?: boolean;
   followUps?: StandardTekstFollowUp[];
   createdByName?: string;
   updatedByName?: string;
@@ -38,4 +40,10 @@ export type PreparatRow = {
   // Stabil ident (f.eks. varenummer) brukt til dedupe.
   // Gjør at to ulike produkter kan ha samme picked-tekst.
   pickedKey: string | null;
+
+  // Grunndata som gjør at picked-tekst kan regenereres når toggles endres
+  baseText: string | null;
+  fullName: string | null;
+  manufacturer: string | null;
+  packSize: string | null;
 };

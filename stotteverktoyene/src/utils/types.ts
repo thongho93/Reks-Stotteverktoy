@@ -15,8 +15,10 @@ export type SearchIndexItem = {
 
   // FEST-only (valgfritt)
   atc?: string;
-  substance?: string;       // virkestoff
+  substance?: string; // virkestoff
   prescriptionGroup?: string; // reseptgruppe
+  manufacturer?: string; // produsent
+  externalId?: string; // kilde-ID (f.eks. Google Sheet ID)
 
   // PIM/HV (valgfritt)
   farmaloggNumber?: string;

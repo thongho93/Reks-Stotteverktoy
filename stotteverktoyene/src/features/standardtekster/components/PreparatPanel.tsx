@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -12,7 +13,7 @@ import {
 import ClearAllIcon from "@mui/icons-material/ClearAll";
 import MedicationSearch from "../../fest/components/MedicationSearch";
 import styles from "../../../styles/standardTekstPage.module.css";
-import { formatPreparatForTemplate } from "../utils/preparat";
+import { formatPreparatForTemplate, formatPreparatRowText } from "../utils/preparat";
 
 type PreparatRowId = string | number;
 
@@ -30,9 +31,44 @@ type Props = {
   onIncludeManufacturerInTextChange?: (value: boolean) => void;
   onIncludePackSizeInTextChange?: (value: boolean) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  onPickText: (pick: string | { text: string; key: string; virkestoff?: string }) => void;
+  onPickText: (
+    pick:
+      | string
+      | {
+          text: string;
+          key: string;
+          virkestoff?: string;
+          formulering?: string;
+          rowData?: {
+            baseText?: string | null;
+            fullName?: string | null;
+            manufacturer?: string | null;
+            packSize?: string | null;
+          };
+        },
+  ) => void;
   onClear: () => void;
   onRemove: (id: PreparatRowId) => void;
+};
+
+type PickPayload = {
+  text: string;
+  key: string;
+  virkestoff?: string;
+  formulering?: string;
+  rowData?: {
+    baseText?: string | null;
+    fullName?: string | null;
+    manufacturer?: string | null;
+    packSize?: string | null;
+  };
+};
+
+type RecentSuggestion = {
+  key: string;
+  name: string;
+  varenummer: string;
+  payload: PickPayload;
 };
 
 export default function PreparatPanel({
@@ -49,21 +85,129 @@ export default function PreparatPanel({
   onRemove,
 }: Props) {
   const hasPicked = preparatRows.some((r) => r.picked);
+  const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>([]);
+
+  const pushRecentSuggestion = (entry: RecentSuggestion) => {
+    setRecentSuggestions((prev) => {
+      const deduped = prev.filter((item) => item.key !== entry.key);
+      return [entry, ...deduped].slice(0, 10);
+    });
+  };
+
+  const applyPickPayload = (payload: PickPayload) => {
+    onPickText(payload);
+    const nameForChip = payload.rowData?.baseText?.trim() || payload.text.trim();
+    const varenummerForChip = String(payload.key ?? "").trim();
+    if (!nameForChip || !varenummerForChip) return;
+
+    pushRecentSuggestion({
+      key: varenummerForChip,
+      name: nameForChip,
+      varenummer: varenummerForChip,
+      payload,
+    });
+  };
+
+  const suggestionChips = useMemo(
+    () =>
+      recentSuggestions.map((item) => (
+        <Chip
+          key={item.key}
+          variant="outlined"
+          size="small"
+          label={`${item.name} (${item.varenummer})`}
+          onClick={() => applyPickPayload(item.payload)}
+          sx={{
+            width: "100%",
+            justifyContent: "flex-start",
+            "& .MuiChip-label": {
+              width: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontSize: "0.72rem",
+              px: 0.75,
+            },
+            height: 20,
+          }}
+        />
+      )),
+    [recentSuggestions],
+  );
+
+  const deriveFormuleringPlural = (m: any): string => {
+    const texts = [
+      m?.navnForStyrke,
+      m?.navnFormStyrke,
+      m?.nameFormStrength,
+      m?.varenavn,
+      m?.name,
+      m?.displayName,
+      m?.label,
+      m?.searchText,
+    ]
+      .map((v) => (typeof v === "string" ? v.toLowerCase() : ""))
+      .filter(Boolean);
+
+    const hay = texts.join(" ");
+
+    const rules: Array<[RegExp, string]> = [
+      [/\bdepotplaster\b/, "depotplastre"],
+      [/\bdepottablett\b|\bdepottab\b/, "depottabletter"],
+      [/\bsmeltetablett\b|\bsmeltetab\b/, "smeltetabletter"],
+      [/\benterotablett\b|\benterotab\b/, "enterotabletter"],
+      [/\bsublingvaltablett\b|\bsublingvaltab\b/, "sublingvaltabletter"],
+      [/\bbrusetablett\b|\bbrusetab\b/, "brusetabletter"],
+      [/\bdepotkapsel\b|\bdepotkaps\b/, "depotkapsler"],
+      [/\bnesespray\b/, "nesesprayer"],
+      [/\bøyedråpe\b|\bøyedr\b|\boyedr\b/, "øyedråper"],
+      [/\børedråpe\b|\boredr\b/, "øredråper"],
+      [/\bstikkpille\b|\bstikkpil\b|\bsupp\b/, "stikkpiller"],
+      [/\binjeksjon\b|\binj\b/, "injeksjoner"],
+      [/\binfusjon\b|\binf\b/, "infusjoner"],
+      [/\binhalasjonspulver\b|\binh\s*pulv\b/, "inhalasjonspulvere"],
+      [/\binhalasjonsvæske\b|\binh\s*væske\b/, "inhalasjonsvæsker"],
+      [/\bmikstur\b/, "miksturer"],
+      [/\bgranulat\b|\bgran\b/, "granulater"],
+      [/\bplaster\b/, "plastre"],
+      [/\btablett\b|\btab\b|\btabl\b/, "tabletter"],
+      [/\bkapsel\b|\bkaps\b/, "kapsler"],
+      [/\bdråpe\b|\bdråper\b|\bdr\b/, "dråper"],
+      [/\bsalve\b/, "salver"],
+      [/\bkrem\b/, "kremer"],
+      [/\bgel\b/, "geler"],
+      [/\bspray\b/, "sprayer"],
+    ];
+
+    for (const [re, plural] of rules) {
+      if (re.test(hay)) return plural;
+    }
+
+    return "";
+  };
 
   return (
-    <Paper className={styles.preparatPaper}>
-      <Box className={styles.preparatHeader}>
-        <Typography variant="subtitle2" className={styles.preparatTitle}>
-          Preparater
-        </Typography>
-      </Box>
+    <Box
+      sx={{
+        display: "grid",
+        gap: 1,
+        gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 300px" },
+        alignItems: { xs: "start", lg: "stretch" },
+      }}
+    >
+      <Paper className={styles.preparatPaper}>
+        <Box className={styles.preparatHeader}>
+          <Typography variant="subtitle2" className={styles.preparatTitle}>
+            Preparater
+          </Typography>
+        </Box>
 
-      <Stack
-        direction="row"
-        spacing={1}
-        alignItems="flex-start"
-        className={styles.preparatSearchRow}
-      >
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="flex-start"
+          className={styles.preparatSearchRow}
+        >
         <Box className={styles.preparatSingleSearch} style={{ flex: 1 }}>
           <MedicationSearch
             inputRef={inputRef}
@@ -90,54 +234,29 @@ export default function PreparatPanel({
                   "",
               ).trim();
 
-              const text = (() => {
-                // Helper: normalize full name (keeps manufacturer if present in the name)
-                const cleanedFullName = fullName
-                  ? fullName
-                      .replace(/(\d)\s*(mg|mcg|µg|g|ml)\b/gi, "$1 $2") // 1000mg -> 1000 mg
-                      .replace(/\b(tab|tbl|tablett|kapsel|mikstur|depottablett|depot)\b/gi, "")
-                      .replace(/\s{2,}/g, " ")
-                      .trim()
-                  : "";
+              const cleanedFullName = fullName
+                ? fullName
+                    .replace(/(\d)\s*(mg|mcg|µg|g|ml)\b/gi, "$1 $2")
+                    .replace(/\b(tab|tbl|tablett|kapsel|mikstur|depottablett|depot)\b/gi, "")
+                    .replace(/\s{2,}/g, " ")
+                    .trim()
+                : "";
 
-                // Pack size is typically a trailing number in PIM/HV varenavn/navnForStyrke, e.g. " ... 60".
-                const packSizeMatch = cleanedFullName.match(/\s(\d+)\s*$/);
-                const packSize = packSizeMatch?.[1] ?? "";
+              const packSizeMatch = cleanedFullName.match(/\s(\d+)\s*$/);
+              const packSize = packSizeMatch?.[1] ?? "";
 
-                const baseLower = baseText.toLowerCase();
-
-                let out = baseText;
-
-                // 1) Manufacturer toggle (independent)
-                if (includeManufacturerInText) {
-                  if (manufacturer) {
-                    const mLower = manufacturer.toLowerCase();
-                    if (!baseLower.includes(mLower)) {
-                      out = `${out} ${manufacturer}`.trim();
-                    }
-                  } else if (cleanedFullName) {
-                    // If we don't have a manufacturer field, prefer the cleaned full name
-                    // (it often contains manufacturer, e.g. "metformin sandoz ...").
-                    out = cleanedFullName;
-                  }
-                }
-
-                // 2) Pack size toggle (independent)
-                if (includePackSizeInText && packSize) {
-                  const outLower = out.toLowerCase();
-                  // Only append if the output doesn't already end with the pack size.
-                  if (!outLower.match(new RegExp(`\\s${packSize}\\s*$`))) {
-                    out = `${out} ${packSize}`.trim();
-                  }
-                }
-
-                // If pack size toggle is OFF and we ended up using the full name, strip trailing pack size.
-                if (!includePackSizeInText && cleanedFullName && out === cleanedFullName) {
-                  out = out.replace(/\s+\d+\s*$/g, "").trim();
-                }
-
-                return out;
-              })();
+              const text = formatPreparatRowText(
+                {
+                  baseText,
+                  fullName: cleanedFullName || null,
+                  manufacturer: manufacturer || null,
+                  packSize: packSize || null,
+                },
+                {
+                  includeManufacturer: includeManufacturerInText,
+                  includePackSize: includePackSizeInText,
+                },
+              );
 
               // Stabil ident for dedupe:
               // - PIM/HV: farmaloggNumber (f.eks. 440704)
@@ -193,8 +312,20 @@ export default function PreparatPanel({
               };
 
               const virkestoff = deriveVirkestoff(med);
+              const formulering = deriveFormuleringPlural(med);
 
-              onPickText({ text, key, virkestoff: virkestoff || undefined });
+              applyPickPayload({
+                text,
+                key,
+                virkestoff: virkestoff || undefined,
+                formulering: formulering || undefined,
+                rowData: {
+                  baseText: baseText || null,
+                  fullName: cleanedFullName || null,
+                  manufacturer: manufacturer || null,
+                  packSize: packSize || null,
+                },
+              });
             }}
           />
         </Box>
@@ -203,8 +334,6 @@ export default function PreparatPanel({
           variant="outlined"
           className={styles.preparatClearButton}
           sx={{
-            height: 56,
-            minHeight: 56,
             boxSizing: "border-box",
             alignSelf: "flex-start",
             flexShrink: 0,
@@ -218,17 +347,18 @@ export default function PreparatPanel({
         >
           Tøm
         </Button>
-      </Stack>
 
-      <Box
-        sx={{
-          mt: 1,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 1.5,
-          alignItems: "center",
-        }}
-      >
+        </Stack>
+
+        <Box
+          sx={{
+            mt: 0.75,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1.5,
+            alignItems: "center",
+          }}
+        >
         <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
           <FormControlLabel
             sx={{ m: 0 }}
@@ -270,26 +400,54 @@ export default function PreparatPanel({
             label={<Typography variant="caption">Vis pakningsstørrelse</Typography>}
           />
         </Tooltip>
-      </Box>
+        </Box>
 
-      <Box className={styles.preparatChipsWrap}>
-        {preparatRows
-          .filter((r) => r.picked)
-          .map((r) => (
-            <Chip
-              key={String(r.id)}
-              label={r.picked as string}
-              onDelete={() => onRemove(r.id)}
-              className={styles.preparatChip}
-            />
-          ))}
-      </Box>
+        <Box className={styles.preparatChipsWrap}>
+          {preparatRows
+            .filter((r) => r.picked)
+            .map((r) => (
+              <Chip
+                key={String(r.id)}
+                label={r.picked as string}
+                onDelete={() => onRemove(r.id)}
+                className={styles.preparatChip}
+              />
+            ))}
+        </Box>
 
-      <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
-        <span className={styles.preparatHintTip}>
-          Tips: Skriv eller lim inn varenummer – søket rydder opp automatisk.
-        </span>
-      </Typography>
-    </Paper>
+      </Paper>
+
+      <Paper
+        className={styles.preparatPaper}
+        sx={{
+          p: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 0.75,
+          height: { xs: "auto", lg: "100%" },
+        }}
+      >
+        <Typography variant="subtitle2">De siste 10 søkene</Typography>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 0.35,
+            maxHeight: { xs: 120, lg: 170 },
+            overflowY: "auto",
+            overflowX: "hidden",
+            pr: 0.25,
+          }}
+        >
+          {suggestionChips.length > 0 ? (
+            suggestionChips
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              Ingen nylige søk.
+            </Typography>
+          )}
+        </Box>
+      </Paper>
+    </Box>
   );
 }

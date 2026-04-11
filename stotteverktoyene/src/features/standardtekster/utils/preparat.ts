@@ -172,10 +172,38 @@ export function formatPreparatRowText(
   },
   opts: { includeManufacturer: boolean; includePackSize: boolean },
 ): string {
+  const splitNameAndTrailingStrength = (value: string): { name: string; strength: string } | null => {
+    const text = value.replace(/\s+/g, " ").trim();
+    if (!text) return null;
+
+    const strengthPatterns = [
+      // "40 % w/v"
+      /(.*?)(\s+\d+(?:[.,]\d+)?\s*%\s*(?:w\/v|v\/v)?)$/i,
+      // "80/4,5mcg" or "400/30 mg"
+      /(.*?)(\s+\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)+(?:\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e))?)$/i,
+      // "18 mg", "0,2 mg/dose", "100 mcg/24t"
+      /(.*?)(\s+\d+(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e)(?:\s*\/\s*\d*(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e|t(?:imer)?|dose))?)$/i,
+    ];
+
+    for (const pattern of strengthPatterns) {
+      const match = text.match(pattern);
+      if (!match) continue;
+
+      const name = (match[1] ?? "").trim();
+      const strength = (match[2] ?? "").trim();
+      if (!name || !strength) continue;
+
+      return { name, strength };
+    }
+
+    return null;
+  };
+
   const baseText = (row.baseText ?? "").trim();
   if (!baseText) return "";
 
   const manufacturer = (row.manufacturer ?? "").trim();
+  const manufacturerDisplay = manufacturer.toLowerCase();
   const fullName = (row.fullName ?? "").trim();
   const packSize = (row.packSize ?? "").trim();
 
@@ -185,8 +213,15 @@ export function formatPreparatRowText(
   if (opts.includeManufacturer) {
     if (manufacturer) {
       const baseLower = baseText.toLowerCase();
-      const mLower = manufacturer.toLowerCase();
-      if (!baseLower.includes(mLower)) out = `${out} ${manufacturer}`.trim();
+      const mLower = manufacturerDisplay;
+      if (!baseLower.includes(mLower)) {
+        const split = splitNameAndTrailingStrength(baseText);
+        if (split) {
+          out = `${split.name} ${manufacturerDisplay} ${split.strength}`.replace(/\s+/g, " ").trim();
+        } else {
+          out = `${out} ${manufacturerDisplay}`.trim();
+        }
+      }
     } else if (fullName) {
       // Some sources only expose manufacturer inside the full name.
       out = fullName;
@@ -243,8 +278,11 @@ export function formatPreparatForTemplate(med: {
   );
 
   // 2) Regular pattern where the first number has a unit, optionally followed by "/..."
+  // Use a specific denominator pattern to avoid greedily capturing pack-size and dosage-form tokens
+  // (e.g. "100mcg/24t 24 24 stk. Plaster" should yield "100mcg/24t", not the full trailing string).
+  const denomUnit = `${unit}|t(?:imer)?\\b|dose\\b`;
   const regular = nfs.match(
-    new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*[^;\\)\\n]+?)?)(?=,\\s|$)`, "i"),
+    new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*\\d*[.,]?\\d*\\s*(?:${denomUnit}))?)`, "i"),
   );
 
   // 0) Percentage strengths like "40 % w/v" / "40% w/v" / "5 % v/v"
@@ -311,10 +349,13 @@ export function formatPreparatForTemplate(med: {
     rawName = rawName.replace(new RegExp(`\\s*${flex}\\s*`, "i"), " ");
   }
 
-  // Drop trailing pack-size tokens that often appear at the end of PIM names, e.g. "... 2,5" or "... 120".
+  // Drop trailing pack-size tokens that often appear at the end of PIM/HV names.
+  // Handles "... 24 24 stk." (Norwegian pack-size format) and plain trailing numbers like "... 120".
   // Keep strengths intact (we already extracted `strength` separately).
   rawName = rawName
-    .replace(/\s+\d+(?:[.,]\d+)?\s*$/g, " ")
+    .replace(/(?:\s+\d+)+\s*stk\.?\s*$/gi, " ")  // "24 24 stk." / "24stk"
+    .replace(/(?:\s+\d+){2,}\s*$/g, " ")           // "24 24" (two+ consecutive pack-count numbers)
+    .replace(/\s+\d+(?:[.,]\d+)?\s*$/g, " ")       // single trailing number or decimal
     .replace(/\s+/g, " ")
     .trim();
 
@@ -425,6 +466,24 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   return text.replace(re, safeValue);
 }
 
+export function templateHasKlokkeslettDagToken(text: string): boolean {
+  return /\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/i.test(text ?? "");
+}
+
+export function replaceKlokkeslettDagTokens(text: string, value: string): string {
+  if (!text) return text;
+  return text.replace(/\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/gi, value ?? "");
+}
+
+export function migrateLegacyClockTallTokens(text: string): string {
+  if (!text) return text;
+  // Migrate legacy templates like "klokken TALL" / "kl TALL1" to the explicit clock token.
+  return text.replace(
+    /\b(klokken|kl)\.?\s+(?:\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b)/gi,
+    (_m, prefix: string) => `${prefix} KLOKKESLETT_DAG`,
+  );
+}
+
 // New helpers for DATO tokens
 export function replaceNextDatoToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
@@ -487,20 +546,51 @@ export function replaceNextDatoMndToken(text: string, value: string) {
 
 export function usePreparatRows() {
   const [preparatRows, setPreparatRows] = useState<PreparatRow[]>([
-    { id: 0, picked: null, pickedKey: null },
+    {
+      id: 0,
+      picked: null,
+      pickedKey: null,
+      baseText: null,
+      fullName: null,
+      manufacturer: null,
+      packSize: null,
+    },
   ]);
 
   const addPreparatRow = useCallback(() => {
     setPreparatRows((prev) => {
       const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
-      return [...prev, { id: nextId, picked: null, pickedKey: null }];
+      return [
+        ...prev,
+        {
+          id: nextId,
+          picked: null,
+          pickedKey: null,
+          baseText: null,
+          fullName: null,
+          manufacturer: null,
+          packSize: null,
+        },
+      ];
     });
   }, []);
 
   const removePreparatRow = useCallback((id: number) => {
     setPreparatRows((prev) => {
       const next = prev.filter((r) => r.id !== id);
-      return next.length ? next : [{ id: 0, picked: null, pickedKey: null }];
+      return next.length
+        ? next
+        : [
+            {
+              id: 0,
+              picked: null,
+              pickedKey: null,
+              baseText: null,
+              fullName: null,
+              manufacturer: null,
+              packSize: null,
+            },
+          ];
     });
   }, []);
 
@@ -511,10 +601,14 @@ export function usePreparatRows() {
           r.id === id
             ? {
                 ...r,
-                picked,
-                pickedKey: picked ? (pickedKey ?? r.pickedKey ?? picked) : null,
-              }
-            : r,
+              picked,
+              pickedKey: picked ? (pickedKey ?? r.pickedKey ?? picked) : null,
+              baseText: picked ? r.baseText : null,
+              fullName: picked ? r.fullName : null,
+              manufacturer: picked ? r.manufacturer : null,
+              packSize: picked ? r.packSize : null,
+            }
+          : r,
         ),
       );
     },
@@ -522,36 +616,108 @@ export function usePreparatRows() {
   );
 
   const resetPreparatRows = useCallback(() => {
-    setPreparatRows([{ id: 0, picked: null, pickedKey: null }]);
+    setPreparatRows([
+      {
+        id: 0,
+        picked: null,
+        pickedKey: null,
+        baseText: null,
+        fullName: null,
+        manufacturer: null,
+        packSize: null,
+      },
+    ]);
   }, []);
 
   const clearPreparats = useCallback(() => {
-    setPreparatRows([{ id: 0, picked: null, pickedKey: null }]);
+    setPreparatRows([
+      {
+        id: 0,
+        picked: null,
+        pickedKey: null,
+        baseText: null,
+        fullName: null,
+        manufacturer: null,
+        packSize: null,
+      },
+    ]);
   }, []);
 
-  const addPickedPreparat = useCallback((picked: string, pickedKey?: string | null) => {
-    setPreparatRows((prev) => {
-      const key = String((pickedKey ?? picked).trim());
+  const addPickedPreparat = useCallback(
+    (
+      picked: string,
+      pickedKey?: string | null,
+      meta?: {
+        baseText?: string | null;
+        fullName?: string | null;
+        manufacturer?: string | null;
+        packSize?: string | null;
+      },
+    ) => {
+      setPreparatRows((prev) => {
+        const key = String((pickedKey ?? picked).trim());
 
-      const alreadyPicked = prev
-        .map((r) => r.pickedKey ?? r.picked)
-        .filter(Boolean)
-        .includes(key);
+        const alreadyPicked = prev
+          .map((r) => r.pickedKey ?? r.picked)
+          .filter(Boolean)
+          .includes(key);
 
-      if (alreadyPicked) return prev;
+        if (alreadyPicked) return prev;
 
-      const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
-      const kept = prev.filter((r) => r.picked);
-      return [...kept, { id: nextId, picked, pickedKey: key }];
-    });
-  }, []);
+        const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
+        const kept = prev.filter((r) => r.picked);
+        return [
+          ...kept,
+          {
+            id: nextId,
+            picked,
+            pickedKey: key,
+            baseText: meta?.baseText ?? null,
+            fullName: meta?.fullName ?? null,
+            manufacturer: meta?.manufacturer ?? null,
+            packSize: meta?.packSize ?? null,
+          },
+        ];
+      });
+    },
+    [],
+  );
 
   const removePreparatById = useCallback((id: number) => {
     setPreparatRows((prev) => {
       const remaining = prev.filter((r) => r.id !== id);
-      return remaining.length > 0 ? remaining : [{ id: 0, picked: null, pickedKey: null }];
+      return remaining.length > 0
+        ? remaining
+        : [
+            {
+              id: 0,
+              picked: null,
+              pickedKey: null,
+              baseText: null,
+              fullName: null,
+              manufacturer: null,
+              packSize: null,
+            },
+          ];
     });
   }, []);
+
+  const reformatPickedPreparats = useCallback(
+    (
+      formatter: (row: Pick<PreparatRow, "picked" | "baseText" | "fullName" | "manufacturer" | "packSize">) =>
+        | string
+        | null,
+    ) => {
+      setPreparatRows((prev) =>
+        prev.map((row) => {
+          if (!row.picked) return row;
+          const nextPicked = formatter(row);
+          return { ...row, picked: (nextPicked ?? row.picked).trim() };
+        }),
+      );
+    },
+    [],
+  );
 
   return {
     preparatRows,
@@ -562,6 +728,7 @@ export function usePreparatRows() {
     clearPreparats,
     addPickedPreparat,
     removePreparatById,
+    reformatPickedPreparats,
   };
 }
 
@@ -626,6 +793,9 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat", group: "PREPARAT" },
   { label: "VIRKESTOFF", insert: "VIRKESTOFF", help: "Virkestoff fra valgt preparat", group: "PREPARAT" },
   { label: "FORMULERING", insert: "FORMULERING", help: "Fri tekst (f.eks. tablett/kapsel/nesespray)", group: "ANNET" },
+  { label: "FORMULERING1", insert: "FORMULERING1", help: "Formulering for preparat 1", group: "ANNET" },
+  { label: "FORMULERING2", insert: "FORMULERING2", help: "Formulering for preparat 2", group: "ANNET" },
+  { label: "KLOKKESLETT_DAG", insert: "KLOKKESLETT_DAG", help: "Klokkeslett med dag (f.eks. 11 i dag)", group: "ANNET" },
 
   { label: "TALL", insert: "TALL", help: "Første tall", group: "TALL" },
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
