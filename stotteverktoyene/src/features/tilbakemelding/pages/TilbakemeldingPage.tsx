@@ -1,5 +1,17 @@
 import * as React from "react";
-import { Alert, Box, Button, CircularProgress, Paper, Tab, Tabs, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  FormControlLabel,
+  Paper,
+  Switch,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
+} from "@mui/material";
 import type { FirebaseError } from "firebase/app";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
@@ -68,7 +80,7 @@ function mapFirebaseError(error: unknown, fallback: string): string {
 
 export default function TilbakemeldingPage() {
   const { user } = useAuthUser();
-  const [tab, setTab] = React.useState<"meldeskjema" | "notater">("meldeskjema");
+  const [tab, setTab] = React.useState<"meldeskjema" | "notater">("notater");
 
   const [savedNotesList, setSavedNotesList] = React.useState<PrivateNote[]>([]);
   const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
@@ -78,6 +90,8 @@ export default function TilbakemeldingPage() {
   const [loadingNotes, setLoadingNotes] = React.useState(true);
   const [savingNotes, setSavingNotes] = React.useState(false);
   const [deletingNote, setDeletingNote] = React.useState(false);
+  const [autoCopyEnabled, setAutoCopyEnabled] = React.useState(true);
+  const [copyStatus, setCopyStatus] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
@@ -192,6 +206,28 @@ export default function TilbakemeldingPage() {
     return draftTitle.trim().length > 0 || draftContent.trim().length > 0;
   }, [draftContent, draftTitle, normalizedDraftContent, normalizedDraftTitle, selectedNote]);
 
+  const copyNoteToClipboard = React.useCallback(
+    async (title: string, content: string, mode: "auto" | "manual") => {
+      const text = `${title.trim() ? `${title.trim()}\n\n` : ""}${content}`.trim();
+      if (!text) {
+        setCopyStatus("Notatet er tomt, ingenting å kopiere.");
+        return;
+      }
+
+      try {
+        if (!navigator?.clipboard?.writeText) {
+          setCopyStatus("Utklippstavle er ikke tilgjengelig i denne nettleseren.");
+          return;
+        }
+        await navigator.clipboard.writeText(text);
+        setCopyStatus(mode === "auto" ? "Notat kopiert automatisk." : "Notat kopiert.");
+      } catch {
+        setCopyStatus("Kunne ikke kopiere til utklippstavlen.");
+      }
+    },
+    []
+  );
+
   const handleNewNote = React.useCallback(() => {
     setSelectedNoteId(null);
     setDraftTitle("");
@@ -206,7 +242,10 @@ export default function TilbakemeldingPage() {
     setDraftContent(note.content);
     setError(null);
     setSuccess(null);
-  }, []);
+    if (autoCopyEnabled) {
+      void copyNoteToClipboard(note.title, note.content, "auto");
+    }
+  }, [autoCopyEnabled, copyNoteToClipboard]);
 
   const handleSaveNote = React.useCallback(async () => {
     if (!user?.uid) {
@@ -251,6 +290,9 @@ export default function TilbakemeldingPage() {
         setDraftTitle(updated.title);
         setDraftContent(updated.content);
         setSuccess("Notatet er oppdatert.");
+        if (autoCopyEnabled) {
+          void copyNoteToClipboard(updated.title, updated.content, "auto");
+        }
       } else {
         const createdRef = await addDoc(collection(db, "users", user.uid, "privateNotes"), {
           ...payload,
@@ -269,13 +311,23 @@ export default function TilbakemeldingPage() {
         setDraftTitle(created.title);
         setDraftContent(created.content);
         setSuccess("Nytt notat er lagret.");
+        if (autoCopyEnabled) {
+          void copyNoteToClipboard(created.title, created.content, "auto");
+        }
       }
     } catch (err) {
       setError(mapFirebaseError(err, "Lagring feilet. Prøv igjen."));
     } finally {
       setSavingNotes(false);
     }
-  }, [normalizedDraftContent, normalizedDraftTitle, selectedNoteId, user?.uid]);
+  }, [
+    autoCopyEnabled,
+    copyNoteToClipboard,
+    normalizedDraftContent,
+    normalizedDraftTitle,
+    selectedNoteId,
+    user?.uid,
+  ]);
 
   const handleDeleteNote = React.useCallback(async () => {
     if (!user?.uid || !selectedNoteId) return;
@@ -320,8 +372,8 @@ export default function TilbakemeldingPage() {
           variant="scrollable"
           scrollButtons="auto"
         >
-          <Tab value="meldeskjema" label="Meldeskjema" />
           <Tab value="notater" label="Mine notater" />
+          <Tab value="meldeskjema" label="Meldeskjema" />
         </Tabs>
       </Paper>
 
@@ -359,6 +411,11 @@ export default function TilbakemeldingPage() {
               {success}
             </Alert>
           )}
+          {copyStatus && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {copyStatus}
+            </Alert>
+          )}
 
           {loadingNotes ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -384,9 +441,21 @@ export default function TilbakemeldingPage() {
                   }}
                 >
                   <Typography variant="h3">Skriv private notater</Typography>
-                  <Button variant="outlined" onClick={handleNewNote}>
-                    Nytt notat
-                  </Button>
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={autoCopyEnabled}
+                          onChange={(event) => setAutoCopyEnabled(event.target.checked)}
+                        />
+                      }
+                      label="Auto-kopi"
+                      sx={{ mr: 0 }}
+                    />
+                    <Button variant="outlined" onClick={handleNewNote}>
+                      Nytt notat
+                    </Button>
+                  </Box>
                 </Box>
 
                 <TextField
@@ -428,6 +497,12 @@ export default function TilbakemeldingPage() {
                     {hasUnsavedChanges ? "Du har ulagrede endringer." : "Alt er lagret."}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={() => void copyNoteToClipboard(draftTitle, draftContent, "manual")}
+                    >
+                      Kopier notat
+                    </Button>
                     {selectedNoteId && (
                       <Button
                         variant="outlined"

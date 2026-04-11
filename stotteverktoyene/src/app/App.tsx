@@ -18,8 +18,9 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import CampaignIcon from "@mui/icons-material/Campaign";
+import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
+import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import OMEQPage from "../features/omeq/pages/OMEQPage";
 import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
 import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
@@ -31,7 +32,6 @@ import PendingApprovalPage from "./auth/PendingApprovalPage";
 import { logUsage } from "../shared/services/usage";
 import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
 import InteraksjonerPage from "../features/interaksjoner/pages/InteraksjonerPage";
-import MedicationIcon from "@mui/icons-material/Medication";
 import { useAuthUser } from "./auth/useAuthUser";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import RekspertPage from "../features/rekspert/RekspertPage";
@@ -57,11 +57,36 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const mainItems = [
     { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#1E88E5" },
-    { label: "Standardtekster", path: "/standardtekster", Icon: DescriptionIcon, color: "#43A047" },
-    { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#D32F2F" },
-    { label: "Produktskjema", path: "/produktskjema", Icon: LocalShippingIcon, color: "#671aff" },
-    { label: "Anbrudd", path: "/anbrudd", Icon: ListAltIcon, color: "#FB8C00" },
-    { label: "Meld inn", path: "/tilbakemelding", Icon: CampaignIcon, color: "#6A1B9A" },
+    {
+      label: "Standardtekster",
+      path: "/standardtekster",
+      Icon: DescriptionIcon,
+      color: "#43A047",
+    },
+    {
+      label: "Interaksjonssøk",
+      path: "/interaksjoner",
+      Icon: CompareArrowsIcon,
+      color: "#D32F2F",
+    },
+    {
+      label: "Produktskjema",
+      path: "/produktskjema",
+      Icon: LocalShippingIcon,
+      color: "#00897B",
+    },
+    {
+      label: "Anbrudd",
+      path: "/anbrudd",
+      Icon: ChecklistRoundedIcon,
+      color: "#FB8C00",
+    },
+    {
+      label: "Innspill og notater",
+      path: "/tilbakemelding",
+      Icon: FeedbackRoundedIcon,
+      color: "#8E24AA",
+    },
   ];
 
   const adminItems =
@@ -132,29 +157,42 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       <Divider />
 
       <List>
-        {mainItems.map((item) => (
-          <Tooltip key={item.path} title={collapsed ? item.label : ""} placement="right">
-            <ListItemButton
-              selected={isSelected(item.path)}
-              onClick={() => navigate(item.path)}
-              sx={{
-                justifyContent: collapsed ? "center" : "flex-start",
-                px: collapsed ? 1 : 2,
-              }}
-            >
-              <ListItemIcon
+        {mainItems.map((item, index) => (
+          <React.Fragment key={item.path}>
+            <Tooltip title={collapsed ? item.label : ""} placement="right">
+              <ListItemButton
+                selected={isSelected(item.path)}
+                onClick={() => navigate(item.path)}
                 sx={{
-                  minWidth: 0,
-                  mr: collapsed ? 0 : 2,
-                  justifyContent: "center",
-                  color: item.color,
+                  justifyContent: collapsed ? "center" : "flex-start",
+                  px: collapsed ? 1 : 2,
+                  py: collapsed ? 1.8 : 1.2,
                 }}
               >
-                <item.Icon sx={{ fontSize: collapsed ? 45 : 35 }} />
-              </ListItemIcon>
-              {!collapsed && <ListItemText primary={item.label} />}
-            </ListItemButton>
-          </Tooltip>
+                <ListItemIcon
+                  sx={{
+                    minWidth: 0,
+                    mr: collapsed ? 0 : 2,
+                    justifyContent: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    color: item.color,
+                  }}
+                >
+                  <item.Icon sx={{ fontSize: collapsed ? 45 : 35 }} />
+                </ListItemIcon>
+                {!collapsed && <ListItemText primary={item.label} />}
+              </ListItemButton>
+            </Tooltip>
+            {index < mainItems.length - 1 && (
+              <Divider
+                sx={{
+                  mx: collapsed ? 1.5 : 2,
+                  opacity: 0.45,
+                }}
+              />
+            )}
+          </React.Fragment>
         ))}
 
         {adminItems.length > 0 && (
@@ -189,6 +227,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       minWidth: 0,
                       mr: collapsed ? 0 : 2,
                       justifyContent: "center",
+                      display: "flex",
+                      alignItems: "center",
                       color: item.color,
                     }}
                   >
