@@ -38,4 +38,10 @@ export type PreparatRow = {
   // Stabil ident (f.eks. varenummer) brukt til dedupe.
   // Gjør at to ulike produkter kan ha samme picked-tekst.
   pickedKey: string | null;
+
+  // Grunndata som gjør at picked-tekst kan regenereres når toggles endres
+  baseText: string | null;
+  fullName: string | null;
+  manufacturer: string | null;
+  packSize: string | null;
 };

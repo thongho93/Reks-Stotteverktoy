@@ -172,10 +172,38 @@ export function formatPreparatRowText(
   },
   opts: { includeManufacturer: boolean; includePackSize: boolean },
 ): string {
+  const splitNameAndTrailingStrength = (value: string): { name: string; strength: string } | null => {
+    const text = value.replace(/\s+/g, " ").trim();
+    if (!text) return null;
+
+    const strengthPatterns = [
+      // "40 % w/v"
+      /(.*?)(\s+\d+(?:[.,]\d+)?\s*%\s*(?:w\/v|v\/v)?)$/i,
+      // "80/4,5mcg" or "400/30 mg"
+      /(.*?)(\s+\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)+(?:\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e))?)$/i,
+      // "18 mg", "0,2 mg/dose", "100 mcg/24t"
+      /(.*?)(\s+\d+(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e)(?:\s*\/\s*\d*(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|ug|mikrog|mikrogram|iu|ie|i\.e\.|mmol|ml|e|t(?:imer)?|dose))?)$/i,
+    ];
+
+    for (const pattern of strengthPatterns) {
+      const match = text.match(pattern);
+      if (!match) continue;
+
+      const name = (match[1] ?? "").trim();
+      const strength = (match[2] ?? "").trim();
+      if (!name || !strength) continue;
+
+      return { name, strength };
+    }
+
+    return null;
+  };
+
   const baseText = (row.baseText ?? "").trim();
   if (!baseText) return "";
 
   const manufacturer = (row.manufacturer ?? "").trim();
+  const manufacturerDisplay = manufacturer.toLowerCase();
   const fullName = (row.fullName ?? "").trim();
   const packSize = (row.packSize ?? "").trim();
 
@@ -185,8 +213,15 @@ export function formatPreparatRowText(
   if (opts.includeManufacturer) {
     if (manufacturer) {
       const baseLower = baseText.toLowerCase();
-      const mLower = manufacturer.toLowerCase();
-      if (!baseLower.includes(mLower)) out = `${out} ${manufacturer}`.trim();
+      const mLower = manufacturerDisplay;
+      if (!baseLower.includes(mLower)) {
+        const split = splitNameAndTrailingStrength(baseText);
+        if (split) {
+          out = `${split.name} ${manufacturerDisplay} ${split.strength}`.replace(/\s+/g, " ").trim();
+        } else {
+          out = `${out} ${manufacturerDisplay}`.trim();
+        }
+      }
     } else if (fullName) {
       // Some sources only expose manufacturer inside the full name.
       out = fullName;
@@ -493,20 +528,51 @@ export function replaceNextDatoMndToken(text: string, value: string) {
 
 export function usePreparatRows() {
   const [preparatRows, setPreparatRows] = useState<PreparatRow[]>([
-    { id: 0, picked: null, pickedKey: null },
+    {
+      id: 0,
+      picked: null,
+      pickedKey: null,
+      baseText: null,
+      fullName: null,
+      manufacturer: null,
+      packSize: null,
+    },
   ]);
 
   const addPreparatRow = useCallback(() => {
     setPreparatRows((prev) => {
       const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
-      return [...prev, { id: nextId, picked: null, pickedKey: null }];
+      return [
+        ...prev,
+        {
+          id: nextId,
+          picked: null,
+          pickedKey: null,
+          baseText: null,
+          fullName: null,
+          manufacturer: null,
+          packSize: null,
+        },
+      ];
     });
   }, []);
 
   const removePreparatRow = useCallback((id: number) => {
     setPreparatRows((prev) => {
       const next = prev.filter((r) => r.id !== id);
-      return next.length ? next : [{ id: 0, picked: null, pickedKey: null }];
+      return next.length
+        ? next
+        : [
+            {
+              id: 0,
+              picked: null,
+              pickedKey: null,
+              baseText: null,
+              fullName: null,
+              manufacturer: null,
+              packSize: null,
+            },
+          ];
     });
   }, []);
 
@@ -517,10 +583,14 @@ export function usePreparatRows() {
           r.id === id
             ? {
                 ...r,
-                picked,
-                pickedKey: picked ? (pickedKey ?? r.pickedKey ?? picked) : null,
-              }
-            : r,
+              picked,
+              pickedKey: picked ? (pickedKey ?? r.pickedKey ?? picked) : null,
+              baseText: picked ? r.baseText : null,
+              fullName: picked ? r.fullName : null,
+              manufacturer: picked ? r.manufacturer : null,
+              packSize: picked ? r.packSize : null,
+            }
+          : r,
         ),
       );
     },
@@ -528,36 +598,108 @@ export function usePreparatRows() {
   );
 
   const resetPreparatRows = useCallback(() => {
-    setPreparatRows([{ id: 0, picked: null, pickedKey: null }]);
+    setPreparatRows([
+      {
+        id: 0,
+        picked: null,
+        pickedKey: null,
+        baseText: null,
+        fullName: null,
+        manufacturer: null,
+        packSize: null,
+      },
+    ]);
   }, []);
 
   const clearPreparats = useCallback(() => {
-    setPreparatRows([{ id: 0, picked: null, pickedKey: null }]);
+    setPreparatRows([
+      {
+        id: 0,
+        picked: null,
+        pickedKey: null,
+        baseText: null,
+        fullName: null,
+        manufacturer: null,
+        packSize: null,
+      },
+    ]);
   }, []);
 
-  const addPickedPreparat = useCallback((picked: string, pickedKey?: string | null) => {
-    setPreparatRows((prev) => {
-      const key = String((pickedKey ?? picked).trim());
+  const addPickedPreparat = useCallback(
+    (
+      picked: string,
+      pickedKey?: string | null,
+      meta?: {
+        baseText?: string | null;
+        fullName?: string | null;
+        manufacturer?: string | null;
+        packSize?: string | null;
+      },
+    ) => {
+      setPreparatRows((prev) => {
+        const key = String((pickedKey ?? picked).trim());
 
-      const alreadyPicked = prev
-        .map((r) => r.pickedKey ?? r.picked)
-        .filter(Boolean)
-        .includes(key);
+        const alreadyPicked = prev
+          .map((r) => r.pickedKey ?? r.picked)
+          .filter(Boolean)
+          .includes(key);
 
-      if (alreadyPicked) return prev;
+        if (alreadyPicked) return prev;
 
-      const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
-      const kept = prev.filter((r) => r.picked);
-      return [...kept, { id: nextId, picked, pickedKey: key }];
-    });
-  }, []);
+        const nextId = (prev[prev.length - 1]?.id ?? 0) + 1;
+        const kept = prev.filter((r) => r.picked);
+        return [
+          ...kept,
+          {
+            id: nextId,
+            picked,
+            pickedKey: key,
+            baseText: meta?.baseText ?? null,
+            fullName: meta?.fullName ?? null,
+            manufacturer: meta?.manufacturer ?? null,
+            packSize: meta?.packSize ?? null,
+          },
+        ];
+      });
+    },
+    [],
+  );
 
   const removePreparatById = useCallback((id: number) => {
     setPreparatRows((prev) => {
       const remaining = prev.filter((r) => r.id !== id);
-      return remaining.length > 0 ? remaining : [{ id: 0, picked: null, pickedKey: null }];
+      return remaining.length > 0
+        ? remaining
+        : [
+            {
+              id: 0,
+              picked: null,
+              pickedKey: null,
+              baseText: null,
+              fullName: null,
+              manufacturer: null,
+              packSize: null,
+            },
+          ];
     });
   }, []);
+
+  const reformatPickedPreparats = useCallback(
+    (
+      formatter: (row: Pick<PreparatRow, "picked" | "baseText" | "fullName" | "manufacturer" | "packSize">) =>
+        | string
+        | null,
+    ) => {
+      setPreparatRows((prev) =>
+        prev.map((row) => {
+          if (!row.picked) return row;
+          const nextPicked = formatter(row);
+          return { ...row, picked: (nextPicked ?? row.picked).trim() };
+        }),
+      );
+    },
+    [],
+  );
 
   return {
     preparatRows,
@@ -568,6 +710,7 @@ export function usePreparatRows() {
     clearPreparats,
     addPickedPreparat,
     removePreparatById,
+    reformatPickedPreparats,
   };
 }
 
