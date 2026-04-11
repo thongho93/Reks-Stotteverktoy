@@ -243,8 +243,11 @@ export function formatPreparatForTemplate(med: {
   );
 
   // 2) Regular pattern where the first number has a unit, optionally followed by "/..."
+  // Use a specific denominator pattern to avoid greedily capturing pack-size and dosage-form tokens
+  // (e.g. "100mcg/24t 24 24 stk. Plaster" should yield "100mcg/24t", not the full trailing string).
+  const denomUnit = `${unit}|t(?:imer)?\\b|dose\\b`;
   const regular = nfs.match(
-    new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*[^;\\)\\n]+?)?)(?=,\\s|$)`, "i"),
+    new RegExp(`(\\d+[.,]?\\d*\\s*(?:${unit})(?:\\s*\\/\\s*\\d*[.,]?\\d*\\s*(?:${denomUnit}))?)`, "i"),
   );
 
   // 0) Percentage strengths like "40 % w/v" / "40% w/v" / "5 % v/v"
@@ -311,10 +314,13 @@ export function formatPreparatForTemplate(med: {
     rawName = rawName.replace(new RegExp(`\\s*${flex}\\s*`, "i"), " ");
   }
 
-  // Drop trailing pack-size tokens that often appear at the end of PIM names, e.g. "... 2,5" or "... 120".
+  // Drop trailing pack-size tokens that often appear at the end of PIM/HV names.
+  // Handles "... 24 24 stk." (Norwegian pack-size format) and plain trailing numbers like "... 120".
   // Keep strengths intact (we already extracted `strength` separately).
   rawName = rawName
-    .replace(/\s+\d+(?:[.,]\d+)?\s*$/g, " ")
+    .replace(/(?:\s+\d+)+\s*stk\.?\s*$/gi, " ")  // "24 24 stk." / "24stk"
+    .replace(/(?:\s+\d+){2,}\s*$/g, " ")           // "24 24" (two+ consecutive pack-count numbers)
+    .replace(/\s+\d+(?:[.,]\d+)?\s*$/g, " ")       // single trailing number or decimal
     .replace(/\s+/g, " ")
     .trim();
 

@@ -2,17 +2,22 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   ClickAwayListener,
+  Link,
   List,
   ListItemButton,
   ListItemText,
   Paper,
   Popper,
   TextField,
+  Typography,
 } from "@mui/material";
 
 import meds from "../meds.json";
 import pimProducts from "./pimProducts.json";
 import hvProducts from "./hvProducts.json";
+
+const SPREADSHEET_EDIT_URL =
+  "https://docs.google.com/spreadsheets/d/1rBMivx3lHY4CKrFev_On__YVendKv6O7i_Zzcoy9QYg/edit?gid=1369769996#gid=1369769996";
 import { festToSearchIndex } from "../mappers/festToSearchIndex";
 import { pimToSearchIndex } from "../mappers/pimToSearchIndex";
 import type { SearchIndexItem } from "../../../utils/types";
@@ -950,6 +955,17 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         }}
         InputProps={{}}
       />
+
+      {open && results.length === 0 && deferredQuery.trim().length >= 2 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+          <strong>Ingen treff.</strong>{" "}
+          Mangler preparatet?{" "}
+          <Link href={SPREADSHEET_EDIT_URL} target="_blank" rel="noopener noreferrer">
+            Legg det til i regnearket
+          </Link>
+          .
+        </Typography>
+      )}
 
       <Popper
         open={open && results.length > 0}
