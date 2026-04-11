@@ -423,8 +423,8 @@
 
 .preparatClearButton {
   text-transform: none !important;
-  height: 56px !important;
-  min-height: 56px !important;
+  height: 54px !important;
+  min-height: 54px !important;
   align-self: flex-start;
   flex-shrink: 0;
   box-sizing: border-box;

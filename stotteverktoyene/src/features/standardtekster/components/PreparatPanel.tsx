@@ -334,8 +334,6 @@ export default function PreparatPanel({
           variant="outlined"
           className={styles.preparatClearButton}
           sx={{
-            height: 56,
-            minHeight: 56,
             boxSizing: "border-box",
             alignSelf: "flex-start",
             flexShrink: 0,

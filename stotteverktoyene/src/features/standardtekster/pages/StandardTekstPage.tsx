@@ -11,11 +11,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Paper,
   Snackbar,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -191,6 +193,23 @@ export default function StandardTekstPage() {
   const errorToShow = errorLocal ?? error;
 
   const { user, isAdmin, firstName } = useAuthUser();
+  const [adminViewEnabled, setAdminViewEnabled] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem("standardtekster.adminViewEnabled");
+      return raw !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const canManageStandardTekster = isAdmin && adminViewEnabled;
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("standardtekster.adminViewEnabled", String(adminViewEnabled));
+    } catch {
+      // ignore
+    }
+  }, [adminViewEnabled]);
   const actorName = (firstName ?? "").trim() || user?.displayName?.trim() || user?.email?.trim() || "";
   const actor = user
     ? {
@@ -205,7 +224,9 @@ export default function StandardTekstPage() {
   const [draftContent, setDraftContent] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
-  const lockBeforeEdit = Boolean(selected && !isEditing && selected.title === "Ny standardtekst");
+  const lockBeforeEdit = Boolean(
+    canManageStandardTekster && selected && !isEditing && selected.title === "Ny standardtekst",
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -623,7 +644,9 @@ export default function StandardTekstPage() {
 
   // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
-    const shouldAutoEditNew = Boolean(isAdmin && selected && selected.title === "Ny standardtekst");
+    const shouldAutoEditNew = Boolean(
+      canManageStandardTekster && selected && selected.title === "Ny standardtekst",
+    );
     const pending = pendingOmeqPrefill;
     const shouldApplyOmeqPrefill =
       Boolean(pending && selected) &&
@@ -706,12 +729,19 @@ export default function StandardTekstPage() {
   }, [
     addPickedPreparat,
     activeTemplateContent,
-    isAdmin,
+    canManageStandardTekster,
     pendingOmeqPrefill,
     resetPreparatRows,
     selected,
     selectedId,
   ]);
+
+  useEffect(() => {
+    if (canManageStandardTekster) return;
+    if (!isEditing) return;
+    setIsEditing(false);
+    setFollowUpsOpen(false);
+  }, [canManageStandardTekster, isEditing]);
 
   useEffect(() => {
     if (!protectedOmeqSelectedIdRef.current) return;
@@ -749,6 +779,7 @@ export default function StandardTekstPage() {
   }, [items, omeqPrefill, selected, selectedId, setSelectedId]);
 
   const startEdit = () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setDraftTitle(selected.title ?? "");
     setDraftCategory(selected.category ?? "");
@@ -780,6 +811,7 @@ export default function StandardTekstPage() {
   };
 
   const saveEdit = async () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setSaving(true);
     setErrorLocal(null);
@@ -840,7 +872,7 @@ export default function StandardTekstPage() {
   };
 
   const createNewStandardTekst = async () => {
-    if (!isAdmin) return;
+    if (!canManageStandardTekster) return;
 
     setCreating(true);
     setErrorLocal(null);
@@ -985,8 +1017,8 @@ export default function StandardTekstPage() {
               key={fu.id}
               label={fu.label}
               onClick={() => openFollowUp(fu.id)}
-              onDelete={isAdmin && isEditing ? () => removeFollowUp(fu.id) : undefined}
-              deleteIcon={isAdmin && isEditing ? <DeleteOutlineIcon /> : undefined}
+              onDelete={canManageStandardTekster && isEditing ? () => removeFollowUp(fu.id) : undefined}
+              deleteIcon={canManageStandardTekster && isEditing ? <DeleteOutlineIcon /> : undefined}
               icon={<OpenInNewIcon />}
               variant="outlined"
             />
@@ -1281,6 +1313,7 @@ export default function StandardTekstPage() {
   };
 
   const requestDelete = () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setDeleteOpen(true);
   };
@@ -1291,6 +1324,7 @@ export default function StandardTekstPage() {
   };
 
   const confirmDelete = async () => {
+    if (!canManageStandardTekster) return;
     if (!selected) return;
     setDeleting(true);
     setErrorLocal(null);
@@ -1324,6 +1358,24 @@ export default function StandardTekstPage() {
         </Box>
 
         <Box className={styles.headerActions}>
+          {isAdmin && (
+            <FormControlLabel
+              sx={{ m: 0 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={adminViewEnabled}
+                  onChange={(e) => setAdminViewEnabled(e.target.checked)}
+                />
+              }
+              label={
+                <Typography variant="caption" color="text.secondary">
+                  {adminViewEnabled ? "Admin view" : "User view"}
+                </Typography>
+              }
+            />
+          )}
+
           <Typography
             variant="caption"
             color="text.secondary"
@@ -1368,7 +1420,12 @@ export default function StandardTekstPage() {
             <li>Klokkeslettfelt bruker faste valg og foreslår automatisk i dag eller i morgen ut fra lokal tid.</li>
             <li>Velg om produsent og pakningsstørrelse skal tas med i preparatteksten via bryterne øverst.</li>
             <li>Klikk i teksten for å kopiere. Hvis "Tøm etter kopiering" er på, nullstilles feltene automatisk etterpå.</li>
-            {isAdmin && <li>Som admin kan du opprette, redigere og slette standardtekster, og se hvem som opprettet og sist oppdaterte teksten.</li>}
+            {isAdmin && (
+              <li>
+                Som admin kan du opprette, redigere og slette standardtekster, og se hvem som
+                opprettet og sist oppdaterte teksten.
+              </li>
+            )}
           </Box>
         </Paper>
       </Collapse>
@@ -1388,7 +1445,7 @@ export default function StandardTekstPage() {
         >
           <StandardTekstSidebar
             disabled={lockBeforeEdit}
-            isAdmin={isAdmin}
+            isAdmin={canManageStandardTekster}
             creating={creating}
             onCreate={createNewStandardTekst}
             search={search}
@@ -1567,18 +1624,24 @@ export default function StandardTekstPage() {
 
                       {(() => {
                         const tallIndices = getTallTokenIndices(activeTemplateContent);
+                        const tallColumnsOnSm =
+                          tallIndices.length > 1
+                            ? "repeat(2, minmax(120px, 170px))"
+                            : "minmax(120px, 170px)";
 
                         return (
                           <>
                             <Box
                               sx={{
                                 display: "grid",
-                                gap: 1,
+                                gap: 0.75,
                                 gridTemplateColumns: {
                                   xs: "1fr",
-                                  sm: "repeat(auto-fit, minmax(170px, 220px))",
+                                  sm: tallColumnsOnSm,
                                 },
                                 alignItems: "start",
+                                alignContent: "start",
+                                gridAutoRows: "min-content",
                               }}
                             >
                               {tallIndices.map((idx) => {
@@ -1605,7 +1668,7 @@ export default function StandardTekstPage() {
                                     size="small"
                                     type="text"
                                     error={invalid}
-                                    helperText={invalid ? "Kun tall (f.eks. 1, 2, 2,5)" : " "}
+                                    helperText={invalid ? "Kun tall (f.eks. 1, 2, 2,5)" : undefined}
                                     slotProps={{
                                       htmlInput: {
                                         inputMode: "decimal",
@@ -1887,7 +1950,7 @@ export default function StandardTekstPage() {
           <StandardTekstContent
             selected={selected}
             loading={loading}
-            isAdmin={isAdmin}
+            isAdmin={canManageStandardTekster}
             isEditing={isEditing}
             draftTitle={draftTitle}
             draftCategory={draftCategory}
@@ -1932,7 +1995,7 @@ export default function StandardTekstPage() {
               },
             )}
             editorTools={
-              isAdmin ? (
+              canManageStandardTekster ? (
                 <Button
                   size="small"
                   variant="outlined"
