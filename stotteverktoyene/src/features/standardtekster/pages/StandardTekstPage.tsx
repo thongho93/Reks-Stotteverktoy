@@ -1880,10 +1880,6 @@ export default function StandardTekstPage() {
                         borderRadius: 1.5,
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                        Tall i teksten
-                      </Typography>
-
                       {(() => {
                         const tallIndices = getTallTokenIndices(activeTemplateContent);
                         const tallColumnsOnSm =
@@ -1955,14 +1951,12 @@ export default function StandardTekstPage() {
                       sx={{
                         p: 1,
                         border: "1px solid",
-                        borderColor: "divider",
+                        borderColor: "secondary.light",
                         borderRadius: 1.5,
+                        bgcolor: "rgba(208, 106, 147, 0.06)",
+                        boxShadow: "0 0 0 1px rgba(208, 106, 147, 0.08) inset",
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                        Tid i teksten
-                      </Typography>
-
                       {(() => {
                         const selectedClockTime = CLOCK_TALL_OPTIONS.includes(
                           clockTime as (typeof CLOCK_TALL_OPTIONS)[number],
@@ -1979,15 +1973,19 @@ export default function StandardTekstPage() {
                               gap: 1,
                               gridTemplateColumns: {
                                 xs: "1fr",
-                                sm: clockCustomMode ? "170px 130px 170px" : "170px 130px",
+                                sm: clockCustomMode
+                                  ? "auto auto auto"
+                                  : "auto auto",
                               },
                               alignItems: "start",
+                              justifyContent: { xs: "stretch", sm: "start" },
                             }}
                           >
                             <TextField
                               select
                               label="Klokkeslett"
                               size="small"
+                              sx={{ width: { xs: "100%", sm: 140 } }}
                               value={selectedClockTime}
                               onChange={(e) => {
                                 if (e.target.value === CUSTOM_CLOCK_VALUE) {
@@ -2021,6 +2019,7 @@ export default function StandardTekstPage() {
                               select
                               label="Dag"
                               size="small"
+                              sx={{ width: { xs: "100%", sm: 145 } }}
                               value={clockDay}
                               onChange={(e) => {
                                 setClockDay(e.target.value as ClockTallDay);
@@ -2038,6 +2037,7 @@ export default function StandardTekstPage() {
                                 label="Eget klokkeslett"
                                 type="time"
                                 size="small"
+                                sx={{ width: { xs: "100%", sm: 150 } }}
                                 value={clockTime}
                                 onChange={(e) => {
                                   const nextTime = e.target.value;
@@ -2068,8 +2068,10 @@ export default function StandardTekstPage() {
                       sx={{
                         p: 1,
                         border: "1px solid",
-                        borderColor: "divider",
+                        borderColor: "secondary.light",
                         borderRadius: 1.5,
+                        bgcolor: "rgba(208, 106, 147, 0.06)",
+                        boxShadow: "0 0 0 1px rgba(208, 106, 147, 0.08) inset",
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
@@ -2150,10 +2152,6 @@ export default function StandardTekstPage() {
                         borderRadius: 1.5,
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                        Formulering i teksten
-                      </Typography>
-
                       <Box sx={{ display: "grid", gap: 1 }}>
                         {getFormuleringTokenIndices(activeTemplateContent).map((idx) => {
                           const fieldLabel = idx === 0 ? "Formulering" : `Formulering ${idx}`;

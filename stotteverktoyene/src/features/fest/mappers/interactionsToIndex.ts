@@ -62,6 +62,8 @@ export type BuiltInteraction = {
   }>;
 };
 
+const ATC_TERM_RE = /^[A-Z]\d{2}[A-Z0-9]{0,4}$/;
+
 export function normalizeText(input: string): string {
   return input
     .toLowerCase()
@@ -168,6 +170,28 @@ export function buildInteractionsIndex(interactions: InteractionJson[]) {
     });
   });
 
+  const searchableAtcPrefixes = new Set<string>();
+  searchableAtcs.forEach((code) => {
+    for (let i = 1; i <= code.length; i++) {
+      searchableAtcPrefixes.add(code.slice(0, i));
+    }
+  });
+
+  const hasAtcHierarchyMatch = (atc: string | undefined): boolean => {
+    if (!atc || !ATC_TERM_RE.test(atc)) return false;
+
+    // Direct hit OR class-prefix hit (e.g. C09A matches C09AA01)
+    if (searchableAtcs.has(atc) || searchableAtcPrefixes.has(atc)) return true;
+
+    // Descendant hit (e.g. product C09AA01 should match interaction class C09A)
+    for (let i = 3; i <= atc.length; i++) {
+      const prefix = atc.slice(0, i);
+      if (searchableAtcs.has(prefix)) return true;
+    }
+
+    return false;
+  };
+
   const medicationRows = Array.isArray(meds) ? (meds as Array<Record<string, unknown>>) : [];
 
   medicationRows.forEach((med) => {
@@ -180,7 +204,7 @@ export function buildInteractionsIndex(interactions: InteractionJson[]) {
     const atc = atcRaw ? normalizeAtc(atcRaw) : undefined;
 
     const hasSubstanceMatch = substanceKey ? searchableNameKeys.has(substanceKey) : false;
-    const hasAtcMatch = atc ? searchableAtcs.has(atc) : false;
+    const hasAtcMatch = hasAtcHierarchyMatch(atc);
     if (!hasSubstanceMatch && !hasAtcMatch) return;
 
     const key = substanceKey || normalizeText(productName);
@@ -218,12 +242,16 @@ export function matchInteractionsBySelectedTerms(
   index: InteractionIndex,
   selectedTerms: string[]
 ): MatchResult[] {
-  const looksLikeAtc = (t: string) => /^[A-Za-z]\d{2}[A-Za-z0-9]*$/.test(t.trim());
+  const looksLikeAtc = (t: string) => ATC_TERM_RE.test(t.trim().toUpperCase());
 
-  const selected = selectedTerms
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .map((t) => (looksLikeAtc(t) ? normalizeAtc(t) : normalizeText(t)));
+  const selected = Array.from(
+    new Set(
+      selectedTerms
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .map((t) => (looksLikeAtc(t) ? normalizeAtc(t) : normalizeText(t)))
+    )
+  );
 
   const perInteraction = new Map<number, { groups: Set<number>; groupToTerms: Map<number, Set<string>> }>();
 
@@ -231,17 +259,23 @@ export function matchInteractionsBySelectedTerms(
     const direct = index.termIndex.get(term);
     if (direct && direct.length > 0) return direct;
 
-    // Fallback: ATC group expansion (N02A -> N02A*).
-    // Note: you already index ATC prefixes in buildInteractionsIndex, so this is
-    // mostly a safety net if the prefix key is missing for any reason.
-    if (/^[A-Z]\d{2}[A-Z0-9]*$/.test(term)) {
-      const out: InteractionOccurrence[] = [];
+    // Fallback: bidirectional ATC hierarchy match.
+    // - class -> descendants: N02A should match N02AA01
+    // - descendant -> class: N02AA01 should match N02A
+    // Note: prefix keys are already indexed, so this mostly serves as a safety net.
+    if (ATC_TERM_RE.test(term)) {
+      const out = new Map<string, InteractionOccurrence>();
       for (const [key, list] of index.termIndex.entries()) {
-        if (!/^[A-Z]\d{2}[A-Z0-9]*$/.test(key)) continue;
-        if (!key.startsWith(term)) continue;
-        if (list?.length) out.push(...list);
+        if (!ATC_TERM_RE.test(key)) continue;
+        if (!key.startsWith(term) && !term.startsWith(key)) continue;
+        if (!list?.length) continue;
+
+        for (const occ of list) {
+          const occKey = `${occ.interactionIndex}:${occ.groupIndex}`;
+          if (!out.has(occKey)) out.set(occKey, occ);
+        }
       }
-      return out;
+      return Array.from(out.values());
     }
 
     return [];
