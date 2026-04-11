@@ -46,7 +46,7 @@ async function getFirstName(uid: string): Promise<string | undefined> {
 }
 
 export type UsageEventMetadata = {
-  page?: "standardtekster" | "omeq" | "profil" | "produktskjema" | "other";
+  page?: "standardtekster" | "omeq" | "profil" | "produktskjema" | "tilbakemelding" | "other";
   standardtekstId?: string;
   searchLen?: number;
 };

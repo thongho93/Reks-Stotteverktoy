@@ -19,10 +19,12 @@ import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ListAltIcon from "@mui/icons-material/ListAlt";
+import CampaignIcon from "@mui/icons-material/Campaign";
 import OMEQPage from "../features/omeq/pages/OMEQPage";
 import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
 import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
 import AndbruddPage from "../features/anbrudd/andbruddPage";
+import TilbakemeldingPage from "../features/tilbakemelding/pages/TilbakemeldingPage";
 import HomePage from "./HomePage";
 import { RequireAuth, LoginPage, ProfileMenu, ProfilePage } from "./auth/Auth";
 import PendingApprovalPage from "./auth/PendingApprovalPage";
@@ -59,6 +61,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     { label: "Interaksjonssøk", path: "/interaksjoner", Icon: MedicationIcon, color: "#D32F2F" },
     { label: "Produktskjema", path: "/produktskjema", Icon: LocalShippingIcon, color: "#671aff" },
     { label: "Anbrudd", path: "/anbrudd", Icon: ListAltIcon, color: "#FB8C00" },
+    { label: "Meld inn", path: "/tilbakemelding", Icon: CampaignIcon, color: "#6A1B9A" },
   ];
 
   const adminItems =
@@ -238,6 +241,8 @@ function Layout() {
       ? "profil"
       : pathname.startsWith("/produktskjema")
       ? "produktskjema"
+      : pathname.startsWith("/tilbakemelding")
+      ? "tilbakemelding"
       : "other";
 
     logUsage("page_view", { page });
@@ -256,6 +261,7 @@ function Layout() {
           <Route path="/statistikk" element={<StatistikkPage />} />
           <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
           <Route path="/anbrudd" element={<AndbruddPage />} />
+          <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
           <Route element={<RequireRekspert />}>
             <Route path="/rekspert" element={<RekspertPage />} />
           </Route>
