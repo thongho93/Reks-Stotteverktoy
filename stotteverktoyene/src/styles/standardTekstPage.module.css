@@ -318,6 +318,7 @@
   width: 100%;
   margin: 0;
   padding-top: 6px; /* litt mindre luft på toppen */
+  padding-right: clamp(20px, 8vw, 180px);
 }
 
 /* Auth */

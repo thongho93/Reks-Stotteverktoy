@@ -116,6 +116,77 @@ function buildInitialTallValues(template: string): Record<number, string> {
   return next;
 }
 
+const SINGULAR_TO_PLURAL_FORMULERING: Record<string, string> = {
+  tablett: "tabletter",
+  kapsel: "kapsler",
+  depottablett: "depottabletter",
+  smeltetablett: "smeltetabletter",
+  enterotablett: "enterotabletter",
+  sublingvaltablett: "sublingvaltabletter",
+  brusetablett: "brusetabletter",
+  depotkapsel: "depotkapsler",
+  nesespray: "nesesprayer",
+  oyedrape: "oyedraper",
+  oredrape: "oredraper",
+  drape: "draper",
+  stikkpille: "stikkpiller",
+  injeksjon: "injeksjoner",
+  infusjon: "infusjoner",
+  inhalasjonspulver: "inhalasjonspulvere",
+  inhalasjonsvaeske: "inhalasjonsvaesker",
+  mikstur: "miksturer",
+  granulat: "granulater",
+  plaster: "plastre",
+  depotplaster: "depotplastre",
+  salve: "salver",
+  krem: "kremer",
+  gel: "geler",
+  spray: "sprayer",
+  sirup: "siruper",
+  sugetablett: "sugetabletter",
+  vaginaltablett: "vaginaltabletter",
+  vaginalkrem: "vaginalkremer",
+  vaginalring: "vaginalringer",
+  munnspray: "munnsprayer",
+  munnskyllevaeske: "munnskyllevaesker",
+};
+
+const normalizeFormKey = (value: string) =>
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ø/g, "o")
+    .replace(/å/g, "a")
+    .replace(/æ/g, "ae");
+
+const PLURAL_TO_SINGULAR_FORMULERING = Object.entries(SINGULAR_TO_PLURAL_FORMULERING).reduce(
+  (acc, [singular, plural]) => {
+    acc[plural] = singular;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
+function toPluralFormulering(value: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  const key = normalizeFormKey(trimmed);
+  const mapped = SINGULAR_TO_PLURAL_FORMULERING[key];
+  if (mapped) return mapped;
+  if (trimmed.endsWith("er")) return trimmed;
+  return `${trimmed}er`;
+}
+
+function toSingularFormulering(value: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  const key = normalizeFormKey(trimmed);
+  const mapped = PLURAL_TO_SINGULAR_FORMULERING[key];
+  if (mapped) return mapped;
+  if (trimmed.endsWith("er") && trimmed.length > 2) return trimmed.slice(0, -2);
+  return trimmed;
+}
+
 function parseOmeqStandardtekstPrefill(value: unknown): OMEQStandardtekstPrefill | null {
   if (!value || typeof value !== "object") return null;
 
@@ -403,6 +474,83 @@ export default function StandardTekstPage() {
     );
     return text.replace(re, safeValue);
   };
+
+  const getTallNumericValue = useCallback(
+    (index: number): number | null => {
+      const candidate =
+        (tallByIndex[index] ?? "").trim() || (index !== 0 ? (tallByIndex[0] ?? "").trim() : "");
+      if (!candidate) return null;
+
+      const normalized = candidate.replace(",", ".");
+      const parsed = Number(normalized);
+      if (!Number.isFinite(parsed)) return null;
+      return parsed;
+    },
+    [tallByIndex],
+  );
+
+  const resolveFormuleringForPreviewAndCopy = useCallback(
+    (index: number, value: string, template: string): string => {
+      const raw = (value ?? "").trim();
+      if (!raw) return raw;
+      if (!templateHasTallToken(template)) return raw;
+
+      const numeric = getTallNumericValue(index);
+      if (numeric === null) return raw;
+      if (numeric === 1) return toSingularFormulering(raw);
+      if (numeric > 1) return toPluralFormulering(raw);
+      return raw;
+    },
+    [getTallNumericValue],
+  );
+
+  const getTallTokenOccurrences = useCallback((template: string): number[] => {
+    const occurrences: number[] = [];
+    const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
+    let m: RegExpExecArray | null;
+
+    while ((m = re.exec(template ?? ""))) {
+      const raw = (m[1] ?? m[2] ?? "").trim();
+      const idx = raw ? Number(raw) : 0;
+      occurrences.push(Number.isFinite(idx) ? idx : 0);
+    }
+
+    return occurrences;
+  }, []);
+
+  const buildUnnumberedFormuleringOccurrenceValues = useCallback(
+    (template: string): string[] => {
+      if (!templateHasTallToken(template)) return [];
+      const raw = (formuleringByIndex[0] ?? "").trim();
+      if (!raw) return [];
+
+      const tallOccurrences = getTallTokenOccurrences(template);
+      if (!tallOccurrences.length) return [];
+
+      return tallOccurrences.map((idx) => {
+        const numeric = getTallNumericValue(idx);
+        if (numeric === 1) return toSingularFormulering(raw);
+        if (numeric !== null && numeric > 1) return toPluralFormulering(raw);
+        return raw;
+      });
+    },
+    [formuleringByIndex, getTallNumericValue, getTallTokenOccurrences],
+  );
+
+  const replaceUnnumberedFormuleringTokensByOccurrence = useCallback(
+    (text: string, values: string[]): string => {
+      if (!text) return text;
+      if (!values.length) return text;
+
+      let cursor = 0;
+      return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, () => {
+        const value = values[cursor] ?? values[values.length - 1] ?? "";
+        cursor += 1;
+        return value;
+      });
+    },
+    [],
+  );
 
   const getTallFieldLabel = useCallback((_template: string, index: number) => {
     return index === 0 ? "Tall" : `Tall ${index}`;
@@ -1208,10 +1356,36 @@ export default function StandardTekstPage() {
 
     // Replace FORMULERING tokens (free text) by index (FORMULERING, FORMULERING1, ...)
     if (templateHasFormuleringTokens(selectedContent)) {
-      for (const idx of getFormuleringTokenIndices(selectedContent)) {
-        const v = (formuleringByIndex[idx] ?? "").trim();
-        if (!v) continue;
-        text = replaceFormuleringTokenByIndex(text, idx, v);
+      const indices = getFormuleringTokenIndices(selectedContent);
+      const hasNumbered = indices.some((idx) => idx > 0);
+
+      if (hasNumbered) {
+        for (const idx of indices.filter((i) => i > 0)) {
+          const v = resolveFormuleringForPreviewAndCopy(
+            idx,
+            (formuleringByIndex[idx] ?? "").trim(),
+            selectedContent,
+          );
+          if (!v) continue;
+          text = replaceFormuleringTokenByIndex(text, idx, v);
+        }
+      }
+
+      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      if (hasUnnumberedToken) {
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        if (occurrenceValues.length > 0) {
+          text = replaceUnnumberedFormuleringTokensByOccurrence(text, occurrenceValues);
+        } else {
+          const v0 = resolveFormuleringForPreviewAndCopy(
+            0,
+            (formuleringByIndex[0] ?? "").trim(),
+            selectedContent,
+          );
+          if (v0) {
+            text = replaceFormuleringTokenByIndex(text, 0, v0);
+          }
+        }
       }
     }
 
@@ -1349,6 +1523,22 @@ export default function StandardTekstPage() {
     }
   };
 
+  const toggleStandardTekstActive = async (id: string, isActive: boolean) => {
+    if (!canManageStandardTekster) return;
+
+    await standardTeksterApi.update(id, { isActive }, actor);
+
+    setItems((prev) => {
+      const next = prev.map((it) => (it.id === id ? { ...it, isActive } : it));
+      if (!isActive && selectedId === id) {
+        const nextActive = next.find((it) => it.id !== id && it.isActive !== false);
+        setSelectedId(nextActive?.id ?? null);
+        setIsEditing(false);
+      }
+      return next;
+    });
+  };
+
   return (
     <Box className={styles.page}>
       {errorToShow && (
@@ -1402,6 +1592,7 @@ export default function StandardTekstPage() {
             setSearch={setSearch}
             loading={loading}
             filtered={filtered}
+            onToggleActive={toggleStandardTekstActive}
             selectedId={selectedId}
             setSelectedId={(id) => setSelectedId(id)}
             searchInputRef={standardTekstSearchInputRef}
@@ -1938,10 +2129,17 @@ export default function StandardTekstPage() {
                   const indices = getFormuleringTokenIndices(activeTemplateContent);
                   const arr: string[] = [];
                   for (const i of indices) {
-                    arr[i] = (formuleringByIndex[i] ?? "").trim();
+                    arr[i] = resolveFormuleringForPreviewAndCopy(
+                      i,
+                      (formuleringByIndex[i] ?? "").trim(),
+                      activeTemplateContent,
+                    );
                   }
                   return arr;
                 })(),
+                formuleringOccurrenceValues: buildUnnumberedFormuleringOccurrenceValues(
+                  activeTemplateContent,
+                ),
               },
             )}
             editorTools={

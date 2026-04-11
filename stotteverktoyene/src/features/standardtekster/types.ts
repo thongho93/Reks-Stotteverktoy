@@ -10,6 +10,7 @@ export type UpdateStandardTekstDto = {
   category?: string;
   content?: string;
   followUps?: StandardTekstFollowUp[];
+  isActive?: boolean;
 };
 
 export type CreateStandardTekstDto = {
@@ -24,6 +25,7 @@ export type StandardTekst = {
   title: string;
   category?: string;
   content: string;
+  isActive?: boolean;
   followUps?: StandardTekstFollowUp[];
   createdByName?: string;
   updatedByName?: string;

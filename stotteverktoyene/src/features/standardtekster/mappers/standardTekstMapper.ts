@@ -30,12 +30,21 @@ export function mapDocToStandardTekst(id: string, data: Record<string, unknown>)
 
   const followUpsRaw = data["followUps"] ?? data["follow_ups"];
   const followUps = Array.isArray(followUpsRaw) ? (followUpsRaw as unknown[]) : undefined;
+  const explicitIsActive = data["isActive"];
+  const explicitIsInactive = data["isInactive"] ?? data["deactivated"];
+  const isActive =
+    typeof explicitIsActive === "boolean"
+      ? explicitIsActive
+      : typeof explicitIsInactive === "boolean"
+        ? !explicitIsInactive
+        : true;
 
   return {
     id,
     title,
     category: category || undefined,
     content,
+    isActive,
     followUps: followUps as any,
     createdByName,
     updatedByName,

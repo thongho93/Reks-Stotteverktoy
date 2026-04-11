@@ -5,11 +5,13 @@ import {
   CircularProgress,
   Collapse,
   Divider,
+  FormControlLabel,
   InputAdornment,
   List,
   ListItemButton,
   ListItemText,
   Paper,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -22,6 +24,7 @@ import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import IconButton from "@mui/material/IconButton";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import ClearIcon from "@mui/icons-material/Clear";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
@@ -74,6 +77,7 @@ type Props = {
 
   loading: boolean;
   filtered: StandardTekst[];
+  onToggleActive?: (id: string, isActive: boolean) => Promise<void> | void;
 
   selectedId: string | null;
   setSelectedId: (id: string) => void;
@@ -214,6 +218,7 @@ export default function StandardTekstSidebar({
   setSearch,
   loading,
   filtered,
+  onToggleActive,
   selectedId,
   setSelectedId,
   searchInputRef,
@@ -266,6 +271,8 @@ export default function StandardTekstSidebar({
   // Category hide/show state (persisted locally)
   const [hiddenCategories, setHiddenCategories] = useState<Record<string, boolean>>({});
   const [hiddenHydrated, setHiddenHydrated] = useState(false);
+  const [showInactive, setShowInactive] = useState<boolean>(false);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
 
   // Hydrate expand/collapse state from localStorage on mount
   useEffect(() => {
@@ -365,13 +372,17 @@ export default function StandardTekstSidebar({
   };
 
   const isSearching = search.trim().length > 0;
+  const visibleItems = useMemo(() => {
+    if (isAdmin && showInactive) return filtered;
+    return filtered.filter((it) => it.isActive !== false);
+  }, [filtered, isAdmin, showInactive]);
 
   // Sort items: favorites on top. Favorites are ordered by most used (clicks desc), then title.
   // Non-favorites are ordered by title.
   const sortedItems = useMemo(() => {
     const isSearchingNow = search.trim().length > 0;
 
-    return [...filtered].sort((a, b) => {
+    return [...visibleItems].sort((a, b) => {
       if (isSearchingNow) {
         const rankDiff = getSearchRank(a, search) - getSearchRank(b, search);
         if (rankDiff !== 0) return rankDiff;
@@ -393,7 +404,7 @@ export default function StandardTekstSidebar({
 
       return a.title.localeCompare(b.title, "nb");
     });
-  }, [filtered, favorites, search, usageById]);
+  }, [visibleItems, favorites, search, usageById]);
 
   // Group items by category, with favorites as a separate group on top
   const groupedByCategory = useMemo(() => {
@@ -600,6 +611,10 @@ export default function StandardTekstSidebar({
             label="Søk i standardtekster"
             value={search}
             inputRef={searchInputRef}
+            onFocus={() => {
+              // Reset search each time the field is re-activated.
+              setSearch("");
+            }}
             onChange={(e) => {
               const value = e.target.value;
               setSearch(value);
@@ -611,6 +626,13 @@ export default function StandardTekstSidebar({
               }
             }}
             onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setSearch("");
+                return;
+              }
+
               if (e.key !== "Enter") return;
 
               const topMatch = sortedItems[0];
@@ -692,9 +714,28 @@ export default function StandardTekstSidebar({
           </Box>
         </Box>
 
+        {isAdmin && (
+          <FormControlLabel
+            sx={{ m: 0, mt: 0.25 }}
+            control={
+              <Switch
+                size="small"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                disabled={disabled}
+              />
+            }
+            label={
+              <Typography variant="caption" color="text.secondary">
+                Vis deaktiverte
+              </Typography>
+            }
+          />
+        )}
+
         {search.trim() && (
           <Typography variant="subtitle2" color="text.secondary" className={styles.sidebarCount}>
-            {loading ? "Laster..." : `${filtered.length} treff`}
+            {loading ? "Laster..." : `${sortedItems.length} treff`}
           </Typography>
         )}
       </Box>
@@ -706,7 +747,7 @@ export default function StandardTekstSidebar({
           <Box className={styles.sidebarLoading}>
             <CircularProgress size={28} />
           </Box>
-        ) : filtered.length === 0 ? (
+        ) : sortedItems.length === 0 ? (
           <Box className={styles.sidebarEmpty}>
             <Typography variant="body2" color="text.secondary">
               Ingen treff.
@@ -845,8 +886,40 @@ export default function StandardTekstSidebar({
                           >
                             <ListItemText
                               primary={<TruncatedTitle title={it.title} />}
-                              secondary={undefined}
+                              secondary={it.isActive === false ? "Deaktivert" : undefined}
                             />
+
+                            {isAdmin && onToggleActive ? (
+                              <Tooltip
+                                title={it.isActive === false ? "Reaktiver standardtekst" : "Deaktiver standardtekst"}
+                                placement="top"
+                                arrow
+                              >
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    edge="end"
+                                    disabled={activatingId === it.id}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const nextActive = it.isActive === false;
+                                      try {
+                                        setActivatingId(it.id);
+                                        await onToggleActive(it.id, nextActive);
+                                      } finally {
+                                        setActivatingId(null);
+                                      }
+                                    }}
+                                  >
+                                    {it.isActive === false ? (
+                                      <VisibilityIcon fontSize="small" />
+                                    ) : (
+                                      <VisibilityOffIcon fontSize="small" />
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            ) : null}
 
                             <IconButton
                               size="small"

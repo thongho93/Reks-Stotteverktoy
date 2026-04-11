@@ -12,6 +12,7 @@ export function renderContentWithPreparatHighlight(
     virkestoffValue?: string;
     formuleringValue?: string;
     formuleringValues?: string[];
+    formuleringOccurrenceValues?: string[];
   }
 ) {
   const tokenSx = {
@@ -112,6 +113,7 @@ export function renderContentWithPreparatHighlight(
 
   const renderTokensInText = (t: string) => {
     if (!t) return t;
+    let formuleringOccurrenceIdx = 0;
 
     // Match both legacy {{...}} and plain tokens (no braces)
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
@@ -189,9 +191,15 @@ export function renderContentWithPreparatHighlight(
             const rawIdx = (formuleringMatch[1] ?? "").trim();
             const idx = rawIdx ? Number(rawIdx) : 0;
 
+            const occurrenceValue =
+              idx === 0
+                ? (opts?.formuleringOccurrenceValues?.[formuleringOccurrenceIdx] ?? "").trim()
+                : "";
+            if (idx === 0) formuleringOccurrenceIdx += 1;
+
             const listValue = (opts?.formuleringValues?.[idx] ?? "").trim();
             const singleValue = idx === 0 ? (opts?.formuleringValue ?? "").trim() : "";
-            const v = listValue || singleValue;
+            const v = occurrenceValue || listValue || singleValue;
 
             const tokenLabel = idx === 0 ? "FORMULERING" : `FORMULERING${idx}`;
             const label = v || tokenLabel;
