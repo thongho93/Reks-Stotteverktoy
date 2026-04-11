@@ -13,7 +13,6 @@ import {
   Chip,
   Divider,
 } from "@mui/material";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
@@ -330,61 +329,25 @@ export default function StandardTekstContent({
             sx={{
               display: "flex",
               alignItems: "flex-start",
-              justifyContent: "space-between",
-              gap: 1,
+              justifyContent: "flex-start",
             }}
           >
             <Typography variant="h2" className={styles.title} sx={{ mb: 1 }}>
               {selected.title}
             </Typography>
-
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 0.5,
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {!isEditing && !lockBeforeEdit && (
-                <Button
-                  size="small"
-                  variant="text"
-                  onClick={handleCopy}
-                  sx={{ minWidth: "auto", p: 0.5 }}
-                  aria-label="Kopier standardtekst"
-                >
-                  <ContentCopyIcon fontSize="small" />
-                </Button>
-              )}
-
-              {headerRight ? headerRight : null}
-            </Box>
           </Box>
+
+          {!isEditing && headerRight ? (
+            <Box sx={{ mb: 1.25 }} onClick={(e) => e.stopPropagation()}>
+              {headerRight}
+            </Box>
+          ) : null}
 
           {isAdmin && isEditing && (
             <Typography variant="body2" color="text.secondary" className={styles.category}>
               {selected.category}
             </Typography>
           )}
-
-          {selected.updatedAt && (
-            <Typography variant="caption" color="text.secondary" className={styles.updatedAt}>
-              Sist oppdatert: {selected.updatedAt.toLocaleString("nb-NO")}
-            </Typography>
-          )}
-
-          {isAdmin && selected.createdByName ? (
-            <Typography variant="caption" color="text.secondary" className={styles.updatedAt}>
-              Opprettet av: {selected.createdByName}
-            </Typography>
-          ) : null}
-
-          {isAdmin && selected.updatedByName ? (
-            <Typography variant="caption" color="text.secondary" className={styles.updatedAt}>
-              Sist oppdatert av: {selected.updatedByName}
-            </Typography>
-          ) : null}
 
           {isEditing ? (
             <>
@@ -477,50 +440,35 @@ export default function StandardTekstContent({
                       Innsettingsfelt:
                     </Typography>
 
-                    {TOKEN_OPTIONS.filter((t) => t.group === "PREPARAT").map((t) => (
-                      <Chip
-                        key={t.label}
-                        size="small"
-                        variant="outlined"
-                        label={`${t.label} – ${t.help ?? ""}`.trim()}
-                        clickable
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertTokenFromTextareaSelection(t.insert)}
-                      />
-                    ))}
+                    {(["PREPARAT", "TALL", "VARE", "ANNET"] as const).map((group, groupIndex) => {
+                      const groupTokens = TOKEN_OPTIONS.filter((t) => t.group === group);
+                      if (!groupTokens.length) return null;
 
-                    {TOKEN_OPTIONS.some((t) => t.group === "TALL" || t.group === "VARE") ? (
-                      <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} />
-                    ) : null}
-
-                    {TOKEN_OPTIONS.filter((t) => t.group === "TALL").map((t) => (
-                      <Chip
-                        key={t.label}
-                        size="small"
-                        variant="outlined"
-                        label={`${t.label} – ${t.help ?? ""}`.trim()}
-                        clickable
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertTokenFromTextareaSelection(t.insert)}
-                      />
-                    ))}
-
-                    {TOKEN_OPTIONS.some((t) => t.group === "TALL") &&
-                    TOKEN_OPTIONS.some((t) => t.group === "VARE") ? (
-                      <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} />
-                    ) : null}
-
-                    {TOKEN_OPTIONS.filter((t) => t.group === "VARE").map((t) => (
-                      <Chip
-                        key={t.label}
-                        size="small"
-                        variant="outlined"
-                        label={`${t.label}`.trim()}
-                        clickable
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertTokenFromTextareaSelection(t.insert)}
-                      />
-                    ))}
+                      return (
+                        <Box
+                          key={group}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 1,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {groupIndex > 0 ? <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} /> : null}
+                          {groupTokens.map((t) => (
+                            <Chip
+                              key={t.label}
+                              size="small"
+                              variant="outlined"
+                              label={t.label}
+                              clickable
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => insertTokenFromTextareaSelection(t.insert)}
+                            />
+                          ))}
+                        </Box>
+                      );
+                    })}
                   </Stack>
                 </Box>
 
@@ -638,40 +586,56 @@ export default function StandardTekstContent({
               </Typography>
               {belowContent}
 
-              {isAdmin && (
+              {(selected.updatedAt || isAdmin) && (
                 <Box
                   className={styles.editRowBottom}
-                  display="flex"
-                  gap={1}
-                  sx={{ position: "relative", zIndex: 2 }}
+                  sx={{
+                    position: "relative",
+                    zIndex: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1.25,
+                    flexWrap: "wrap",
+                  }}
                 >
-                  <Button
-                    variant="contained"
-                    size="small"
-                    color="primary"
-                    sx={{ color: "#fff" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStartEdit();
-                    }}
-                    className={styles.pillButton}
-                  >
-                    Rediger
-                  </Button>
+                  <Typography variant="caption" color="text.secondary">
+                    {selected.updatedAt
+                      ? `Sist oppdatert${selected.updatedByName ? ` av ${selected.updatedByName}` : ""}: ${selected.updatedAt.toLocaleDateString("nb-NO")}`
+                      : ""}
+                  </Typography>
 
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    color="error"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete();
-                    }}
-                    className={styles.pillButton}
-                    disabled={saving || deleting}
-                  >
-                    Slett
-                  </Button>
+                  {isAdmin && (
+                    <Box display="flex" gap={1}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="primary"
+                        sx={{ color: "#fff" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStartEdit();
+                        }}
+                        className={styles.pillButton}
+                      >
+                        Rediger
+                      </Button>
+
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete();
+                        }}
+                        className={styles.pillButton}
+                        disabled={saving || deleting}
+                      >
+                        Slett
+                      </Button>
+                    </Box>
+                  )}
                 </Box>
               )}
             </>

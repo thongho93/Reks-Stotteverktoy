@@ -8,6 +8,7 @@ export function renderContentWithPreparatHighlight(
     tallValues?: string[];
     datoValue?: string;
     datoMndValue?: string;
+    klokkeslettDagValue?: string;
     virkestoffValue?: string;
     formuleringValue?: string;
     formuleringValues?: string[];
@@ -113,9 +114,9 @@ export function renderContentWithPreparatHighlight(
     if (!t) return t;
 
     // Match both legacy {{...}} and plain tokens (no braces)
-    // Supports: TALL, TALL1, TALL2... and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
+    // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{\s*(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
+      /(\{\{\s*(?:TALL\d*|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
     );
     if (parts.length <= 1) return t;
 
@@ -131,6 +132,19 @@ export function renderContentWithPreparatHighlight(
             const v = (opts?.tallValues?.[idx] ?? "").trim();
             const tokenLabel = idx === 0 ? "TALL" : `TALL${idx}`;
             const label = v || tokenLabel;
+
+            return (
+              <Box key={i} component="span" sx={placeholderTallSx}>
+                {label}
+              </Box>
+            );
+          }
+
+          // KLOKKESLETT_DAG / {{KLOKKESLETT_DAG}}
+          const klokkeslettMatch = part.match(/^(?:\{\{\s*)?KLOKKESLETT_DAG(?:\s*\}\})?$/i);
+          if (klokkeslettMatch) {
+            const v = (opts?.klokkeslettDagValue ?? "").trim();
+            const label = v || "KLOKKESLETT_DAG";
 
             return (
               <Box key={i} component="span" sx={placeholderTallSx}>

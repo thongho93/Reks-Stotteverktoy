@@ -258,7 +258,9 @@
   flex: 1;
   min-height: 75%;
   overflow: visible;
-  margin-top: 12px;
+  margin: 12px 0 0;
+  width: 100%;
+  max-width: 940px;
 }
 
 @media (min-width: 900px) {
@@ -304,7 +306,7 @@
   white-space: pre-wrap;
   line-height: 1.45; /* tettere linjeavstand */
   max-width: none;
-  width: 80%;
+  width: 100%;
   margin: 0;
   padding-top: 6px; /* litt mindre luft på toppen */
 }

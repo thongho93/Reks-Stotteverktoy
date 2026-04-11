@@ -466,6 +466,24 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   return text.replace(re, safeValue);
 }
 
+export function templateHasKlokkeslettDagToken(text: string): boolean {
+  return /\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/i.test(text ?? "");
+}
+
+export function replaceKlokkeslettDagTokens(text: string, value: string): string {
+  if (!text) return text;
+  return text.replace(/\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/gi, value ?? "");
+}
+
+export function migrateLegacyClockTallTokens(text: string): string {
+  if (!text) return text;
+  // Migrate legacy templates like "klokken TALL" / "kl TALL1" to the explicit clock token.
+  return text.replace(
+    /\b(klokken|kl)\.?\s+(?:\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b)/gi,
+    (_m, prefix: string) => `${prefix} KLOKKESLETT_DAG`,
+  );
+}
+
 // New helpers for DATO tokens
 export function replaceNextDatoToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
@@ -775,6 +793,7 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat", group: "PREPARAT" },
   { label: "VIRKESTOFF", insert: "VIRKESTOFF", help: "Virkestoff fra valgt preparat", group: "PREPARAT" },
   { label: "FORMULERING", insert: "FORMULERING", help: "Fri tekst (f.eks. tablett/kapsel/nesespray)", group: "ANNET" },
+  { label: "KLOKKESLETT_DAG", insert: "KLOKKESLETT_DAG", help: "Klokkeslett med dag (f.eks. 11 i dag)", group: "ANNET" },
 
   { label: "TALL", insert: "TALL", help: "Første tall", group: "TALL" },
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },

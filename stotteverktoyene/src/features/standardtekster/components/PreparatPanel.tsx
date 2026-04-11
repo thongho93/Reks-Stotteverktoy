@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -50,6 +51,26 @@ type Props = {
   onRemove: (id: PreparatRowId) => void;
 };
 
+type PickPayload = {
+  text: string;
+  key: string;
+  virkestoff?: string;
+  formulering?: string;
+  rowData?: {
+    baseText?: string | null;
+    fullName?: string | null;
+    manufacturer?: string | null;
+    packSize?: string | null;
+  };
+};
+
+type RecentSuggestion = {
+  key: string;
+  name: string;
+  varenummer: string;
+  payload: PickPayload;
+};
+
 export default function PreparatPanel({
   preparatRows,
   clearOnCopy = false,
@@ -64,6 +85,55 @@ export default function PreparatPanel({
   onRemove,
 }: Props) {
   const hasPicked = preparatRows.some((r) => r.picked);
+  const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>([]);
+
+  const pushRecentSuggestion = (entry: RecentSuggestion) => {
+    setRecentSuggestions((prev) => {
+      const deduped = prev.filter((item) => item.key !== entry.key);
+      return [entry, ...deduped].slice(0, 10);
+    });
+  };
+
+  const applyPickPayload = (payload: PickPayload) => {
+    onPickText(payload);
+    const nameForChip = payload.rowData?.baseText?.trim() || payload.text.trim();
+    const varenummerForChip = String(payload.key ?? "").trim();
+    if (!nameForChip || !varenummerForChip) return;
+
+    pushRecentSuggestion({
+      key: varenummerForChip,
+      name: nameForChip,
+      varenummer: varenummerForChip,
+      payload,
+    });
+  };
+
+  const suggestionChips = useMemo(
+    () =>
+      recentSuggestions.map((item) => (
+        <Chip
+          key={item.key}
+          variant="outlined"
+          size="small"
+          label={`${item.name} (${item.varenummer})`}
+          onClick={() => applyPickPayload(item.payload)}
+          sx={{
+            width: "100%",
+            justifyContent: "flex-start",
+            "& .MuiChip-label": {
+              width: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontSize: "0.72rem",
+              px: 0.75,
+            },
+            height: 20,
+          }}
+        />
+      )),
+    [recentSuggestions],
+  );
 
   const deriveFormuleringPlural = (m: any): string => {
     const texts = [
@@ -117,19 +187,27 @@ export default function PreparatPanel({
   };
 
   return (
-    <Paper className={styles.preparatPaper}>
-      <Box className={styles.preparatHeader}>
-        <Typography variant="subtitle2" className={styles.preparatTitle}>
-          Preparater
-        </Typography>
-      </Box>
+    <Box
+      sx={{
+        display: "grid",
+        gap: 1,
+        gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 300px" },
+        alignItems: { xs: "start", lg: "stretch" },
+      }}
+    >
+      <Paper className={styles.preparatPaper}>
+        <Box className={styles.preparatHeader}>
+          <Typography variant="subtitle2" className={styles.preparatTitle}>
+            Preparater
+          </Typography>
+        </Box>
 
-      <Stack
-        direction="row"
-        spacing={1}
-        alignItems="flex-start"
-        className={styles.preparatSearchRow}
-      >
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="flex-start"
+          className={styles.preparatSearchRow}
+        >
         <Box className={styles.preparatSingleSearch} style={{ flex: 1 }}>
           <MedicationSearch
             inputRef={inputRef}
@@ -236,7 +314,7 @@ export default function PreparatPanel({
               const virkestoff = deriveVirkestoff(med);
               const formulering = deriveFormuleringPlural(med);
 
-              onPickText({
+              applyPickPayload({
                 text,
                 key,
                 virkestoff: virkestoff || undefined,
@@ -271,17 +349,18 @@ export default function PreparatPanel({
         >
           Tøm
         </Button>
-      </Stack>
 
-      <Box
-        sx={{
-          mt: 1,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 1.5,
-          alignItems: "center",
-        }}
-      >
+        </Stack>
+
+        <Box
+          sx={{
+            mt: 1,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1.5,
+            alignItems: "center",
+          }}
+        >
         <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
           <FormControlLabel
             sx={{ m: 0 }}
@@ -323,26 +402,59 @@ export default function PreparatPanel({
             label={<Typography variant="caption">Vis pakningsstørrelse</Typography>}
           />
         </Tooltip>
-      </Box>
+        </Box>
 
-      <Box className={styles.preparatChipsWrap}>
-        {preparatRows
-          .filter((r) => r.picked)
-          .map((r) => (
-            <Chip
-              key={String(r.id)}
-              label={r.picked as string}
-              onDelete={() => onRemove(r.id)}
-              className={styles.preparatChip}
-            />
-          ))}
-      </Box>
+        <Box className={styles.preparatChipsWrap}>
+          {preparatRows
+            .filter((r) => r.picked)
+            .map((r) => (
+              <Chip
+                key={String(r.id)}
+                label={r.picked as string}
+                onDelete={() => onRemove(r.id)}
+                className={styles.preparatChip}
+              />
+            ))}
+        </Box>
 
-      <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
-        <span className={styles.preparatHintTip}>
-          Tips: Skriv eller lim inn varenummer – søket rydder opp automatisk.
-        </span>
-      </Typography>
-    </Paper>
+        <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
+          <span className={styles.preparatHintTip}>
+            Tips: Skriv eller lim inn varenummer – søket rydder opp automatisk.
+          </span>
+        </Typography>
+      </Paper>
+
+      <Paper
+        className={styles.preparatPaper}
+        sx={{
+          p: 1.25,
+          display: "flex",
+          flexDirection: "column",
+          gap: 0.75,
+          height: { xs: "auto", lg: "100%" },
+        }}
+      >
+        <Typography variant="subtitle2">De siste 10 søkene</Typography>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 0.35,
+            maxHeight: { xs: 120, lg: 170 },
+            overflowY: "auto",
+            overflowX: "hidden",
+            pr: 0.25,
+          }}
+        >
+          {suggestionChips.length > 0 ? (
+            suggestionChips
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              Ingen nylige søk.
+            </Typography>
+          )}
+        </Box>
+      </Paper>
+    </Box>
   );
 }
