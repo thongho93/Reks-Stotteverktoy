@@ -435,6 +435,7 @@ export default function StandardTekstPage() {
   const [clockCustomMode, setClockCustomMode] = useState<boolean>(false);
   const [datoInput, setDatoInput] = useState<string>("");
   const [formuleringByIndex, setFormuleringByIndex] = useState<Record<number, string>>({ 0: "" });
+  const [formuleringByPreparatKey, setFormuleringByPreparatKey] = useState<Record<string, string>>({});
   const templateHasVirkestoffToken = (template: string) => /\bVIRKESTOFF\b/.test(template ?? "");
   const templateHasFormuleringTokens = (template: string) =>
     /\{\{\s*FORMULERING\d*\s*\}\}|\bFORMULERING\d*\b/i.test(template ?? "");
@@ -518,23 +519,118 @@ export default function StandardTekstPage() {
     return occurrences;
   }, []);
 
+  const getUnnumberedFormuleringOccurrenceCount = useCallback((template: string): number => {
+    const re = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi;
+    let count = 0;
+    while (re.exec(template ?? "")) count += 1;
+    return count;
+  }, []);
+
+  const getUnnumberedFormuleringPreparatPositions = useCallback(
+    (template: string): Array<number | null> => {
+      const positions: Array<number | null> = [];
+      let currentPreparatPosition: number | null = null;
+      const re = /\{\{\s*(PREPARAT\d*|FORMULERING)\s*\}\}|\b(PREPARAT\d*|FORMULERING)\b/gi;
+      let m: RegExpExecArray | null;
+
+      while ((m = re.exec(template ?? ""))) {
+        const token = String(m[1] ?? m[2] ?? "").trim().toUpperCase();
+        if (!token) continue;
+
+        if (token.startsWith("PREPARAT")) {
+          const rawIndex = token.slice("PREPARAT".length).trim();
+          if (!rawIndex) {
+            currentPreparatPosition = 0;
+          } else {
+            const n = Number(rawIndex);
+            currentPreparatPosition = Number.isFinite(n) && n > 0 ? n - 1 : 0;
+          }
+          continue;
+        }
+
+        if (token === "FORMULERING") {
+          positions.push(currentPreparatPosition);
+        }
+      }
+
+      return positions;
+    },
+    [],
+  );
+
   const buildUnnumberedFormuleringOccurrenceValues = useCallback(
     (template: string): string[] => {
-      if (!templateHasTallToken(template)) return [];
-      const raw = (formuleringByIndex[0] ?? "").trim();
-      if (!raw) return [];
+      const manualRaw = (formuleringByIndex[0] ?? "").trim();
+      const occurrenceCount = getUnnumberedFormuleringOccurrenceCount(template);
+      if (!occurrenceCount) return [];
+      const formuleringPreparatPositions = getUnnumberedFormuleringPreparatPositions(template);
 
-      const tallOccurrences = getTallTokenOccurrences(template);
-      if (!tallOccurrences.length) return [];
+      const hasTallTokens = templateHasTallToken(template);
+      const tallOccurrences = hasTallTokens ? getTallTokenOccurrences(template) : [];
 
-      return tallOccurrences.map((idx) => {
-        const numeric = getTallNumericValue(idx);
-        if (numeric === 1) return toSingularFormulering(raw);
-        if (numeric !== null && numeric > 1) return toPluralFormulering(raw);
+      const getRawFromPreparatPosition = (position: number | null | undefined): string => {
+        if (position === null || position === undefined || position < 0) return "";
+        const row = (preparatRows as any[])[position];
+        const key = String(row?.pickedKey ?? row?.picked ?? "").trim();
+        if (!key) return "";
+        return (formuleringByPreparatKey[key] ?? "").trim();
+      };
+
+      return Array.from({ length: occurrenceCount }, (_, occurrenceIdx) => {
+        const preparatPosition = formuleringPreparatPositions[occurrenceIdx] ?? null;
+        const raw =
+          getRawFromPreparatPosition(preparatPosition) ||
+          getRawFromPreparatPosition(occurrenceIdx) ||
+          manualRaw;
+        if (!raw) return "";
+
+        if (hasTallTokens) {
+          const tallIdx = tallOccurrences[occurrenceIdx];
+          if (typeof tallIdx === "number") {
+            const numeric = getTallNumericValue(tallIdx);
+            if (numeric === 1) return toSingularFormulering(raw);
+            if (numeric !== null && numeric > 1) return toPluralFormulering(raw);
+          }
+        }
+
         return raw;
       });
     },
-    [formuleringByIndex, getTallNumericValue, getTallTokenOccurrences],
+    [
+      formuleringByIndex,
+      formuleringByPreparatKey,
+      getTallNumericValue,
+      getTallTokenOccurrences,
+      getUnnumberedFormuleringOccurrenceCount,
+      getUnnumberedFormuleringPreparatPositions,
+      preparatRows,
+    ],
+  );
+
+  const getFormuleringForPreparatPosition = useCallback(
+    (position: number): string => {
+      if (position < 0) return "";
+      const row = (preparatRows as any[])[position];
+      const key = String(row?.pickedKey ?? row?.picked ?? "").trim();
+      if (!key) return "";
+      return (formuleringByPreparatKey[key] ?? "").trim();
+    },
+    [formuleringByPreparatKey, preparatRows],
+  );
+
+  const resolveFormuleringTokenValue = useCallback(
+    (index: number, template: string): string => {
+      const manual = (formuleringByIndex[index] ?? "").trim();
+      const byPreparat = index === 0
+        ? getFormuleringForPreparatPosition(0)
+        : getFormuleringForPreparatPosition(index - 1);
+
+      const raw = manual || byPreparat;
+      if (!raw) return "";
+
+      return resolveFormuleringForPreviewAndCopy(index, raw, template);
+    },
+    [formuleringByIndex, getFormuleringForPreparatPosition, resolveFormuleringForPreviewAndCopy],
   );
 
   const replaceUnnumberedFormuleringTokensByOccurrence = useCallback(
@@ -822,6 +918,7 @@ export default function StandardTekstPage() {
     if (shouldApplyOmeqPrefill && selected && pending) {
       resetPreparatRows();
       setVirkestoffByKey({});
+      setFormuleringByPreparatKey({});
 
       for (const preparat of pending.preparats) {
         addPickedPreparat(preparat, preparat);
@@ -847,6 +944,7 @@ export default function StandardTekstPage() {
     } else if (!shouldProtectCurrentSelection && !preserveInputsOnNextSelectRef.current) {
       resetPreparatRows();
       setVirkestoffByKey({});
+      setFormuleringByPreparatKey({});
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
@@ -1285,9 +1383,26 @@ export default function StandardTekstPage() {
     }
     if (templateHasFormuleringTokens(selectedContent)) {
       const indices = getFormuleringTokenIndices(selectedContent);
-      const missing = indices.filter((i) => !(formuleringByIndex[i] ?? "").trim());
-      if (missing.length) {
-        const label = missing.map((i) => (i === 0 ? "FORMULERING" : `FORMULERING${i}`)).join(", ");
+      const missingLabels = new Set<string>();
+
+      for (const idx of indices.filter((i) => i > 0)) {
+        if (!resolveFormuleringTokenValue(idx, selectedContent)) {
+          missingLabels.add(`FORMULERING${idx}`);
+        }
+      }
+
+      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      if (hasUnnumberedToken) {
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        if (!occurrenceValues.length || occurrenceValues.some((value) => !value.trim())) {
+          missingLabels.add("FORMULERING");
+        }
+      } else if (indices.includes(0) && !resolveFormuleringTokenValue(0, selectedContent)) {
+        missingLabels.add("FORMULERING");
+      }
+
+      if (missingLabels.size) {
+        const label = Array.from(missingLabels).join(", ");
         setErrorLocal(`Fyll inn formulering før du kopierer teksten: ${label}.`);
         return;
       }
@@ -1361,11 +1476,7 @@ export default function StandardTekstPage() {
 
       if (hasNumbered) {
         for (const idx of indices.filter((i) => i > 0)) {
-          const v = resolveFormuleringForPreviewAndCopy(
-            idx,
-            (formuleringByIndex[idx] ?? "").trim(),
-            selectedContent,
-          );
+          const v = resolveFormuleringTokenValue(idx, selectedContent);
           if (!v) continue;
           text = replaceFormuleringTokenByIndex(text, idx, v);
         }
@@ -1377,11 +1488,7 @@ export default function StandardTekstPage() {
         if (occurrenceValues.length > 0) {
           text = replaceUnnumberedFormuleringTokensByOccurrence(text, occurrenceValues);
         } else {
-          const v0 = resolveFormuleringForPreviewAndCopy(
-            0,
-            (formuleringByIndex[0] ?? "").trim(),
-            selectedContent,
-          );
+          const v0 = resolveFormuleringTokenValue(0, selectedContent);
           if (v0) {
             text = replaceFormuleringTokenByIndex(text, 0, v0);
           }
@@ -1399,6 +1506,7 @@ export default function StandardTekstPage() {
       if (clearOnCopy) {
         clearPreparats();
         setVirkestoffByKey({});
+        setFormuleringByPreparatKey({});
 
         if (templateHasTallToken(selectedContent)) {
           setTallByIndex(buildInitialTallValues(selectedContent));
@@ -1449,6 +1557,7 @@ export default function StandardTekstPage() {
         if (clearOnCopy) {
           clearPreparats();
           setVirkestoffByKey({});
+          setFormuleringByPreparatKey({});
 
           if (templateHasTallToken(selectedContent)) {
             setTallByIndex(buildInitialTallValues(selectedContent));
@@ -1683,6 +1792,12 @@ export default function StandardTekstPage() {
                     }
 
                     const formulering = String((pick as any)?.formulering ?? "").trim();
+                    if (formulering && key) {
+                      setFormuleringByPreparatKey((prev) => ({
+                        ...prev,
+                        [String(key)]: formulering,
+                      }));
+                    }
                     if (formulering && selected && templateHasFormuleringTokens(activeTemplateContent)) {
                       const tokenIndices = getFormuleringTokenIndices(activeTemplateContent);
                       if (tokenIndices.length > 0) {
@@ -1709,6 +1824,7 @@ export default function StandardTekstPage() {
                 onClear={() => {
                   clearPreparats();
                   setVirkestoffByKey({});
+                  setFormuleringByPreparatKey({});
                 }}
                 onRemove={(id) => {
                   const numericId = typeof id === "number" ? id : Number(id);
@@ -1718,6 +1834,11 @@ export default function StandardTekstPage() {
                   const pickedKey = String(row?.pickedKey ?? row?.picked ?? "").trim();
                   if (pickedKey) {
                     setVirkestoffByKey((prev) => {
+                      const next = { ...prev };
+                      delete next[pickedKey];
+                      return next;
+                    });
+                    setFormuleringByPreparatKey((prev) => {
                       const next = { ...prev };
                       delete next[pickedKey];
                       return next;
@@ -2129,11 +2250,7 @@ export default function StandardTekstPage() {
                   const indices = getFormuleringTokenIndices(activeTemplateContent);
                   const arr: string[] = [];
                   for (const i of indices) {
-                    arr[i] = resolveFormuleringForPreviewAndCopy(
-                      i,
-                      (formuleringByIndex[i] ?? "").trim(),
-                      activeTemplateContent,
-                    );
+                    arr[i] = resolveFormuleringTokenValue(i, activeTemplateContent);
                   }
                   return arr;
                 })(),

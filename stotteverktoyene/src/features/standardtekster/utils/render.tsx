@@ -15,6 +15,8 @@ export function renderContentWithPreparatHighlight(
     formuleringOccurrenceValues?: string[];
   }
 ) {
+  let formuleringOccurrenceIdx = 0;
+
   const tokenSx = {
     display: "inline-flex",
     alignItems: "center",
@@ -113,7 +115,6 @@ export function renderContentWithPreparatHighlight(
 
   const renderTokensInText = (t: string) => {
     if (!t) return t;
-    let formuleringOccurrenceIdx = 0;
 
     // Match both legacy {{...}} and plain tokens (no braces)
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
