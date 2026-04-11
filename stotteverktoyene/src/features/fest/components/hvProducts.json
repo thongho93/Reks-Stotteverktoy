@@ -1,66 +1,127 @@
 [
   {
     "name": "Budenofalk stikkpille 4mg 30",
-    "farmaloggNumber": "128923"
+    "farmaloggNumber": "128923",
+    "atc": "A07EA06",
+    "virkestoff": "Budesonid",
+    "produsent": "Vifor Pharma Nordiska AB",
+    "id": "ID_EACB20F6-8D1B-47B5-9F70-1C27013BFFA4"
   },
   {
     "name": "Litfulo kaps 50mg 30",
-    "farmaloggNumber": "384770"
+    "farmaloggNumber": "384770",
+    "atc": "L04AF08",
+    "virkestoff": "Ritlecitinib",
+    "produsent": "Pfizer",
+    "id": "ID_04281A28-7562-4771-BC97-91DB122F0D8F"
   },
   {
     "name": "Atomoxetine Stada kaps 40 mg 30",
-    "farmaloggNumber": "344590"
+    "farmaloggNumber": "344590",
+    "atc": "N06BA09",
+    "virkestoff": "Atomoksetin",
+    "produsent": "Stada",
+    "id": "ID_112ED061-90E8-4691-B66E-477F596A36CC"
   },
   {
     "name": "IsoGalen kaps 10mg 30",
-    "farmaloggNumber": "273969"
+    "farmaloggNumber": "273969",
+    "atc": "D10BA01",
+    "virkestoff": "Isotretinoin",
+    "produsent": "Galen Pharma",
+    "id": "ID_6FCA0818-8EE8-4163-88F3-7790D235BD81"
   },
   {
     "name": "Liothyronine sigpha tab 5mcg 90",
-    "farmaloggNumber": "292863"
+    "farmaloggNumber": "292863",
+    "atc": "H03AA02",
+    "virkestoff": "Liotyroninnatrium",
+    "produsent": "sigmapharm",
+    "id": "ID_F8336510-0AEF-40AC-94C3-85548DA2C6E8"
   },
   {
     "name": "Estradiol hex dpl 100mcg/24t 24 24 stk. Plaster",
-    "farmaloggNumber": "468928"
+    "farmaloggNumber": "468928",
+    "atc": "G03CA03",
+    "virkestoff": "Østradiol",
+    "produsent": "Hexal",
+    "id": "ID_2B7FD35B-D604-4221-9DF1-BB33B34FA269"
   },
   {
     "name": "Estradiol hex dpl 75mcg/24t 24 24 stk. Plaster",
-    "farmaloggNumber": "555785"
+    "farmaloggNumber": "555785",
+    "atc": "G03CA03",
+    "virkestoff": "Østradiol",
+    "id": "ID_0AD12CB1-03D7-4A82-8A9E-E606EAB208F0"
   },
   {
     "name": "Estradiol hex dpl 50mcg/24t 24stk",
-    "farmaloggNumber": "427809"
+    "farmaloggNumber": "427809",
+    "atc": "G03CA03",
+    "virkestoff": "Østradiol",
+    "produsent": "Hexal",
+    "id": "ID_BD866A68-3749-43BA-B362-20E42CA2D5C1"
   },
   {
     "name": "Penomax 200mg 9 pakning",
-    "farmaloggNumber": "384407"
+    "farmaloggNumber": "384407",
+    "atc": "J01CA08",
+    "virkestoff": "Pivmecillinam",
+    "id": "ID_C47832F2-333E-4B01-9F62-325BA5C3B7EE"
   },
   {
     "name": "Atomoxetine stada kaps 18 mg",
-    "farmaloggNumber": "335175"
+    "farmaloggNumber": "335175",
+    "atc": "N06BA09",
+    "virkestoff": "Atomoksetin",
+    "produsent": "Stada",
+    "id": "ID_04868FA1-DE69-4C83-A993-FF5FBA471046"
   },
   {
     "name": "Atomoxetine stada kaps 80 mg",
-    "farmaloggNumber": "301269"
+    "farmaloggNumber": "301269",
+    "atc": "N06BA09",
+    "virkestoff": "Atomoksetin",
+    "produsent": "Stada",
+    "id": "ID_5EB92099-F2C5-4B61-AAE7-EF9816555213"
   },
   {
     "name": "Atomoxetine stada kaps 10 mg",
-    "farmaloggNumber": "219265"
+    "farmaloggNumber": "219265",
+    "atc": "N06BA09",
+    "virkestoff": "Atomoksetin",
+    "produsent": "Stada",
+    "id": "ID_6F2DBEE3-753E-456B-B27B-AD4628602910"
   },
   {
     "name": "Atomoxetine stada kaps 25 mg",
-    "farmaloggNumber": "248639"
+    "farmaloggNumber": "248639",
+    "atc": "N06BA09",
+    "virkestoff": "Atomoksetin",
+    "produsent": "Stada",
+    "id": "ID_C2E10623-0F7F-4712-AC6F-A41198C5903A"
   },
   {
     "name": "Obgemsa 75mg",
-    "farmaloggNumber": "44565"
+    "farmaloggNumber": "44565",
+    "atc": "G04D15",
+    "virkestoff": "Vibegron",
+    "id": "ID_A47BB028-8C8F-47F0-BB51-A24EE67023B7"
   },
   {
     "name": "Quetiapine scieg deptab 400 mg",
-    "farmaloggNumber": "244633"
+    "farmaloggNumber": "244633",
+    "atc": "N05AH04",
+    "virkestoff": "Kvetiapin",
+    "produsent": "Scieg",
+    "id": "ID_871F583D-B90C-4FB9-8B6A-875D2CCFDA5D"
   },
   {
     "name": "Emtricitabine​/​Tenofovir disoproxil Krka 200 mg/245 mg",
-    "farmaloggNumber": "455223"
+    "farmaloggNumber": "455223",
+    "atc": "J05AR03",
+    "virkestoff": "(Emtricitabin, Tenofovirdisoproksil)",
+    "produsent": "Krka",
+    "id": "ID_A0674A6C-4DF1-4464-A1B6-C2873289AF91"
   }
 ]

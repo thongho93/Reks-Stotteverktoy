@@ -347,7 +347,9 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       varenavnTokens: toTokens(varenavnText),
       substanceTokens: toTokens(substanceText),
       hayTokens: toTokens(searchText),
-      dedupKey: buildDedupKeyFromFields(nameText, substanceText),
+      dedupKey: input.farmaloggNumber
+        ? `farmalogg:${normalizeIdToken(input.farmaloggNumber)}`
+        : buildDedupKeyFromFields(nameText, substanceText),
     };
   };
 
@@ -386,6 +388,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
           undefined,
         prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
         manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
+        externalId: (p as any).id ?? undefined,
       }))
     );
 
@@ -407,6 +410,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
           undefined,
         prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
         manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
+        externalId: (p as any).id ?? undefined,
       }))
     ).map((item) => ({
       ...item,
@@ -528,7 +532,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         navnFormStyrke: item.nameFormStrength ?? item.displayName ?? item.name ?? null,
         atc: item.atc ?? fallbackMeta.atc ?? null,
         virkestoff: item.substance ?? fallbackMeta.virkestoff ?? null,
-        produsent: (item as any).manufacturer ?? null,
+        produsent: item.manufacturer ?? null,
         reseptgruppe: item.prescriptionGroup ?? fallbackMeta.reseptgruppe ?? null,
         searchText: item.searchText,
       });
@@ -1004,6 +1008,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
                     const secondaryParts = [
                       `Virkestoff: ${m.virkestoff?.trim() || "-"}`,
                       `ATC: ${m.atc?.trim() || "-"}`,
+                      `Produsent: ${m.produsent?.trim() || "-"}`,
                       `Reseptgruppe: ${m.reseptgruppe?.trim() || "-"}`,
                     ];
 
