@@ -29,11 +29,20 @@
 }
 
 .header {
-  margin-bottom: 10px;
+  margin-bottom: 4px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pageFooter {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 14px;
 }
 
 .pillButton {
@@ -83,12 +92,12 @@
 @media (min-width: 900px) {
   .sidebar {
     position: sticky;
-    top: 12px;
+    top: 0;
     align-self: start;
     justify-self: stretch;
     width: 100%;
     box-sizing: border-box;
-    max-height: calc(100vh - 24px);
+    max-height: 100vh;
   }
 
   .sidebarResizeHandle {
@@ -96,9 +105,9 @@
     align-self: start;
     justify-self: stretch;
     position: sticky;
-    top: 12px;
-    height: calc(100vh - 24px);
-    min-height: calc(100vh - 24px);
+    top: 0;
+    height: 100vh;
+    min-height: 100vh;
     cursor: col-resize;
     user-select: none;
     touch-action: none;
@@ -220,7 +229,7 @@
 }
 
 .preparatPaper {
-  padding: 12px;
+  padding: 10px;
 }
 
 .preparatMaxWidth {
@@ -258,7 +267,7 @@
   flex: 1;
   min-height: 75%;
   overflow: visible;
-  margin: 12px 0 0;
+  margin: 4px 0 0;
   width: 100%;
   max-width: 940px;
 }
@@ -413,7 +422,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .preparatTitle {
@@ -441,7 +450,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .preparatChip {
@@ -450,11 +459,11 @@
 
 .preparatSearchRow {
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
 }
 
 .preparatHint {
-  margin-top: 10px;
+  margin-top: 6px;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;

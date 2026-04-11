@@ -352,7 +352,7 @@ export default function PreparatPanel({
 
         <Box
           sx={{
-            mt: 1,
+            mt: 0.75,
             display: "flex",
             flexWrap: "wrap",
             gap: 1.5,
@@ -415,17 +415,12 @@ export default function PreparatPanel({
             ))}
         </Box>
 
-        <Typography variant="caption" color="text.secondary" className={styles.preparatHint}>
-          <span className={styles.preparatHintTip}>
-            Tips: Skriv eller lim inn varenummer – søket rydder opp automatisk.
-          </span>
-        </Typography>
       </Paper>
 
       <Paper
         className={styles.preparatPaper}
         sx={{
-          p: 1.25,
+          p: 1,
           display: "flex",
           flexDirection: "column",
           gap: 0.75,

@@ -30,7 +30,6 @@ import { logUsage } from "../shared/services/usage";
 import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
 import InteraksjonerPage from "../features/interaksjoner/pages/InteraksjonerPage";
 import MedicationIcon from "@mui/icons-material/Medication";
-import Chatbot from "../features/kunstigintelligens/Chatbot";
 import { useAuthUser } from "./auth/useAuthUser";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import RekspertPage from "../features/rekspert/RekspertPage";
@@ -271,7 +270,6 @@ function Layout() {
           <Route path="*" element={<Navigate to="/omeq" replace />} />
         </Routes>
       </Box>
-      <Chatbot />
     </Box>
   );
 }

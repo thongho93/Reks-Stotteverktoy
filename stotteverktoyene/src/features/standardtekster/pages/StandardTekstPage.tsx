@@ -25,7 +25,6 @@ import StandardTekstSidebar from "../components/StandardTekstSidebar";
 import StandardTekstContent from "../components/StandardTekstContent";
 import { standardTeksterApi } from "../services/standardTeksterApi";
 import { useAuthUser } from "../../../app/auth/Auth";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -1352,55 +1351,6 @@ export default function StandardTekstPage() {
 
   return (
     <Box className={styles.page}>
-      <Box className={styles.header}>
-        <Box>
-          <Typography variant="h1">Standardtekster</Typography>
-        </Box>
-
-        <Box className={styles.headerActions}>
-          {isAdmin && (
-            <FormControlLabel
-              sx={{ m: 0 }}
-              control={
-                <Switch
-                  size="small"
-                  checked={adminViewEnabled}
-                  onChange={(e) => setAdminViewEnabled(e.target.checked)}
-                />
-              }
-              label={
-                <Typography variant="caption" color="text.secondary">
-                  {adminViewEnabled ? "Admin view" : "User view"}
-                </Typography>
-              }
-            />
-          )}
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "flex", alignItems: "center" }}
-          >
-            <span className={styles.preparatHintKeys}>
-              <span className={styles.preparatHintKeyLabel}>Søk tekst:</span> Ctrl+S ·{" "}
-              <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl+Shift+F ·{" "}
-              <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
-            </span>
-          </Typography>
-          <Button
-            variant="text"
-            size="small"
-            onClick={() => setShowGuide((v) => !v)}
-            className={styles.headerLinkButton}
-            endIcon={
-              <ExpandMoreIcon className={showGuide ? styles.expandIconOpen : styles.expandIcon} />
-            }
-          >
-            {showGuide ? "Skjul bruksanvisning" : "Vis bruksanvisning"}
-          </Button>
-        </Box>
-      </Box>
-
       {errorToShow && (
         <Alert severity="error" className={styles.error}>
           {errorToShow}
@@ -1596,10 +1546,10 @@ export default function StandardTekstPage() {
                 templateHasFormuleringTokens(activeTemplateContent)) && (
                 <Box
                   sx={{
-                    mt: 1,
-                    mb: 1.5,
+                    mt: 0.75,
+                    mb: 1,
                     display: "grid",
-                    gap: 1,
+                    gap: 0.75,
                     gridTemplateColumns: {
                       xs: "1fr",
                       lg: "repeat(2, minmax(280px, 1fr))",
@@ -1612,13 +1562,13 @@ export default function StandardTekstPage() {
                     <Paper
                       elevation={0}
                       sx={{
-                        p: 1.25,
+                        p: 1,
                         border: "1px solid",
                         borderColor: "divider",
-                        borderRadius: 2,
+                        borderRadius: 1.5,
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                         Tall i teksten
                       </Typography>
 
@@ -1691,13 +1641,13 @@ export default function StandardTekstPage() {
                     <Paper
                       elevation={0}
                       sx={{
-                        p: 1.25,
+                        p: 1,
                         border: "1px solid",
                         borderColor: "divider",
-                        borderRadius: 2,
+                        borderRadius: 1.5,
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                         Tid i teksten
                       </Typography>
 
@@ -1804,13 +1754,13 @@ export default function StandardTekstPage() {
                     <Paper
                       elevation={0}
                       sx={{
-                        p: 1.25,
+                        p: 1,
                         border: "1px solid",
                         borderColor: "divider",
-                        borderRadius: 2,
+                        borderRadius: 1.5,
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                         Dato i teksten
                       </Typography>
 
@@ -1882,13 +1832,13 @@ export default function StandardTekstPage() {
                     <Paper
                       elevation={0}
                       sx={{
-                        p: 1.25,
+                        p: 1,
                         border: "1px solid",
                         borderColor: "divider",
-                        borderRadius: 2,
+                        borderRadius: 1.5,
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                         Formulering i teksten
                       </Typography>
 
@@ -2012,6 +1962,47 @@ export default function StandardTekstPage() {
             categoryOptions={categoryOptions}
           />
         </Box>
+      </Box>
+
+      <Box className={styles.pageFooter}>
+        {isAdmin && (
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Switch
+                size="small"
+                checked={adminViewEnabled}
+                onChange={(e) => setAdminViewEnabled(e.target.checked)}
+              />
+            }
+            label={
+              <Typography variant="caption" color="text.secondary">
+                {adminViewEnabled ? "Admin view" : "User view"}
+              </Typography>
+            }
+          />
+        )}
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "flex", alignItems: "center" }}
+        >
+          <span className={styles.preparatHintKeys}>
+            <span className={styles.preparatHintKeyLabel}>Søk tekst:</span> Ctrl+S ·{" "}
+            <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl+Shift+F ·{" "}
+            <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
+          </span>
+        </Typography>
+
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => setShowGuide((v) => !v)}
+          className={styles.headerLinkButton}
+        >
+          {showGuide ? "Skjul bruksanvisning" : "Vis bruksanvisning"}
+        </Button>
       </Box>
       <Dialog open={followUpsOpen} onClose={() => setFollowUpsOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Oppfølgingstekster</DialogTitle>
