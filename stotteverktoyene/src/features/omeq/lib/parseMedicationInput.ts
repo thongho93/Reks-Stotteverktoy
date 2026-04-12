@@ -24,14 +24,23 @@ export interface ParsedMedicationInput {
 export const normalizeText = (value: string) =>
   value.toLowerCase().replace(/[,()]/g, " ").replace(/\s+/g, " ").trim();
 
-export const buildProductIndex = (): ProductIndexItem[] =>
-  Object.entries(ATC_PRODUCTS).flatMap(([atcCode, products]) =>
-    (products ?? []).map((p) => ({
-      name: p.name,
-      atcCode: atcCode as ATCcode,
-      form: p.form,
-    }))
-  );
+let cachedProductIndex: ProductIndexItem[] | null = null;
+
+export const buildProductIndex = (): ProductIndexItem[] => {
+  if (cachedProductIndex) return cachedProductIndex;
+
+  cachedProductIndex = Object.entries(ATC_PRODUCTS)
+    .flatMap(([atcCode, products]) =>
+      (products ?? []).map((p) => ({
+        name: p.name,
+        atcCode: atcCode as ATCcode,
+        form: p.form,
+      }))
+    )
+    .sort((a, b) => b.name.length - a.name.length);
+
+  return cachedProductIndex;
+};
 
 export const findProductInText = (
   input: string,
@@ -39,10 +48,7 @@ export const findProductInText = (
 ): ProductIndexItem | null => {
   const text = normalizeText(input);
 
-  // Lengste navn først for å unngå at korte navn “stjeler” treff.
-  const sorted = [...products].sort((a, b) => b.name.length - a.name.length);
-
-  for (const p of sorted) {
+  for (const p of products) {
     const name = normalizeText(p.name);
 
     // Krev “ordgrense-ish” på begge sider der det gir mening

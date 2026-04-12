@@ -838,6 +838,8 @@ export default function InteraksjonerPage() {
                 component="img"
                 alt="Venter"
                 src="/img/imwaiting.gif"
+                loading="lazy"
+                decoding="async"
                 sx={{
                   width: 340,
                   maxWidth: "85%",

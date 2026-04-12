@@ -1,6 +1,7 @@
-import React from "react";
+import React, { Suspense } from "react";
 import {
   Box,
+  CircularProgress,
   Divider,
   Drawer,
   IconButton,
@@ -21,26 +22,55 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
-import OMEQPage from "../features/omeq/pages/OMEQPage";
-import StandardTekstPage from "../features/standardtekster/pages/StandardTekstPage";
-import OfficeFormRedirectPage from "../features/produktskjema/pages/OfficeFormRedirectPage";
-import AndbruddPage from "../features/anbrudd/andbruddPage";
-import TilbakemeldingPage from "../features/tilbakemelding/pages/TilbakemeldingPage";
-import HomePage from "./HomePage";
-import { RequireAuth, LoginPage, ProfileMenu, ProfilePage } from "./auth/Auth";
-import PendingApprovalPage from "./auth/PendingApprovalPage";
+import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage } from "../shared/services/usage";
-import StatistikkPage from "../features/statistikk/pages/StatistikkPage";
-import InteraksjonerPage from "../features/interaksjoner/pages/InteraksjonerPage";
 import { useAuthUser } from "./auth/useAuthUser";
 import ConstructionIcon from "@mui/icons-material/Construction";
-import RekspertPage from "../features/rekspert/RekspertPage";
-import MsalProviderWrapper from "./auth/MsalProviderWrapper";
-import TeamsChatPage from "../features/teamsChat/page/TeamsChatPage";
 import RequireRekspert from "./auth/RequireRekspert";
+import { ProfileMenu } from "./auth/ProfileMenu";
+
+const HomePage = React.lazy(() => import("./HomePage"));
+const OMEQPage = React.lazy(() => import("../features/omeq/pages/OMEQPage"));
+const StandardTekstPage = React.lazy(
+  () => import("../features/standardtekster/pages/StandardTekstPage")
+);
+const InteraksjonerPage = React.lazy(
+  () => import("../features/interaksjoner/pages/InteraksjonerPage")
+);
+const ProfilePage = React.lazy(() =>
+  import("./auth/ProfilePage").then((module) => ({ default: module.ProfilePage }))
+);
+const StatistikkPage = React.lazy(() => import("../features/statistikk/pages/StatistikkPage"));
+const OfficeFormRedirectPage = React.lazy(
+  () => import("../features/produktskjema/pages/OfficeFormRedirectPage")
+);
+const AndbruddPage = React.lazy(() => import("../features/anbrudd/andbruddPage"));
+const TilbakemeldingPage = React.lazy(
+  () => import("../features/tilbakemelding/pages/TilbakemeldingPage")
+);
+const RekspertPage = React.lazy(() => import("../features/rekspert/RekspertPage"));
+const TeamsChatRoute = React.lazy(() => import("../features/teamsChat/page/TeamsChatRoute"));
+const LoginPage = React.lazy(() =>
+  import("./auth/LoginPage").then((module) => ({ default: module.LoginPage }))
+);
+const PendingApprovalPage = React.lazy(() => import("./auth/PendingApprovalPage"));
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
+
+function RouteLoader() {
+  return (
+    <Box
+      sx={{
+        minHeight: "40vh",
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      <CircularProgress size={28} />
+    </Box>
+  );
+}
 
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { isOwner, isRekspert, role } = useAuthUser() as any;
@@ -292,29 +322,24 @@ function Layout() {
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <Box component="main" sx={{ flex: 1, p: 2 }}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/omeq" element={<OMEQPage />} />
-          <Route path="/standardtekster" element={<StandardTekstPage />} />
-          <Route path="/interaksjoner" element={<InteraksjonerPage />} />
-          <Route path="/profil" element={<ProfilePage />} />
-          <Route path="/statistikk" element={<StatistikkPage />} />
-          <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
-          <Route path="/anbrudd" element={<AndbruddPage />} />
-          <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
-          <Route element={<RequireRekspert />}>
-            <Route path="/rekspert" element={<RekspertPage />} />
-          </Route>
-          <Route
-            path="/teams-chat"
-            element={
-              <MsalProviderWrapper>
-                <TeamsChatPage />
-              </MsalProviderWrapper>
-            }
-          />
-          <Route path="*" element={<Navigate to="/omeq" replace />} />
-        </Routes>
+        <Suspense fallback={<RouteLoader />}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/omeq" element={<OMEQPage />} />
+            <Route path="/standardtekster" element={<StandardTekstPage />} />
+            <Route path="/interaksjoner" element={<InteraksjonerPage />} />
+            <Route path="/profil" element={<ProfilePage />} />
+            <Route path="/statistikk" element={<StatistikkPage />} />
+            <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
+            <Route path="/anbrudd" element={<AndbruddPage />} />
+            <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
+            <Route element={<RequireRekspert />}>
+              <Route path="/rekspert" element={<RekspertPage />} />
+            </Route>
+            <Route path="/teams-chat" element={<TeamsChatRoute />} />
+            <Route path="*" element={<Navigate to="/omeq" replace />} />
+          </Routes>
+        </Suspense>
       </Box>
     </Box>
   );
@@ -323,18 +348,20 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/pending-approval" element={<PendingApprovalPage />} />
-        <Route
-          path="/*"
-          element={
-            <RequireAuth>
-              <Layout />
-            </RequireAuth>
-          }
-        />
-      </Routes>
+      <Suspense fallback={<RouteLoader />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/pending-approval" element={<PendingApprovalPage />} />
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                <Layout />
+              </RequireAuth>
+            }
+          />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

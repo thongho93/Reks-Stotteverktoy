@@ -54,6 +54,8 @@ export default function HomePage() {
           component="img"
           src="/img/letscook.gif"
           alt="Let’s cook"
+          loading="lazy"
+          decoding="async"
           sx={{
             maxWidth: 420,
             width: "100%",

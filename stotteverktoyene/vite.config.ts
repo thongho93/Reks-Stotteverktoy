@@ -10,4 +10,29 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+
+          if (
+            id.includes("react-dom") ||
+            id.includes("react-router-dom") ||
+            id.includes("/react/")
+          ) {
+            return "vendor-react";
+          }
+
+          if (id.includes("@mui") || id.includes("@emotion")) {
+            return "vendor-mui";
+          }
+
+          if (id.includes("firebase") || id.includes("@supabase")) {
+            return "vendor-backend";
+          }
+        },
+      },
+    },
+  },
 });
