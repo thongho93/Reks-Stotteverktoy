@@ -50,6 +50,7 @@ import { replaceFirstName } from "../../standardtekster/utils/content";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 
 const HISTORY_KEY_PREFIX = "interaksjoner_history_v1";
+const HISTORY_LAST_UID_KEY = "interaksjoner_last_uid_v1";
 
 const PREPARAT_SUFFIX_RE = /\s*\(preparatnavn\)\s*$/i;
 
@@ -122,15 +123,28 @@ export default function InteraksjonerPage() {
 
   const { user, isAdmin } = useAuthUser();
   const lastKnownUidRef = React.useRef<string | null>(null);
+  const [historyReadyKey, setHistoryReadyKey] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (user?.uid) lastKnownUidRef.current = user.uid;
+    if (!user?.uid) return;
+    lastKnownUidRef.current = user.uid;
+    try {
+      window.sessionStorage.setItem(HISTORY_LAST_UID_KEY, user.uid);
+    } catch {
+      // ignore
+    }
   }, [user?.uid]);
 
   const firstName = (user?.firstName ?? null) as string | null;
 
   const historyKey = React.useMemo(() => {
-    const uid = user?.uid ?? lastKnownUidRef.current;
+    let persistedUid: string | null = null;
+    try {
+      persistedUid = window.sessionStorage.getItem(HISTORY_LAST_UID_KEY);
+    } catch {
+      // ignore
+    }
+    const uid = user?.uid ?? lastKnownUidRef.current ?? persistedUid;
     return uid ? `${HISTORY_KEY_PREFIX}:${uid}` : `${HISTORY_KEY_PREFIX}:anon`;
   }, [user?.uid]);
 
@@ -236,30 +250,36 @@ export default function InteraksjonerPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleReset, createOpen, editOpen]);
   React.useEffect(() => {
+    setHistoryReadyKey(null);
     try {
       const raw = window.localStorage.getItem(historyKey);
       if (!raw) {
         setHistory([]);
+        setHistoryReadyKey(historyKey);
         return;
       }
       const parsed = JSON.parse(raw) as HistoryItem[];
       if (!Array.isArray(parsed)) {
         setHistory([]);
+        setHistoryReadyKey(historyKey);
         return;
       }
       setHistory(parsed.slice(0, 5));
+      setHistoryReadyKey(historyKey);
     } catch {
       setHistory([]);
+      setHistoryReadyKey(historyKey);
     }
   }, [historyKey]);
 
   React.useEffect(() => {
+    if (historyReadyKey !== historyKey) return;
     try {
       window.localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 5)));
     } catch {
       // ignore
     }
-  }, [history, historyKey]);
+  }, [history, historyKey, historyReadyKey]);
 
   const getMatchTitle = React.useCallback(
     (r: MatchResult, selectedForTitle: InteractionEntity[]) => {
