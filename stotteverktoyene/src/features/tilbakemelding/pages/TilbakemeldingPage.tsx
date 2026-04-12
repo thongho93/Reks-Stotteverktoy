@@ -488,12 +488,6 @@ export default function TilbakemeldingPage() {
                     {hasUnsavedChanges ? "Du har ulagrede endringer." : "Alt er lagret."}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 1 }}>
-                    <Button
-                      variant="outlined"
-                      onClick={() => void copyNoteToClipboard(draftTitle, draftContent, "manual")}
-                    >
-                      Kopier notat
-                    </Button>
                     {selectedNoteId && (
                       <Button
                         variant="outlined"
