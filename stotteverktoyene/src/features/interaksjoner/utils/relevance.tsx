@@ -22,6 +22,11 @@ export function isActionableRelevance(relevansV: string | null, relevansDn: stri
   return !!code && ACTIONABLE_RELEVANCE_CODES.has(code);
 }
 
+export function isAvoidRelevance(relevansV: string | null, relevansDn: string | null): boolean {
+  const code = normalizeRelevanceCode(relevansV, relevansDn);
+  return code === "1";
+}
+
 export function relevanceKind(relevansV: string | null, relevansDn: string | null): RelevanceKind | null {
   const code = normalizeRelevanceCode(relevansV, relevansDn);
   if (code === "1") return "avoid";
