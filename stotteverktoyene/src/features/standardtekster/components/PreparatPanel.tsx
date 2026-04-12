@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -71,6 +71,53 @@ type RecentSuggestion = {
   payload: PickPayload;
 };
 
+const RECENT_SUGGESTIONS_STORAGE_KEY = "standardtekster.preparater.recent.v1";
+
+const readRecentSuggestionsFromStorage = (): RecentSuggestion[] => {
+  try {
+    const raw = window.localStorage.getItem(RECENT_SUGGESTIONS_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as RecentSuggestion[];
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item) => {
+        const key = String(item.key ?? "").trim();
+        const name = String(item.name ?? "").trim();
+        const varenummer = String(item.varenummer ?? "").trim();
+        const payload = item.payload ?? ({} as PickPayload);
+        const payloadText = String(payload.text ?? "").trim();
+        const payloadKey = String(payload.key ?? "").trim();
+
+        return {
+          key,
+          name,
+          varenummer,
+          payload: {
+            text: payloadText,
+            key: payloadKey,
+            virkestoff: payload.virkestoff ? String(payload.virkestoff).trim() : undefined,
+            formulering: payload.formulering ? String(payload.formulering).trim() : undefined,
+            rowData: payload.rowData
+              ? {
+                  baseText: payload.rowData.baseText ?? null,
+                  fullName: payload.rowData.fullName ?? null,
+                  manufacturer: payload.rowData.manufacturer ?? null,
+                  packSize: payload.rowData.packSize ?? null,
+                }
+              : undefined,
+          },
+        } as RecentSuggestion;
+      })
+      .filter((item) => item.key && item.name && item.payload?.text && item.payload?.key)
+      .slice(0, 10);
+  } catch {
+    return [];
+  }
+};
+
 export default function PreparatPanel({
   preparatRows,
   clearOnCopy = false,
@@ -85,7 +132,20 @@ export default function PreparatPanel({
   onRemove,
 }: Props) {
   const hasPicked = preparatRows.some((r) => r.picked);
-  const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>([]);
+  const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>(
+    () => readRecentSuggestionsFromStorage(),
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        RECENT_SUGGESTIONS_STORAGE_KEY,
+        JSON.stringify(recentSuggestions.slice(0, 10)),
+      );
+    } catch {
+      // ignore storage write errors
+    }
+  }, [recentSuggestions]);
 
   const pushRecentSuggestion = (entry: RecentSuggestion) => {
     setRecentSuggestions((prev) => {
@@ -115,7 +175,11 @@ export default function PreparatPanel({
           key={item.key}
           variant="outlined"
           size="small"
-          label={`${item.name} (${item.varenummer})`}
+          label={
+            /^FEST:/i.test(item.varenummer)
+              ? item.name
+              : `${item.name} (${item.varenummer})`
+          }
           onClick={() => applyPickPayload(item.payload)}
           sx={{
             width: "100%",

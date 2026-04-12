@@ -23,6 +23,63 @@ type UseStandardTeksterResult = {
   reload: () => Promise<void>;
 };
 
+const STANDARDTEKSTER_CACHE_KEY = "standardtekster.sidebar.cache.v1";
+const STANDARDTEKSTER_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let memoryCache:
+  | {
+      items: StandardTekst[];
+      ts: number;
+    }
+  | null = null;
+
+const toDateOrNull = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const normalizeCachedItems = (items: StandardTekst[]): StandardTekst[] =>
+  items.map((it) => ({
+    ...it,
+    updatedAt: toDateOrNull((it as any).updatedAt),
+  }));
+
+const readCachedItems = (): StandardTekst[] | null => {
+  const now = Date.now();
+
+  if (memoryCache && now - memoryCache.ts < STANDARDTEKSTER_CACHE_TTL_MS) {
+    return normalizeCachedItems(memoryCache.items);
+  }
+
+  try {
+    const raw = sessionStorage.getItem(STANDARDTEKSTER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { ts?: number; items?: StandardTekst[] };
+    if (!parsed || !Array.isArray(parsed.items) || typeof parsed.ts !== "number") return null;
+    if (now - parsed.ts >= STANDARDTEKSTER_CACHE_TTL_MS) return null;
+
+    const normalizedItems = normalizeCachedItems(parsed.items);
+    memoryCache = { items: normalizedItems, ts: parsed.ts };
+    return normalizedItems;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedItems = (items: StandardTekst[]) => {
+  const payload = { ts: Date.now(), items };
+  memoryCache = payload;
+
+  try {
+    sessionStorage.setItem(STANDARDTEKSTER_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore cache-write errors
+  }
+};
+
 export function useStandardTekster(): UseStandardTeksterResult {
   const [items, setItems] = useState<StandardTekst[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -33,21 +90,21 @@ export function useStandardTekster(): UseStandardTeksterResult {
   // Prevent state updates after unmount / stale reloads
   const runIdRef = useRef(0);
 
-  const reload = useCallback(async () => {
+  const reloadFromServer = useCallback(async (showLoading: boolean) => {
     const runId = ++runIdRef.current;
 
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
 
       const mapped = await standardTeksterApi.fetchAll();
       if (runId !== runIdRef.current) return;
 
       setItems(mapped);
+      writeCachedItems(mapped);
       setSelectedId((prev) => {
-        if (prev) return prev;
-        const firstActive = mapped.find((it) => it.isActive !== false);
-        return firstActive?.id ?? mapped[0]?.id ?? null;
+        if (prev && mapped.some((it) => it.id === prev)) return prev;
+        return null;
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved henting fra Firebase";
@@ -55,17 +112,33 @@ export function useStandardTekster(): UseStandardTeksterResult {
       setError(message);
     } finally {
       if (runId !== runIdRef.current) return;
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
+  const reload = useCallback(async () => {
+    await reloadFromServer(true);
+  }, [reloadFromServer]);
+
   useEffect(() => {
-    reload();
+    const cached = readCachedItems();
+    if (cached?.length) {
+      setItems(cached);
+      setSelectedId((prev) => {
+        if (prev && cached.some((it) => it.id === prev)) return prev;
+        return null;
+      });
+      setLoading(false);
+      void reloadFromServer(false);
+    } else {
+      void reloadFromServer(true);
+    }
+
     return () => {
       // Invalidate any in-flight reload
       runIdRef.current++;
     };
-  }, [reload]);
+  }, [reloadFromServer]);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();

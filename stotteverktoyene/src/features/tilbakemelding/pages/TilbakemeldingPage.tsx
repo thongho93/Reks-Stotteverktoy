@@ -6,6 +6,7 @@ import {
   CircularProgress,
   Paper,
   FormControlLabel,
+  Snackbar,
   Switch,
   Tab,
   Tabs,
@@ -13,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { FirebaseError } from "firebase/app";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
@@ -92,7 +94,10 @@ export default function TilbakemeldingPage() {
   const [savingNotes, setSavingNotes] = React.useState(false);
   const [deletingNote, setDeletingNote] = React.useState(false);
   const [autoCopyEnabled, setAutoCopyEnabled] = React.useState(true);
-  const [copyStatus, setCopyStatus] = React.useState<string | null>(null);
+  const [copyToast, setCopyToast] = React.useState<{
+    message: string;
+    severity: "success" | "error" | "info";
+  } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
@@ -211,19 +216,25 @@ export default function TilbakemeldingPage() {
     async (title: string, content: string, mode: "auto" | "manual") => {
       const text = `${title.trim() ? `${title.trim()}\n\n` : ""}${content}`.trim();
       if (!text) {
-        setCopyStatus("Notatet er tomt, ingenting å kopiere.");
+        setCopyToast({ message: "Notatet er tomt, ingenting å kopiere.", severity: "info" });
         return;
       }
 
       try {
         if (!navigator?.clipboard?.writeText) {
-          setCopyStatus("Utklippstavle er ikke tilgjengelig i denne nettleseren.");
+          setCopyToast({
+            message: "Utklippstavle er ikke tilgjengelig i denne nettleseren.",
+            severity: "error",
+          });
           return;
         }
         await navigator.clipboard.writeText(text);
-        setCopyStatus(mode === "auto" ? "Notat kopiert automatisk." : "Notat kopiert.");
+        setCopyToast({
+          message: mode === "auto" ? "Notat kopiert automatisk." : "Notat kopiert.",
+          severity: "success",
+        });
       } catch {
-        setCopyStatus("Kunne ikke kopiere til utklippstavlen.");
+        setCopyToast({ message: "Kunne ikke kopiere til utklippstavlen.", severity: "error" });
       }
     },
     []
@@ -412,12 +423,6 @@ export default function TilbakemeldingPage() {
               {success}
             </Alert>
           )}
-          {copyStatus && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              {copyStatus}
-            </Alert>
-          )}
-
           {loadingNotes ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
               <CircularProgress size={28} />
@@ -596,6 +601,28 @@ export default function TilbakemeldingPage() {
           )}
         </Paper>
       )}
+      <Snackbar
+        open={Boolean(copyToast)}
+        autoHideDuration={1500}
+        onClose={() => setCopyToast(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setCopyToast(null)}
+          severity={copyToast?.severity ?? "success"}
+          variant="filled"
+          icon={copyToast?.severity === "success" ? <CheckCircleIcon fontSize="inherit" /> : undefined}
+          sx={{
+            borderRadius: 999,
+            px: 2,
+            py: 0.75,
+            alignItems: "center",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          {copyToast?.message ?? ""}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -40,7 +40,7 @@ import {
 } from "../../fest/mappers/interactionsToIndex";
 
 import {
-  isActionableRelevance,
+  isAvoidRelevance,
   RelevanceIcon,
   relevanceKind,
 } from "../utils/relevance";
@@ -50,6 +50,58 @@ import { replaceFirstName } from "../../standardtekster/utils/content";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 
 const HISTORY_KEY_PREFIX = "interaksjoner_history_v1";
+const HISTORY_LAST_UID_KEY = "interaksjoner_last_uid_v1";
+
+const PREPARAT_SUFFIX_RE = /\s*\(preparatnavn\)\s*$/i;
+
+function cleanMatchTerm(value: string): string {
+  return String(value ?? "")
+    .replace(PREPARAT_SUFFIX_RE, "")
+    .trim();
+}
+
+function normalizeForMatch(value: string): string {
+  return cleanMatchTerm(value).toLowerCase();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderHighlightedText(label: string, matchedTerms: string[]): React.ReactNode {
+  const terms = Array.from(
+    new Set(
+      matchedTerms
+        .map((t) => cleanMatchTerm(t))
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length)
+    )
+  );
+  if (terms.length === 0) return label;
+
+  const pattern = new RegExp(`(${terms.map((t) => escapeRegExp(t)).join("|")})`, "ig");
+  const parts = label.split(pattern);
+  if (parts.length <= 1) return label;
+
+  return (
+    <Box component="span">
+      {parts.map((part, idx) => {
+        const isHit = terms.some((t) => t.toLowerCase() === part.toLowerCase());
+        if (!isHit) return <React.Fragment key={idx}>{part}</React.Fragment>;
+        return (
+          <Box
+            key={idx}
+            component="span"
+            sx={{ bgcolor: "warning.light", borderRadius: 0.75, px: 0.4 }}
+          >
+            {part}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
 
 type HistoryItem = {
   id: string;
@@ -71,15 +123,28 @@ export default function InteraksjonerPage() {
 
   const { user, isAdmin } = useAuthUser();
   const lastKnownUidRef = React.useRef<string | null>(null);
+  const [historyReadyKey, setHistoryReadyKey] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (user?.uid) lastKnownUidRef.current = user.uid;
+    if (!user?.uid) return;
+    lastKnownUidRef.current = user.uid;
+    try {
+      window.sessionStorage.setItem(HISTORY_LAST_UID_KEY, user.uid);
+    } catch {
+      // ignore
+    }
   }, [user?.uid]);
 
   const firstName = (user?.firstName ?? null) as string | null;
 
   const historyKey = React.useMemo(() => {
-    const uid = user?.uid ?? lastKnownUidRef.current;
+    let persistedUid: string | null = null;
+    try {
+      persistedUid = window.sessionStorage.getItem(HISTORY_LAST_UID_KEY);
+    } catch {
+      // ignore
+    }
+    const uid = user?.uid ?? lastKnownUidRef.current ?? persistedUid;
     return uid ? `${HISTORY_KEY_PREFIX}:${uid}` : `${HISTORY_KEY_PREFIX}:anon`;
   }, [user?.uid]);
 
@@ -185,37 +250,49 @@ export default function InteraksjonerPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleReset, createOpen, editOpen]);
   React.useEffect(() => {
+    setHistoryReadyKey(null);
     try {
       const raw = window.localStorage.getItem(historyKey);
       if (!raw) {
         setHistory([]);
+        setHistoryReadyKey(historyKey);
         return;
       }
       const parsed = JSON.parse(raw) as HistoryItem[];
       if (!Array.isArray(parsed)) {
         setHistory([]);
+        setHistoryReadyKey(historyKey);
         return;
       }
       setHistory(parsed.slice(0, 5));
+      setHistoryReadyKey(historyKey);
     } catch {
       setHistory([]);
+      setHistoryReadyKey(historyKey);
     }
   }, [historyKey]);
 
   React.useEffect(() => {
+    if (historyReadyKey !== historyKey) return;
     try {
       window.localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 5)));
     } catch {
       // ignore
     }
-  }, [history, historyKey]);
+  }, [history, historyKey, historyReadyKey]);
 
   const getMatchTitle = React.useCallback(
-    (r: MatchResult) => {
+    (r: MatchResult, selectedForTitle: InteractionEntity[]) => {
       if (!index) return "Interaksjon";
       const it = index.interactions[r.interactionIndex];
       const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
       const gB = it.substansgrupper?.[r.matchedGroups?.[1]];
+      const labelBySelectedTerm = new Map<string, string>();
+      for (const s of selectedForTitle) {
+        const cleanedLabel = s.label.replace(/\s*\(preparatnavn\)\s*$/i, "").trim();
+        if (s.key) labelBySelectedTerm.set(s.key, cleanedLabel);
+        if (s.atc) labelBySelectedTerm.set(s.atc, cleanedLabel);
+      }
 
       const nameFromGroup = (g?: any) => {
         if (!g) return "";
@@ -223,8 +300,17 @@ export default function InteraksjonerPage() {
         return g.substanser?.[0]?.substans || "";
       };
 
-      const a = nameFromGroup(gA);
-      const b = nameFromGroup(gB);
+      const selectedLabelForGroup = (groupIndex: number): string => {
+        const terms = r.groupToSelectedTerms[groupIndex] ?? [];
+        for (const t of terms) {
+          const lbl = labelBySelectedTerm.get(t);
+          if (lbl) return lbl;
+        }
+        return "";
+      };
+
+      const a = selectedLabelForGroup(r.matchedGroups?.[0]) || nameFromGroup(gA);
+      const b = selectedLabelForGroup(r.matchedGroups?.[1]) || nameFromGroup(gB);
       return [a, b].filter(Boolean).join(" × ") || "Interaksjon";
     },
     [index]
@@ -234,7 +320,7 @@ export default function InteraksjonerPage() {
     (r: MatchResult) => {
       if (!index) return;
       const it = index.interactions[r.interactionIndex];
-      const title = getMatchTitle(r);
+      const title = getMatchTitle(r, selected);
 
       const item: HistoryItem = {
         id: `${it.interaksjonId ?? r.interactionIndex}:${Date.now()}`,
@@ -296,7 +382,7 @@ export default function InteraksjonerPage() {
     const allMatches = matchInteractionsBySelectedTerms(index, terms);
     const matches = allMatches.filter((m) => {
       const it = index.interactions[m.interactionIndex];
-      return isActionableRelevance(it.relevansV, it.relevansDn);
+      return isAvoidRelevance(it.relevansV, it.relevansDn);
     });
 
     setResults(matches);
@@ -384,12 +470,12 @@ export default function InteraksjonerPage() {
   return (
     <Box
       sx={{
-        maxWidth: 1440,
+        maxWidth: 1760,
+        width: "100%",
         mx: "auto",
-        mt: 4,
-        px: 2,
-        height: { xs: "auto", md: "calc(100vh - 32px)" },
-        maxHeight: { xs: "none", md: "90vh" },
+        mt: { xs: 2, md: 1.5 },
+        px: { xs: 1.5, md: 2.5 },
+        height: { xs: "auto", md: "calc(100vh - 20px)" },
         overflow: { xs: "visible", md: "hidden" },
         display: "flex",
         flexDirection: "column",
@@ -397,27 +483,9 @@ export default function InteraksjonerPage() {
     >
       <Box
         sx={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 2,
-          mb: 2,
-        }}
-      >
-        <Typography variant="h2">Interaksjonssøk</Typography>
-        <Typography color="text.secondary" sx={{ fontSize: 14 }}>
-          <Box component="span" sx={{ fontWeight: 800 }}>
-            Nullstill
-          </Box>
-          : Escape
-        </Typography>
-      </Box>
-
-      <Box
-        sx={{
           display: { xs: "block", md: "grid" },
-          gridTemplateColumns: { md: "1fr 2fr" },
-          gap: 4,
+          gridTemplateColumns: { md: "minmax(460px, 1.1fr) minmax(780px, 2fr)" },
+          gap: { xs: 2.5, md: 3 },
           alignItems: "start",
           flex: 1,
           minHeight: 0,
@@ -426,7 +494,7 @@ export default function InteraksjonerPage() {
         {/* Left: Search */}
         <Paper
           sx={{
-            p: 3,
+            p: { xs: 2.5, md: 3.5 },
             height: { xs: "auto", md: "100%" },
             overflow: { xs: "visible", md: "auto" },
           }}
@@ -515,15 +583,21 @@ export default function InteraksjonerPage() {
                 <TextField
                   {...params}
                   label="Velg legemiddel, virkestoff eller ATC-kode"
-                  placeholder={selected.length === 0 ? "Søk etter preparat" : ""}
+                  placeholder={
+                    selected.length === 0 ? "Søk etter legemiddel, virkestoff eller ATC-kode" : ""
+                  }
                   autoFocus
                   inputRef={searchInputRef}
+                  onKeyDown={(e) => {
+                    if (e.key === "Backspace" && inputValue.trim().length === 0) {
+                      // Prevent MUI Autocomplete from deleting the last selected option
+                      // when the input itself is empty.
+                      e.stopPropagation();
+                    }
+                  }}
                 />
               )}
             />
-            <Typography variant="caption" color="text.secondary" sx={{ mt: -0.5 }}>
-              Tips: Søk på preparatnavn, virkestoff eller ATC-kode direkte i søkefeltet.
-            </Typography>
             {searchProgressLabel ? (
               <Chip
                 size="small"
@@ -809,8 +883,8 @@ export default function InteraksjonerPage() {
         {/* Right: Results + Details */}
         <Paper
           sx={{
-            p: 3,
-            minHeight: 360,
+            p: { xs: 2.5, md: 3.5 },
+            minHeight: { xs: 420, md: 560 },
             height: { xs: "auto", md: "100%" },
             overflow: { xs: "visible", md: "auto" },
           }}
@@ -821,17 +895,19 @@ export default function InteraksjonerPage() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                justifyContent: "center",
-                minHeight: 360,
+                justifyContent: "flex-start",
+                minHeight: { xs: 420, md: 620 },
                 px: 2,
+                pt: { xs: 1, md: 2 },
               }}
             >
               <Box sx={{ width: "100%", maxWidth: 560 }}>
                 <Typography
                   color="text.secondary"
-                  sx={{ fontWeight: 600, textAlign: "center", fontSize: 23, mt: 1 }}
+                  variant="h2"
+                  sx={{ fontWeight: 800, textAlign: "center", mt: 1 }}
                 >
-                  Søk minst 2 ATC-koder/virkestoffer fra ulike grupper for å få treff.
+                  Interaksjonssøk
                 </Typography>
               </Box>
               <Box
@@ -849,7 +925,10 @@ export default function InteraksjonerPage() {
                 }}
               />
               <Box sx={{ width: "100%", maxWidth: 560 }}>
-                <Typography color="text.secondary" sx={{ textAlign: "center", fontSize: 23 }}>
+                <Typography
+                  color="text.secondary"
+                  sx={{ textAlign: "center", fontSize: 23 }}
+                >
                   Kom igjen. Jeg har ikke hele dagen.{" "}
                 </Typography>
               </Box>
@@ -870,15 +949,81 @@ export default function InteraksjonerPage() {
                       (s.interactionIds ?? []).includes(activeCtx.interactionId!)
                     )
                   : [];
+                const matchTermsFromGroups = Array.from(
+                  new Set(
+                    r.matchedGroups
+                      .flatMap((gi) => r.groupToSelectedTerms[gi] ?? [])
+                      .map((t) => labelByTerm.get(t) ?? t)
+                      .map((t) => cleanMatchTerm(t))
+                      .filter(Boolean)
+                  )
+                );
+                const matchTerms =
+                  matchTermsFromGroups.length > 0
+                    ? matchTermsFromGroups
+                    : Array.from(
+                        new Set(
+                          selected
+                            .map((s) => cleanMatchTerm(s.label))
+                            .filter(Boolean)
+                        )
+                      );
+
+                const linkedWithScore = linkedStandardtekster.map((s) => {
+                  const title = normalizeStandardtekstTitle(s);
+                  const copyText =
+                    (s as any).text ??
+                    (s as any).content ??
+                    (s as any).melding ??
+                    (s as any).body ??
+                    (s as any).template ??
+                    "";
+                  const titleNorm = normalizeForMatch(title);
+                  const bodyNorm = normalizeForMatch(copyText);
+                  const matchedTerms: string[] = [];
+                  let score = 0;
+
+                  for (const term of matchTerms) {
+                    const normTerm = normalizeForMatch(term);
+                    if (!normTerm) continue;
+
+                    if (titleNorm.includes(normTerm)) {
+                      score += 12;
+                      matchedTerms.push(term);
+                      continue;
+                    }
+                    if (bodyNorm.includes(normTerm)) {
+                      score += 5;
+                      matchedTerms.push(term);
+                    }
+                  }
+
+                  if (matchedTerms.length > 0 && matchedTerms.length === matchTerms.length) {
+                    score += 10;
+                  }
+
+                  return {
+                    doc: s,
+                    title,
+                    copyText,
+                    score,
+                    matchedTerms: Array.from(new Set(matchedTerms)),
+                  };
+                });
+
+                const sortedLinkedWithScore = [...linkedWithScore].sort((a, b) => {
+                  if (b.score !== a.score) return b.score - a.score;
+                  return a.title.localeCompare(b.title, "nb");
+                });
                 const filterNeedle = standardtekstFilter.trim().toLowerCase();
-                const filteredLinkedStandardtekster =
+                const filteredLinkedWithScore =
                   filterNeedle.length > 0
-                    ? linkedStandardtekster.filter((s) =>
-                        normalizeStandardtekstTitle(s).toLowerCase().includes(filterNeedle)
+                    ? sortedLinkedWithScore.filter((s) =>
+                        s.title.toLowerCase().includes(filterNeedle)
                       )
-                    : linkedStandardtekster;
+                    : sortedLinkedWithScore;
                 const activeLinkedStd = activeLinkedStdId
-                  ? filteredLinkedStandardtekster.find((s) => s.id === activeLinkedStdId)
+                  ? filteredLinkedWithScore.find((s) => s.doc.id === activeLinkedStdId)?.doc ?? null
                   : null;
 
                 const groupLines = r.matchedGroups.slice(0, 2).map((gi) => {
@@ -1091,7 +1236,7 @@ export default function InteraksjonerPage() {
                                 />
                               ) : null}
 
-                              {filteredLinkedStandardtekster.length === 0 ? (
+                              {filteredLinkedWithScore.length === 0 ? (
                                 <Typography color="text.secondary" sx={{ mt: 0.5 }}>
                                   Ingen standardtekster matcher søket.
                                 </Typography>
@@ -1100,13 +1245,13 @@ export default function InteraksjonerPage() {
                               <Box
                                 sx={{ display: "flex", flexWrap: "wrap", gap: 1, width: "100%" }}
                               >
-                                {filteredLinkedStandardtekster.map((s) => {
-                                  const isOpenStd = activeLinkedStdId === s.id;
-                                  const label = normalizeStandardtekstTitle(s);
+                                {filteredLinkedWithScore.map((s) => {
+                                  const isOpenStd = activeLinkedStdId === s.doc.id;
+                                  const label = s.title;
 
                                   return (
                                     <Tooltip
-                                      key={s.id}
+                                      key={s.doc.id}
                                       title={
                                         isOpenStd ? "Skjul standardtekst" : "Vis standardtekst"
                                       }
@@ -1115,11 +1260,11 @@ export default function InteraksjonerPage() {
                                       <Chip
                                         size="medium"
                                         icon={<DescriptionOutlinedIcon />}
-                                        label={label}
+                                        label={renderHighlightedText(label, s.matchedTerms)}
                                         clickable
                                         onClick={() =>
                                           setActiveLinkedStdId((prev) =>
-                                            prev === s.id ? null : s.id
+                                            prev === s.doc.id ? null : s.doc.id
                                           )
                                         }
                                         deleteIcon={
@@ -1131,7 +1276,7 @@ export default function InteraksjonerPage() {
                                         }
                                         onDelete={() =>
                                           setActiveLinkedStdId((prev) =>
-                                            prev === s.id ? null : s.id
+                                            prev === s.doc.id ? null : s.doc.id
                                           )
                                         }
                                         sx={{
@@ -1170,7 +1315,7 @@ export default function InteraksjonerPage() {
                                   );
                                 })}
                               </Box>
-                              {!activeLinkedStd && filteredLinkedStandardtekster.length > 0 ? (
+                              {!activeLinkedStd && filteredLinkedWithScore.length > 0 ? (
                                 <Typography color="text.secondary" sx={{ mt: 1, fontSize: 13 }}>
                                   Trykk på en tittel for å vise standardteksten.
                                 </Typography>
@@ -1273,6 +1418,21 @@ export default function InteraksjonerPage() {
             </Stack>
           ) : null}
         </Paper>
+      </Box>
+      <Box
+        sx={{
+          mt: 1.5,
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          <Box component="span" sx={{ fontWeight: 700 }}>
+            Tøm:
+          </Box>{" "}
+          Escape
+        </Typography>
       </Box>
       <Snackbar
         open={copySnackOpen}
