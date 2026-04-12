@@ -39,7 +39,12 @@ import {
   type MatchResult,
 } from "../../fest/mappers/interactionsToIndex";
 
-import { RelevanceIcon, relevanceKind } from "../utils/relevance";
+import {
+  isActionableRelevance,
+  RelevanceIcon,
+  relevanceKind,
+} from "../utils/relevance";
+import { normalizeStandardtekstTitle } from "../utils/standardtekster";
 
 import { replaceFirstName } from "../../standardtekster/utils/content";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
@@ -92,6 +97,7 @@ export default function InteraksjonerPage() {
 
   const [copySnackOpen, setCopySnackOpen] = React.useState(false);
   const [copySnackMsg, setCopySnackMsg] = React.useState<string>("Tekst kopiert");
+  const [standardtekstFilter, setStandardtekstFilter] = React.useState("");
 
   const { standardtekster, reload: reloadStandardtekster } = useStandardtekster();
 
@@ -275,6 +281,13 @@ export default function InteraksjonerPage() {
   }, [index, results, selected, pushHistory]);
 
   const showHistory = selected.length === 0 && inputValue.trim().length === 0 && history.length > 0;
+  const searchProgressLabel =
+    selected.length === 0
+      ? null
+      : selected.length === 1
+        ? "1 av 2 valgt"
+        : "Interaksjonssøk aktiv";
+  const searchProgressColor = selected.length >= 2 ? "success" : "warning";
 
   const handleSearch = React.useCallback(() => {
     if (!index) return;
@@ -283,7 +296,7 @@ export default function InteraksjonerPage() {
     const allMatches = matchInteractionsBySelectedTerms(index, terms);
     const matches = allMatches.filter((m) => {
       const it = index.interactions[m.interactionIndex];
-      return !!relevanceKind(it.relevansDn);
+      return isActionableRelevance(it.relevansV, it.relevansDn);
     });
 
     setResults(matches);
@@ -362,6 +375,11 @@ export default function InteraksjonerPage() {
       searchInputRef.current?.focus();
     });
   }, []);
+
+  React.useEffect(() => {
+    // Reset standardtekst-filter when active interaction changes
+    setStandardtekstFilter("");
+  }, [activeCtx?.interactionId]);
 
   return (
     <Box
@@ -506,6 +524,15 @@ export default function InteraksjonerPage() {
             <Typography variant="caption" color="text.secondary" sx={{ mt: -0.5 }}>
               Tips: Søk på preparatnavn, virkestoff eller ATC-kode direkte i søkefeltet.
             </Typography>
+            {searchProgressLabel ? (
+              <Chip
+                size="small"
+                label={searchProgressLabel}
+                color={searchProgressColor}
+                variant="outlined"
+                sx={{ alignSelf: "flex-start", fontWeight: 700 }}
+              />
+            ) : null}
             {showHistory ? (
               <Box sx={{ pt: 1 }}>
                 <Divider sx={{ my: 2 }} />
@@ -626,7 +653,12 @@ export default function InteraksjonerPage() {
                 pt: 1,
               }}
             >
-              <Button variant="text" onClick={handleReset} disabled={selected.length === 0}>
+              <Button
+                variant="text"
+                onClick={handleReset}
+                disabled={selected.length === 0}
+                sx={{ color: "text.primary", fontWeight: 700 }}
+              >
                 NULLSTILL
               </Button>
             </Box>
@@ -669,6 +701,7 @@ export default function InteraksjonerPage() {
                       const it = index.interactions[r.interactionIndex];
                       const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
                       const gB = it.substansgrupper?.[r.matchedGroups?.[1]];
+                      const kind = relevanceKind(it.relevansV, it.relevansDn);
 
                       const nameFromGroup = (g?: any) => {
                         if (!g) return "";
@@ -694,13 +727,23 @@ export default function InteraksjonerPage() {
                               pushHistory(r);
                             }}
                             sx={{
-                              py: 1.75,
+                              py: 1.25,
                               alignItems: "flex-start",
+                              gap: 1,
                             }}
                           >
                             <ListItemText
                               primary={
-                                <Typography sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 800,
+                                    lineHeight: 1.2,
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                  }}
+                                >
                                   {label}
                                 </Typography>
                               }
@@ -710,7 +753,7 @@ export default function InteraksjonerPage() {
                                     color="text.secondary"
                                     sx={{
                                       display: "-webkit-box",
-                                      WebkitLineClamp: 2,
+                                      WebkitLineClamp: 1,
                                       WebkitBoxOrient: "vertical",
                                       overflow: "hidden",
                                       mt: 0.25,
@@ -721,6 +764,24 @@ export default function InteraksjonerPage() {
                                 ) : null
                               }
                             />
+                            {kind ? (
+                              <Chip
+                                size="small"
+                                icon={<RelevanceIcon kind={kind} />}
+                                label={it.relevansDn ?? ""}
+                                variant="outlined"
+                                sx={{
+                                  mt: 0.25,
+                                  fontWeight: 700,
+                                  maxWidth: 180,
+                                  "& .MuiChip-label": {
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  },
+                                }}
+                              />
+                            ) : null}
                           </ListItemButton>
                           {i !== results.length - 1 ? <Divider /> : null}
                         </React.Fragment>
@@ -731,7 +792,13 @@ export default function InteraksjonerPage() {
               </Box>
             ) : null}
 
-            {selected.length > 0 && results.length === 0 ? (
+            {selected.length === 1 ? (
+              <Typography color="text.secondary" sx={{ pt: 1 }}>
+                Velg ett legemiddel til for å søke etter interaksjoner.
+              </Typography>
+            ) : null}
+
+            {selected.length >= 2 && results.length === 0 ? (
               <Typography color="text.secondary" sx={{ pt: 1 }}>
                 Ingen treff.
               </Typography>
@@ -771,6 +838,8 @@ export default function InteraksjonerPage() {
                 component="img"
                 alt="Venter"
                 src="/img/imwaiting.gif"
+                loading="lazy"
+                decoding="async"
                 sx={{
                   width: 340,
                   maxWidth: "85%",
@@ -794,15 +863,22 @@ export default function InteraksjonerPage() {
                 const r = activeCtx?.r;
                 const it = activeCtx?.it;
                 if (!r || !it) return null;
-                const kind = relevanceKind(it.relevansDn);
+                const kind = relevanceKind(it.relevansV, it.relevansDn);
                 // Compute linked standardtekster for the current interaction
                 const linkedStandardtekster = activeCtx.interactionId
                   ? standardtekster.filter((s) =>
                       (s.interactionIds ?? []).includes(activeCtx.interactionId!)
                     )
                   : [];
+                const filterNeedle = standardtekstFilter.trim().toLowerCase();
+                const filteredLinkedStandardtekster =
+                  filterNeedle.length > 0
+                    ? linkedStandardtekster.filter((s) =>
+                        normalizeStandardtekstTitle(s).toLowerCase().includes(filterNeedle)
+                      )
+                    : linkedStandardtekster;
                 const activeLinkedStd = activeLinkedStdId
-                  ? linkedStandardtekster.find((s) => s.id === activeLinkedStdId)
+                  ? filteredLinkedStandardtekster.find((s) => s.id === activeLinkedStdId)
                   : null;
 
                 const groupLines = r.matchedGroups.slice(0, 2).map((gi) => {
@@ -812,9 +888,12 @@ export default function InteraksjonerPage() {
                   const selectedTerms = (r.groupToSelectedTerms[gi] ?? [])
                     .map((t) => labelByTerm.get(t) ?? t)
                     .filter(Boolean);
+                  const uniqueSelectedTerms = Array.from(new Set(selectedTerms));
 
                   const suffix =
-                    selectedTerms.length > 0 ? `(søkeinput ${selectedTerms.join(", ")})` : "";
+                    uniqueSelectedTerms.length > 0
+                      ? `(søkeinput ${uniqueSelectedTerms.join(", ")})`
+                      : "";
 
                   // Prefer to show ATC (first substans ATC) when available
                   // In our indexed JSON, `atc` may be either a string (code) or an object with `{ v }`.
@@ -876,8 +955,21 @@ export default function InteraksjonerPage() {
                                 flexWrap: "wrap",
                               }}
                             >
+                              {isAdmin ? (
+                                <Button
+                                  variant="contained"
+                                  onClick={() => {
+                                    if (!activeCtx.interactionId) return;
+                                    setCreateOpen(true);
+                                  }}
+                                  sx={{ fontWeight: 800 }}
+                                >
+                                  Ny standardtekst
+                                </Button>
+                              ) : null}
+
                               <Button
-                                variant="text"
+                                variant="outlined"
                                 onClick={() => toggleExpanded(r.interactionIndex)}
                                 startIcon={
                                   isOpen ? (
@@ -886,22 +978,15 @@ export default function InteraksjonerPage() {
                                     <AddBoxOutlinedIcon />
                                   )
                                 }
-                                sx={{ px: 0 }}
+                                sx={{
+                                  color: "text.primary",
+                                  borderColor: "divider",
+                                  px: 1.25,
+                                  fontWeight: 700,
+                                }}
                               >
                                 Vis detaljer
                               </Button>
-
-                              {isAdmin ? (
-                                <Button
-                                  variant="contained"
-                                  onClick={() => {
-                                    if (!activeCtx.interactionId) return;
-                                    setCreateOpen(true);
-                                  }}
-                                >
-                                  Ny standardtekst
-                                </Button>
-                              ) : null}
                             </Box>
                           </Box>
 
@@ -920,15 +1005,20 @@ export default function InteraksjonerPage() {
                                   borderColor: "divider",
                                 }}
                               >
-                                <RelevanceIcon />
+                                <RelevanceIcon kind={kind} />
                                 <Typography sx={{ fontWeight: 700 }}>
                                   {it.relevansDn ?? ""}
                                 </Typography>
                               </Box>
                             ) : null}
-                            <IconButton onClick={() => handleCopy(r.interactionIndex)}>
-                              <ContentCopyIcon />
-                            </IconButton>
+                            <Tooltip title="Kopier interaksjonstekst" arrow>
+                              <IconButton
+                                aria-label="Kopier interaksjonstekst"
+                                onClick={() => handleCopy(r.interactionIndex)}
+                              >
+                                <ContentCopyIcon />
+                              </IconButton>
+                            </Tooltip>
                           </Stack>
                         </Box>
 
@@ -983,18 +1073,36 @@ export default function InteraksjonerPage() {
                         >
                           <Box sx={{ mb: 1 }}>
                             <Typography sx={{ fontWeight: 800 }} variant="h3">
-                              Knyttet standardtekst
+                              Knyttet standardtekst ({linkedStandardtekster.length})
                             </Typography>
                           </Box>
 
                           {linkedStandardtekster.length > 0 ? (
                             <Box sx={{ width: "100%" }}>
+                              {linkedStandardtekster.length > 4 ? (
+                                <TextField
+                                  size="small"
+                                  fullWidth
+                                  label="Filtrer standardtekster"
+                                  placeholder="Søk på tittel"
+                                  value={standardtekstFilter}
+                                  onChange={(e) => setStandardtekstFilter(e.target.value)}
+                                  sx={{ mb: 1.5, maxWidth: 420 }}
+                                />
+                              ) : null}
+
+                              {filteredLinkedStandardtekster.length === 0 ? (
+                                <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+                                  Ingen standardtekster matcher søket.
+                                </Typography>
+                              ) : null}
+
                               <Box
                                 sx={{ display: "flex", flexWrap: "wrap", gap: 1, width: "100%" }}
                               >
-                                {linkedStandardtekster.map((s) => {
+                                {filteredLinkedStandardtekster.map((s) => {
                                   const isOpenStd = activeLinkedStdId === s.id;
-                                  const label = s.title || "(Uten tittel)";
+                                  const label = normalizeStandardtekstTitle(s);
 
                                   return (
                                     <Tooltip
@@ -1062,7 +1170,7 @@ export default function InteraksjonerPage() {
                                   );
                                 })}
                               </Box>
-                              {!activeLinkedStd ? (
+                              {!activeLinkedStd && filteredLinkedStandardtekster.length > 0 ? (
                                 <Typography color="text.secondary" sx={{ mt: 1, fontSize: 13 }}>
                                   Trykk på en tittel for å vise standardteksten.
                                 </Typography>
@@ -1105,7 +1213,7 @@ export default function InteraksjonerPage() {
                                           }}
                                         >
                                           <Typography sx={{ fontWeight: 800, mb: 0.75 }}>
-                                            {activeLinkedStd.title || "Standardtekst"}
+                                            {normalizeStandardtekstTitle(activeLinkedStd)}
                                           </Typography>
                                           <Box
                                             sx={{
@@ -1116,25 +1224,31 @@ export default function InteraksjonerPage() {
                                             }}
                                           >
                                             {isAdmin ? (
+                                              <Tooltip title="Rediger standardtekst" arrow>
+                                                <IconButton
+                                                  aria-label="Rediger standardtekst"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditOpen(true);
+                                                  }}
+                                                  size="small"
+                                                >
+                                                  <EditOutlinedIcon fontSize="small" />
+                                                </IconButton>
+                                              </Tooltip>
+                                            ) : null}
+                                            <Tooltip title="Kopier standardtekst" arrow>
                                               <IconButton
+                                                aria-label="Kopier standardtekst"
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  setEditOpen(true);
+                                                  handleCopyStandardtekst(copyText);
                                                 }}
                                                 size="small"
                                               >
-                                                <EditOutlinedIcon fontSize="small" />
+                                                <ContentCopyIcon fontSize="small" />
                                               </IconButton>
-                                            ) : null}
-                                            <IconButton
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleCopyStandardtekst(copyText);
-                                              }}
-                                              size="small"
-                                            >
-                                              <ContentCopyIcon fontSize="small" />
-                                            </IconButton>
+                                            </Tooltip>
                                           </Box>
                                         </Box>
                                         <Typography sx={{ whiteSpace: "pre-line" }}>

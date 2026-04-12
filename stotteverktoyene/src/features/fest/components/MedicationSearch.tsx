@@ -12,10 +12,6 @@ import {
   Typography,
 } from "@mui/material";
 
-import meds from "../meds.json";
-import pimProducts from "./pimProducts.json";
-import hvProducts from "./hvProducts.json";
-
 const SPREADSHEET_EDIT_URL =
   "https://docs.google.com/spreadsheets/d/1rBMivx3lHY4CKrFev_On__YVendKv6O7i_Zzcoy9QYg/edit?gid=1369769996#gid=1369769996";
 import { festToSearchIndex } from "../mappers/festToSearchIndex";
@@ -60,6 +56,8 @@ type ScoredMed = {
   med: Med;
   score: number;
 };
+
+let medicationItemsPromise: Promise<Med[]> | null = null;
 
 type Props = {
   maxResults?: number;
@@ -298,6 +296,220 @@ const collapseSimilarResults = (items: ScoredMed[]): ScoredMed[] => {
   });
 };
 
+const finalizeMed = (input: {
+  id: string;
+  source: "FEST" | "PIM" | "HV";
+  varenavn: string | null;
+  navnFormStyrke: string | null;
+  atc: string | null;
+  virkestoff: string | null;
+  produsent: string | null;
+  reseptgruppe: string | null;
+  farmaloggNumber?: string | null;
+  searchText: string;
+}): Med => {
+  const nameText = input.navnFormStyrke ?? input.varenavn ?? "";
+  const varenavnText = input.varenavn ?? input.navnFormStyrke ?? "";
+  const substanceText = input.virkestoff ?? "";
+  const searchText = input.searchText || nameText || varenavnText || substanceText;
+
+  return {
+    ...input,
+    normalizedName: normalizeForSearch(nameText),
+    normalizedVarenavn: normalizeForSearch(varenavnText),
+    normalizedSubstance: normalizeForSearch(substanceText),
+    normalizedSearchText: normalizeForSearch(searchText),
+    nameTokens: toTokens(nameText),
+    varenavnTokens: toTokens(varenavnText),
+    substanceTokens: toTokens(substanceText),
+    hayTokens: toTokens(searchText),
+    dedupKey: input.farmaloggNumber
+      ? `farmalogg:${normalizeIdToken(input.farmaloggNumber)}`
+      : buildDedupKeyFromFields(nameText, substanceText),
+  };
+};
+
+const buildMedicationItems = (festRaw: any[], pimRaw: any[], hvRaw: any[]): Med[] => {
+  const festIndex: SearchIndexItem[] = festToSearchIndex(
+    festRaw.map((m) => ({
+      id: String(m.id),
+      name: String(m.navnFormStyrke ?? m.varenavn ?? ""),
+      atc: m.atc ?? undefined,
+      substance: m.virkestoff ?? undefined,
+      prescriptionGroup: m.reseptgruppe ?? undefined,
+    }))
+  );
+
+  const pimIndex: SearchIndexItem[] = pimToSearchIndex(
+    pimRaw.map((p) => ({
+      farmaloggNumber: String(p.farmaloggNumber),
+      name: p.name ?? undefined,
+      nameFormStrength:
+        ((p as any).nameFormStrength && String((p as any).nameFormStrength).trim().length > 0
+          ? (p as any).nameFormStrength
+          : (p as any).name) ?? undefined,
+      atc: (p as any).atc ?? undefined,
+      substance:
+        (p as any).virkestoff ??
+        (p as any).virkestoffNavn ??
+        (p as any).substance ??
+        (p as any).activeSubstance ??
+        (p as any).activeSubstanceName ??
+        undefined,
+      prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
+      manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
+      externalId: (p as any).id ?? undefined,
+    }))
+  );
+
+  const hvIndex: SearchIndexItem[] = pimToSearchIndex(
+    hvRaw.map((p) => ({
+      farmaloggNumber: String(p.farmaloggNumber),
+      name: p.name ?? undefined,
+      nameFormStrength: p.name ?? undefined,
+      atc: (p as any).atc ?? undefined,
+      substance:
+        (p as any).virkestoff ??
+        (p as any).virkestoffNavn ??
+        (p as any).substance ??
+        (p as any).activeSubstance ??
+        (p as any).activeSubstanceName ??
+        undefined,
+      prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
+      manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
+      externalId: (p as any).id ?? undefined,
+    }))
+  ).map((item) => ({
+    ...item,
+    source: "HV" as const,
+    id: String(item.farmaloggNumber ?? item.id),
+  }));
+
+  const searchIndex: SearchIndexItem[] = [...festIndex, ...pimIndex, ...hvIndex];
+
+  const festByKey = new Map<string, any>();
+  for (const m of festRaw) {
+    festByKey.set(`FEST:${String(m.id)}`, m);
+  }
+
+  const normalizeForKey = (s: string) =>
+    normalizeForSearch(String(s ?? ""))
+      .replace(/[\s\-]+/g, " ")
+      .trim();
+
+  const festVirkestoffByAtc = new Map<string, string>();
+  for (const m of festRaw) {
+    const atc = String((m as any)?.atc ?? "").trim();
+    const v = String((m as any)?.virkestoff ?? "").trim();
+    if (!atc || !v) continue;
+    if (!festVirkestoffByAtc.has(atc)) festVirkestoffByAtc.set(atc, v);
+  }
+
+  const festMetaByNameKey = new Map<string, { virkestoff: string; atc: string; reseptgruppe: string }>();
+  for (const m of festRaw) {
+    const meta = {
+      virkestoff: String((m as any)?.virkestoff ?? "").trim(),
+      atc: String((m as any)?.atc ?? "").trim(),
+      reseptgruppe: String((m as any)?.reseptgruppe ?? "").trim(),
+    };
+    if (!meta.virkestoff && !meta.atc && !meta.reseptgruppe) continue;
+
+    const n1 = String((m as any)?.varenavn ?? "").trim();
+    const n2 = String((m as any)?.navnFormStyrke ?? "").trim();
+    const k1 = n1 ? normalizeForKey(n1) : "";
+    const k2 = n2 ? normalizeForKey(n2) : "";
+    if (k1 && !festMetaByNameKey.has(k1)) festMetaByNameKey.set(k1, meta);
+    if (k2 && !festMetaByNameKey.has(k2)) festMetaByNameKey.set(k2, meta);
+  }
+
+  const fallbackMetaForPimHv = (item: SearchIndexItem) => {
+    const atc = String((item as any)?.atc ?? "").trim();
+    if (atc) {
+      const virkestoff = festVirkestoffByAtc.get(atc) ?? "";
+      if (virkestoff || atc) {
+        return {
+          virkestoff,
+          atc,
+          reseptgruppe: "",
+        };
+      }
+    }
+
+    const nameCandidates = [
+      (item as any)?.nameFormStrength,
+      (item as any)?.name,
+      (item as any)?.displayName,
+    ]
+      .filter(Boolean)
+      .map((s: any) => String(s).trim())
+      .filter(Boolean);
+
+    for (const n of nameCandidates) {
+      const k = normalizeForKey(n);
+      const meta = festMetaByNameKey.get(k);
+      if (meta) return meta;
+    }
+
+    return {
+      virkestoff: "",
+      atc: "",
+      reseptgruppe: "",
+    };
+  };
+
+  return searchIndex.map((item) => {
+    const key = `${item.source}:${item.id}`;
+
+    if (item.source === "FEST") {
+      const original = festByKey.get(key);
+
+      return finalizeMed({
+        id: key,
+        source: "FEST",
+        varenavn: original?.varenavn ?? null,
+        navnFormStyrke: original?.navnFormStyrke ?? original?.varenavn ?? item.displayName ?? null,
+        atc: original?.atc ?? item.atc ?? null,
+        virkestoff: original?.virkestoff ?? item.substance ?? null,
+        produsent: original?.produsent ?? null,
+        reseptgruppe: original?.reseptgruppe ?? item.prescriptionGroup ?? null,
+        searchText: item.searchText,
+      });
+    }
+
+    const fallbackMeta = fallbackMetaForPimHv(item);
+    return finalizeMed({
+      id: key,
+      source: item.source as "PIM" | "HV",
+      farmaloggNumber: item.farmaloggNumber ?? String(item.id),
+      varenavn: item.name ?? item.displayName ?? null,
+      navnFormStyrke: item.nameFormStrength ?? item.displayName ?? item.name ?? null,
+      atc: item.atc ?? fallbackMeta.atc ?? null,
+      virkestoff: item.substance ?? fallbackMeta.virkestoff ?? null,
+      produsent: item.manufacturer ?? null,
+      reseptgruppe: item.prescriptionGroup ?? fallbackMeta.reseptgruppe ?? null,
+      searchText: item.searchText,
+    });
+  });
+};
+
+const loadMedicationItems = () => {
+  if (!medicationItemsPromise) {
+    medicationItemsPromise = Promise.all([
+      import("../meds.json"),
+      import("./pimProducts.json"),
+      import("./hvProducts.json"),
+    ]).then(([festModule, pimModule, hvModule]) =>
+      buildMedicationItems(
+        Array.isArray(festModule.default) ? festModule.default : [],
+        Array.isArray(pimModule.default) ? pimModule.default : [],
+        Array.isArray(hvModule.default) ? hvModule.default : []
+      )
+    );
+  }
+
+  return medicationItemsPromise;
+};
+
 const tokenMatches = (hayTokens: string[], needleRaw: string) => {
   const needle = needleRaw.replace(",", ".");
 
@@ -313,6 +525,9 @@ const tokenMatches = (hayTokens: string[], needleRaw: string) => {
 export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: Props) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
+  const [allItems, setAllItems] = useState<Med[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const anchorRef = useRef<HTMLDivElement | null>(null);
@@ -320,228 +535,35 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const effectiveInputRef = inputRef ?? internalInputRef;
 
-  const finalizeMed = (input: {
-    id: string;
-    source: "FEST" | "PIM" | "HV";
-    varenavn: string | null;
-    navnFormStyrke: string | null;
-    atc: string | null;
-    virkestoff: string | null;
-    produsent: string | null;
-    reseptgruppe: string | null;
-    farmaloggNumber?: string | null;
-    searchText: string;
-  }): Med => {
-    const nameText = input.navnFormStyrke ?? input.varenavn ?? "";
-    const varenavnText = input.varenavn ?? input.navnFormStyrke ?? "";
-    const substanceText = input.virkestoff ?? "";
-    const searchText = input.searchText || nameText || varenavnText || substanceText;
+  useEffect(() => {
+    let cancelled = false;
 
-    return {
-      ...input,
-      normalizedName: normalizeForSearch(nameText),
-      normalizedVarenavn: normalizeForSearch(varenavnText),
-      normalizedSubstance: normalizeForSearch(substanceText),
-      normalizedSearchText: normalizeForSearch(searchText),
-      nameTokens: toTokens(nameText),
-      varenavnTokens: toTokens(varenavnText),
-      substanceTokens: toTokens(substanceText),
-      hayTokens: toTokens(searchText),
-      dedupKey: input.farmaloggNumber
-        ? `farmalogg:${normalizeIdToken(input.farmaloggNumber)}`
-        : buildDedupKeyFromFields(nameText, substanceText),
-    };
-  };
-
-  const allItems: Med[] = useMemo(() => {
-    const festRaw = (meds as any[]) ?? [];
-    const pimRaw = (pimProducts as any[]) ?? [];
-    const hvRaw = (hvProducts as any[]) ?? [];
-
-    // Normalize both sources into a shared SearchIndexItem shape
-    const festIndex: SearchIndexItem[] = festToSearchIndex(
-      festRaw.map((m) => ({
-        id: String(m.id),
-        name: String(m.navnFormStyrke ?? m.varenavn ?? ""),
-        atc: m.atc ?? undefined,
-        substance: m.virkestoff ?? undefined,
-        prescriptionGroup: m.reseptgruppe ?? undefined,
-      }))
-    );
-
-    const pimIndex: SearchIndexItem[] = pimToSearchIndex(
-      pimRaw.map((p) => ({
-        farmaloggNumber: String(p.farmaloggNumber),
-        name: p.name ?? undefined,
-        nameFormStrength:
-          ((p as any).nameFormStrength && String((p as any).nameFormStrength).trim().length > 0
-            ? (p as any).nameFormStrength
-            : (p as any).name) ?? undefined,
-        // Optional enrichment (some PIM exports include these)
-        atc: (p as any).atc ?? undefined,
-        substance:
-          (p as any).virkestoff ??
-          (p as any).virkestoffNavn ??
-          (p as any).substance ??
-          (p as any).activeSubstance ??
-          (p as any).activeSubstanceName ??
-          undefined,
-        prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
-        manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
-        externalId: (p as any).id ?? undefined,
-      }))
-    );
-
-    // HV products: same backing fields as PIM (farmaloggNumber + name)
-    // We reuse the PIM mapper to keep normalization/tokenization identical.
-    const hvIndex: SearchIndexItem[] = pimToSearchIndex(
-      hvRaw.map((p) => ({
-        farmaloggNumber: String(p.farmaloggNumber),
-        name: p.name ?? undefined,
-        nameFormStrength: p.name ?? undefined,
-        // Optional enrichment (some HV exports include these)
-        atc: (p as any).atc ?? undefined,
-        substance:
-          (p as any).virkestoff ??
-          (p as any).virkestoffNavn ??
-          (p as any).substance ??
-          (p as any).activeSubstance ??
-          (p as any).activeSubstanceName ??
-          undefined,
-        prescriptionGroup: (p as any).reseptgruppe ?? (p as any).prescriptionGroup ?? undefined,
-        manufacturer: (p as any).produsent ?? (p as any).manufacturer ?? undefined,
-        externalId: (p as any).id ?? undefined,
-      }))
-    ).map((item) => ({
-      ...item,
-      source: "HV" as const,
-      // make ids unique across sources
-      id: String(item.farmaloggNumber ?? item.id),
-    }));
-
-    const searchIndex: SearchIndexItem[] = [...festIndex, ...pimIndex, ...hvIndex];
-
-    // Keep a lookup for FEST so we can preserve extra fields (produsent, etc.)
-    const festByKey = new Map<string, any>();
-    for (const m of festRaw) {
-      festByKey.set(`FEST:${String(m.id)}`, m);
-    }
-
-    // --- FEST fallback lookup for PIM/HV virkestoff ---
-    const normalizeForKey = (s: string) =>
-      normalizeForSearch(String(s ?? ""))
-        // remove common separators
-        .replace(/[\s\-]+/g, " ")
-        .trim();
-
-    // 1) Fast fallback by ATC -> virkestoff
-    const festVirkestoffByAtc = new Map<string, string>();
-    for (const m of festRaw) {
-      const atc = String((m as any)?.atc ?? "").trim();
-      const v = String((m as any)?.virkestoff ?? "").trim();
-      if (!atc || !v) continue;
-      if (!festVirkestoffByAtc.has(atc)) festVirkestoffByAtc.set(atc, v);
-    }
-
-    // 2) Fallback by normalized name (varenavn/navnFormStyrke) -> metadata
-    const festMetaByNameKey = new Map<
-      string,
-      { virkestoff: string; atc: string; reseptgruppe: string }
-    >();
-    for (const m of festRaw) {
-      const meta = {
-        virkestoff: String((m as any)?.virkestoff ?? "").trim(),
-        atc: String((m as any)?.atc ?? "").trim(),
-        reseptgruppe: String((m as any)?.reseptgruppe ?? "").trim(),
-      };
-      if (!meta.virkestoff && !meta.atc && !meta.reseptgruppe) continue;
-
-      const n1 = String((m as any)?.varenavn ?? "").trim();
-      const n2 = String((m as any)?.navnFormStyrke ?? "").trim();
-      const k1 = n1 ? normalizeForKey(n1) : "";
-      const k2 = n2 ? normalizeForKey(n2) : "";
-      if (k1 && !festMetaByNameKey.has(k1)) festMetaByNameKey.set(k1, meta);
-      if (k2 && !festMetaByNameKey.has(k2)) festMetaByNameKey.set(k2, meta);
-    }
-
-    const fallbackMetaForPimHv = (item: SearchIndexItem) => {
-      // Prefer ATC match (most stable)
-      const atc = String((item as any)?.atc ?? "").trim();
-      if (atc) {
-        const virkestoff = festVirkestoffByAtc.get(atc) ?? "";
-        if (virkestoff || atc) {
-          return {
-            virkestoff,
-            atc,
-            reseptgruppe: "",
-          };
-        }
-      }
-
-      // Otherwise try by name key (displayName/name/nameFormStrength)
-      const nameCandidates = [
-        (item as any)?.nameFormStrength,
-        (item as any)?.name,
-        (item as any)?.displayName,
-      ]
-        .filter(Boolean)
-        .map((s: any) => String(s).trim())
-        .filter(Boolean);
-
-      for (const n of nameCandidates) {
-        const k = normalizeForKey(n);
-        const meta = festMetaByNameKey.get(k);
-        if (meta) return meta;
-      }
-
-      return {
-        virkestoff: "",
-        atc: "",
-        reseptgruppe: "",
-      };
-    };
-
-    // Convert SearchIndexItem -> Med (the rest of this component continues to work on Med[])
-    return searchIndex.map((item) => {
-      const key = `${item.source}:${item.id}`;
-
-      if (item.source === "FEST") {
-        const original = festByKey.get(key);
-
-        return finalizeMed({
-          id: key,
-          source: "FEST",
-          varenavn: original?.varenavn ?? null,
-          navnFormStyrke:
-            original?.navnFormStyrke ?? original?.varenavn ?? item.displayName ?? null,
-          atc: original?.atc ?? item.atc ?? null,
-          virkestoff: original?.virkestoff ?? item.substance ?? null,
-          produsent: original?.produsent ?? null,
-          reseptgruppe: original?.reseptgruppe ?? item.prescriptionGroup ?? null,
-          searchText: item.searchText,
-        });
-      }
-
-      // PIM / HV
-      const fallbackMeta = fallbackMetaForPimHv(item);
-      return finalizeMed({
-        id: key,
-        source: item.source as "PIM" | "HV",
-        farmaloggNumber: item.farmaloggNumber ?? String(item.id),
-        varenavn: item.name ?? item.displayName ?? null,
-        navnFormStyrke: item.nameFormStrength ?? item.displayName ?? item.name ?? null,
-        atc: item.atc ?? fallbackMeta.atc ?? null,
-        virkestoff: item.substance ?? fallbackMeta.virkestoff ?? null,
-        produsent: item.manufacturer ?? null,
-        reseptgruppe: item.prescriptionGroup ?? fallbackMeta.reseptgruppe ?? null,
-        searchText: item.searchText,
+    setIsLoadingData(true);
+    loadMedicationItems()
+      .then((items) => {
+        if (cancelled) return;
+        setAllItems(items);
+        setLoadError(null);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLoadError(
+          error instanceof Error ? error.message : "Klarte ikke å laste preparatdata."
+        );
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLoadingData(false);
       });
-    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const results = useMemo(() => {
     const tokens = toTokens(deferredQuery);
-    if (tokens.length === 0) return [];
+    if (tokens.length === 0 || allItems.length === 0) return [];
 
     // number + unit pair like "75 mg" or "1.25 ml"
     // Split into meaningful text vs number tokens
@@ -903,12 +925,12 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         inputRef={effectiveInputRef}
         fullWidth
         label="Søk etter preparat"
-        placeholder="Søk på navn eller varenummer"
+        placeholder={isLoadingData ? "Laster preparatdata..." : "Søk på navn eller varenummer"}
         value={query}
         onChange={(e) => {
           const next = e.target.value;
           setQuery(next);
-          setOpen(Boolean(next.trim()));
+          setOpen(Boolean(next.trim()) && !isLoadingData && !loadError);
         }}
         onFocus={() => {
           // Clear the field on focus to make it ready for a new search
@@ -960,7 +982,19 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
         InputProps={{}}
       />
 
-      {open && results.length === 0 && deferredQuery.trim().length >= 2 && (
+      {loadError && (
+        <Typography variant="body2" color="error" sx={{ mt: 0.5, display: "block" }}>
+          Klarte ikke å laste preparatdata. Prøv å laste siden på nytt.
+        </Typography>
+      )}
+
+      {isLoadingData && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+          Laster preparatdata...
+        </Typography>
+      )}
+
+      {!isLoadingData && !loadError && open && results.length === 0 && deferredQuery.trim().length >= 2 && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
           <strong>Ingen treff.</strong>{" "}
           Mangler preparatet?{" "}
@@ -972,7 +1006,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       )}
 
       <Popper
-        open={open && results.length > 0}
+        open={!isLoadingData && !loadError && open && results.length > 0}
         anchorEl={anchorRef.current}
         placement="bottom-start"
         sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}

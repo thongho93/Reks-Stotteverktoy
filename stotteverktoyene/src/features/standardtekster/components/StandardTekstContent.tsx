@@ -300,6 +300,8 @@ export default function StandardTekstContent({
             component="img"
             src="/img/checkthisout.gif"
             alt="Velg standardtekst"
+            loading="lazy"
+            decoding="async"
             sx={{
               width: 450,
               maxWidth: "80%",
