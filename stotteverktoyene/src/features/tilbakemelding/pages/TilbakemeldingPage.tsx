@@ -4,8 +4,8 @@ import {
   Box,
   Button,
   CircularProgress,
-  FormControlLabel,
   Paper,
+  FormControlLabel,
   Switch,
   Tab,
   Tabs,
@@ -13,6 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { FirebaseError } from "firebase/app";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
@@ -373,7 +374,7 @@ export default function TilbakemeldingPage() {
           scrollButtons="auto"
         >
           <Tab value="notater" label="Mine notater" />
-          <Tab value="meldeskjema" label="Meldeskjema" />
+          <Tab value="meldeskjema" label="Innspill" />
         </Tabs>
       </Paper>
 
@@ -442,16 +443,6 @@ export default function TilbakemeldingPage() {
                 >
                   <Typography variant="h3">Skriv private notater</Typography>
                   <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={autoCopyEnabled}
-                          onChange={(event) => setAutoCopyEnabled(event.target.checked)}
-                        />
-                      }
-                      label="Auto-kopi"
-                      sx={{ mr: 0 }}
-                    />
                     <Button variant="outlined" onClick={handleNewNote}>
                       Nytt notat
                     </Button>
@@ -525,9 +516,28 @@ export default function TilbakemeldingPage() {
               </Paper>
 
               <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="h3" sx={{ mb: 1.5 }}>
-                  Lagrede notater ({savedNotesList.length})
-                </Typography>
+                <Box
+                  sx={{
+                    mb: 1.5,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 1,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Typography variant="h3">Lagrede notater ({savedNotesList.length})</Typography>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={autoCopyEnabled}
+                        onChange={(event) => setAutoCopyEnabled(event.target.checked)}
+                      />
+                    }
+                    label="Auto-kopi ved klikk"
+                    sx={{ mr: 0 }}
+                  />
+                </Box>
 
                 <Box sx={{ maxHeight: { xs: 360, md: 540 }, overflowY: "auto", pr: 0.5 }}>
                   {savedNotesList.length === 0 ? (
@@ -551,9 +561,30 @@ export default function TilbakemeldingPage() {
                               bgcolor: isSelected ? "action.selected" : "background.paper",
                             }}
                           >
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                              {note.title || "Uten tittel"}
-                            </Typography>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                                gap: 1,
+                              }}
+                            >
+                              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                {note.title || "Uten tittel"}
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                  color: "text.secondary",
+                                  mt: 0.2,
+                                }}
+                              >
+                                <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />
+                                <Typography variant="caption">Klikk for kopiering</Typography>
+                              </Box>
+                            </Box>
                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                               {buildSnippet(note.content)}
                             </Typography>
