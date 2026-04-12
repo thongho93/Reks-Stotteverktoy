@@ -1,3 +1,4 @@
+import { Box, CircularProgress, Typography } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 
 const OFFICE_FORM_URL = import.meta.env.VITE_OFFICE_FORM_URL as string;
@@ -8,6 +9,7 @@ if (!OFFICE_FORM_URL) {
 
 export default function OfficeFormRedirectPage() {
   const [iframeError, setIframeError] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -21,9 +23,34 @@ export default function OfficeFormRedirectPage() {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
+      {!iframeLoaded && (
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            gap: 1.5,
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,252,0.98) 100%)",
+            zIndex: 1,
+            textAlign: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <Box>
+            <CircularProgress size={28} />
+            <Typography sx={{ mt: 1.5, fontWeight: 600 }}>Laster produktskjema ...</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Selve skjemaet hentes fra Microsoft Forms.
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
       {iframeError && (
-        <div style={{ padding: 12 }}>
+        <div style={{ padding: 12, position: "relative", zIndex: 2 }}>
           Bruk knappen hvis skjemaet ikke lastes automatisk:
           <br />
           <button
@@ -59,9 +86,13 @@ export default function OfficeFormRedirectPage() {
         style={{ flex: 1, border: 0 }}
         onLoad={() => {
           hasLoadedRef.current = true;
+          setIframeLoaded(true);
           setIframeError(false);
         }}
-        onError={() => setIframeError(true)}
+        onError={() => {
+          setIframeLoaded(true);
+          setIframeError(true);
+        }}
       />
     </div>
   );

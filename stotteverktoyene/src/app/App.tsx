@@ -54,9 +54,39 @@ const LoginPage = React.lazy(() =>
   import("./auth/LoginPage").then((module) => ({ default: module.LoginPage }))
 );
 const PendingApprovalPage = React.lazy(() => import("./auth/PendingApprovalPage"));
+const OFFICE_FORM_URL = import.meta.env.VITE_OFFICE_FORM_URL as string | undefined;
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
+
+function warmConnection(url?: string) {
+  if (!url || typeof document === "undefined") return;
+
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return;
+  }
+
+  const ensureLink = (rel: "preconnect" | "dns-prefetch") => {
+    const selector = `link[rel="${rel}"][href="${origin}"]`;
+    if (document.head.querySelector(selector)) return;
+
+    const link = document.createElement("link");
+    link.rel = rel;
+    link.href = origin;
+
+    if (rel === "preconnect") {
+      link.crossOrigin = "anonymous";
+    }
+
+    document.head.appendChild(link);
+  };
+
+  ensureLink("dns-prefetch");
+  ensureLink("preconnect");
+}
 
 function RouteLoader() {
   return (
@@ -299,6 +329,10 @@ function Layout() {
 
   React.useEffect(() => {
     logUsage("app_open");
+  }, []);
+
+  React.useEffect(() => {
+    warmConnection(OFFICE_FORM_URL);
   }, []);
 
   React.useEffect(() => {
