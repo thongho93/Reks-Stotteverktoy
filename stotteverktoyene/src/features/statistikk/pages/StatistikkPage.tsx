@@ -5,11 +5,16 @@ import {
   Typography,
   TextField,
   Button,
+  IconButton,
+  Chip,
+  Divider,
+  LinearProgress,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  TableContainer,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
@@ -23,12 +28,17 @@ import {
   ListItem,
   ListItemText,
 } from "@mui/material";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
+import type { UsagePage } from "../../../shared/services/usage";
+
+type ViewMode = "day" | "week" | "month";
 
 type TotalsRow = {
-  key: string; // dateKey (daily) or weekKey (weekly)
-  label: string; // shown in table
+  key: string;
+  label: string;
   pageViews: number;
   copies: number;
   searches: number;
@@ -45,8 +55,63 @@ type UserAggRow = {
   searches: number;
   lastPage?: string;
   lastStandardtekstId?: string;
-  updatedAt?: any;
+  updatedAt?: { toMillis: () => number };
 };
+
+type PageUsageRow = {
+  page: UsagePage;
+  label: string;
+  views: number;
+  uniqueUsers: number;
+};
+
+type PeriodTotals = {
+  pageViews: number;
+  copies: number;
+  searches: number;
+  standardtekstOpens: number;
+  activeUsers: number;
+};
+
+const EMPTY_PERIOD_TOTALS: PeriodTotals = {
+  pageViews: 0,
+  copies: 0,
+  searches: 0,
+  standardtekstOpens: 0,
+  activeUsers: 0,
+};
+
+const PAGE_ORDER: UsagePage[] = [
+  "home",
+  "omeq",
+  "standardtekster",
+  "interaksjoner",
+  "produktskjema",
+  "anbrudd",
+  "teamschat",
+  "tilbakemelding",
+  "profil",
+  "rekspert",
+  "statistikk",
+  "other",
+];
+
+const PAGE_LABELS: Record<UsagePage, string> = {
+  home: "Forside",
+  omeq: "OMEQ",
+  standardtekster: "Standardtekster",
+  interaksjoner: "Interaksjoner",
+  produktskjema: "Produktskjema",
+  anbrudd: "Anbrudd",
+  teamschat: "Teams chat",
+  tilbakemelding: "Innspill og notater",
+  profil: "Profil",
+  rekspert: "Rekspert",
+  statistikk: "Statistikk",
+  other: "Annet",
+};
+
+const KNOWN_PAGE_SET = new Set<string>(PAGE_ORDER);
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -62,10 +127,41 @@ function addDays(date: Date, days: number) {
   return d;
 }
 
+function atStartOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getRangeForAnchor(anchorInput: Date, mode: ViewMode) {
+  const anchor = atStartOfDay(anchorInput);
+  const today = atStartOfDay(new Date());
+
+  if (mode === "day") {
+    return { from: anchor, to: anchor };
+  }
+
+  if (mode === "week") {
+    const weekStart = startOfIsoWeekMonday(anchor);
+    return { from: weekStart, to: anchor };
+  }
+
+  const monthStart = startOfMonth(anchor);
+  const monthEnd = endOfMonth(anchor);
+  return { from: monthStart, to: isSameYearMonth(anchor, today) ? today : monthEnd };
+}
+
+function shiftAnchorByMode(anchorInput: Date, mode: ViewMode, direction: -1 | 1) {
+  const anchor = atStartOfDay(anchorInput);
+
+  if (mode === "day") return addDays(anchor, direction);
+  if (mode === "week") return addDays(anchor, direction * 7);
+  return new Date(anchor.getFullYear(), anchor.getMonth() + direction, 1);
+}
+
 function parseDateKey(input: string) {
   const s = String(input || "").trim();
 
-  // Accept both yyyy-mm-dd and dd.mm.yyyy
   const iso = /^\d{4}-\d{2}-\d{2}$/;
   const nor = /^\d{2}\.\d{2}\.\d{4}$/;
 
@@ -105,7 +201,6 @@ function listDateKeysInclusive(fromKey: string, toKey: string) {
 
 function startOfIsoWeekMonday(date: Date) {
   const d = new Date(date);
-  // getDay(): 0=Sun,1=Mon,...6=Sat. Convert so Mon=0,...Sun=6
   const day = (d.getDay() + 6) % 7;
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - day);
@@ -120,11 +215,27 @@ function endOfIsoWeekSunday(date: Date) {
   return end;
 }
 
+function startOfMonth(date: Date) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfMonth(date: Date) {
+  const d = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function isSameYearMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
 function getIsoWeekKey(date: Date) {
-  // ISO week: week starts Monday; week-year can differ near year boundaries.
   const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = utc.getUTCDay() || 7; // Mon=1..Sun=7
-  utc.setUTCDate(utc.getUTCDate() + 4 - dayNum); // move to Thursday
+  const dayNum = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - dayNum);
   const isoYear = utc.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
   const weekNo = Math.ceil(((utc.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
@@ -154,7 +265,6 @@ function groupByIsoWeeks(dayRows: TotalsRow[]) {
   >();
 
   for (const r of dayRows) {
-    // r.key is the ISO dateKey: yyyy-mm-dd
     const d = parseDateKey(r.key);
     if (!isValidDate(d)) continue;
 
@@ -191,45 +301,170 @@ function groupByIsoWeeks(dayRows: TotalsRow[]) {
     });
 }
 
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+}
+
+function getMonthLabel(date: Date) {
+  return date.toLocaleDateString("nb-NO", { month: "long", year: "numeric" });
+}
+
+function groupByMonths(dayRows: TotalsRow[]) {
+  const map = new Map<
+    string,
+    {
+      monthStart: Date;
+      pageViews: number;
+      copies: number;
+      searches: number;
+    }
+  >();
+
+  for (const r of dayRows) {
+    const d = parseDateKey(r.key);
+    if (!isValidDate(d)) continue;
+
+    const monthKey = getMonthKey(d);
+    const monthStart = startOfMonth(d);
+    const prev = map.get(monthKey);
+
+    if (!prev) {
+      map.set(monthKey, {
+        monthStart,
+        pageViews: r.pageViews,
+        copies: r.copies,
+        searches: r.searches,
+      });
+    } else {
+      prev.pageViews += r.pageViews;
+      prev.copies += r.copies;
+      prev.searches += r.searches;
+    }
+  }
+
+  return [...map.entries()]
+    .sort((a, b) => a[1].monthStart.getTime() - b[1].monthStart.getTime())
+    .map(([monthKey, v]) => ({
+      key: monthKey,
+      label: getMonthLabel(v.monthStart),
+      pageViews: v.pageViews,
+      copies: v.copies,
+      searches: v.searches,
+    }));
+}
+
+function asCount(value: unknown): number {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+
+function normalizePage(value: string): UsagePage {
+  const key = value.trim().toLowerCase();
+  return KNOWN_PAGE_SET.has(key) ? (key as UsagePage) : "other";
+}
+
+function parsePageCounterMap(raw: unknown): Partial<Record<UsagePage, number>> {
+  if (!raw || typeof raw !== "object") return {};
+
+  const entries = raw as Record<string, unknown>;
+  const out: Partial<Record<UsagePage, number>> = {};
+
+  for (const [key, value] of Object.entries(entries)) {
+    const count = asCount(value);
+    if (!count) continue;
+    const page = normalizePage(key);
+    out[page] = (out[page] ?? 0) + count;
+  }
+
+  return out;
+}
+
+function hasPageCounters(map: Partial<Record<UsagePage, number>>) {
+  return Object.values(map).some((n) => asCount(n) > 0);
+}
+
+function getPageFromValue(value: unknown): UsagePage {
+  if (typeof value !== "string") return "other";
+  return normalizePage(value);
+}
+
 export default function StatistikkPage() {
-  const [from, setFrom] = React.useState(() => {
-    // default: last 7 days
-    return toDateKey(addDays(new Date(), -6));
-  });
-  const [to, setTo] = React.useState(() => toDateKey(new Date()));
-  const [viewMode, setViewMode] = React.useState<"day" | "week">("day");
-  const [userViewMode, setUserViewMode] = React.useState<"day" | "total">("total");
+  const [from, setFrom] = React.useState(() =>
+    toDateKey(getRangeForAnchor(new Date(), "day").from)
+  );
+  const [to, setTo] = React.useState(() => toDateKey(getRangeForAnchor(new Date(), "day").to));
+  const [viewMode, setViewMode] = React.useState<ViewMode>("day");
   const [showAllUsers, setShowAllUsers] = React.useState(false);
 
   const [rows, setRows] = React.useState<TotalsRow[]>([]);
+  const [pageRows, setPageRows] = React.useState<PageUsageRow[]>([]);
   const [topStandardtekster, setTopStandardtekster] = React.useState<
     { title: string; opens: number }[]
   >([]);
   const [topDialogOpen, setTopDialogOpen] = React.useState(false);
   const [aggregatedUsers, setAggregatedUsers] = React.useState<UserAggRow[]>([]);
+  const [periodTotals, setPeriodTotals] = React.useState<PeriodTotals>(EMPTY_PERIOD_TOTALS);
+
   const [loadingTotals, setLoadingTotals] = React.useState(false);
   const [loadingUsers, setLoadingUsers] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
   const [userTopDialogOpen, setUserTopDialogOpen] = React.useState(false);
   const [userTopDialogTitle, setUserTopDialogTitle] = React.useState<string>("");
   const [userTopLoading, setUserTopLoading] = React.useState(false);
   const [userTopError, setUserTopError] = React.useState<string | null>(null);
   const [userTopItems, setUserTopItems] = React.useState<{ title: string; opens: number }[]>([]);
 
-  const getUserTopDateKeys = React.useCallback(() => {
+  const numberFormatter = React.useMemo(() => new Intl.NumberFormat("nb-NO"), []);
+
+  const applyPresetRangeForMode = React.useCallback((mode: ViewMode) => {
+    const range = getRangeForAnchor(new Date(), mode);
+    setFrom(toDateKey(range.from));
+    setTo(toDateKey(range.to));
+  }, []);
+
+  const navigatePeriod = React.useCallback(
+    (direction: -1 | 1) => {
+      const toDate = parseDateKey(to);
+      if (!isValidDate(toDate)) return;
+
+      const shiftedAnchor = shiftAnchorByMode(toDate, viewMode, direction);
+      const today = atStartOfDay(new Date());
+      if (direction > 0 && shiftedAnchor > today) return;
+
+      const range = getRangeForAnchor(shiftedAnchor, viewMode);
+      setFrom(toDateKey(range.from));
+      setTo(toDateKey(range.to));
+    },
+    [to, viewMode]
+  );
+
+  const getSelectedRange = React.useCallback(() => {
     const fromDate = parseDateKey(from);
     const toDate = parseDateKey(to);
-    if (!isValidDate(fromDate) || !isValidDate(toDate)) return [] as string[];
 
-    const rangeStart = viewMode === "week" ? startOfIsoWeekMonday(fromDate) : fromDate;
-    const rangeEnd = viewMode === "week" ? endOfIsoWeekSunday(toDate) : toDate;
+    if (!isValidDate(fromDate) || !isValidDate(toDate)) return null;
+    if (fromDate > toDate) return null;
 
-    const all = listDateKeysInclusive(toDateKey(rangeStart), toDateKey(rangeEnd));
-    if (userViewMode === "day") {
-      return [toDateKey(toDate)];
-    }
-    return all;
-  }, [from, to, viewMode, userViewMode]);
+    const rangeStart = fromDate;
+    const rangeEnd = toDate;
+    const dateKeys = listDateKeysInclusive(toDateKey(rangeStart), toDateKey(rangeEnd));
+
+    return {
+      fromDate,
+      toDate,
+      rangeStart,
+      rangeEnd,
+      dateKeys,
+    };
+  }, [from, to]);
+
+  const getUserTopDateKeys = React.useCallback(() => {
+    const range = getSelectedRange();
+    if (!range) return [] as string[];
+    return range.dateKeys;
+  }, [getSelectedRange]);
 
   const openUserTopDialog = React.useCallback(
     async (uid: string, label: string) => {
@@ -253,8 +488,8 @@ export default function StatistikkPage() {
             const ref = collection(db, "usage_daily", dateKey, "users", uid, "standardtekster");
             const snap = await getDocs(ref);
             snap.forEach((d) => {
-              const data = d.data() as any;
-              const opens = Number(data.opens ?? 0);
+              const data = d.data() as Record<string, unknown>;
+              const opens = asCount(data.opens);
               if (!opens) return;
               opensById.set(d.id, (opensById.get(d.id) ?? 0) + opens);
             });
@@ -270,7 +505,7 @@ export default function StatistikkPage() {
             try {
               const ref = doc(db, "Standardtekster", id);
               const s = await getDoc(ref);
-              const data = s.exists() ? (s.data() as any) : null;
+              const data = s.exists() ? (s.data() as Record<string, unknown>) : null;
               const title = typeof data?.title === "string" ? data.title.trim() : "";
               return { title: title || id, opens };
             } catch {
@@ -280,8 +515,11 @@ export default function StatistikkPage() {
         );
 
         setUserTopItems(items);
-      } catch (e: any) {
-        const message = typeof e?.message === "string" ? e.message : "Kunne ikke hente topp 5.";
+      } catch (e: unknown) {
+        const message =
+          typeof e === "object" && e && "message" in e && typeof e.message === "string"
+            ? e.message
+            : "Kunne ikke hente topp 5.";
         setUserTopError(message);
         setUserTopItems([]);
       } finally {
@@ -299,30 +537,16 @@ export default function StatistikkPage() {
     try {
       if (!from || !to) {
         setRows([]);
+        setPageRows([]);
         setAggregatedUsers([]);
         setTopStandardtekster([]);
+        setPeriodTotals(EMPTY_PERIOD_TOTALS);
         setTopDialogOpen(false);
         setUserTopDialogOpen(false);
         setUserTopItems([]);
         setUserTopError(null);
         setUserTopLoading(false);
         setUserTopDialogTitle("");
-        setLoadingTotals(false);
-        setLoadingUsers(false);
-        return;
-      }
-
-      if (from > to) {
-        setRows([]);
-        setAggregatedUsers([]);
-        setTopStandardtekster([]);
-        setTopDialogOpen(false);
-        setUserTopDialogOpen(false);
-        setUserTopItems([]);
-        setUserTopError(null);
-        setUserTopLoading(false);
-        setUserTopDialogTitle("");
-        setError("Fra-dato kan ikke være etter til-dato.");
         setLoadingTotals(false);
         setLoadingUsers(false);
         return;
@@ -333,8 +557,10 @@ export default function StatistikkPage() {
 
       if (!isValidDate(fromDate) || !isValidDate(toDate)) {
         setRows([]);
+        setPageRows([]);
         setAggregatedUsers([]);
         setTopStandardtekster([]);
+        setPeriodTotals(EMPTY_PERIOD_TOTALS);
         setTopDialogOpen(false);
         setUserTopDialogOpen(false);
         setUserTopItems([]);
@@ -347,12 +573,42 @@ export default function StatistikkPage() {
         return;
       }
 
-      const rangeStart = viewMode === "week" ? startOfIsoWeekMonday(fromDate) : fromDate;
-      const rangeEnd = viewMode === "week" ? endOfIsoWeekSunday(toDate) : toDate;
+      if (fromDate > toDate) {
+        setRows([]);
+        setPageRows([]);
+        setAggregatedUsers([]);
+        setTopStandardtekster([]);
+        setPeriodTotals(EMPTY_PERIOD_TOTALS);
+        setTopDialogOpen(false);
+        setUserTopDialogOpen(false);
+        setUserTopItems([]);
+        setUserTopError(null);
+        setUserTopLoading(false);
+        setUserTopDialogTitle("");
+        setError("Fra-dato kan ikke være etter til-dato.");
+        setLoadingTotals(false);
+        setLoadingUsers(false);
+        return;
+      }
 
-      const dateKeys = listDateKeysInclusive(toDateKey(rangeStart), toDateKey(rangeEnd));
+      const range = getSelectedRange();
+      if (!range) {
+        setRows([]);
+        setPageRows([]);
+        setAggregatedUsers([]);
+        setTopStandardtekster([]);
+        setPeriodTotals(EMPTY_PERIOD_TOTALS);
+        setError("Ingen gyldig periode valgt.");
+        setLoadingTotals(false);
+        setLoadingUsers(false);
+        return;
+      }
 
-      // 0) Top 10 standardtekster (sum opens per standardtekstId over perioden)
+      const { dateKeys } = range;
+
+      const ownerSnap = await getDocs(collection(db, "owners"));
+      const ownerUids = new Set<string>(ownerSnap.docs.map((d) => d.id));
+
       const standardtekstOpensById = new Map<string, number>();
 
       await Promise.all(
@@ -360,8 +616,8 @@ export default function StatistikkPage() {
           const stRef = collection(db, "usage_daily", dateKey, "standardtekster");
           const snap = await getDocs(stRef);
           snap.forEach((d) => {
-            const data = d.data() as any;
-            const opens = Number(data.opens ?? 0);
+            const data = d.data() as Record<string, unknown>;
+            const opens = asCount(data.opens);
             if (!opens) return;
             standardtekstOpensById.set(d.id, (standardtekstOpensById.get(d.id) ?? 0) + opens);
           });
@@ -372,13 +628,12 @@ export default function StatistikkPage() {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
 
-      // Fetch titles for the top IDs (fallback to id if missing)
-      const items = await Promise.all(
+      const topItems = await Promise.all(
         topEntries.map(async ([id, opens]) => {
           try {
             const ref = doc(db, "Standardtekster", id);
             const s = await getDoc(ref);
-            const data = s.exists() ? (s.data() as any) : null;
+            const data = s.exists() ? (s.data() as Record<string, unknown>) : null;
             const title = typeof data?.title === "string" ? data.title.trim() : "";
             return { title: title || id, opens };
           } catch {
@@ -387,20 +642,24 @@ export default function StatistikkPage() {
         })
       );
 
-      setTopStandardtekster(items);
+      setTopStandardtekster(topItems);
 
-      // Per-user aggregation can be either the full selected range (total) or only the selected "Til" day.
-      const userDayKey = toDateKey(toDate);
-      const userDateKeys = userViewMode === "day" ? [userDayKey] : dateKeys;
-
-      // Hent eier(e) og ekskluder fra statistikken (både totals og per bruker).
-      const ownerSnap = await getDocs(collection(db, "owners"));
-      const ownerUids = new Set<string>(ownerSnap.docs.map((d) => d.id));
-
+      const userDateKeys = dateKeys;
       const dayTotals = new Map<string, TotalsRow>();
       const userAgg = new Map<string, UserAggRow>();
 
-      // 1) Build main per-day totals (for the day/week table)
+      const activeUsers = new Set<string>();
+      const periodAccumulator: PeriodTotals = {
+        pageViews: 0,
+        copies: 0,
+        searches: 0,
+        standardtekstOpens: 0,
+        activeUsers: 0,
+      };
+
+      const pageViewsByPage = new Map<UsagePage, number>();
+      const uniqueUsersByPage = new Map<UsagePage, Set<string>>();
+
       await Promise.all(
         dateKeys.map(async (dateKey) => {
           const usersRef = collection(db, "usage_daily", dateKey, "users");
@@ -417,11 +676,41 @@ export default function StatistikkPage() {
           snap.forEach((d) => {
             const uid = d.id;
             if (ownerUids.has(uid)) return;
-            const data = d.data() as any;
 
-            dayRow.pageViews += Number(data.pageViews ?? 0);
-            dayRow.copies += Number(data.copies ?? 0);
-            dayRow.searches += Number(data.searches ?? 0);
+            const data = d.data() as Record<string, unknown>;
+            const pageViews = asCount(data.pageViews);
+            const copies = asCount(data.copies);
+            const searches = asCount(data.searches);
+            const standardtekstOpens = asCount(data.standardtekstOpens);
+
+            dayRow.pageViews += pageViews;
+            dayRow.copies += copies;
+            dayRow.searches += searches;
+
+            periodAccumulator.pageViews += pageViews;
+            periodAccumulator.copies += copies;
+            periodAccumulator.searches += searches;
+            periodAccumulator.standardtekstOpens += standardtekstOpens;
+            activeUsers.add(uid);
+
+            const pageMap = parsePageCounterMap(data.pageViewsByPage);
+            if (!hasPageCounters(pageMap) && pageViews > 0) {
+              const fallbackPage = getPageFromValue(data.lastPage);
+              pageMap[fallbackPage] = (pageMap[fallbackPage] ?? 0) + pageViews;
+            }
+
+            for (const [rawPage, rawCount] of Object.entries(pageMap)) {
+              const page = normalizePage(rawPage);
+              const count = asCount(rawCount);
+              if (!count) continue;
+
+              pageViewsByPage.set(page, (pageViewsByPage.get(page) ?? 0) + count);
+
+              const usersForPage = uniqueUsersByPage.get(page) ?? new Set<string>();
+              usersForPage.add(uid);
+              uniqueUsersByPage.set(page, usersForPage);
+            }
+
           });
 
           dayTotals.set(dateKey, dayRow);
@@ -429,7 +718,6 @@ export default function StatistikkPage() {
       );
       setLoadingTotals(false);
 
-      // 2) Build per-user aggregation (either day or total)
       await Promise.all(
         userDateKeys.map(async (dateKey) => {
           const usersRef = collection(db, "usage_daily", dateKey, "users");
@@ -438,7 +726,8 @@ export default function StatistikkPage() {
           snap.forEach((d) => {
             const uid = d.id;
             if (ownerUids.has(uid)) return;
-            const data = d.data() as any;
+
+            const data = d.data() as Record<string, unknown>;
 
             const prev = userAgg.get(uid) ?? {
               uid,
@@ -448,35 +737,44 @@ export default function StatistikkPage() {
               searches: 0,
             };
 
-            prev.pageViews += Number(data.pageViews ?? 0);
-            prev.standardtekstOpens += Number(data.standardtekstOpens ?? 0);
-            prev.copies += Number(data.copies ?? 0);
-            prev.searches += Number(data.searches ?? 0);
+            prev.pageViews += asCount(data.pageViews);
+            prev.standardtekstOpens += asCount(data.standardtekstOpens);
+            prev.copies += asCount(data.copies);
+            prev.searches += asCount(data.searches);
 
-            // Prefer most recent firstName and email metadata.
             const updatedAt = data.updatedAt;
             const firstName = typeof data.firstName === "string" ? data.firstName.trim() : "";
             const email = typeof data.email === "string" ? data.email.trim() : "";
             const displayName = firstName || email || `${uid.slice(0, 6)}…${uid.slice(-4)}`;
             prev.displayName = displayName;
+
+            const prevUpdatedAt = prev.updatedAt;
+            const currentTs =
+              updatedAt &&
+              typeof updatedAt === "object" &&
+              "toMillis" in updatedAt &&
+              typeof (updatedAt as { toMillis?: unknown }).toMillis === "function"
+                ? (updatedAt as { toMillis: () => number })
+                : undefined;
+
             if (
-              !prev.updatedAt ||
-              (updatedAt &&
-                prev.updatedAt?.toMillis &&
-                updatedAt?.toMillis &&
-                updatedAt.toMillis() > prev.updatedAt.toMillis())
+              !prevUpdatedAt ||
+              (currentTs &&
+                typeof prevUpdatedAt.toMillis === "function" &&
+                currentTs.toMillis() > prevUpdatedAt.toMillis())
             ) {
-              prev.updatedAt = updatedAt;
+              prev.updatedAt = currentTs;
               if (typeof data.lastPage === "string") prev.lastPage = data.lastPage;
-              if (typeof data.lastStandardtekstId === "string")
+              if (typeof data.lastStandardtekstId === "string") {
                 prev.lastStandardtekstId = data.lastStandardtekstId;
+              }
               if (firstName) prev.firstName = firstName;
               if (email) prev.email = email;
             } else {
-              if (!prev.lastPage && typeof data.lastPage === "string")
-                prev.lastPage = data.lastPage;
-              if (!prev.lastStandardtekstId && typeof data.lastStandardtekstId === "string")
+              if (!prev.lastPage && typeof data.lastPage === "string") prev.lastPage = data.lastPage;
+              if (!prev.lastStandardtekstId && typeof data.lastStandardtekstId === "string") {
                 prev.lastStandardtekstId = data.lastStandardtekstId;
+              }
               if (!prev.firstName && firstName) prev.firstName = firstName;
               if (!prev.email && email) prev.email = email;
             }
@@ -487,14 +785,20 @@ export default function StatistikkPage() {
       );
       setLoadingUsers(false);
 
-      const existingDayRows = [...dayTotals.values()].filter(
-        (r) => r.pageViews !== 0 || r.copies !== 0 || r.searches !== 0
-      );
+      const existingDayRows = dateKeys
+        .map((key) => dayTotals.get(key))
+        .filter((r): r is TotalsRow => Boolean(r))
+        .filter((r) => r.pageViews !== 0 || r.copies !== 0 || r.searches !== 0);
 
-      const viewRows = viewMode === "week" ? groupByIsoWeeks(existingDayRows) : existingDayRows;
+      const viewRows =
+        viewMode === "week"
+          ? groupByIsoWeeks(existingDayRows)
+          : viewMode === "month"
+          ? groupByMonths(existingDayRows)
+          : existingDayRows;
       setRows(viewRows);
 
-      const aggregatedUsers = [...userAgg.values()]
+      const users = [...userAgg.values()]
         .filter((u) => u.pageViews || u.standardtekstOpens || u.copies || u.searches)
         .sort(
           (a, b) =>
@@ -505,14 +809,39 @@ export default function StatistikkPage() {
             (a.pageViews + a.standardtekstOpens + a.copies + a.searches)
         );
 
-      setAggregatedUsers(aggregatedUsers);
+      setAggregatedUsers(users);
+
+      periodAccumulator.activeUsers = activeUsers.size;
+      setPeriodTotals(periodAccumulator);
+
+      const pageUsageRows = PAGE_ORDER.map((page) => {
+        const views = pageViewsByPage.get(page) ?? 0;
+        const uniqueUsers = uniqueUsersByPage.get(page)?.size ?? 0;
+
+        return {
+          page,
+          label: PAGE_LABELS[page],
+          views,
+          uniqueUsers,
+        } satisfies PageUsageRow;
+      })
+        .filter((r) => r.views > 0)
+        .sort((a, b) => b.views - a.views || b.uniqueUsers - a.uniqueUsers);
+
+      setPageRows(pageUsageRows);
+
       return;
-    } catch (e: any) {
-      const message = typeof e?.message === "string" ? e.message : "Kunne ikke hente statistikk.";
+    } catch (e: unknown) {
+      const message =
+        typeof e === "object" && e && "message" in e && typeof e.message === "string"
+          ? e.message
+          : "Kunne ikke hente statistikk.";
       setError(message);
       setRows([]);
+      setPageRows([]);
       setAggregatedUsers([]);
       setTopStandardtekster([]);
+      setPeriodTotals(EMPTY_PERIOD_TOTALS);
       setTopDialogOpen(false);
       setUserTopDialogOpen(false);
       setUserTopItems([]);
@@ -522,18 +851,16 @@ export default function StatistikkPage() {
       setLoadingTotals(false);
       setLoadingUsers(false);
     } finally {
-      // If we returned early, these might already be false.
-      // Keep safe: turn both off.
       setLoadingTotals(false);
       setLoadingUsers(false);
     }
-  }, [from, to, viewMode, userViewMode]);
+  }, [from, to, getSelectedRange, viewMode]);
 
   React.useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  const totals = React.useMemo(() => {
+  const tableTotals = React.useMemo(() => {
     return rows.reduce(
       (acc, r) => {
         acc.pageViews += r.pageViews;
@@ -549,22 +876,50 @@ export default function StatistikkPage() {
     return showAllUsers ? aggregatedUsers : aggregatedUsers.slice(0, 5);
   }, [showAllUsers, aggregatedUsers]);
 
+  const kpiCards = [
+    {
+      title: "Aktive brukere",
+      description: "Unike brukere i valgt periode",
+      value: numberFormatter.format(periodTotals.activeUsers),
+    },
+    {
+      title: "Sidevisninger",
+      description: "Totalt antall sidevisninger",
+      value: numberFormatter.format(periodTotals.pageViews),
+    },
+    {
+      title: "Kopieringer",
+      description: "Tekst kopiert fra appen",
+      value: numberFormatter.format(periodTotals.copies),
+    },
+  ];
+
+  const isLoading = loadingTotals || loadingUsers;
+  const parsedFrom = parseDateKey(from);
+  const parsedTo = parseDateKey(to);
+  const hasValidHeaderRange = isValidDate(parsedFrom) && isValidDate(parsedTo);
+  const periodRangeLabel = hasValidHeaderRange
+    ? `${formatNorDate(parsedFrom)}–${formatNorDate(parsedTo)}`
+    : "Ugyldig periode";
+  const canNavigateForward = hasValidHeaderRange && parsedTo < atStartOfDay(new Date());
+
   return (
     <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Box
         sx={{
-          maxWidth: 900,
-          mx: "auto",
           width: "100%",
           flex: "1 1 auto",
           display: "flex",
           overflow: "hidden",
-          p: 2,
+          px: { xs: 1, sm: 2 },
+          py: { xs: 1, sm: 2 },
         }}
       >
         <Paper
           sx={{
-            p: 3,
+            width: "100%",
+            p: { xs: 2, sm: 3 },
+            borderRadius: 3,
             flex: "1 1 auto",
             minHeight: 0,
             overflow: "hidden",
@@ -572,58 +927,122 @@ export default function StatistikkPage() {
             flexDirection: "column",
           }}
         >
-          <Typography variant="h2" gutterBottom>
-            Statistikk
-          </Typography>
-          <Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
-              <TextField
-                label="Fra"
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                label="Til"
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-              <Button
-                variant="outlined"
-                onClick={fetchStats}
-                disabled={loadingTotals || loadingUsers}
-                sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
-              >
-                Oppdater
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => setTopDialogOpen(true)}
-                disabled={loadingTotals || loadingUsers || topStandardtekster.length === 0}
-                sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
-              >
-                Topp standardtekster
-              </Button>
-            </Stack>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            alignItems={{ xs: "flex-start", md: "center" }}
+            justifyContent="space-between"
+            spacing={1}
+            sx={{ mb: 2 }}
+          >
+            <Box>
+              <Typography variant="h2" gutterBottom={false}>
+                Statistikk
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+                Innsikt i bruk, verdi og hvilke sider som faktisk blir brukt
+              </Typography>
+            </Box>
+          </Stack>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {isLoading && <LinearProgress sx={{ mb: 2, borderRadius: 999 }} />}
+
+          <Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 1.5,
+                mb: 2,
+                borderRadius: 2,
+                position: "sticky",
+                top: 0,
+                zIndex: 5,
+                backgroundColor: "background.paper",
+              }}
+            >
+              <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} alignItems="stretch">
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ flex: 1 }}>
+                  <TextField
+                    label="Fra"
+                    type="date"
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 170 }}
+                  />
+                  <TextField
+                    label="Til"
+                    type="date"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 170 }}
+                  />
+                </Stack>
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <Button
+                    variant="contained"
+                    onClick={fetchStats}
+                    disabled={isLoading}
+                    sx={{ minWidth: 130 }}
+                  >
+                    Oppdater
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setTopDialogOpen(true)}
+                    disabled={isLoading || topStandardtekster.length === 0}
+                    sx={{ minWidth: 200 }}
+                  >
+                    Topp standardtekster
+                  </Button>
+                </Stack>
+              </Stack>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 1.5 }}>
                 <ToggleButtonGroup
                   size="small"
                   exclusive
                   value={viewMode}
                   onChange={(_, next) => {
-                    if (next) setViewMode(next);
+                    if (!next) return;
+                    setViewMode(next);
+                    applyPresetRangeForMode(next);
                   }}
                 >
                   <ToggleButton value="day">Dag</ToggleButton>
                   <ToggleButton value="week">Uke</ToggleButton>
+                  <ToggleButton value="month">Måned</ToggleButton>
                 </ToggleButtonGroup>
-              </Box>
-            </Stack>
+
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.5}
+                  sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, px: 0.5 }}
+                >
+                  <IconButton
+                    aria-label="Forrige periode"
+                    size="small"
+                    onClick={() => navigatePeriod(-1)}
+                    disabled={isLoading}
+                  >
+                    <ChevronLeftRoundedIcon fontSize="small" />
+                  </IconButton>
+                  <Typography variant="body2" sx={{ minWidth: 170, textAlign: "center", px: 0.5 }}>
+                    {periodRangeLabel}
+                  </Typography>
+                  <IconButton
+                    aria-label="Neste periode"
+                    size="small"
+                    onClick={() => navigatePeriod(1)}
+                    disabled={isLoading || !canNavigateForward}
+                  >
+                    <ChevronRightRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Stack>
+            </Paper>
 
             {error && (
               <Typography color="error" sx={{ mb: 2 }}>
@@ -631,83 +1050,169 @@ export default function StatistikkPage() {
               </Typography>
             )}
 
-            <Table size="small" aria-label="statistikk">
-              <TableHead>
-                <TableRow>
-                  <TableCell>{viewMode === "week" ? "Uke" : "Dato"}</TableCell>
-                  <TableCell align="center">Sider vist</TableCell>
-                  <TableCell align="center">Tekst kopiert</TableCell>
-                  <TableCell align="center">Tekst søkt</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map((r) => (
-                  <TableRow key={r.key}>
-                    <TableCell>{r.label}</TableCell>
-                    <TableCell align="center">{r.pageViews}</TableCell>
-                    <TableCell align="center">{r.copies}</TableCell>
-                    <TableCell align="center">{r.searches}</TableCell>
-                  </TableRow>
-                ))}
-
-                {viewMode === "week" && (
-                  <TableRow
-                    sx={{
-                      backgroundColor: "rgba(0,0,0,0.03)",
-                      "& td": {
-                        fontWeight: 700,
-                        borderTop: "2px solid rgba(0,0,0,0.12)",
-                      },
-                    }}
-                  >
-                    <TableCell>Sum</TableCell>
-                    <TableCell align="center">{totals.pageViews}</TableCell>
-                    <TableCell align="center">{totals.copies}</TableCell>
-                    <TableCell align="center">{totals.searches}</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-
-            {!loadingTotals && !error && rows.length === 0 && (
-              <Typography color="text.secondary" sx={{ mt: 2 }}>
-                Ingen data i valgt periode.
-              </Typography>
+            {!error && (
+              <>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "repeat(2, minmax(0, 1fr))",
+                      lg: "repeat(4, minmax(0, 1fr))",
+                    },
+                    gap: 1.5,
+                    mb: 1.5,
+                  }}
+                >
+                  {kpiCards.map((card) => (
+                    <Paper
+                      key={card.title}
+                      variant="outlined"
+                      sx={{
+                        p: 1.75,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="overline"
+                        color="text.secondary"
+                        sx={{ display: "block", lineHeight: 1.3 }}
+                      >
+                        {card.title}
+                      </Typography>
+                      <Typography
+                        variant="h5"
+                        sx={{ lineHeight: 1.15, fontWeight: 800, mt: 0.25 }}
+                      >
+                        {card.value}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                        {card.description}
+                      </Typography>
+                    </Paper>
+                  ))}
+                </Box>
+              </>
             )}
 
             <Box
               sx={{
-                mt: 2,
-                flex: "1 1 auto",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
+                mt: 1,
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+                gap: 2,
+                alignItems: "start",
               }}
             >
+              <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
+                <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="h6">
+                    Aktivitet per {viewMode === "week" ? "uke" : viewMode === "month" ? "måned" : "dag"}
+                  </Typography>
+                </Box>
+                <TableContainer>
+                  <Table size="small" aria-label="statistikk" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>
+                          {viewMode === "week" ? "Uke" : viewMode === "month" ? "Måned" : "Dato"}
+                        </TableCell>
+                        <TableCell align="center">Sider vist</TableCell>
+                        <TableCell align="center">Tekst kopiert</TableCell>
+                        <TableCell align="center">Tekst søkt</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rows.map((r) => (
+                        <TableRow key={r.key} hover>
+                          <TableCell>{r.label}</TableCell>
+                          <TableCell align="center">{numberFormatter.format(r.pageViews)}</TableCell>
+                          <TableCell align="center">{numberFormatter.format(r.copies)}</TableCell>
+                          <TableCell align="center">{numberFormatter.format(r.searches)}</TableCell>
+                        </TableRow>
+                      ))}
+
+                      {rows.length > 0 && (
+                        <TableRow
+                          sx={{
+                            backgroundColor: "rgba(0,0,0,0.03)",
+                            "& td": {
+                              fontWeight: 700,
+                              borderTop: "2px solid rgba(0,0,0,0.12)",
+                            },
+                          }}
+                        >
+                          <TableCell>Sum</TableCell>
+                          <TableCell align="center">{numberFormatter.format(tableTotals.pageViews)}</TableCell>
+                          <TableCell align="center">{numberFormatter.format(tableTotals.copies)}</TableCell>
+                          <TableCell align="center">{numberFormatter.format(tableTotals.searches)}</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                {!loadingTotals && !error && rows.length === 0 && (
+                  <Typography color="text.secondary" sx={{ px: 2, py: 1.5 }}>
+                    Ingen data i valgt periode.
+                  </Typography>
+                )}
+              </Paper>
+
+              <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
+                <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="h6">Mest brukte sider</Typography>
+                </Box>
+                <TableContainer>
+                  <Table size="small" aria-label="mest brukte sider" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Side</TableCell>
+                        <TableCell align="center">Unike brukere</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pageRows.map((r) => (
+                        <TableRow key={r.page} hover>
+                          <TableCell>{r.label}</TableCell>
+                          <TableCell align="center">{numberFormatter.format(r.uniqueUsers)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                {!loadingTotals && !error && pageRows.length === 0 && (
+                  <Typography color="text.secondary" sx={{ px: 2, py: 1.5 }}>
+                    Ingen sidedata i valgt periode.
+                  </Typography>
+                )}
+              </Paper>
+            </Box>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Box sx={{ mt: 0.5, flex: "1 1 auto", overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <Box
                 sx={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: { xs: "flex-start", md: "center" },
                   justifyContent: "space-between",
                   mb: 1,
-                  mt: 4,
+                  gap: 1,
+                  flexDirection: { xs: "column", md: "row" },
                 }}
               >
-                {" "}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                  <ToggleButtonGroup
+                  <Typography variant="h6" sx={{ mr: 1 }}>
+                    Brukeratferd
+                  </Typography>
+                  <Chip
                     size="small"
-                    exclusive
-                    value={userViewMode}
-                    onChange={(_, next) => {
-                      if (next) setUserViewMode(next);
-                    }}
-                  >
-                    <ToggleButton value="day">Dag</ToggleButton>
-                    <ToggleButton value="total">Totalt</ToggleButton>
-                  </ToggleButtonGroup>
+                    label={`Visning: ${viewMode === "week" ? "Uke" : viewMode === "month" ? "Måned" : "Dag"}`}
+                    sx={{ fontWeight: 600 }}
+                  />
                 </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: { xs: "100%", md: "auto" } }}>
                   <Typography>
                     {showAllUsers ? "Per bruker (alle)" : "Per bruker (topp 5)"}
                   </Typography>
@@ -722,11 +1227,11 @@ export default function StatistikkPage() {
                     }
                     label={showAllUsers ? "Alle" : "Topp 5"}
                   />
-                </Box>{" "}
+                </Box>
               </Box>
 
-              <Box sx={{ flex: "1 1 auto" }}>
-                <Table size="small" aria-label="statistikk per bruker">
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, flex: "1 1 auto" }}>
+                <Table size="small" aria-label="statistikk per bruker" stickyHeader>
                   <TableHead>
                     <TableRow>
                       <TableCell>Bruker</TableCell>
@@ -739,12 +1244,12 @@ export default function StatistikkPage() {
                   </TableHead>
                   <TableBody>
                     {visibleUsers.map((u) => (
-                      <TableRow key={u.uid}>
+                      <TableRow key={u.uid} hover>
                         <TableCell>{u.displayName}</TableCell>
-                        <TableCell align="center">{u.pageViews}</TableCell>
-                        <TableCell align="center">{u.standardtekstOpens}</TableCell>
-                        <TableCell align="center">{u.copies}</TableCell>
-                        <TableCell align="center">{u.searches}</TableCell>
+                        <TableCell align="center">{numberFormatter.format(u.pageViews)}</TableCell>
+                        <TableCell align="center">{numberFormatter.format(u.standardtekstOpens)}</TableCell>
+                        <TableCell align="center">{numberFormatter.format(u.copies)}</TableCell>
+                        <TableCell align="center">{numberFormatter.format(u.searches)}</TableCell>
                         <TableCell align="right" sx={{ whiteSpace: "nowrap", width: 72 }}>
                           <Button
                             size="small"
@@ -769,7 +1274,7 @@ export default function StatistikkPage() {
                     )}
                   </TableBody>
                 </Table>
-              </Box>
+              </TableContainer>
             </Box>
           </Box>
 
@@ -782,7 +1287,7 @@ export default function StatistikkPage() {
                 <List dense>
                   {topStandardtekster.map((it, idx) => (
                     <ListItem key={`${idx}-${it.title}`} disableGutters>
-                      <ListItemText primary={`${idx + 1}. ${it.title} (${it.opens})`} />
+                      <ListItemText primary={`${idx + 1}. ${it.title} (${numberFormatter.format(it.opens)})`} />
                     </ListItem>
                   ))}
                 </List>
@@ -792,15 +1297,14 @@ export default function StatistikkPage() {
               <Button onClick={() => setTopDialogOpen(false)}>Lukk</Button>
             </DialogActions>
           </Dialog>
+
           <Dialog
             open={userTopDialogOpen}
             onClose={() => setUserTopDialogOpen(false)}
             fullWidth
             maxWidth="sm"
           >
-            <DialogTitle>
-              Topp 5 standardtekster – {userTopDialogTitle}
-            </DialogTitle>
+            <DialogTitle>Topp 5 standardtekster – {userTopDialogTitle}</DialogTitle>
             <DialogContent dividers>
               {userTopLoading ? (
                 <Typography color="text.secondary">Laster…</Typography>
@@ -812,7 +1316,7 @@ export default function StatistikkPage() {
                 <List dense>
                   {userTopItems.map((it, idx) => (
                     <ListItem key={`${idx}-${it.title}`} disableGutters>
-                      <ListItemText primary={`${idx + 1}. ${it.title} (${it.opens})`} />
+                      <ListItemText primary={`${idx + 1}. ${it.title} (${numberFormatter.format(it.opens)})`} />
                     </ListItem>
                   ))}
                 </List>
@@ -822,6 +1326,7 @@ export default function StatistikkPage() {
               <Button onClick={() => setUserTopDialogOpen(false)}>Lukk</Button>
             </DialogActions>
           </Dialog>
+
           <Typography color="text.secondary" sx={{ mt: 2 }}>
             Kun administratorer kan lese disse dataene.
           </Typography>

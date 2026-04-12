@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogContent,
   DialogActions,
@@ -17,8 +18,9 @@ const officeFormEmbedUrl = "https://forms.office.com/e/CC67JNYpcr?embed=true";
 const sharepointEmbedUrl = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
   import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
 
-const withRefreshParam = (src: string | undefined, refreshKey: number) => {
+const withRefreshParam = (src: string | undefined, refreshKey?: number) => {
   if (!src) return src;
+  if (!refreshKey || refreshKey <= 0) return src;
   const separator = src.includes("?") ? "&" : "?";
   return `${src}${separator}reks_refresh=${refreshKey}`;
 };
@@ -38,22 +40,21 @@ const formatRefreshTime = (value: string | null) => {
 export default function AndbruddPage() {
   const [tab, setTab] = useState<"form" | "sharepoint">("sharepoint");
   const [iframeError, setIframeError] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const [showLoginHelp, setShowLoginHelp] = useState(false);
-  const [refreshKeys, setRefreshKeys] = useState(() => {
-    const now = Date.now();
-    return { form: now, sharepoint: now };
-  });
+  const [refreshKeys, setRefreshKeys] = useState({ form: 0, sharepoint: 0 });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastLoadedAt, setLastLoadedAt] = useState<{ form: string | null; sharepoint: string | null }>({
     form: null,
     sharepoint: null,
   });
+  const hasLoadedRef = useRef(false);
 
   const current = useMemo(() => {
     if (tab === "form") {
       return {
         title: "Anbruddskjema",
-        src: officeFormEmbedUrl,
+        src: withRefreshParam(officeFormEmbedUrl, refreshKeys.form),
         missing: "Office Form embed URL mangler",
         iframeTitle: "Office Form",
         height: 780,
@@ -71,9 +72,26 @@ export default function AndbruddPage() {
   }, [refreshKeys.form, refreshKeys.sharepoint, tab]);
 
   useEffect(() => {
+    if (!current.src) {
+      hasLoadedRef.current = true;
+      setIframeLoaded(true);
+      setIframeError(false);
+      setIsRefreshing(false);
+      return;
+    }
+
+    hasLoadedRef.current = false;
+    setIframeLoaded(false);
     setIframeError(false);
-    setIsRefreshing(false);
-  }, [tab]);
+
+    const timer = setTimeout(() => {
+      if (!hasLoadedRef.current) {
+        setIframeError(true);
+      }
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [current.src]);
 
   useEffect(() => {
     setShowLoginHelp(true);
@@ -141,25 +159,63 @@ export default function AndbruddPage() {
             </Alert>
           )}
 
-          <Box
-            key={current.src}
-            component="iframe"
-            title={current.iframeTitle}
-            src={current.src}
-            onLoad={() => {
-              setIframeError(false);
-              setIsRefreshing(false);
-              setLastLoadedAt((prev) => ({
-                ...prev,
-                [tab]: new Date().toISOString(),
-              }));
-            }}
-            onError={() => setIframeError(true)}
-            frameBorder={0}
-            scrolling="no"
-            allowFullScreen
-            style={{ width: "100%", height: `${current.height}px`, border: 0 }}
-          />
+          <Box sx={{ position: "relative", minHeight: current.height }}>
+            {!iframeLoaded && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  gap: 1.5,
+                  background:
+                    "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,252,0.98) 100%)",
+                  zIndex: 1,
+                  textAlign: "center",
+                  pointerEvents: "none",
+                }}
+              >
+                <Box>
+                  <CircularProgress size={28} />
+                  <Typography sx={{ mt: 1.5, fontWeight: 600 }}>
+                    {tab === "form" ? "Laster anbruddskjema ..." : "Laster anbruddsoversikt ..."}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {tab === "form"
+                      ? "Selve skjemaet hentes fra Microsoft Forms."
+                      : "Oversikten hentes fra SharePoint."}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
+            <Box
+              key={current.src}
+              component="iframe"
+              title={current.iframeTitle}
+              src={current.src}
+              onLoad={() => {
+                hasLoadedRef.current = true;
+                setIframeLoaded(true);
+                setIframeError(false);
+                setIsRefreshing(false);
+                setLastLoadedAt((prev) => ({
+                  ...prev,
+                  [tab]: new Date().toISOString(),
+                }));
+              }}
+              onError={() => {
+                hasLoadedRef.current = true;
+                setIframeLoaded(true);
+                setIframeError(true);
+                setIsRefreshing(false);
+              }}
+              frameBorder={0}
+              scrolling="no"
+              allowFullScreen
+              style={{ width: "100%", height: `${current.height}px`, border: 0 }}
+            />
+          </Box>
         </>
       ) : (
         <Typography color="error">{current.missing}</Typography>

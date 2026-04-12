@@ -23,7 +23,7 @@ import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import { RequireAuth } from "./auth/RequireAuth";
-import { logUsage } from "../shared/services/usage";
+import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import RequireRekspert from "./auth/RequireRekspert";
@@ -55,9 +55,27 @@ const LoginPage = React.lazy(() =>
 );
 const PendingApprovalPage = React.lazy(() => import("./auth/PendingApprovalPage"));
 const OFFICE_FORM_URL = import.meta.env.VITE_OFFICE_FORM_URL as string | undefined;
+const ANBRUDD_FORM_URL = "https://forms.office.com/e/CC67JNYpcr?embed=true";
+const ANBRUDD_SHAREPOINT_URL = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
+  import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
 
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
+
+function pathToUsagePage(pathname: string): UsagePage {
+  if (pathname === "/") return "home";
+  if (pathname.startsWith("/omeq")) return "omeq";
+  if (pathname.startsWith("/standardtekster")) return "standardtekster";
+  if (pathname.startsWith("/interaksjoner")) return "interaksjoner";
+  if (pathname.startsWith("/profil")) return "profil";
+  if (pathname.startsWith("/statistikk")) return "statistikk";
+  if (pathname.startsWith("/produktskjema")) return "produktskjema";
+  if (pathname.startsWith("/tilbakemelding")) return "tilbakemelding";
+  if (pathname.startsWith("/anbrudd")) return "anbrudd";
+  if (pathname.startsWith("/rekspert")) return "rekspert";
+  if (pathname.startsWith("/teams-chat")) return "teamschat";
+  return "other";
+}
 
 function warmConnection(url?: string) {
   if (!url || typeof document === "undefined") return;
@@ -86,6 +104,16 @@ function warmConnection(url?: string) {
 
   ensureLink("dns-prefetch");
   ensureLink("preconnect");
+
+  const prefetchSelector = `link[rel="prefetch"][href="${url}"]`;
+  if (!document.head.querySelector(prefetchSelector)) {
+    const prefetch = document.createElement("link");
+    prefetch.rel = "prefetch";
+    prefetch.as = "document";
+    prefetch.href = url;
+    prefetch.crossOrigin = "anonymous";
+    document.head.appendChild(prefetch);
+  }
 }
 
 function RouteLoader() {
@@ -178,7 +206,10 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       }}
     >
       <Box
-        onClick={() => navigate("/")}
+        onClick={() => {
+          logUsage("menu_click", { targetPage: "home" });
+          navigate("/");
+        }}
         sx={{
           height: 64,
           display: "flex",
@@ -222,7 +253,10 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             <Tooltip title={collapsed ? item.label : ""} placement="right">
               <ListItemButton
                 selected={isSelected(item.path)}
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+                  navigate(item.path);
+                }}
                 sx={{
                   justifyContent: collapsed ? "center" : "flex-start",
                   px: collapsed ? 1 : 2,
@@ -276,7 +310,10 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
               <Tooltip key={item.path} title={collapsed ? item.label : ""} placement="right">
                 <ListItemButton
                   selected={isSelected(item.path)}
-                  onClick={() => navigate(item.path)}
+                  onClick={() => {
+                    logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+                    navigate(item.path);
+                  }}
                   sx={{
                     justifyContent: collapsed ? "center" : "flex-start",
                     px: collapsed ? 1 : 2,
@@ -333,22 +370,12 @@ function Layout() {
 
   React.useEffect(() => {
     warmConnection(OFFICE_FORM_URL);
+    warmConnection(ANBRUDD_FORM_URL);
+    warmConnection(ANBRUDD_SHAREPOINT_URL);
   }, []);
 
   React.useEffect(() => {
-    const pathname = location.pathname;
-    const page = pathname.startsWith("/standardtekster")
-      ? "standardtekster"
-      : pathname.startsWith("/omeq") || pathname === "/"
-      ? "omeq"
-      : pathname.startsWith("/profil")
-      ? "profil"
-      : pathname.startsWith("/produktskjema")
-      ? "produktskjema"
-      : pathname.startsWith("/tilbakemelding")
-      ? "tilbakemelding"
-      : "other";
-
+    const page = pathToUsagePage(location.pathname);
     logUsage("page_view", { page });
   }, [location.pathname]);
 
