@@ -144,12 +144,6 @@ export default function TeamsChatPage() {
 
     setStatus("Sender...");
     try {
-      // Ensure we have Chat.ReadWrite consent when sending.
-      await instance.acquireTokenSilent({
-        account,
-        scopes: graphScopes.chatReadWrite,
-      });
-
       await sendChatMessage(instance, account, selectedChatId, text);
       setDraft("");
 

@@ -1,4 +1,8 @@
-import type { AccountInfo, IPublicClientApplication } from "@azure/msal-browser";
+import {
+  InteractionRequiredAuthError,
+  type AccountInfo,
+  type IPublicClientApplication,
+} from "@azure/msal-browser";
 import { graphScopes } from "../../../app/auth/msalConfig";
 
 export type GraphScopes = string[];
@@ -8,12 +12,27 @@ async function acquireAccessToken(
   account: AccountInfo,
   scopes: GraphScopes
 ): Promise<string> {
-  const res = await instance.acquireTokenSilent({
-    account,
-    scopes,
-  });
+  try {
+    const res = await instance.acquireTokenSilent({
+      account,
+      scopes,
+    });
 
-  return res.accessToken;
+    return res.accessToken;
+  } catch (error) {
+    // If silent token acquisition requires user interaction (expired/revoked consent),
+    // retry in a popup so the user can continue in-app.
+    if (error instanceof InteractionRequiredAuthError) {
+      const res = await instance.acquireTokenPopup({
+        account,
+        scopes,
+      });
+
+      return res.accessToken;
+    }
+
+    throw error;
+  }
 }
 
 export async function graphGet<T>(

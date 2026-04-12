@@ -1,9 +1,24 @@
 import { doc, setDoc, serverTimestamp, increment, getDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase/firebase";
 
+export type UsagePage =
+  | "home"
+  | "omeq"
+  | "standardtekster"
+  | "interaksjoner"
+  | "profil"
+  | "statistikk"
+  | "produktskjema"
+  | "tilbakemelding"
+  | "anbrudd"
+  | "teamschat"
+  | "rekspert"
+  | "other";
+
 export type UsageEventType =
   | "app_open"
   | "page_view"
+  | "menu_click"
   | "standardtekst_open"
   | "standardtekst_copy"
   | "search_standardtekster";
@@ -22,6 +37,8 @@ function mapEventToField(event: UsageEventType): string {
       return "opens";
     case "page_view":
       return "pageViews";
+    case "menu_click":
+      return "menuClicks";
     case "standardtekst_open":
       return "standardtekstOpens";
     case "standardtekst_copy":
@@ -46,7 +63,8 @@ async function getFirstName(uid: string): Promise<string | undefined> {
 }
 
 export type UsageEventMetadata = {
-  page?: "standardtekster" | "omeq" | "profil" | "produktskjema" | "tilbakemelding" | "other";
+  page?: UsagePage;
+  targetPage?: UsagePage;
   standardtekstId?: string;
   searchLen?: number;
 };
@@ -66,9 +84,19 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
   const firstName = await getFirstName(user.uid);
 
   const meta: Record<string, unknown> = {};
+  const userCounters: Record<string, unknown> = {
+    [`eventCounts.${event}`]: increment(1),
+  };
+  const totalsCounters: Record<string, unknown> = {
+    [`eventCounts.${event}`]: increment(1),
+  };
 
   if (data?.page) {
     meta.lastPage = data.page;
+  }
+
+  if (data?.targetPage) {
+    meta.lastTargetPage = data.targetPage;
   }
 
   if (typeof data?.searchLen === "number" && Number.isFinite(data.searchLen)) {
@@ -78,6 +106,16 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
   if (standardtekstId) {
     // Store as "last opened" id only (bounded field count)
     meta.lastStandardtekstId = standardtekstId;
+  }
+
+  if (event === "page_view" && data?.page) {
+    userCounters[`pageViewsByPage.${data.page}`] = increment(1);
+    totalsCounters[`pageViewsByPage.${data.page}`] = increment(1);
+  }
+
+  if (event === "menu_click" && data?.targetPage) {
+    userCounters[`menuClicksByPage.${data.targetPage}`] = increment(1);
+    totalsCounters[`menuClicksByPage.${data.targetPage}`] = increment(1);
   }
 
   const standardtekstRef =
@@ -97,6 +135,7 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
         uid: user.uid,
         ...(firstName ? { firstName } : {}),
         [field]: increment(1),
+        ...userCounters,
         ...meta,
         updatedAt: serverTimestamp(),
       },
@@ -106,6 +145,7 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
       totalsRef,
       {
         [field]: increment(1),
+        ...totalsCounters,
         updatedAt: serverTimestamp(),
       },
       { merge: true }
