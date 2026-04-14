@@ -376,7 +376,7 @@ function Layout() {
 
   React.useEffect(() => {
     const page = pathToUsagePage(location.pathname);
-    logUsage("page_view", { page });
+    logUsage("page_view", { page, pagePath: location.pathname });
   }, [location.pathname]);
 
   return (

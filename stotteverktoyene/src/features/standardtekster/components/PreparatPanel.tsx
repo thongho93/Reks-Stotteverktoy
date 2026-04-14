@@ -63,7 +63,7 @@ export default function PreparatPanel({
 }: Props) {
   const hasPicked = preparatRows.some((r) => r.picked);
 
-  const deriveFormuleringPlural = (m: any): string => {
+  const deriveFormuleringBase = (m: any): string => {
     const texts = [
       m?.navnForStyrke,
       m?.navnFormStyrke,
@@ -80,31 +80,32 @@ export default function PreparatPanel({
     const hay = texts.join(" ");
 
     const rules: Array<[RegExp, string]> = [
-      [/\bdepotplaster\b/, "depotplastre"],
-      [/\bdepottablett\b|\bdepottab\b/, "depottabletter"],
-      [/\bsmeltetablett\b|\bsmeltetab\b/, "smeltetabletter"],
-      [/\benterotablett\b|\benterotab\b/, "enterotabletter"],
-      [/\bsublingvaltablett\b|\bsublingvaltab\b/, "sublingvaltabletter"],
-      [/\bbrusetablett\b|\bbrusetab\b/, "brusetabletter"],
-      [/\bdepotkapsel\b|\bdepotkaps\b/, "depotkapsler"],
-      [/\bnesespray\b/, "nesesprayer"],
-      [/\bøyedråpe\b|\bøyedr\b|\boyedr\b/, "øyedråper"],
-      [/\børedråpe\b|\boredr\b/, "øredråper"],
-      [/\bstikkpille\b|\bstikkpil\b|\bsupp\b/, "stikkpiller"],
-      [/\binjeksjon\b|\binj\b/, "injeksjoner"],
-      [/\binfusjon\b|\binf\b/, "infusjoner"],
-      [/\binhalasjonspulver\b|\binh\s*pulv\b/, "inhalasjonspulvere"],
-      [/\binhalasjonsvæske\b|\binh\s*væske\b/, "inhalasjonsvæsker"],
-      [/\bmikstur\b/, "miksturer"],
-      [/\bgranulat\b|\bgran\b/, "granulater"],
-      [/\bplaster\b/, "plastre"],
-      [/\btablett\b|\btab\b|\btabl\b/, "tabletter"],
-      [/\bkapsel\b|\bkaps\b/, "kapsler"],
-      [/\bdråpe\b|\bdråper\b|\bdr\b/, "dråper"],
-      [/\bsalve\b/, "salver"],
-      [/\bkrem\b/, "kremer"],
-      [/\bgel\b/, "geler"],
-      [/\bspray\b/, "sprayer"],
+      [/\bdepotplaster\b|\bdepotplastre\b/, "depotplaster"],
+      [/\btyggetablett\b|\btyggetab\b|\btyggetabletter\b/, "tyggetablett"],
+      [/\bdepottablett\b|\bdepottab\b|\bdepottabletter\b/, "depottablett"],
+      [/\bsmeltetablett\b|\bsmeltetab\b|\bsmeltetabletter\b/, "smeltetablett"],
+      [/\benterotablett\b|\benterotab\b|\benterotabletter\b/, "enterotablett"],
+      [/\bsublingvaltablett\b|\bsublingvaltab\b|\bsublingvaltabletter\b/, "sublingvaltablett"],
+      [/\bbrusetablett\b|\bbrusetab\b|\bbrusetabletter\b/, "brusetablett"],
+      [/\bdepotkapsel\b|\bdepotkaps\b|\bdepotkapsler\b/, "depotkapsel"],
+      [/\bnesespray\b|\bnesesprayer\b/, "nesespray"],
+      [/\bøyedråpe\b|\bøyedr\b|\boyedr\b|\bøyedråper\b/, "øyedråpe"],
+      [/\børedråpe\b|\boredr\b|\børedråper\b/, "øredråpe"],
+      [/\bstikkpille\b|\bstikkpil\b|\bsupp\b|\bstikkpiller\b/, "stikkpille"],
+      [/\binjeksjon\b|\binj\b|\binjeksjoner\b/, "injeksjon"],
+      [/\binfusjon\b|\binf\b|\binfusjoner\b/, "infusjon"],
+      [/\binhalasjonspulver\b|\binh\s*pulv\b|\binhalasjonspulvere\b/, "inhalasjonspulver"],
+      [/\binhalasjonsvæske\b|\binh\s*væske\b|\binhalasjonsvæsker\b/, "inhalasjonsvæske"],
+      [/\bmikstur\b|\bmiksturer\b/, "mikstur"],
+      [/\bgranulat\b|\bgran\b|\bgranulater\b/, "granulat"],
+      [/\bplaster\b|\bplastre\b/, "plaster"],
+      [/\btablett\b|\btab\b|\btabl\b|\btabletter\b/, "tablett"],
+      [/\bkapsel\b|\bkaps\b|\bkapsler\b/, "kapsel"],
+      [/\bdråpe\b|\bdråper\b|\bdr\b/, "dråpe"],
+      [/\bsalve\b|\bsalver\b/, "salve"],
+      [/\bkrem\b|\bkremer\b/, "krem"],
+      [/\bgel\b|\bgeler\b/, "gel"],
+      [/\bspray\b|\bsprayer\b/, "spray"],
     ];
 
     for (const [re, plural] of rules) {
@@ -233,7 +234,7 @@ export default function PreparatPanel({
               };
 
               const virkestoff = deriveVirkestoff(med);
-              const formulering = deriveFormuleringPlural(med);
+              const formulering = deriveFormuleringBase(med);
 
               onPickText({
                 text,

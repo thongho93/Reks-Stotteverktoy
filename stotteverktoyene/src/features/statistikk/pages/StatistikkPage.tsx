@@ -32,7 +32,6 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
-import type { UsagePage } from "../../../shared/services/usage";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -58,9 +57,9 @@ type UserAggRow = {
   updatedAt?: { toMillis: () => number };
 };
 
-type PageUsageRow = {
-  page: UsagePage;
-  label: string;
+type PathUsageRow = {
+  pathKey: string;
+  path: string;
   views: number;
   uniqueUsers: number;
 };
@@ -71,6 +70,7 @@ type PeriodTotals = {
   searches: number;
   standardtekstOpens: number;
   activeUsers: number;
+  sessions: number;
 };
 
 const EMPTY_PERIOD_TOTALS: PeriodTotals = {
@@ -79,39 +79,9 @@ const EMPTY_PERIOD_TOTALS: PeriodTotals = {
   searches: 0,
   standardtekstOpens: 0,
   activeUsers: 0,
+  sessions: 0,
 };
 
-const PAGE_ORDER: UsagePage[] = [
-  "home",
-  "omeq",
-  "standardtekster",
-  "interaksjoner",
-  "produktskjema",
-  "anbrudd",
-  "teamschat",
-  "tilbakemelding",
-  "profil",
-  "rekspert",
-  "statistikk",
-  "other",
-];
-
-const PAGE_LABELS: Record<UsagePage, string> = {
-  home: "Forside",
-  omeq: "OMEQ",
-  standardtekster: "Standardtekster",
-  interaksjoner: "Interaksjoner",
-  produktskjema: "Produktskjema",
-  anbrudd: "Anbrudd",
-  teamschat: "Teams chat",
-  tilbakemelding: "Innspill og notater",
-  profil: "Profil",
-  rekspert: "Rekspert",
-  statistikk: "Statistikk",
-  other: "Annet",
-};
-
-const KNOWN_PAGE_SET = new Set<string>(PAGE_ORDER);
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -359,34 +329,42 @@ function asCount(value: unknown): number {
   return Math.floor(n);
 }
 
-function normalizePage(value: string): UsagePage {
-  const key = value.trim().toLowerCase();
-  return KNOWN_PAGE_SET.has(key) ? (key as UsagePage) : "other";
-}
 
-function parsePageCounterMap(raw: unknown): Partial<Record<UsagePage, number>> {
+function parsePathCounterMap(raw: unknown): Record<string, number> {
   if (!raw || typeof raw !== "object") return {};
 
   const entries = raw as Record<string, unknown>;
-  const out: Partial<Record<UsagePage, number>> = {};
+  const out: Record<string, number> = {};
 
   for (const [key, value] of Object.entries(entries)) {
     const count = asCount(value);
     if (!count) continue;
-    const page = normalizePage(key);
-    out[page] = (out[page] ?? 0) + count;
+    out[key] = (out[key] ?? 0) + count;
   }
 
   return out;
 }
 
-function hasPageCounters(map: Partial<Record<UsagePage, number>>) {
-  return Object.values(map).some((n) => asCount(n) > 0);
+function parsePathLabelMap(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object") return {};
+
+  const entries = raw as Record<string, unknown>;
+  const out: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(entries)) {
+    if (typeof value !== "string") continue;
+    const label = value.trim();
+    if (!label) continue;
+    out[key] = label;
+  }
+
+  return out;
 }
 
-function getPageFromValue(value: unknown): UsagePage {
-  if (typeof value !== "string") return "other";
-  return normalizePage(value);
+function pathFromCounterKey(pathKey: string): string {
+  if (!pathKey || pathKey === "root") return "/";
+  const reconstructed = pathKey.replace(/__/g, "/").replace(/_/g, "-");
+  return reconstructed.startsWith("/") ? reconstructed : `/${reconstructed}`;
 }
 
 export default function StatistikkPage() {
@@ -398,7 +376,7 @@ export default function StatistikkPage() {
   const [showAllUsers, setShowAllUsers] = React.useState(false);
 
   const [rows, setRows] = React.useState<TotalsRow[]>([]);
-  const [pageRows, setPageRows] = React.useState<PageUsageRow[]>([]);
+  const [pathRows, setPathRows] = React.useState<PathUsageRow[]>([]);
   const [topStandardtekster, setTopStandardtekster] = React.useState<
     { title: string; opens: number }[]
   >([]);
@@ -537,7 +515,7 @@ export default function StatistikkPage() {
     try {
       if (!from || !to) {
         setRows([]);
-        setPageRows([]);
+        setPathRows([]);
         setAggregatedUsers([]);
         setTopStandardtekster([]);
         setPeriodTotals(EMPTY_PERIOD_TOTALS);
@@ -557,7 +535,7 @@ export default function StatistikkPage() {
 
       if (!isValidDate(fromDate) || !isValidDate(toDate)) {
         setRows([]);
-        setPageRows([]);
+        setPathRows([]);
         setAggregatedUsers([]);
         setTopStandardtekster([]);
         setPeriodTotals(EMPTY_PERIOD_TOTALS);
@@ -575,7 +553,7 @@ export default function StatistikkPage() {
 
       if (fromDate > toDate) {
         setRows([]);
-        setPageRows([]);
+        setPathRows([]);
         setAggregatedUsers([]);
         setTopStandardtekster([]);
         setPeriodTotals(EMPTY_PERIOD_TOTALS);
@@ -594,7 +572,7 @@ export default function StatistikkPage() {
       const range = getSelectedRange();
       if (!range) {
         setRows([]);
-        setPageRows([]);
+        setPathRows([]);
         setAggregatedUsers([]);
         setTopStandardtekster([]);
         setPeriodTotals(EMPTY_PERIOD_TOTALS);
@@ -655,10 +633,12 @@ export default function StatistikkPage() {
         searches: 0,
         standardtekstOpens: 0,
         activeUsers: 0,
+        sessions: 0,
       };
 
-      const pageViewsByPage = new Map<UsagePage, number>();
-      const uniqueUsersByPage = new Map<UsagePage, Set<string>>();
+      const pageViewsByPath = new Map<string, number>();
+      const uniqueUsersByPath = new Map<string, Set<string>>();
+      const pathLabelsByKey = new Map<string, string>();
 
       await Promise.all(
         dateKeys.map(async (dateKey) => {
@@ -682,6 +662,7 @@ export default function StatistikkPage() {
             const copies = asCount(data.copies);
             const searches = asCount(data.searches);
             const standardtekstOpens = asCount(data.standardtekstOpens);
+            const sessions = asCount(data.sessions);
 
             dayRow.pageViews += pageViews;
             dayRow.copies += copies;
@@ -691,24 +672,17 @@ export default function StatistikkPage() {
             periodAccumulator.copies += copies;
             periodAccumulator.searches += searches;
             periodAccumulator.standardtekstOpens += standardtekstOpens;
+            periodAccumulator.sessions += sessions;
             activeUsers.add(uid);
 
-            const pageMap = parsePageCounterMap(data.pageViewsByPage);
-            if (!hasPageCounters(pageMap) && pageViews > 0) {
-              const fallbackPage = getPageFromValue(data.lastPage);
-              pageMap[fallbackPage] = (pageMap[fallbackPage] ?? 0) + pageViews;
-            }
-
-            for (const [rawPage, rawCount] of Object.entries(pageMap)) {
-              const page = normalizePage(rawPage);
-              const count = asCount(rawCount);
-              if (!count) continue;
-
-              pageViewsByPage.set(page, (pageViewsByPage.get(page) ?? 0) + count);
-
-              const usersForPage = uniqueUsersByPage.get(page) ?? new Set<string>();
-              usersForPage.add(uid);
-              uniqueUsersByPage.set(page, usersForPage);
+            const pathMap = parsePathCounterMap(data.pageViewsByPath);
+            const pathLabels = parsePathLabelMap(data.pathLabels);
+            for (const [pathKey, count] of Object.entries(pathMap)) {
+              pageViewsByPath.set(pathKey, (pageViewsByPath.get(pathKey) ?? 0) + count);
+              const usersForPath = uniqueUsersByPath.get(pathKey) ?? new Set<string>();
+              usersForPath.add(uid);
+              uniqueUsersByPath.set(pathKey, usersForPath);
+              if (pathLabels[pathKey]) pathLabelsByKey.set(pathKey, pathLabels[pathKey]);
             }
 
           });
@@ -814,21 +788,22 @@ export default function StatistikkPage() {
       periodAccumulator.activeUsers = activeUsers.size;
       setPeriodTotals(periodAccumulator);
 
-      const pageUsageRows = PAGE_ORDER.map((page) => {
-        const views = pageViewsByPage.get(page) ?? 0;
-        const uniqueUsers = uniqueUsersByPage.get(page)?.size ?? 0;
-
-        return {
-          page,
-          label: PAGE_LABELS[page],
-          views,
-          uniqueUsers,
-        } satisfies PageUsageRow;
-      })
+      const pathUsageRows = [...pageViewsByPath.entries()]
+        .map(([pathKey, views]) => {
+          const uniqueUsers = uniqueUsersByPath.get(pathKey)?.size ?? 0;
+          const path = pathLabelsByKey.get(pathKey) ?? pathFromCounterKey(pathKey);
+          return {
+            pathKey,
+            path,
+            views,
+            uniqueUsers,
+          } satisfies PathUsageRow;
+        })
         .filter((r) => r.views > 0)
-        .sort((a, b) => b.views - a.views || b.uniqueUsers - a.uniqueUsers);
+        .sort((a, b) => b.views - a.views || b.uniqueUsers - a.uniqueUsers)
+        .slice(0, 15);
 
-      setPageRows(pageUsageRows);
+      setPathRows(pathUsageRows);
 
       return;
     } catch (e: unknown) {
@@ -838,7 +813,7 @@ export default function StatistikkPage() {
           : "Kunne ikke hente statistikk.";
       setError(message);
       setRows([]);
-      setPageRows([]);
+      setPathRows([]);
       setAggregatedUsers([]);
       setTopStandardtekster([]);
       setPeriodTotals(EMPTY_PERIOD_TOTALS);
@@ -881,6 +856,11 @@ export default function StatistikkPage() {
       title: "Aktive brukere",
       description: "Unike brukere i valgt periode",
       value: numberFormatter.format(periodTotals.activeUsers),
+    },
+    {
+      title: "Sesjoner",
+      description: "Antall brukerøkter (30 min inaktivitet = ny økt)",
+      value: numberFormatter.format(periodTotals.sessions),
     },
     {
       title: "Sidevisninger",
@@ -1117,7 +1097,7 @@ export default function StatistikkPage() {
                         <TableCell>
                           {viewMode === "week" ? "Uke" : viewMode === "month" ? "Måned" : "Dato"}
                         </TableCell>
-                        <TableCell align="center">Sider vist</TableCell>
+                        <TableCell align="center">Sidevisninger</TableCell>
                         <TableCell align="center">Tekst kopiert</TableCell>
                         <TableCell align="center">Tekst søkt</TableCell>
                       </TableRow>
@@ -1160,29 +1140,31 @@ export default function StatistikkPage() {
 
               <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
                 <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}>
-                  <Typography variant="h6">Mest brukte sider</Typography>
+                  <Typography variant="h6">Mest brukte side-paths</Typography>
                 </Box>
                 <TableContainer>
-                  <Table size="small" aria-label="mest brukte sider" stickyHeader>
+                  <Table size="small" aria-label="mest brukte paths" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Side</TableCell>
+                        <TableCell>Path</TableCell>
+                        <TableCell align="center">Sidevisninger</TableCell>
                         <TableCell align="center">Unike brukere</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {pageRows.map((r) => (
-                        <TableRow key={r.page} hover>
-                          <TableCell>{r.label}</TableCell>
+                      {pathRows.map((r) => (
+                        <TableRow key={r.pathKey} hover>
+                          <TableCell sx={{ fontFamily: "monospace", fontSize: 13 }}>{r.path}</TableCell>
+                          <TableCell align="center">{numberFormatter.format(r.views)}</TableCell>
                           <TableCell align="center">{numberFormatter.format(r.uniqueUsers)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </TableContainer>
-                {!loadingTotals && !error && pageRows.length === 0 && (
+                {!loadingTotals && !error && pathRows.length === 0 && (
                   <Typography color="text.secondary" sx={{ px: 2, py: 1.5 }}>
-                    Ingen sidedata i valgt periode.
+                    Ingen path-data i valgt periode.
                   </Typography>
                 )}
               </Paper>
@@ -1235,7 +1217,7 @@ export default function StatistikkPage() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Bruker</TableCell>
-                      <TableCell align="center">Sider vist</TableCell>
+                      <TableCell align="center">Sidevisninger</TableCell>
                       <TableCell align="center">Standardtekst åpnet</TableCell>
                       <TableCell align="center">Tekst kopiert</TableCell>
                       <TableCell align="center">Tekst søkt</TableCell>
