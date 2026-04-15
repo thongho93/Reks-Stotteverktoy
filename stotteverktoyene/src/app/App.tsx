@@ -22,6 +22,7 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
@@ -73,6 +74,7 @@ function pathToUsagePage(pathname: string): UsagePage {
   if (pathname.startsWith("/tilbakemelding")) return "tilbakemelding";
   if (pathname.startsWith("/anbrudd")) return "anbrudd";
   if (pathname.startsWith("/rekspert")) return "rekspert";
+  if (pathname.startsWith("/intern-chat")) return "teamschat";
   if (pathname.startsWith("/teams-chat")) return "teamschat";
   return "other";
 }
@@ -104,16 +106,6 @@ function warmConnection(url?: string) {
 
   ensureLink("dns-prefetch");
   ensureLink("preconnect");
-
-  const prefetchSelector = `link[rel="prefetch"][href="${url}"]`;
-  if (!document.head.querySelector(prefetchSelector)) {
-    const prefetch = document.createElement("link");
-    prefetch.rel = "prefetch";
-    prefetch.as = "document";
-    prefetch.href = url;
-    prefetch.crossOrigin = "anonymous";
-    document.head.appendChild(prefetch);
-  }
 }
 
 function RouteLoader() {
@@ -174,6 +166,12 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       path: "/tilbakemelding",
       Icon: FeedbackRoundedIcon,
       color: "#8E24AA",
+    },
+    {
+      label: "Intern chat",
+      path: "/intern-chat",
+      Icon: ChatBubbleOutlineRoundedIcon,
+      color: "#5D4037",
     },
   ];
 
@@ -397,7 +395,8 @@ function Layout() {
             <Route element={<RequireRekspert />}>
               <Route path="/rekspert" element={<RekspertPage />} />
             </Route>
-            <Route path="/teams-chat" element={<TeamsChatRoute />} />
+            <Route path="/intern-chat" element={<TeamsChatRoute />} />
+            <Route path="/teams-chat" element={<Navigate to="/intern-chat" replace />} />
             <Route path="*" element={<Navigate to="/omeq" replace />} />
           </Routes>
         </Suspense>

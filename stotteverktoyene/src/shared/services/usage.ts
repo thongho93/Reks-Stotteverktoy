@@ -189,51 +189,57 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
       ? doc(db, "usage_daily", dateKey, "users", user.uid, "standardtekster", standardtekstId)
       : null;
 
-  await Promise.all([
-    setDoc(
-      userRef,
-      {
-        uid: user.uid,
-        ...(firstName ? { firstName } : {}),
-        [field]: increment(1),
-        ...userCounters,
-        ...meta,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    ),
-    setDoc(
-      totalsRef,
-      {
-        [field]: increment(1),
-        ...totalsCounters,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    ),
-    ...(standardtekstRef
-      ? [
-          setDoc(
-            standardtekstRef,
-            {
-              opens: increment(1),
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          ),
-        ]
-      : []),
-    ...(standardtekstUserRef
-      ? [
-          setDoc(
-            standardtekstUserRef,
-            {
-              opens: increment(1),
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          ),
-        ]
-      : []),
-  ]);
+  try {
+    await Promise.all([
+      setDoc(
+        userRef,
+        {
+          uid: user.uid,
+          ...(firstName ? { firstName } : {}),
+          [field]: increment(1),
+          ...userCounters,
+          ...meta,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      ),
+      setDoc(
+        totalsRef,
+        {
+          [field]: increment(1),
+          ...totalsCounters,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      ),
+      ...(standardtekstRef
+        ? [
+            setDoc(
+              standardtekstRef,
+              {
+                opens: increment(1),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            ),
+          ]
+        : []),
+      ...(standardtekstUserRef
+        ? [
+            setDoc(
+              standardtekstUserRef,
+              {
+                opens: increment(1),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            ),
+          ]
+        : []),
+    ]);
+  } catch (error) {
+    // Usage logging should never break the user flow.
+    // eslint-disable-next-line no-console
+    console.warn("[usage] Kunne ikke logge bruk:", error);
+  }
 }

@@ -581,9 +581,9 @@ export default function StandardTekstPage() {
       return Array.from({ length: occurrenceCount }, (_, occurrenceIdx) => {
         const preparatPosition = formuleringPreparatPositions[occurrenceIdx] ?? null;
         const raw =
+          manualRaw ||
           getRawFromPreparatPosition(preparatPosition) ||
-          getRawFromPreparatPosition(occurrenceIdx) ||
-          manualRaw;
+          getRawFromPreparatPosition(occurrenceIdx);
         if (!raw) return "";
 
         if (hasTallTokens) {
