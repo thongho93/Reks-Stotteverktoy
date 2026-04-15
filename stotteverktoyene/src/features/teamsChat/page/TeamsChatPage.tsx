@@ -1,28 +1,50 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
+  CircularProgress,
   Divider,
   IconButton,
+  List,
   ListItemButton,
   ListItemText,
   Typography,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import LoginIcon from "@mui/icons-material/Login";
-import LogoutIcon from "@mui/icons-material/Logout";
-import { useMsal } from "@azure/msal-react";
 
-import { graphScopes } from "../../../app/auth/msalConfig";
+import { useAuthUser } from "../../../app/auth/useAuthUser";
 import ChatList from "../components/ChatList";
-import MessageList from "../components/MessageList";
 import MessageComposer from "../components/MessageComposer";
-import { listChatMessages, listMyChats, sendChatMessage, type GraphChat, type GraphChatMessage } from "../graph/chatApi";
+import MessageList from "../components/MessageList";
+import {
+  ensureDirectChat,
+  listActiveMembers,
+  sendChatMessage,
+  subscribeChatMessages,
+  subscribeMyChats,
+  type ActiveMember,
+  type ChatUserIdentity,
+  type GraphChat,
+  type GraphChatMessage,
+} from "../graph/chatApi";
+
+function mapError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function getDisplayName(name?: string | null, email?: string | null): string {
+  const trimmedName = name?.trim();
+  if (trimmedName) return trimmedName;
+
+  const trimmedEmail = email?.trim().toLowerCase();
+  if (trimmedEmail) return trimmedEmail.split("@")[0];
+
+  return "Bruker";
+}
 
 export default function TeamsChatPage() {
-  const { instance, accounts } = useMsal();
-
-  const account = accounts[0] ?? null;
-  const isSignedIn = Boolean(account);
+  const { user, firstName } = useAuthUser();
+  const isSignedIn = Boolean(user);
 
   const [status, setStatus] = useState<string>("Klar");
   const [error, setError] = useState<string>("");
@@ -30,107 +52,69 @@ export default function TeamsChatPage() {
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<GraphChatMessage[]>([]);
+  const [activeMembers, setActiveMembers] = useState<ActiveMember[]>([]);
 
+  const [loadingMembers, setLoadingMembers] = useState<boolean>(false);
+  const [startingChatUid, setStartingChatUid] = useState<string | null>(null);
   const [draft, setDraft] = useState<string>("");
 
-  const loginScopes = useMemo(() => graphScopes.chatRead, []);
+  const sender = useMemo<ChatUserIdentity | null>(() => {
+    if (!user) return null;
+    return {
+      uid: user.uid,
+      displayName: getDisplayName(firstName, user.email),
+      email: user.email,
+    };
+  }, [firstName, user]);
 
-  const signIn = useCallback(async () => {
+  const selectedChat = useMemo(
+    () => chats.find((chat) => chat.id === selectedChatId) ?? null,
+    [chats, selectedChatId]
+  );
+
+  const refreshMembers = useCallback(async () => {
+    if (!user?.uid) return;
+
+    setLoadingMembers(true);
     setError("");
-    setStatus("Logger inn...");
-    try {
-      await instance.loginPopup({ scopes: loginScopes });
-      setStatus("Innlogget");
-    } catch (e: any) {
-      setStatus("Feilet");
-      setError(e?.message ?? String(e));
-    }
-  }, [instance, loginScopes]);
+    setStatus("Henter aktive medlemmer...");
 
-  const signOut = useCallback(async () => {
-    setError("");
-    setStatus("Logger ut...");
     try {
-      if (account) {
-        await instance.logoutPopup({ account });
-      } else {
-        await instance.logoutPopup();
-      }
-      setChats([]);
-      setMessages([]);
-      setSelectedChatId(null);
-      setDraft("");
-      setStatus("Utlogget");
-    } catch (e: any) {
-      setStatus("Feilet");
-      setError(e?.message ?? String(e));
-    }
-  }, [instance, account]);
-
-  const loadChats = useCallback(async () => {
-    setError("");
-    if (!account) {
-      setStatus("Mangler innlogging");
-      return;
-    }
-
-    setStatus("Henter chats...");
-    try {
-      const data = await listMyChats(instance, account);
-      setChats(data);
+      const members = await listActiveMembers(user.uid);
+      setActiveMembers(members);
       setStatus("OK");
-
-      // Auto-select first chat if none selected yet.
-      if (!selectedChatId && data.length > 0) {
-        setSelectedChatId(data[0].id);
-      }
-    } catch (e: any) {
+    } catch (e) {
       setStatus("Feilet");
-      setError(e?.message ?? String(e));
+      setError(mapError(e));
+    } finally {
+      setLoadingMembers(false);
     }
-  }, [instance, account, selectedChatId]);
+  }, [user?.uid]);
 
-  const loadMessages = useCallback(
-    async (chatId: string) => {
+  const handleStartChat = useCallback(
+    async (member: ActiveMember) => {
+      if (!sender) return;
+
+      setStartingChatUid(member.uid);
       setError("");
-      if (!account) {
-        setStatus("Mangler innlogging");
-        return;
-      }
+      setStatus("Oppretter chat...");
 
-      setStatus("Henter meldinger...");
       try {
-        const data = await listChatMessages(instance, account, chatId);
-        setMessages(data);
+        const chatId = await ensureDirectChat(sender, member);
+        setSelectedChatId(chatId);
         setStatus("OK");
-      } catch (e: any) {
+      } catch (e) {
         setStatus("Feilet");
-        setError(e?.message ?? String(e));
+        setError(mapError(e));
+      } finally {
+        setStartingChatUid(null);
       }
     },
-    [instance, account]
+    [sender]
   );
-
-  const handleSelectChat = useCallback(
-    (chatId: string) => {
-      setSelectedChatId(chatId);
-      setMessages([]);
-      loadMessages(chatId);
-    },
-    [loadMessages]
-  );
-
-  const handleRefresh = useCallback(async () => {
-    if (!account) return;
-    await loadChats();
-    if (selectedChatId) {
-      await loadMessages(selectedChatId);
-    }
-  }, [account, loadChats, loadMessages, selectedChatId]);
 
   const handleSend = useCallback(async () => {
-    setError("");
-    if (!account) {
+    if (!sender) {
       setStatus("Mangler innlogging");
       return;
     }
@@ -142,65 +126,96 @@ export default function TeamsChatPage() {
     const text = draft.trim();
     if (!text) return;
 
+    setError("");
     setStatus("Sender...");
     try {
-      await sendChatMessage(instance, account, selectedChatId, text);
+      await sendChatMessage(selectedChatId, text, sender);
       setDraft("");
-
-      // Refresh messages after sending.
-      const data = await listChatMessages(instance, account, selectedChatId);
-      setMessages(data);
       setStatus("OK");
-    } catch (e: any) {
+    } catch (e) {
       setStatus("Feilet");
-      setError(e?.message ?? String(e));
+      setError(mapError(e));
     }
-  }, [instance, account, selectedChatId, draft]);
+  }, [draft, selectedChatId, sender]);
 
   useEffect(() => {
-    if (!account) return;
-    // Load chats once we have an account.
-    loadChats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account]);
+    if (!user?.uid) {
+      setChats([]);
+      setMessages([]);
+      setActiveMembers([]);
+      setSelectedChatId(null);
+      setStatus("Mangler innlogging");
+      return;
+    }
+
+    setError("");
+    setStatus("Lytter på chatter...");
+
+    const unsubscribe = subscribeMyChats(
+      user.uid,
+      (nextChats) => {
+        setChats(nextChats);
+        setSelectedChatId((previousId) => {
+          if (!nextChats.length) return null;
+          if (previousId && nextChats.some((chat) => chat.id === previousId)) return previousId;
+          return nextChats[0].id;
+        });
+        setStatus("OK");
+      },
+      (subscriptionError) => {
+        setStatus("Feilet");
+        setError(mapError(subscriptionError));
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   useEffect(() => {
-    if (!account) return;
-    if (!selectedChatId) return;
-    loadMessages(selectedChatId);
-  }, [account, selectedChatId, loadMessages]);
+    if (!selectedChatId) {
+      setMessages([]);
+      return;
+    }
+
+    setError("");
+    setStatus("Lytter på meldinger...");
+
+    const unsubscribe = subscribeChatMessages(
+      selectedChatId,
+      (nextMessages) => {
+        setMessages(nextMessages);
+        setStatus("OK");
+      },
+      (subscriptionError) => {
+        setStatus("Feilet");
+        setError(mapError(subscriptionError));
+      }
+    );
+
+    return () => unsubscribe();
+  }, [selectedChatId]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    void refreshMembers();
+  }, [refreshMembers, user?.uid]);
 
   return (
     <Box sx={{ height: "calc(100vh - 96px)", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5 }}>
+      <Box
+        sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5 }}
+      >
         <Box>
-          <Typography variant="h5">Teams chat</Typography>
-          <Typography color="text.secondary">Status: {status}</Typography>
+          <Typography variant="h5">Intern chat</Typography>
+          <Typography color="text.secondary">
+            Status: {status}
+            {sender ? ` · Innlogget som ${sender.displayName}` : ""}
+          </Typography>
         </Box>
 
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          <IconButton aria-label="Oppdater" onClick={handleRefresh} disabled={!isSignedIn}>
-            <RefreshIcon />
-          </IconButton>
-
-          {!isSignedIn ? (
-            <ListItemButton
-              onClick={signIn}
-              sx={{ width: "fit-content", border: "1px solid", borderColor: "divider", borderRadius: 2 }}
-            >
-              <LoginIcon fontSize="small" />
-              <ListItemText primary="Logg inn med Microsoft" sx={{ ml: 1 }} />
-            </ListItemButton>
-          ) : (
-            <ListItemButton
-              onClick={signOut}
-              sx={{ width: "fit-content", border: "1px solid", borderColor: "divider", borderRadius: 2 }}
-            >
-              <LogoutIcon fontSize="small" />
-              <ListItemText primary="Logg ut" sx={{ ml: 1 }} />
-            </ListItemButton>
-          )}
-        </Box>
+        <IconButton aria-label="Oppdater medlemmer" onClick={refreshMembers} disabled={!isSignedIn}>
+          <RefreshIcon />
+        </IconButton>
       </Box>
 
       {error ? (
@@ -216,26 +231,78 @@ export default function TeamsChatPage() {
       <Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
         <Box
           sx={{
-            width: 340,
+            width: 360,
             borderRight: "1px solid",
             borderColor: "divider",
             minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          <ChatList
-            chats={chats}
-            selectedChatId={selectedChatId}
-            onSelectChat={handleSelectChat}
-            title="Chatlist"
-          />
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <ChatList
+              chats={chats}
+              selectedChatId={selectedChatId}
+              onSelectChat={setSelectedChatId}
+              currentUserId={sender?.uid}
+              title="Samtaler"
+            />
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ minHeight: 0, maxHeight: "45%", display: "flex", flexDirection: "column" }}>
+            <Typography sx={{ px: 2, py: 1.5 }} variant="subtitle1">
+              Aktive medlemmer
+            </Typography>
+            <Divider />
+
+            {loadingMembers ? (
+              <Box sx={{ px: 2, py: 2, display: "flex", alignItems: "center", gap: 1 }}>
+                <CircularProgress size={18} />
+                <Typography color="text.secondary">Henter medlemmer...</Typography>
+              </Box>
+            ) : activeMembers.length === 0 ? (
+              <Box sx={{ px: 2, py: 2 }}>
+                <Typography color="text.secondary">Ingen aktive medlemmer funnet.</Typography>
+              </Box>
+            ) : (
+              <List dense disablePadding sx={{ overflow: "auto", flex: 1 }}>
+                {activeMembers.map((member) => {
+                  const isSelected =
+                    selectedChat?.memberIds?.length === 2 &&
+                    Boolean(selectedChat.memberIds?.includes(member.uid));
+
+                  return (
+                    <ListItemButton
+                      key={member.uid}
+                      selected={isSelected}
+                      disabled={startingChatUid === member.uid}
+                      onClick={() => {
+                        void handleStartChat(member);
+                      }}
+                      sx={{ px: 2, py: 1.25 }}
+                    >
+                      <ListItemText
+                        primary={member.firstName}
+                        secondary={member.email}
+                        primaryTypographyProps={{ noWrap: true }}
+                        secondaryTypographyProps={{ noWrap: true }}
+                      />
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            )}
+          </Box>
         </Box>
 
         <Box sx={{ display: "flex", flex: 1, flexDirection: "column", minWidth: 0 }}>
           <Box sx={{ flex: 1, minHeight: 0 }}>
             <MessageList
               messages={messages}
-              title="Messagelist"
-              emptyText={isSignedIn ? "Velg en chat for å se meldinger." : "Logg inn for å hente chats og meldinger."}
+              title="Meldinger"
+              emptyText="Velg en chat for å se meldinger."
             />
           </Box>
 
@@ -247,7 +314,7 @@ export default function TeamsChatPage() {
               onChange={setDraft}
               onSend={handleSend}
               disabled={!isSignedIn || !selectedChatId}
-              placeholder={!isSignedIn ? "Logg inn for å sende meldinger" : selectedChatId ? "Skriv en melding…" : "Velg en chat først"}
+              placeholder={selectedChatId ? "Skriv en melding…" : "Velg en chat først"}
             />
           </Box>
         </Box>
