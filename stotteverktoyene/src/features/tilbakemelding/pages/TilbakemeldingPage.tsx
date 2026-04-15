@@ -16,12 +16,15 @@ import {
 import type { FirebaseError } from "firebase/app";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 
 const MELDESKJEMA_EMBED_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLScKadKrBcIT-8a9CgD4QFfCjXsERjolCZbhojJU8jFhy8V6ZA/viewform?embedded=true";
+const MELDESKJEMA_RESPONSES_URL =
+  "https://docs.google.com/forms/d/1dQq_pvU1lXf295odpYPWXs0_zX693iLbKxSFfNS3sAQ/edit#responses";
 
 type PrivateNote = {
   id: string;
@@ -82,7 +85,7 @@ function mapFirebaseError(error: unknown, fallback: string): string {
 }
 
 export default function TilbakemeldingPage() {
-  const { user } = useAuthUser();
+  const { user, isOwner } = useAuthUser();
   const [tab, setTab] = React.useState<"meldeskjema" | "notater">("notater");
 
   const [savedNotesList, setSavedNotesList] = React.useState<PrivateNote[]>([]);
@@ -387,20 +390,49 @@ export default function TilbakemeldingPage() {
       </Paper>
 
       {tab === "meldeskjema" ? (
-        <Paper
-          sx={{
-            height: { xs: "calc(100vh - 310px)", md: "calc(100vh - 280px)" },
-            minHeight: 520,
-            overflow: "hidden",
-          }}
-        >
-          <Box
-            component="iframe"
-            src={MELDESKJEMA_EMBED_URL}
-            title="Meldeskjema for REKS+"
-            sx={{ width: "100%", height: "100%", border: 0 }}
-          />
-        </Paper>
+        <>
+          {isOwner && (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 1.5,
+                mb: 1.5,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 1,
+                flexWrap: "wrap",
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Kun eier kan åpne innsendinger og se svaroversikt.
+              </Typography>
+              <Button
+                variant="outlined"
+                href={MELDESKJEMA_RESPONSES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                startIcon={<OpenInNewIcon />}
+              >
+                Åpne svar
+              </Button>
+            </Paper>
+          )}
+          <Paper
+            sx={{
+              height: { xs: isOwner ? "calc(100vh - 390px)" : "calc(100vh - 310px)", md: isOwner ? "calc(100vh - 360px)" : "calc(100vh - 280px)" },
+              minHeight: 520,
+              overflow: "hidden",
+            }}
+          >
+            <Box
+              component="iframe"
+              src={MELDESKJEMA_EMBED_URL}
+              title="Meldeskjema for REKS+"
+              sx={{ width: "100%", height: "100%", border: 0 }}
+            />
+          </Paper>
+        </>
       ) : (
         <Paper sx={{ p: { xs: 2, md: 3 } }}>
           <Typography variant="h2" sx={{ mb: 1 }}>

@@ -279,103 +279,104 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
         />
       </Box>
 
-      <Tooltip
-        title={doseHelperText}
-        open={!isPatch && !!doseHelperText && isDoseFocused}
-        placement="top-start"
-        arrow
-        PopperProps={{
-          modifiers: [
-            {
-              name: "offset",
-              options: { offset: [0, 8] },
-            },
-          ],
-        }}
-        componentsProps={{
-          tooltip: {
-            sx: {
-              backgroundColor: "rgba(97, 97, 97, 1)", // default MUI grey, 100% opacity
-            },
-          },
-          arrow: {
-            sx: {
-              color: "rgba(97, 97, 97, 1)",
-            },
-          },
-        }}
-        disableFocusListener
-        disableHoverListener
-        disableTouchListener
-      >
-        <Box sx={{ width: "100%" }}>
-          <TextField
-            label={
-              isPatch ? "Ingen døgndose" : isMixture ? "Antall ml per døgn" : "Antall per døgn"
-            }
-            inputRef={doseInputRef}
-            value={isPatch ? "" : value.doseText}
-            onChange={(e) => onChange({ ...value, doseText: e.target.value })}
-            inputProps={{
-              inputMode: "decimal",
-              "aria-label": "Antall per døgn",
-              style: { textAlign: "center" },
-            }}
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            fullWidth
-            disabled={isPatch}
-            error={doseLooksLikeMg && !isPatch}
-            // Keep helperText empty to avoid truncation; tooltip shows the full guidance when active.
-            helperText={""}
-            onFocus={() => setIsDoseFocused(true)}
-            onBlur={() => setIsDoseFocused(false)}
-            InputProps={{
-              endAdornment: !isPatch ? (
-                <InputAdornment position="end">
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    {doseLooksLikeMg && (
-                      <Tooltip title={mgWarningText} placement="top" arrow>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            color: "warning.main",
-                            cursor: "help",
-                          }}
-                        >
-                          <WarningAmberOutlinedIcon fontSize="small" />
-                        </Box>
-                      </Tooltip>
-                    )}
-                    <Box component="span" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
-                      {isMixture ? "ml/døgn" : "stk/døgn"}
-                    </Box>
-                  </Box>
-                </InputAdornment>
-              ) : undefined,
-            }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                "& fieldset": {
-                  borderColor: "primary.main",
-                  height: "125%",
-                },
-                "&:hover fieldset": {
-                  borderColor: "primary.main",
-                },
-                "&.MTooltipsed fieldset": {
-                  borderColor: "primary.main",
-                },
-                "& .MuiOutlinedInput-input": {
-                  paddingRight: "6px",
-                  textAlign: "center",
-                },
+      {isPatch ? (
+        <Box sx={{ width: "100%" }} aria-hidden />
+      ) : (
+        <Tooltip
+          title={doseHelperText}
+          open={!!doseHelperText && isDoseFocused}
+          placement="top-start"
+          arrow
+          PopperProps={{
+            modifiers: [
+              {
+                name: "offset",
+                options: { offset: [0, 8] },
               },
-            }}
-          />
-        </Box>
-      </Tooltip>
+            ],
+          }}
+          componentsProps={{
+            tooltip: {
+              sx: {
+                backgroundColor: "rgba(97, 97, 97, 1)", // default MUI grey, 100% opacity
+              },
+            },
+            arrow: {
+              sx: {
+                color: "rgba(97, 97, 97, 1)",
+              },
+            },
+          }}
+          disableFocusListener
+          disableHoverListener
+          disableTouchListener
+        >
+          <Box sx={{ width: "100%" }}>
+            <TextField
+              label={isMixture ? "Antall ml per døgn" : "Antall per døgn"}
+              inputRef={doseInputRef}
+              value={value.doseText}
+              onChange={(e) => onChange({ ...value, doseText: e.target.value })}
+              inputProps={{
+                inputMode: "decimal",
+                "aria-label": "Antall per døgn",
+                style: { textAlign: "center" },
+              }}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              error={doseLooksLikeMg}
+              // Keep helperText empty to avoid truncation; tooltip shows the full guidance when active.
+              helperText={""}
+              onFocus={() => setIsDoseFocused(true)}
+              onBlur={() => setIsDoseFocused(false)}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      {doseLooksLikeMg && (
+                        <Tooltip title={mgWarningText} placement="top" arrow>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              color: "warning.main",
+                              cursor: "help",
+                            }}
+                          >
+                            <WarningAmberOutlinedIcon fontSize="small" />
+                          </Box>
+                        </Tooltip>
+                      )}
+                      <Box component="span" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
+                        {isMixture ? "ml/døgn" : "stk/døgn"}
+                      </Box>
+                    </Box>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  "& fieldset": {
+                    borderColor: "primary.main",
+                    height: "125%",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "primary.main",
+                  },
+                  "&.MTooltipsed fieldset": {
+                    borderColor: "primary.main",
+                  },
+                  "& .MuiOutlinedInput-input": {
+                    paddingRight: "6px",
+                    textAlign: "center",
+                  },
+                },
+              }}
+            />
+          </Box>
+        </Tooltip>
+      )}
 
       <TextField
         label="OMEQ"
