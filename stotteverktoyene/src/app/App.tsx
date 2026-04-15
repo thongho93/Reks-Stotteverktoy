@@ -106,16 +106,6 @@ function warmConnection(url?: string) {
 
   ensureLink("dns-prefetch");
   ensureLink("preconnect");
-
-  const prefetchSelector = `link[rel="prefetch"][href="${url}"]`;
-  if (!document.head.querySelector(prefetchSelector)) {
-    const prefetch = document.createElement("link");
-    prefetch.rel = "prefetch";
-    prefetch.as = "document";
-    prefetch.href = url;
-    prefetch.crossOrigin = "anonymous";
-    document.head.appendChild(prefetch);
-  }
 }
 
 function RouteLoader() {
