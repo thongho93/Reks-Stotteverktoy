@@ -4,6 +4,11 @@ import {
   Box,
   Button,
   CircularProgress,
+  ClickAwayListener,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Paper,
   FormControlLabel,
   Snackbar,
@@ -17,6 +22,7 @@ import type { FirebaseError } from "firebase/app";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
@@ -25,6 +31,16 @@ const MELDESKJEMA_EMBED_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLScKadKrBcIT-8a9CgD4QFfCjXsERjolCZbhojJU8jFhy8V6ZA/viewform?embedded=true";
 const MELDESKJEMA_RESPONSES_URL =
   "https://docs.google.com/forms/d/1dQq_pvU1lXf295odpYPWXs0_zX693iLbKxSFfNS3sAQ/edit#responses";
+const KEEP_CARD_COLORS = [
+  "#FFF8E1",
+  "#E8F5E9",
+  "#E3F2FD",
+  "#F3E5F5",
+  "#FCE4EC",
+  "#E0F2F1",
+  "#FFF3E0",
+  "#E8EAF6",
+];
 
 type PrivateNote = {
   id: string;
@@ -53,18 +69,32 @@ function buildNoteTitle(title: string, content: string): string {
   return firstNonEmptyLine.slice(0, 60);
 }
 
-function buildSnippet(content: string): string {
-  const text = content.replace(/\s+/g, " ").trim();
-  if (!text) return "Tomt notat";
-  return text.length > 110 ? `${text.slice(0, 110)}...` : text;
-}
-
 function formatDateTime(ms: number): string {
   if (!ms) return "";
   return new Date(ms).toLocaleString("nb-NO", {
     dateStyle: "short",
     timeStyle: "short",
   });
+}
+
+function getNoteColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash << 5) - hash + id.charCodeAt(i);
+    hash |= 0;
+  }
+  return KEEP_CARD_COLORS[Math.abs(hash) % KEEP_CARD_COLORS.length];
+}
+
+function reorderByIds(items: PrivateNote[], fromId: string, toId: string): PrivateNote[] {
+  const fromIndex = items.findIndex((item) => item.id === fromId);
+  const toIndex = items.findIndex((item) => item.id === toId);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return items;
+
+  const next = [...items];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  return next;
 }
 
 function mapFirebaseError(error: unknown, fallback: string): string {
@@ -96,6 +126,11 @@ export default function TilbakemeldingPage() {
   const [loadingNotes, setLoadingNotes] = React.useState(true);
   const [savingNotes, setSavingNotes] = React.useState(false);
   const [deletingNote, setDeletingNote] = React.useState(false);
+  const [draggingNoteId, setDraggingNoteId] = React.useState<string | null>(null);
+  const [dragOverNoteId, setDragOverNoteId] = React.useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = React.useState(false);
+  const [editorSaving, setEditorSaving] = React.useState(false);
+  const [composerExpanded, setComposerExpanded] = React.useState(false);
   const [autoCopyEnabled, setAutoCopyEnabled] = React.useState(true);
   const [copyToast, setCopyToast] = React.useState<{
     message: string;
@@ -103,6 +138,21 @@ export default function TilbakemeldingPage() {
   } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
+
+  const persistNotesOrder = React.useCallback(
+    async (notes: PrivateNote[]) => {
+      if (!user?.uid) return;
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          privateNotesOrder: notes.map((note) => note.id),
+          privateNotesOrderUpdatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    },
+    [user?.uid]
+  );
 
   React.useEffect(() => {
     let cancelled = false;
@@ -123,8 +173,16 @@ export default function TilbakemeldingPage() {
       setError(null);
 
       try {
+        const userRef = doc(db, "users", user.uid);
         const notesRef = collection(db, "users", user.uid, "privateNotes");
-        const notesSnap = await getDocs(notesRef);
+        const [notesSnap, userSnap] = await Promise.all([getDocs(notesRef), getDoc(userRef)]);
+        const userData = userSnap.exists() ? (userSnap.data() as any) : null;
+        const orderedIds = Array.isArray(userData?.privateNotesOrder)
+          ? userData.privateNotesOrder.filter((id: unknown): id is string => typeof id === "string")
+          : [];
+        const orderMap = new Map<string, number>(
+          orderedIds.map((id: string, index: number) => [id, index])
+        );
 
         let loadedNotes: PrivateNote[] = notesSnap.docs.map((noteDoc) => {
           const data = noteDoc.data() as any;
@@ -138,9 +196,8 @@ export default function TilbakemeldingPage() {
 
         // One-time migration from old single-note field to first note document.
         if (loadedNotes.length === 0) {
-          const userSnap = await getDoc(doc(db, "users", user.uid));
-          const legacyText = userSnap.exists()
-            ? String((userSnap.data() as any)?.privateNotes ?? "").trim()
+          const legacyText = userData
+            ? String(userData.privateNotes ?? "").trim()
             : "";
 
           if (legacyText) {
@@ -163,7 +220,15 @@ export default function TilbakemeldingPage() {
           }
         }
 
-        loadedNotes.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+        loadedNotes.sort((a, b) => {
+          const aOrder = orderMap.get(a.id);
+          const bOrder = orderMap.get(b.id);
+
+          if (typeof aOrder === "number" && typeof bOrder === "number") return aOrder - bOrder;
+          if (typeof aOrder === "number") return -1;
+          if (typeof bOrder === "number") return 1;
+          return b.updatedAtMs - a.updatedAtMs;
+        });
 
         if (!cancelled) {
           setSavedNotesList(loadedNotes);
@@ -202,7 +267,8 @@ export default function TilbakemeldingPage() {
   );
 
   const normalizedDraftTitle = buildNoteTitle(draftTitle, draftContent);
-  const normalizedDraftContent = draftContent.trim();
+  const normalizedDraftContent = draftContent;
+  const hasDraftContent = draftContent.trim().length > 0;
 
   const hasUnsavedChanges = React.useMemo(() => {
     if (selectedNote) {
@@ -251,23 +317,85 @@ export default function TilbakemeldingPage() {
     setSuccess(null);
   }, []);
 
-  const handleSelectNote = React.useCallback((note: PrivateNote) => {
+  const handleOpenComposer = React.useCallback(() => {
+    handleNewNote();
+    setComposerExpanded(true);
+  }, [handleNewNote]);
+
+  const handleOpenEditor = React.useCallback((note: PrivateNote) => {
     setSelectedNoteId(note.id);
     setDraftTitle(note.title);
     setDraftContent(note.content);
+    setEditorOpen(true);
     setError(null);
     setSuccess(null);
   }, []);
 
+  const saveExistingNote = React.useCallback(
+    async (nextTitle: string, nextContent: string) => {
+      if (!user?.uid || !selectedNoteId) return false;
+
+      const current = savedNotesList.find((note) => note.id === selectedNoteId);
+      const computedTitle = buildNoteTitle(nextTitle, nextContent);
+      if (current && current.title === computedTitle && current.content === nextContent) return true;
+
+      try {
+        setEditorSaving(true);
+        await setDoc(
+          doc(db, "users", user.uid, "privateNotes", selectedNoteId),
+          {
+            title: computedTitle,
+            content: nextContent,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+        setSavedNotesList((prev) =>
+          prev.map((note) =>
+            note.id === selectedNoteId
+              ? {
+                  ...note,
+                  title: computedTitle,
+                  content: nextContent,
+                  updatedAtMs: Date.now(),
+                }
+              : note
+          )
+        );
+        return true;
+      } catch (err) {
+        setError(mapFirebaseError(err, "Lagring feilet. Prøv igjen."));
+        return false;
+      } finally {
+        setEditorSaving(false);
+      }
+    },
+    [savedNotesList, selectedNoteId, user?.uid]
+  );
+
+  const hasEditorPendingChanges = React.useMemo(() => {
+    if (!selectedNoteId || !editorOpen) return false;
+    const current = savedNotesList.find((note) => note.id === selectedNoteId);
+    if (!current) return false;
+    return current.title !== buildNoteTitle(draftTitle, draftContent) || current.content !== draftContent;
+  }, [draftContent, draftTitle, editorOpen, savedNotesList, selectedNoteId]);
+
+  const handleCloseEditor = React.useCallback(() => {
+    if (hasEditorPendingChanges) {
+      void saveExistingNote(draftTitle, draftContent);
+    }
+    setEditorOpen(false);
+  }, [draftContent, draftTitle, hasEditorPendingChanges, saveExistingNote]);
+
   const handleSaveNote = React.useCallback(async () => {
     if (!user?.uid) {
       setError("Du må være innlogget for å lagre notater.");
-      return;
+      return false;
     }
 
-    if (!normalizedDraftContent) {
+    if (!hasDraftContent) {
       setError("Skriv inn litt tekst før du lagrer notatet.");
-      return;
+      return false;
     }
 
     setSavingNotes(true);
@@ -293,11 +421,7 @@ export default function TilbakemeldingPage() {
           updatedAtMs: Date.now(),
         };
 
-        setSavedNotesList((prev) =>
-          [updated, ...prev.filter((note) => note.id !== selectedNoteId)].sort(
-            (a, b) => b.updatedAtMs - a.updatedAtMs
-          )
-        );
+        setSavedNotesList((prev) => prev.map((note) => (note.id === selectedNoteId ? updated : note)));
 
         setDraftTitle(updated.title);
         setDraftContent(updated.content);
@@ -305,6 +429,7 @@ export default function TilbakemeldingPage() {
         if (autoCopyEnabled) {
           void copyNoteToClipboard(updated.content, "auto");
         }
+        return true;
       } else {
         const createdRef = await addDoc(collection(db, "users", user.uid, "privateNotes"), {
           ...payload,
@@ -318,7 +443,9 @@ export default function TilbakemeldingPage() {
           updatedAtMs: Date.now(),
         };
 
-        setSavedNotesList((prev) => [created, ...prev]);
+        const reordered = [created, ...savedNotesList];
+        setSavedNotesList(reordered);
+        await persistNotesOrder(reordered);
         setSelectedNoteId(created.id);
         setDraftTitle(created.title);
         setDraftContent(created.content);
@@ -326,26 +453,31 @@ export default function TilbakemeldingPage() {
         if (autoCopyEnabled) {
           void copyNoteToClipboard(created.content, "auto");
         }
+        return true;
       }
     } catch (err) {
       setError(mapFirebaseError(err, "Lagring feilet. Prøv igjen."));
+      return false;
     } finally {
       setSavingNotes(false);
     }
   }, [
     autoCopyEnabled,
     copyNoteToClipboard,
+    hasDraftContent,
     normalizedDraftContent,
     normalizedDraftTitle,
+    persistNotesOrder,
+    savedNotesList,
     selectedNoteId,
     user?.uid,
   ]);
 
   const handleDeleteNote = React.useCallback(async () => {
-    if (!user?.uid || !selectedNoteId) return;
+    if (!user?.uid || !selectedNoteId) return false;
 
     const confirmed = window.confirm("Er du sikker på at du vil slette dette notatet?");
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     setDeletingNote(true);
     setError(null);
@@ -356,6 +488,7 @@ export default function TilbakemeldingPage() {
 
       const remaining = savedNotesList.filter((note) => note.id !== selectedNoteId);
       setSavedNotesList(remaining);
+      await persistNotesOrder(remaining);
 
       if (remaining.length > 0) {
         setSelectedNoteId(remaining[0].id);
@@ -368,12 +501,54 @@ export default function TilbakemeldingPage() {
       }
 
       setSuccess("Notatet er slettet.");
+      return true;
     } catch (err) {
       setError(mapFirebaseError(err, "Sletting feilet. Prøv igjen."));
+      return false;
     } finally {
       setDeletingNote(false);
     }
-  }, [savedNotesList, selectedNoteId, user?.uid]);
+  }, [persistNotesOrder, savedNotesList, selectedNoteId, user?.uid]);
+
+  const handleDropOnNote = React.useCallback(
+    async (targetNoteId: string) => {
+      if (!draggingNoteId) return;
+
+      const reordered = reorderByIds(savedNotesList, draggingNoteId, targetNoteId);
+      setDraggingNoteId(null);
+      setDragOverNoteId(null);
+
+      if (reordered === savedNotesList) return;
+
+      setSavedNotesList(reordered);
+      try {
+        await persistNotesOrder(reordered);
+      } catch (err) {
+        setError(mapFirebaseError(err, "Kunne ikke lagre ny rekkefølge."));
+      }
+    },
+    [draggingNoteId, persistNotesOrder, savedNotesList]
+  );
+
+  React.useEffect(() => {
+    if (!editorOpen || !selectedNoteId) return;
+    if (!hasEditorPendingChanges) return;
+
+    const timeout = window.setTimeout(() => {
+      void saveExistingNote(draftTitle, draftContent);
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [
+    draftContent,
+    draftTitle,
+    editorOpen,
+    hasEditorPendingChanges,
+    saveExistingNote,
+    selectedNoteId,
+  ]);
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", width: "100%" }}>
@@ -435,12 +610,35 @@ export default function TilbakemeldingPage() {
         </>
       ) : (
         <Paper sx={{ p: { xs: 2, md: 3 } }}>
-          <Typography variant="h2" sx={{ mb: 1 }}>
-            Private notater
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Dette er kun dine notater, lagret på din bruker.
-          </Typography>
+          <Box
+            sx={{
+              mb: 2,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
+          >
+            <Box>
+              <Typography variant="h2" sx={{ mb: 0.5 }}>
+                Private notater
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Dette er kun dine notater, lagret på din bruker.
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={autoCopyEnabled}
+                  onChange={(event) => setAutoCopyEnabled(event.target.checked)}
+                />
+              }
+              label="Kopi aktiv"
+              sx={{ mr: 0 }}
+            />
+          </Box>
 
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -457,188 +655,254 @@ export default function TilbakemeldingPage() {
               <CircularProgress size={28} />
             </Box>
           ) : (
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                gap: 2,
-              }}
-            >
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 1.5,
-                    gap: 1,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <Typography variant="h3">Skriv private notater</Typography>
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                    <Button variant="outlined" onClick={handleNewNote}>
-                      Nytt notat
-                    </Button>
-                  </Box>
-                </Box>
-
-                <TextField
-                  label="Tittel"
-                  value={draftTitle}
-                  onChange={(event) => {
-                    setDraftTitle(event.target.value);
-                    if (success) setSuccess(null);
-                  }}
-                  placeholder="F.eks. Egne huskeregler"
-                  fullWidth
-                  sx={{ mb: 1.5 }}
-                />
-
-                <TextField
-                  label="Notat"
-                  value={draftContent}
-                  onChange={(event) => {
-                    setDraftContent(event.target.value);
-                    if (success) setSuccess(null);
-                  }}
-                  placeholder="Skriv egne notater her..."
-                  fullWidth
-                  multiline
-                  minRows={12}
-                />
-
-                <Box
-                  sx={{
-                    mt: 2,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 2,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <Typography variant="body2" color="text.secondary">
-                    {hasUnsavedChanges ? "Du har ulagrede endringer." : "Alt er lagret."}
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    {selectedNoteId && (
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        onClick={handleDeleteNote}
-                        disabled={savingNotes || deletingNote}
-                      >
-                        {deletingNote ? "Sletter..." : "Slett notat"}
-                      </Button>
-                    )}
-                    <Button
-                      variant="contained"
-                      onClick={handleSaveNote}
-                      disabled={savingNotes || deletingNote || !hasUnsavedChanges}
-                    >
-                      {savingNotes ? "Lagrer..." : selectedNoteId ? "Oppdater notat" : "Lagre nytt notat"}
-                    </Button>
-                  </Box>
-                </Box>
-              </Paper>
-
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Box
-                  sx={{
-                    mb: 1.5,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 1,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <Typography variant="h3">Lagrede notater ({savedNotesList.length})</Typography>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={autoCopyEnabled}
-                        onChange={(event) => setAutoCopyEnabled(event.target.checked)}
-                      />
-                    }
-                    label="Kopi aktiv"
-                    sx={{ mr: 0 }}
-                  />
-                </Box>
-
-                <Box sx={{ maxHeight: { xs: 360, md: 540 }, overflowY: "auto", pr: 0.5 }}>
-                  {savedNotesList.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Ingen lagrede notater ennå.
+            <>
+              <Paper
+                component="div"
+                sx={{ maxWidth: 760, mx: "auto", mb: 2.5 }}
+              >
+                {!composerExpanded ? (
+                  <Paper
+                    variant="outlined"
+                    onClick={handleOpenComposer}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 3,
+                      boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
+                      cursor: "text",
+                    }}
+                  >
+                    <Typography variant="body1" color="text.secondary">
+                      Skriv et notat
                     </Typography>
-                  ) : (
-                    <Box sx={{ display: "grid", gap: 1 }}>
-                      {savedNotesList.map((note) => {
-                        const isSelected = note.id === selectedNoteId;
+                  </Paper>
+                ) : (
+                  <ClickAwayListener
+                    onClickAway={() => {
+                      setComposerExpanded(false);
+                    }}
+                  >
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      <TextField
+                        label="Tittel"
+                        value={draftTitle}
+                        onChange={(event) => {
+                          setDraftTitle(event.target.value);
+                          if (success) setSuccess(null);
+                        }}
+                        placeholder="F.eks. Egne huskeregler"
+                        fullWidth
+                        autoFocus
+                        sx={{ mb: 1.5 }}
+                      />
 
-                        return (
-                          <Paper
-                            key={note.id}
-                            variant="outlined"
-                            onClick={() => handleSelectNote(note)}
-                            sx={{
-                              p: 1.5,
-                              cursor: "pointer",
-                              borderColor: isSelected ? "primary.main" : "divider",
-                              bgcolor: isSelected ? "action.selected" : "background.paper",
+                      <TextField
+                        label="Notat"
+                        value={draftContent}
+                        onChange={(event) => {
+                          setDraftContent(event.target.value);
+                          if (success) setSuccess(null);
+                        }}
+                        placeholder="Skriv egne notater her..."
+                        fullWidth
+                        multiline
+                        minRows={7}
+                      />
+
+                      <Box
+                        sx={{
+                          mt: 1.5,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 2,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          {hasUnsavedChanges ? "Du har ulagrede endringer." : "Alt er lagret."}
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          <Button
+                            variant="text"
+                            onClick={() => {
+                              handleNewNote();
+                              setComposerExpanded(false);
                             }}
                           >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "flex-start",
-                                gap: 1,
-                              }}
-                            >
-                              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                                {note.title || "Uten tittel"}
-                              </Typography>
-                              <Box
-                                component="button"
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (!autoCopyEnabled) return;
-                                  void copyNoteToClipboard(note.content, "manual");
-                                }}
-                                sx={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                  color: "text.secondary",
-                                  mt: 0.2,
-                                  border: 0,
-                                  bgcolor: "transparent",
-                                  p: 0,
-                                  cursor: autoCopyEnabled ? "pointer" : "not-allowed",
-                                  opacity: autoCopyEnabled ? 1 : 0.45,
-                                }}
-                              >
-                                <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />
-                                <Typography variant="caption">Klikk for kopiering</Typography>
-                              </Box>
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                              {buildSnippet(note.content)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-                              Oppdatert: {formatDateTime(note.updatedAtMs)}
-                            </Typography>
-                          </Paper>
-                        );
-                      })}
-                    </Box>
-                  )}
-                </Box>
+                            Avbryt
+                          </Button>
+                          <Button
+                            variant="contained"
+                            onClick={async () => {
+                              const saved = await handleSaveNote();
+                              if (saved) {
+                                setComposerExpanded(false);
+                              }
+                            }}
+                            disabled={savingNotes || deletingNote || !hasDraftContent}
+                          >
+                            {savingNotes ? "Lagrer..." : "Lagre notat"}
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </ClickAwayListener>
+                )}
               </Paper>
-            </Box>
+
+              <Typography variant="h3" sx={{ mb: 1.25 }}>
+                Lagrede notater ({savedNotesList.length})
+              </Typography>
+
+              <Box
+                sx={{
+                  columnCount: { xs: 1, sm: 2, md: 3, xl: 4 },
+                  columnGap: 2,
+                }}
+              >
+                {savedNotesList.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Ingen lagrede notater ennå.
+                  </Typography>
+                ) : (
+                  savedNotesList.map((note) => {
+                    const isSelected = note.id === selectedNoteId;
+
+                    return (
+                      <Paper
+                        key={note.id}
+                        variant="outlined"
+                        onClick={() => handleOpenEditor(note)}
+                        draggable
+                        onDragStart={(event) => {
+                          setDraggingNoteId(note.id);
+                          setDragOverNoteId(note.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", note.id);
+
+                          const dragPreview = document.createElement("div");
+                          dragPreview.textContent = "⤢ Flytt notat";
+                          dragPreview.style.position = "fixed";
+                          dragPreview.style.top = "-1000px";
+                          dragPreview.style.left = "-1000px";
+                          dragPreview.style.padding = "6px 10px";
+                          dragPreview.style.borderRadius = "999px";
+                          dragPreview.style.background = "rgba(33, 33, 33, 0.92)";
+                          dragPreview.style.color = "#fff";
+                          dragPreview.style.fontSize = "12px";
+                          dragPreview.style.fontWeight = "600";
+                          dragPreview.style.pointerEvents = "none";
+                          dragPreview.style.zIndex = "9999";
+                          document.body.appendChild(dragPreview);
+                          event.dataTransfer.setDragImage(dragPreview, 14, 14);
+                          window.setTimeout(() => {
+                            dragPreview.remove();
+                          }, 0);
+                        }}
+                        onDragEnter={() => {
+                          if (!draggingNoteId || draggingNoteId === note.id) return;
+                          setDragOverNoteId(note.id);
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          void handleDropOnNote(note.id);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingNoteId(null);
+                          setDragOverNoteId(null);
+                        }}
+                        sx={{
+                          p: 1.5,
+                          mb: 2,
+                          display: "inline-block",
+                          width: "100%",
+                          breakInside: "avoid",
+                          cursor: draggingNoteId === note.id ? "grabbing" : "grab",
+                          borderColor:
+                            dragOverNoteId === note.id && draggingNoteId !== note.id
+                              ? "primary.main"
+                              : isSelected
+                              ? "primary.main"
+                              : "divider",
+                          bgcolor: getNoteColor(note.id),
+                          boxShadow: isSelected ? "0 0 0 1px rgba(25,118,210,0.35)" : "none",
+                          transition: "transform 120ms ease, box-shadow 120ms ease",
+                          opacity: draggingNoteId === note.id ? 0.55 : 1,
+                          "&:hover": {
+                            transform: "translateY(-2px)",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            gap: 1,
+                          }}
+                        >
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                            {note.title || "Uten tittel"}
+                          </Typography>
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+                            <DragIndicatorIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                          <Box
+                            component="button"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!autoCopyEnabled) return;
+                              void copyNoteToClipboard(note.content, "manual");
+                            }}
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              color: "text.secondary",
+                              border: 0,
+                              bgcolor: "transparent",
+                              p: 0,
+                              cursor: autoCopyEnabled ? "pointer" : "not-allowed",
+                              opacity: autoCopyEnabled ? 1 : 0.45,
+                            }}
+                          >
+                            <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />
+                            <Typography variant="caption">Kopi</Typography>
+                          </Box>
+                          </Box>
+                        </Box>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            mt: 0.75,
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {note.content}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1.25, display: "block" }}>
+                          Oppdatert: {formatDateTime(note.updatedAtMs)}
+                        </Typography>
+                      </Paper>
+                    );
+                  })
+                )}
+              </Box>
+            </>
           )}
         </Paper>
       )}
@@ -664,6 +928,59 @@ export default function TilbakemeldingPage() {
           {copyToast?.message ?? ""}
         </Alert>
       </Snackbar>
+      <Dialog
+        open={editorOpen}
+        onClose={handleCloseEditor}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            maxWidth: 544,
+          },
+        }}
+      >
+        <DialogTitle>Rediger notat</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Tittel"
+            value={draftTitle}
+            onChange={(event) => {
+              setDraftTitle(event.target.value);
+              if (success) setSuccess(null);
+            }}
+            fullWidth
+            sx={{ mt: 1.5, mb: 2 }}
+          />
+          <TextField
+            label="Notat"
+            value={draftContent}
+            onChange={(event) => {
+              setDraftContent(event.target.value);
+              if (success) setSuccess(null);
+            }}
+            fullWidth
+            multiline
+            minRows={10}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+            {editorSaving ? "Lagrer automatisk..." : "Endringer lagres automatisk"}
+          </Typography>
+          {selectedNoteId && (
+            <Button
+              color="error"
+              onClick={async () => {
+                const deleted = await handleDeleteNote();
+                if (deleted) setEditorOpen(false);
+              }}
+              disabled={savingNotes || deletingNote}
+            >
+              {deletingNote ? "Sletter..." : "Slett"}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
