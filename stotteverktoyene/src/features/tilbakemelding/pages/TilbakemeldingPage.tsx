@@ -213,8 +213,8 @@ export default function TilbakemeldingPage() {
   }, [draftContent, draftTitle, normalizedDraftContent, normalizedDraftTitle, selectedNote]);
 
   const copyNoteToClipboard = React.useCallback(
-    async (title: string, content: string, mode: "auto" | "manual") => {
-      const text = `${title.trim() ? `${title.trim()}\n\n` : ""}${content}`.trim();
+    async (content: string, mode: "auto" | "manual") => {
+      const text = content.trim();
       if (!text) {
         setCopyToast({ message: "Notatet er tomt, ingenting å kopiere.", severity: "info" });
         return;
@@ -254,10 +254,7 @@ export default function TilbakemeldingPage() {
     setDraftContent(note.content);
     setError(null);
     setSuccess(null);
-    if (autoCopyEnabled) {
-      void copyNoteToClipboard(note.title, note.content, "auto");
-    }
-  }, [autoCopyEnabled, copyNoteToClipboard]);
+  }, []);
 
   const handleSaveNote = React.useCallback(async () => {
     if (!user?.uid) {
@@ -303,7 +300,7 @@ export default function TilbakemeldingPage() {
         setDraftContent(updated.content);
         setSuccess("Notatet er oppdatert.");
         if (autoCopyEnabled) {
-          void copyNoteToClipboard(updated.title, updated.content, "auto");
+          void copyNoteToClipboard(updated.content, "auto");
         }
       } else {
         const createdRef = await addDoc(collection(db, "users", user.uid, "privateNotes"), {
@@ -324,7 +321,7 @@ export default function TilbakemeldingPage() {
         setDraftContent(created.content);
         setSuccess("Nytt notat er lagret.");
         if (autoCopyEnabled) {
-          void copyNoteToClipboard(created.title, created.content, "auto");
+          void copyNoteToClipboard(created.content, "auto");
         }
       }
     } catch (err) {
@@ -533,7 +530,7 @@ export default function TilbakemeldingPage() {
                         onChange={(event) => setAutoCopyEnabled(event.target.checked)}
                       />
                     }
-                    label="Auto-kopi ved klikk"
+                    label="Kopi aktiv"
                     sx={{ mr: 0 }}
                   />
                 </Box>
@@ -572,12 +569,24 @@ export default function TilbakemeldingPage() {
                                 {note.title || "Uten tittel"}
                               </Typography>
                               <Box
+                                component="button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (!autoCopyEnabled) return;
+                                  void copyNoteToClipboard(note.content, "manual");
+                                }}
                                 sx={{
                                   display: "inline-flex",
                                   alignItems: "center",
                                   gap: 0.5,
                                   color: "text.secondary",
                                   mt: 0.2,
+                                  border: 0,
+                                  bgcolor: "transparent",
+                                  p: 0,
+                                  cursor: autoCopyEnabled ? "pointer" : "not-allowed",
+                                  opacity: autoCopyEnabled ? 1 : 0.45,
                                 }}
                               >
                                 <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />

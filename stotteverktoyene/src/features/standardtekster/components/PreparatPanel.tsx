@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -31,22 +30,7 @@ type Props = {
   onIncludeManufacturerInTextChange?: (value: boolean) => void;
   onIncludePackSizeInTextChange?: (value: boolean) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  onPickText: (
-    pick:
-      | string
-      | {
-          text: string;
-          key: string;
-          virkestoff?: string;
-          formulering?: string;
-          rowData?: {
-            baseText?: string | null;
-            fullName?: string | null;
-            manufacturer?: string | null;
-            packSize?: string | null;
-          };
-        },
-  ) => void;
+  onPickText: (pick: string | PickPayload) => void;
   onClear: () => void;
   onRemove: (id: PreparatRowId) => void;
 };
@@ -64,60 +48,6 @@ type PickPayload = {
   };
 };
 
-type RecentSuggestion = {
-  key: string;
-  name: string;
-  varenummer: string;
-  payload: PickPayload;
-};
-
-const RECENT_SUGGESTIONS_STORAGE_KEY = "standardtekster.preparater.recent.v1";
-
-const readRecentSuggestionsFromStorage = (): RecentSuggestion[] => {
-  try {
-    const raw = window.localStorage.getItem(RECENT_SUGGESTIONS_STORAGE_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw) as RecentSuggestion[];
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((item) => item && typeof item === "object")
-      .map((item) => {
-        const key = String(item.key ?? "").trim();
-        const name = String(item.name ?? "").trim();
-        const varenummer = String(item.varenummer ?? "").trim();
-        const payload = item.payload ?? ({} as PickPayload);
-        const payloadText = String(payload.text ?? "").trim();
-        const payloadKey = String(payload.key ?? "").trim();
-
-        return {
-          key,
-          name,
-          varenummer,
-          payload: {
-            text: payloadText,
-            key: payloadKey,
-            virkestoff: payload.virkestoff ? String(payload.virkestoff).trim() : undefined,
-            formulering: payload.formulering ? String(payload.formulering).trim() : undefined,
-            rowData: payload.rowData
-              ? {
-                  baseText: payload.rowData.baseText ?? null,
-                  fullName: payload.rowData.fullName ?? null,
-                  manufacturer: payload.rowData.manufacturer ?? null,
-                  packSize: payload.rowData.packSize ?? null,
-                }
-              : undefined,
-          },
-        } as RecentSuggestion;
-      })
-      .filter((item) => item.key && item.name && item.payload?.text && item.payload?.key)
-      .slice(0, 10);
-  } catch {
-    return [];
-  }
-};
-
 export default function PreparatPanel({
   preparatRows,
   clearOnCopy = false,
@@ -132,74 +62,8 @@ export default function PreparatPanel({
   onRemove,
 }: Props) {
   const hasPicked = preparatRows.some((r) => r.picked);
-  const [recentSuggestions, setRecentSuggestions] = useState<RecentSuggestion[]>(
-    () => readRecentSuggestionsFromStorage(),
-  );
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        RECENT_SUGGESTIONS_STORAGE_KEY,
-        JSON.stringify(recentSuggestions.slice(0, 10)),
-      );
-    } catch {
-      // ignore storage write errors
-    }
-  }, [recentSuggestions]);
-
-  const pushRecentSuggestion = (entry: RecentSuggestion) => {
-    setRecentSuggestions((prev) => {
-      const deduped = prev.filter((item) => item.key !== entry.key);
-      return [entry, ...deduped].slice(0, 10);
-    });
-  };
-
-  const applyPickPayload = (payload: PickPayload) => {
-    onPickText(payload);
-    const nameForChip = payload.rowData?.baseText?.trim() || payload.text.trim();
-    const varenummerForChip = String(payload.key ?? "").trim();
-    if (!nameForChip || !varenummerForChip) return;
-
-    pushRecentSuggestion({
-      key: varenummerForChip,
-      name: nameForChip,
-      varenummer: varenummerForChip,
-      payload,
-    });
-  };
-
-  const suggestionChips = useMemo(
-    () =>
-      recentSuggestions.map((item) => (
-        <Chip
-          key={item.key}
-          variant="outlined"
-          size="small"
-          label={
-            /^FEST:/i.test(item.varenummer)
-              ? item.name
-              : `${item.name} (${item.varenummer})`
-          }
-          onClick={() => applyPickPayload(item.payload)}
-          sx={{
-            width: "100%",
-            justifyContent: "flex-start",
-            "& .MuiChip-label": {
-              width: "100%",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              fontSize: "0.72rem",
-              px: 0.75,
-            },
-            height: 20,
-          }}
-        />
-      )),
-    [recentSuggestions],
-  );
-
-  const deriveFormuleringPlural = (m: any): string => {
+  const deriveFormuleringBase = (m: any): string => {
     const texts = [
       m?.navnForStyrke,
       m?.navnFormStyrke,
@@ -216,31 +80,32 @@ export default function PreparatPanel({
     const hay = texts.join(" ");
 
     const rules: Array<[RegExp, string]> = [
-      [/\bdepotplaster\b/, "depotplastre"],
-      [/\bdepottablett\b|\bdepottab\b/, "depottabletter"],
-      [/\bsmeltetablett\b|\bsmeltetab\b/, "smeltetabletter"],
-      [/\benterotablett\b|\benterotab\b/, "enterotabletter"],
-      [/\bsublingvaltablett\b|\bsublingvaltab\b/, "sublingvaltabletter"],
-      [/\bbrusetablett\b|\bbrusetab\b/, "brusetabletter"],
-      [/\bdepotkapsel\b|\bdepotkaps\b/, "depotkapsler"],
-      [/\bnesespray\b/, "nesesprayer"],
-      [/\bøyedråpe\b|\bøyedr\b|\boyedr\b/, "øyedråper"],
-      [/\børedråpe\b|\boredr\b/, "øredråper"],
-      [/\bstikkpille\b|\bstikkpil\b|\bsupp\b/, "stikkpiller"],
-      [/\binjeksjon\b|\binj\b/, "injeksjoner"],
-      [/\binfusjon\b|\binf\b/, "infusjoner"],
-      [/\binhalasjonspulver\b|\binh\s*pulv\b/, "inhalasjonspulvere"],
-      [/\binhalasjonsvæske\b|\binh\s*væske\b/, "inhalasjonsvæsker"],
-      [/\bmikstur\b/, "miksturer"],
-      [/\bgranulat\b|\bgran\b/, "granulater"],
-      [/\bplaster\b/, "plastre"],
-      [/\btablett\b|\btab\b|\btabl\b/, "tabletter"],
-      [/\bkapsel\b|\bkaps\b/, "kapsler"],
-      [/\bdråpe\b|\bdråper\b|\bdr\b/, "dråper"],
-      [/\bsalve\b/, "salver"],
-      [/\bkrem\b/, "kremer"],
-      [/\bgel\b/, "geler"],
-      [/\bspray\b/, "sprayer"],
+      [/\bdepotplaster\b|\bdepotplastre\b/, "depotplaster"],
+      [/\btyggetablett\b|\btyggetab\b|\btyggetabletter\b/, "tyggetablett"],
+      [/\bdepottablett\b|\bdepottab\b|\bdepottabletter\b/, "depottablett"],
+      [/\bsmeltetablett\b|\bsmeltetab\b|\bsmeltetabletter\b/, "smeltetablett"],
+      [/\benterotablett\b|\benterotab\b|\benterotabletter\b/, "enterotablett"],
+      [/\bsublingvaltablett\b|\bsublingvaltab\b|\bsublingvaltabletter\b/, "sublingvaltablett"],
+      [/\bbrusetablett\b|\bbrusetab\b|\bbrusetabletter\b/, "brusetablett"],
+      [/\bdepotkapsel\b|\bdepotkaps\b|\bdepotkapsler\b/, "depotkapsel"],
+      [/\bnesespray\b|\bnesesprayer\b/, "nesespray"],
+      [/\bøyedråpe\b|\bøyedr\b|\boyedr\b|\bøyedråper\b/, "øyedråpe"],
+      [/\børedråpe\b|\boredr\b|\børedråper\b/, "øredråpe"],
+      [/\bstikkpille\b|\bstikkpil\b|\bsupp\b|\bstikkpiller\b/, "stikkpille"],
+      [/\binjeksjon\b|\binj\b|\binjeksjoner\b/, "injeksjon"],
+      [/\binfusjon\b|\binf\b|\binfusjoner\b/, "infusjon"],
+      [/\binhalasjonspulver\b|\binh\s*pulv\b|\binhalasjonspulvere\b/, "inhalasjonspulver"],
+      [/\binhalasjonsvæske\b|\binh\s*væske\b|\binhalasjonsvæsker\b/, "inhalasjonsvæske"],
+      [/\bmikstur\b|\bmiksturer\b/, "mikstur"],
+      [/\bgranulat\b|\bgran\b|\bgranulater\b/, "granulat"],
+      [/\bplaster\b|\bplastre\b/, "plaster"],
+      [/\btablett\b|\btab\b|\btabl\b|\btabletter\b/, "tablett"],
+      [/\bkapsel\b|\bkaps\b|\bkapsler\b/, "kapsel"],
+      [/\bdråpe\b|\bdråper\b|\bdr\b/, "dråpe"],
+      [/\bsalve\b|\bsalver\b/, "salve"],
+      [/\bkrem\b|\bkremer\b/, "krem"],
+      [/\bgel\b|\bgeler\b/, "gel"],
+      [/\bspray\b|\bsprayer\b/, "spray"],
     ];
 
     for (const [re, plural] of rules) {
@@ -251,14 +116,7 @@ export default function PreparatPanel({
   };
 
   return (
-    <Box
-      sx={{
-        display: "grid",
-        gap: 1,
-        gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 300px" },
-        alignItems: { xs: "start", lg: "stretch" },
-      }}
-    >
+    <Box>
       <Paper className={styles.preparatPaper}>
         <Box className={styles.preparatHeader}>
           <Typography variant="subtitle2" className={styles.preparatTitle}>
@@ -376,9 +234,9 @@ export default function PreparatPanel({
               };
 
               const virkestoff = deriveVirkestoff(med);
-              const formulering = deriveFormuleringPlural(med);
+              const formulering = deriveFormuleringBase(med);
 
-              applyPickPayload({
+              onPickText({
                 text,
                 key,
                 virkestoff: virkestoff || undefined,
@@ -479,38 +337,6 @@ export default function PreparatPanel({
             ))}
         </Box>
 
-      </Paper>
-
-      <Paper
-        className={styles.preparatPaper}
-        sx={{
-          p: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: 0.75,
-          height: { xs: "auto", lg: "100%" },
-        }}
-      >
-        <Typography variant="subtitle2">De siste 10 søkene</Typography>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 0.35,
-            maxHeight: { xs: 120, lg: 170 },
-            overflowY: "auto",
-            overflowX: "hidden",
-            pr: 0.25,
-          }}
-        >
-          {suggestionChips.length > 0 ? (
-            suggestionChips
-          ) : (
-            <Typography variant="caption" color="text.secondary">
-              Ingen nylige søk.
-            </Typography>
-          )}
-        </Box>
       </Paper>
     </Box>
   );

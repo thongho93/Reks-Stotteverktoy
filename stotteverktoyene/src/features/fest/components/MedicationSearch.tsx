@@ -618,6 +618,20 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     const isLikelyIdSearch =
       idNumberTokens.length > 0 && meaningfulTextTokens.length === 0 && !numberWithUnit;
     const restrictToPimOnly = isLikelyIdSearch;
+    const strictPrefixTextQuery =
+      !isLikelyIdSearch &&
+      meaningfulTextTokens.length === 1 &&
+      meaningfulTextTokens[0].length >= 4
+        ? meaningfulTextTokens[0]
+        : null;
+    const shortPrefixTextQuery =
+      !isLikelyIdSearch &&
+      meaningfulTextTokens.length === 0 &&
+      textTokens.length === 1 &&
+      textTokens[0].length >= 2 &&
+      textTokens[0].length <= 3
+        ? textTokens[0]
+        : null;
     const normalizedQuery = normalizeForSearch(deferredQuery);
     const exactStrengthPhrase = (() => {
       for (let i = 0; i < tokens.length - 1; i++) {
@@ -676,10 +690,11 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     const queryIndicatesCombo = rawQueryLower.includes("/") || rawQueryLower.includes(" og ");
     let hasNonComboMatch = false;
 
+    const comboNamePattern = /[a-zæøå]\s*\/\s*[a-zæøå]/i;
     const isComboMed = (med: Med) => {
       const name = (med.navnFormStyrke ?? med.varenavn ?? "").toLowerCase();
       const subst = (med.virkestoff ?? "").toLowerCase();
-      return name.includes("/") || subst.includes(" og ");
+      return comboNamePattern.test(name) || subst.includes(" og ");
     };
 
     for (const m of allItems) {
@@ -702,12 +717,33 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
 
       const hay = m.normalizedSearchText;
       const hayTokens = m.hayTokens;
+      const nameTokens = m.nameTokens;
+      const varenavnTokens = m.varenavnTokens;
+      const substanceTokens = m.substanceTokens;
 
       // Må matche viktige tekst-tokens (typisk preparatnavn + ev. produsent/variant fra pasted tekst).
+      if (shortPrefixTextQuery) {
+        const okShortText =
+          tokenMatches(nameTokens, shortPrefixTextQuery) ||
+          tokenMatches(varenavnTokens, shortPrefixTextQuery) ||
+          tokenMatches(substanceTokens, shortPrefixTextQuery) ||
+          tokenMatches(hayTokens, shortPrefixTextQuery);
+        if (!okShortText) continue;
+      }
+
       if (requiredTextTokens.length > 0) {
-        const okText = requiredTextTokens.every(
-          (t) => tokenMatches(hayTokens, t) || hay.includes(t)
-        );
+        const okText = requiredTextTokens.every((t) => {
+          if (strictPrefixTextQuery && t === strictPrefixTextQuery) {
+            return (
+              tokenMatches(nameTokens, t) ||
+              tokenMatches(varenavnTokens, t) ||
+              tokenMatches(substanceTokens, t) ||
+              tokenMatches(hayTokens, t)
+            );
+          }
+
+          return tokenMatches(hayTokens, t) || hay.includes(t);
+        });
         if (!okText) continue;
       }
 
@@ -726,10 +762,6 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       const nameNorm = m.normalizedName;
       const varenavnNorm = m.normalizedVarenavn;
       const substanceNorm = m.normalizedSubstance;
-
-      const nameTokens = m.nameTokens;
-      const varenavnTokens = m.varenavnTokens;
-      const substanceTokens = m.substanceTokens;
 
       for (const t of tokens) {
         if (isNumberToken(t)) {
@@ -758,7 +790,11 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       }
 
       // Favor actual product names over indirect substance-only matches.
-      if (!isLikelyIdSearch && normalizedQuery && meaningfulTextTokens.length > 0) {
+      if (
+        !isLikelyIdSearch &&
+        normalizedQuery &&
+        (meaningfulTextTokens.length > 0 || Boolean(shortPrefixTextQuery))
+      ) {
         if (nameNorm === normalizedQuery) score += 20;
         else if (nameNorm.startsWith(normalizedQuery)) score += 14;
         else if (varenavnNorm.startsWith(normalizedQuery)) score += 10;
@@ -766,7 +802,7 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       }
 
       // Stronger boost when the first meaningful query token matches the beginning of the product name.
-      const firstMeaningfulTextToken = meaningfulTextTokens[0];
+      const firstMeaningfulTextToken = meaningfulTextTokens[0] ?? shortPrefixTextQuery;
       if (!isLikelyIdSearch && firstMeaningfulTextToken) {
         if ((nameTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 10;
         else if ((varenavnTokens[0] ?? "").startsWith(firstMeaningfulTextToken)) score += 7;
