@@ -22,7 +22,6 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
-import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
@@ -50,7 +49,6 @@ const TilbakemeldingPage = React.lazy(
   () => import("../features/tilbakemelding/pages/TilbakemeldingPage")
 );
 const RekspertPage = React.lazy(() => import("../features/rekspert/RekspertPage"));
-const TeamsChatRoute = React.lazy(() => import("../features/teamsChat/page/TeamsChatRoute"));
 const LoginPage = React.lazy(() =>
   import("./auth/LoginPage").then((module) => ({ default: module.LoginPage }))
 );
@@ -166,12 +164,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       path: "/tilbakemelding",
       Icon: FeedbackRoundedIcon,
       color: "#8E24AA",
-    },
-    {
-      label: "Intern chat",
-      path: "/intern-chat",
-      Icon: ChatBubbleOutlineRoundedIcon,
-      color: "#5D4037",
     },
   ];
 
@@ -395,8 +387,8 @@ function Layout() {
             <Route element={<RequireRekspert />}>
               <Route path="/rekspert" element={<RekspertPage />} />
             </Route>
-            <Route path="/intern-chat" element={<TeamsChatRoute />} />
-            <Route path="/teams-chat" element={<Navigate to="/intern-chat" replace />} />
+            <Route path="/intern-chat" element={<Navigate to="/omeq" replace />} />
+            <Route path="/teams-chat" element={<Navigate to="/omeq" replace />} />
             <Route path="*" element={<Navigate to="/omeq" replace />} />
           </Routes>
         </Suspense>
