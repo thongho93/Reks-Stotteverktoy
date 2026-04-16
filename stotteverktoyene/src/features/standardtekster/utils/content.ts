@@ -1,5 +1,7 @@
 import {
   formatPreparatList,
+  replaceDenDeTokenByCount,
+  replaceMedisineneTokenByCount,
   replaceDatoMndTokens,
   replaceDatoTokens,
   replacePreparatTokenWithList,
@@ -62,6 +64,8 @@ export const buildDisplayContent = ({
   }
 
   text = replaceVareTokenByCount(text, picked.length);
+  text = replaceDenDeTokenByCount(text, picked.length);
+  text = replaceMedisineneTokenByCount(text, picked.length);
 
   const d = (dato ?? "").trim();
   if (d) {
@@ -82,8 +86,10 @@ export const buildPreviewContent = ({ template, firstName, picked }: BuildArgs):
   text = replaceFirstName(text, firstName);
 
   // Keep PREPARAT1 / PREPARAT2 placeholders for preview rendering (chips/colors),
-  // but still apply dynamic grammar tokens like varen/varene.
+  // but still apply dynamic grammar tokens like varen/varene and den/de.
   text = replaceVareTokenByCount(text, picked.length);
+  text = replaceDenDeTokenByCount(text, picked.length);
+  text = replaceMedisineneTokenByCount(text, picked.length);
 
   return text;
 };
