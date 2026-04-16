@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
+  Button,
   ClickAwayListener,
   Link,
   List,
@@ -8,6 +9,7 @@ import {
   ListItemText,
   Paper,
   Popper,
+  Stack,
   TextField,
   Typography,
 } from "@mui/material";
@@ -62,6 +64,7 @@ let medicationItemsPromise: Promise<Med[]> | null = null;
 type Props = {
   maxResults?: number;
   onPick?: (med: Med) => void;
+  onManualPick?: (payload: { name: string; query: string }) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
 };
 
@@ -522,8 +525,14 @@ const tokenMatches = (hayTokens: string[], needleRaw: string) => {
   return hayTokens.some((ht) => ht.startsWith(needle));
 };
 
-export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: Props) {
+export default function MedicationSearch({
+  maxResults = 25,
+  onPick,
+  onManualPick,
+  inputRef,
+}: Props) {
   const [query, setQuery] = useState("");
+  const [manualName, setManualName] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [allItems, setAllItems] = useState<Med[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -906,6 +915,19 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
     setHighlightedIndex(-1);
   };
 
+  const normalizedQueryDigits = normalizeForSearch(deferredQuery).replace(/\s+/g, "");
+  const noHitsForLikelyIdSearch =
+    !isLoadingData &&
+    !loadError &&
+    open &&
+    results.length === 0 &&
+    deferredQuery.trim().length >= 2 &&
+    /^\d{4,}$/.test(normalizedQueryDigits);
+
+  useEffect(() => {
+    setManualName("");
+  }, [deferredQuery]);
+
 
   useEffect(() => {
     if (!open || results.length === 0) {
@@ -1031,14 +1053,56 @@ export default function MedicationSearch({ maxResults = 25, onPick, inputRef }: 
       )}
 
       {!isLoadingData && !loadError && open && results.length === 0 && deferredQuery.trim().length >= 2 && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-          <strong>Ingen treff.</strong>{" "}
-          Mangler preparatet?{" "}
-          <Link href={SPREADSHEET_EDIT_URL} target="_blank" rel="noopener noreferrer">
-            Legg det til i regnearket
-          </Link>
-          .
-        </Typography>
+        <Box sx={{ mt: 0.5 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ display: "block" }}>
+            <strong>Ingen treff.</strong>{" "}
+            Mangler preparatet?{" "}
+            <Link href={SPREADSHEET_EDIT_URL} target="_blank" rel="noopener noreferrer">
+              Legg det til i regnearket
+            </Link>
+            .
+          </Typography>
+
+          {noHitsForLikelyIdSearch && (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1, maxWidth: 520 }}>
+              <TextField
+                size="small"
+                fullWidth
+                label="Manuelt preparatnavn"
+                placeholder="Skriv preparatnavn for å overstyre PREPARAT1"
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  const name = manualName.trim();
+                  if (!name) return;
+                  e.preventDefault();
+                  onManualPick?.({ name, query: deferredQuery.trim() });
+                  setManualName("");
+                  setQuery("");
+                  setOpen(false);
+                  setHighlightedIndex(-1);
+                }}
+              />
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  const name = manualName.trim();
+                  if (!name) return;
+                  onManualPick?.({ name, query: deferredQuery.trim() });
+                  setManualName("");
+                  setQuery("");
+                  setOpen(false);
+                  setHighlightedIndex(-1);
+                }}
+                disabled={!manualName.trim()}
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                Bruk navn
+              </Button>
+            </Stack>
+          )}
+        </Box>
       )}
 
       <Popper

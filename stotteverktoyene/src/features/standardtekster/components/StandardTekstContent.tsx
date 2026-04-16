@@ -327,20 +327,14 @@ export default function StandardTekstContent({
               }}
             />
           ) : null}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "flex-start",
-            }}
-          >
-            <Typography variant="h2" className={styles.title} sx={{ mb: 1 }}>
+          <Box className={styles.contentHeader}>
+            <Typography variant="h2" className={styles.title}>
               {selected.title}
             </Typography>
           </Box>
 
           {!isEditing && headerRight ? (
-            <Box sx={{ mb: 1.25 }} onClick={(e) => e.stopPropagation()}>
+            <Box className={styles.headerRightWrap} onClick={(e) => e.stopPropagation()}>
               {headerRight}
             </Box>
           ) : null}
@@ -589,19 +583,8 @@ export default function StandardTekstContent({
               {belowContent}
 
               {(selected.updatedAt || isAdmin) && (
-                <Box
-                  className={styles.editRowBottom}
-                  sx={{
-                    position: "relative",
-                    zIndex: 2,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 1.25,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <Typography variant="caption" color="text.secondary">
+                <Box className={styles.editRowBottom} sx={{ position: "relative", zIndex: 2 }}>
+                  <Typography variant="caption" className={styles.metaText}>
                     {selected.updatedAt
                       ? `Sist oppdatert${selected.updatedByName ? ` av ${selected.updatedByName}` : ""}: ${selected.updatedAt.toLocaleDateString("nb-NO")}`
                       : ""}

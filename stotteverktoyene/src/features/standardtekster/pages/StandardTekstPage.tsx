@@ -409,7 +409,7 @@ export default function StandardTekstPage() {
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
-      setClockCustomMode(false);
+      setClockCustomMode(true);
 
       // Reset date input
       setDatoInput("");
@@ -434,7 +434,7 @@ export default function StandardTekstPage() {
   const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
     getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME),
   );
-  const [clockCustomMode, setClockCustomMode] = useState<boolean>(false);
+  const [clockCustomMode, setClockCustomMode] = useState<boolean>(true);
   const [datoInput, setDatoInput] = useState<string>("");
   const [formuleringByIndex, setFormuleringByIndex] = useState<Record<number, string>>({ 0: "" });
   const [formuleringByPreparatKey, setFormuleringByPreparatKey] = useState<Record<string, string>>({});
@@ -623,16 +623,32 @@ export default function StandardTekstPage() {
   const resolveFormuleringTokenValue = useCallback(
     (index: number, template: string): string => {
       const manual = (formuleringByIndex[index] ?? "").trim();
-      const byPreparat = index === 0
-        ? getFormuleringForPreparatPosition(0)
-        : getFormuleringForPreparatPosition(index - 1);
+      const pickedCount = (preparatRows as any[]).reduce((count, row) => {
+        const key = String(row?.pickedKey ?? row?.picked ?? "").trim();
+        return key ? count + 1 : count;
+      }, 0);
+      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(template ?? "");
+      const preparatPosition = index === 0
+        ? 0
+        : hasUnnumberedToken
+          ? index
+          : index - 1;
+      const byPreparat =
+        index > 0 && pickedCount <= index
+          ? ""
+          : getFormuleringForPreparatPosition(preparatPosition);
 
       const raw = manual || byPreparat;
       if (!raw) return "";
 
       return resolveFormuleringForPreviewAndCopy(index, raw, template);
     },
-    [formuleringByIndex, getFormuleringForPreparatPosition, resolveFormuleringForPreviewAndCopy],
+    [
+      formuleringByIndex,
+      getFormuleringForPreparatPosition,
+      preparatRows,
+      resolveFormuleringForPreviewAndCopy,
+    ],
   );
 
   const replaceUnnumberedFormuleringTokensByOccurrence = useCallback(
@@ -931,7 +947,7 @@ export default function StandardTekstPage() {
       setTallByIndex(nextTallValues);
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
-      setClockCustomMode(false);
+      setClockCustomMode(true);
       setDatoInput("");
       setErrorLocal(null);
       protectedOmeqSelectedIdRef.current = selected.id;
@@ -950,7 +966,7 @@ export default function StandardTekstPage() {
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
-      setClockCustomMode(false);
+      setClockCustomMode(true);
       setDatoInput("");
       const fIndices = getFormuleringTokenIndices(activeTemplateContent);
       if (fIndices.length) {
@@ -1549,7 +1565,7 @@ export default function StandardTekstPage() {
         }
         setClockTime(DEFAULT_CLOCK_TALL_TIME);
         setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
-        setClockCustomMode(false);
+        setClockCustomMode(true);
 
         setSearch("");
         setDatoInput("");
@@ -1600,7 +1616,7 @@ export default function StandardTekstPage() {
           }
           setClockTime(DEFAULT_CLOCK_TALL_TIME);
           setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
-          setClockCustomMode(false);
+          setClockCustomMode(true);
 
           setSearch("");
           setDatoInput("");
@@ -1835,9 +1851,21 @@ export default function StandardTekstPage() {
                     if (formulering && selected && templateHasFormuleringTokens(activeTemplateContent)) {
                       const tokenIndices = getFormuleringTokenIndices(activeTemplateContent);
                       if (tokenIndices.length > 0) {
+                        const normalizedKey = String(key ?? "").trim();
+                        const pickedCountBefore = (preparatRows as any[]).reduce((count, row) => {
+                          const rowKey = String(row?.pickedKey ?? row?.picked ?? "").trim();
+                          return rowKey ? count + 1 : count;
+                        }, 0);
+                        const alreadyPicked = (preparatRows as any[]).some((row) => {
+                          const rowKey = String(row?.pickedKey ?? row?.picked ?? "").trim();
+                          return rowKey && rowKey === normalizedKey;
+                        });
+                        const nextPickedCount = alreadyPicked ? pickedCountBefore : pickedCountBefore + 1;
+                        const autoEligibleIndices = tokenIndices.filter((idx) => idx === 0 || idx < nextPickedCount);
+
                         setFormuleringByIndex((prev) => {
                           const next = { ...prev };
-                          const firstEmpty = tokenIndices.find((idx) => !(next[idx] ?? "").trim());
+                          const firstEmpty = autoEligibleIndices.find((idx) => !(next[idx] ?? "").trim());
                           if (firstEmpty !== undefined) {
                             next[firstEmpty] = formulering;
                           }
@@ -1906,12 +1934,10 @@ export default function StandardTekstPage() {
                 >
                   {templateHasTallToken(activeTemplateContent) && (
                     <Paper
+                      className={styles.inputControlCard}
                       elevation={0}
                       sx={{
                         p: 1,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 1.5,
                       }}
                     >
                       {(() => {
@@ -1981,14 +2007,11 @@ export default function StandardTekstPage() {
 
                   {templateHasKlokkeslettDagToken(activeTemplateContent) && (
                     <Paper
+                      className={`${styles.inputControlCard} ${styles.timeDateCard}`}
                       elevation={0}
                       sx={{
+                        order: 2,
                         p: 1,
-                        border: "1px solid",
-                        borderColor: "secondary.light",
-                        borderRadius: 1.5,
-                        bgcolor: "rgba(208, 106, 147, 0.06)",
-                        boxShadow: "0 0 0 1px rgba(208, 106, 147, 0.08) inset",
                       }}
                     >
                       {(() => {
@@ -2007,19 +2030,20 @@ export default function StandardTekstPage() {
                               gap: 1,
                               gridTemplateColumns: {
                                 xs: "1fr",
-                                sm: clockCustomMode
-                                  ? "auto auto auto"
-                                  : "auto auto",
+                                sm: "repeat(2, minmax(0, 1fr))",
+                                md: clockCustomMode
+                                  ? "repeat(3, minmax(0, 1fr))"
+                                  : "repeat(2, minmax(0, 1fr))",
                               },
                               alignItems: "start",
-                              justifyContent: { xs: "stretch", sm: "start" },
+                              justifyContent: "stretch",
                             }}
                           >
                             <TextField
                               select
                               label="Klokkeslett"
                               size="small"
-                              sx={{ width: { xs: "100%", sm: 140 } }}
+                              sx={{ width: "100%", minWidth: 0 }}
                               value={selectedClockTime}
                               onChange={(e) => {
                                 if (e.target.value === CUSTOM_CLOCK_VALUE) {
@@ -2027,7 +2051,7 @@ export default function StandardTekstPage() {
                                   if (!clockTime) setClockTime(DEFAULT_CLOCK_TALL_TIME);
                                   setClockDay((prev) => prev ?? getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
                                 } else {
-                                  setClockCustomMode(false);
+                                  setClockCustomMode(true);
                                   setClockTime(e.target.value);
                                   setClockDay(getAutomaticClockTallDay(e.target.value));
                                 }
@@ -2053,7 +2077,7 @@ export default function StandardTekstPage() {
                               select
                               label="Dag"
                               size="small"
-                              sx={{ width: { xs: "100%", sm: 145 } }}
+                              sx={{ width: "100%", minWidth: 0 }}
                               value={clockDay}
                               onChange={(e) => {
                                 setClockDay(e.target.value as ClockTallDay);
@@ -2071,7 +2095,7 @@ export default function StandardTekstPage() {
                                 label="Eget klokkeslett"
                                 type="time"
                                 size="small"
-                                sx={{ width: { xs: "100%", sm: 150 } }}
+                                sx={{ width: "100%", minWidth: 0 }}
                                 value={clockTime}
                                 onChange={(e) => {
                                   const nextTime = e.target.value;
@@ -2098,20 +2122,13 @@ export default function StandardTekstPage() {
                   {(templateHasDatoToken(activeTemplateContent) ||
                     templateHasDatoMndToken(activeTemplateContent)) && (
                     <Paper
+                      className={`${styles.inputControlCard} ${styles.timeDateCard}`}
                       elevation={0}
                       sx={{
+                        order: 1,
                         p: 1,
-                        border: "1px solid",
-                        borderColor: "secondary.light",
-                        borderRadius: 1.5,
-                        bgcolor: "rgba(208, 106, 147, 0.06)",
-                        boxShadow: "0 0 0 1px rgba(208, 106, 147, 0.08) inset",
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                        Dato i teksten
-                      </Typography>
-
                       <Box
                         sx={{
                           display: "grid",
@@ -2178,12 +2195,10 @@ export default function StandardTekstPage() {
 
                   {templateHasFormuleringTokens(activeTemplateContent) && (
                     <Paper
+                      className={styles.inputControlCard}
                       elevation={0}
                       sx={{
                         p: 1,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 1.5,
                       }}
                     >
                       <Box sx={{ display: "grid", gap: 1 }}>

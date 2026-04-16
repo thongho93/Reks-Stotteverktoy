@@ -27,7 +27,30 @@ import {
   type GraphChatMessage,
 } from "../graph/chatApi";
 
+type MaybeFirebaseError = {
+  code?: string;
+  message?: string;
+  name?: string;
+  stack?: string;
+};
+
 function mapError(error: unknown): string {
+  const firebaseError = error as MaybeFirebaseError;
+  const code = typeof firebaseError?.code === "string" ? firebaseError.code : "";
+
+  if (code === "permission-denied" || code === "firestore/permission-denied") {
+    return "Mangler tilgang (firestore/permission-denied).";
+  }
+  if (code === "unauthenticated" || code === "firestore/unauthenticated") {
+    return "Du er ikke innlogget (firestore/unauthenticated).";
+  }
+  if (code === "failed-precondition" || code === "firestore/failed-precondition") {
+    return "Feil precondition i Firestore (failed-precondition).";
+  }
+
+  if (typeof firebaseError?.message === "string" && firebaseError.message.trim()) {
+    return firebaseError.message;
+  }
   if (error instanceof Error) return error.message;
   return String(error);
 }
@@ -40,6 +63,18 @@ function getDisplayName(name?: string | null, email?: string | null): string {
   if (trimmedEmail) return trimmedEmail.split("@")[0];
 
   return "Bruker";
+}
+
+function logChatError(context: string, error: unknown, extra?: Record<string, unknown>) {
+  const e = error as MaybeFirebaseError;
+  // eslint-disable-next-line no-console
+  console.error(`[InternChat] ${context}`, {
+    code: e?.code,
+    message: e?.message,
+    name: e?.name,
+    stack: e?.stack,
+    ...extra,
+  });
 }
 
 export default function TeamsChatPage() {
@@ -84,6 +119,7 @@ export default function TeamsChatPage() {
       setActiveMembers(members);
       setStatus("OK");
     } catch (e) {
+      logChatError("Kunne ikke hente aktive medlemmer", e, { userUid: user.uid });
       setStatus("Feilet");
       setError(mapError(e));
     } finally {
@@ -104,6 +140,10 @@ export default function TeamsChatPage() {
         setSelectedChatId(chatId);
         setStatus("OK");
       } catch (e) {
+        logChatError("Kunne ikke opprette/åpne direct chat", e, {
+          userUid: sender.uid,
+          targetUid: member.uid,
+        });
         setStatus("Feilet");
         setError(mapError(e));
       } finally {
@@ -133,6 +173,10 @@ export default function TeamsChatPage() {
       setDraft("");
       setStatus("OK");
     } catch (e) {
+      logChatError("Kunne ikke sende melding", e, {
+        userUid: sender.uid,
+        chatId: selectedChatId,
+      });
       setStatus("Feilet");
       setError(mapError(e));
     }
@@ -163,6 +207,7 @@ export default function TeamsChatPage() {
         setStatus("OK");
       },
       (subscriptionError) => {
+        logChatError("Chat-listener feilet", subscriptionError, { userUid: user.uid });
         setStatus("Feilet");
         setError(mapError(subscriptionError));
       }
@@ -187,6 +232,7 @@ export default function TeamsChatPage() {
         setStatus("OK");
       },
       (subscriptionError) => {
+        logChatError("Meldings-listener feilet", subscriptionError, { chatId: selectedChatId });
         setStatus("Feilet");
         setError(mapError(subscriptionError));
       }
