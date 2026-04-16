@@ -419,6 +419,46 @@ export const replaceVareTokenByCount = (text: string, count: number): string => 
   );
 };
 
+export const replaceDenDeTokenByCount = (text: string, count: number): string => {
+  if (!text) return text;
+
+  const replacement = count <= 1 ? "den" : "de";
+
+  return (
+    text
+      // Ny anbefalt syntaks
+      .replace(
+        /(^|[^A-Z0-9_])DEN_DE(?=[^A-Z0-9_]|$)/gi,
+        (_m, p1: string) => `${p1}${replacement}`,
+      )
+      .replace(/\{\{\s*DEN_DE\s*\}\}/gi, replacement)
+
+      // Bakoverkompatibilitet for ev. tidlige varianter
+      .replace(/\{\{\s*DEN\/DE\s*\}\}/gi, replacement)
+      .replace(/\{\{\s*DEN_DE\b[^}]*\}\}/gi, replacement)
+  );
+};
+
+export const replaceMedisineneTokenByCount = (text: string, count: number): string => {
+  if (!text) return text;
+
+  const replacement = count <= 1 ? "medisinen" : "medisinene";
+
+  return (
+    text
+      // Ny anbefalt syntaks
+      .replace(
+        /(^|[^A-Z0-9_])MEDISIN\(ENE\)(?=[^A-Z0-9_]|$)/gi,
+        (_m, p1: string) => `${p1}${replacement}`,
+      )
+      .replace(/\{\{\s*MEDISIN\(ENE\)\s*\}\}/gi, replacement)
+
+      // Bakoverkompatibilitet / aliaser
+      .replace(/(^|[^A-Z0-9_])MEDISINENE(?=[^A-Z0-9_]|$)/gi, (_m, p1: string) => `${p1}${replacement}`)
+      .replace(/\{\{\s*MEDISINENE\s*\}\}/gi, replacement)
+  );
+};
+
 export function replaceNextTallToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
   // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
@@ -792,6 +832,7 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "PREPARAT1", insert: "PREPARAT1", help: "Første preparat", group: "PREPARAT" },
   { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat", group: "PREPARAT" },
   { label: "VIRKESTOFF", insert: "VIRKESTOFF", help: "Virkestoff fra valgt preparat", group: "PREPARAT" },
+  { label: "DEN_DE", insert: "DEN_DE", help: "Setter inn den (1 preparat) eller de (flere preparater)", group: "PREPARAT" },
   { label: "FORMULERING", insert: "FORMULERING", help: "Fri tekst (f.eks. tablett/kapsel/nesespray)", group: "ANNET" },
   { label: "FORMULERING1", insert: "FORMULERING1", help: "Formulering for preparat 1", group: "ANNET" },
   { label: "FORMULERING2", insert: "FORMULERING2", help: "Formulering for preparat 2", group: "ANNET" },
@@ -801,6 +842,7 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
 
   { label: "VAREN(E)", insert: "VAREN(E)", group: "VARE" },
+  { label: "MEDISIN(ENE)", insert: "MEDISIN(ENE)", help: "Setter inn medisinen (1 preparat) eller medisinene (flere preparater)", group: "VARE" },
 
   { label: "DATO", insert: "DATO", help: "Dato (DD.MM.YYYY)", group: "ANNET" },
   { label: "DATO_MND", insert: "DATO_MND", help: "Måned/år (MM.YYYY)", group: "ANNET" },
