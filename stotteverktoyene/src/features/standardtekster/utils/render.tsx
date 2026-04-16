@@ -20,97 +20,114 @@ export function renderContentWithPreparatHighlight(
   const tokenSx = {
     display: "inline-flex",
     alignItems: "center",
-    borderRadius: 0.75,
-    px: 0.75,
-    py: 0.15,
-    lineHeight: 1.2,
-    fontSize: "0.95em",
+    borderRadius: 999,
+    px: 0.85,
+    py: 0.18,
+    lineHeight: 1.25,
+    fontSize: "0.9em",
+    fontWeight: 650,
+    letterSpacing: "0.01em",
+    border: "1px solid transparent",
+    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.12)",
     whiteSpace: "nowrap",
+    verticalAlign: "baseline",
+  } as const;
+
+  const tokenPlaceholderSx = {
+    ...tokenSx,
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+    fontWeight: 600,
+    letterSpacing: "0.025em",
+    borderStyle: "dashed",
   } as const;
 
   const placeholderPreparatSx = {
-    ...tokenSx,
-    bgcolor: "warning.light",
-    color: "warning.contrastText",
-    fontFamily: "monospace",
+    ...tokenPlaceholderSx,
+    bgcolor: "rgba(234, 179, 8, 0.18)",
+    color: "#7a3f00",
+    borderColor: "rgba(217, 119, 6, 0.55)",
   } as const;
 
   const placeholderPreparat1Sx = {
-    ...tokenSx,
-    bgcolor: "success.light",
-    color: "success.contrastText",
-    fontFamily: "monospace",
+    ...tokenPlaceholderSx,
+    bgcolor: "rgba(16, 185, 129, 0.16)",
+    color: "#065f46",
+    borderColor: "rgba(5, 150, 105, 0.5)",
   } as const;
 
   const placeholderTallSx = {
-    ...tokenSx,
-    bgcolor: "info.light",
-    color: "info.contrastText",
-    fontFamily: "monospace",
+    ...tokenPlaceholderSx,
+    bgcolor: "rgba(14, 165, 233, 0.16)",
+    color: "#075985",
+    borderColor: "rgba(2, 132, 199, 0.5)",
   } as const;
 
   const placeholderDatoSx = {
-    ...tokenSx,
-    bgcolor: "secondary.light",
-    color: "secondary.contrastText",
-    fontFamily: "monospace",
+    ...tokenPlaceholderSx,
+    bgcolor: "rgba(236, 72, 153, 0.14)",
+    color: "#9d174d",
+    borderColor: "rgba(219, 39, 119, 0.45)",
   } as const;
 
   const placeholderVirkestoffSx = {
-    ...tokenSx,
-    bgcolor: "primary.light",
-    color: "primary.contrastText",
-    fontFamily: "monospace",
+    ...tokenPlaceholderSx,
+    bgcolor: "rgba(236, 72, 153, 0.14)",
+    color: "#861657",
+    borderColor: "rgba(190, 24, 93, 0.45)",
   } as const;
 
   const pickedVirkestoffSx = {
     ...tokenSx,
-    bgcolor: "primary.light",
-    color: "primary.contrastText",
-    fontWeight: 600,
+    background: "linear-gradient(180deg, #f5bfd9 0%, #e8a7c8 100%)",
+    color: "#321223",
+    borderColor: "rgba(165, 28, 97, 0.35)",
+    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 1px 2px rgba(70, 19, 45, 0.14)",
   } as const;
 
   const placeholderFormuleringSx = {
-    ...tokenSx,
-    bgcolor: "secondary.light",
-    color: "secondary.contrastText",
-    fontFamily: "monospace",
+    ...tokenPlaceholderSx,
+    bgcolor: "rgba(148, 163, 184, 0.18)",
+    color: "#334155",
+    borderColor: "rgba(100, 116, 139, 0.45)",
   } as const;
 
   const pickedFormuleringSx = {
     ...tokenSx,
-    bgcolor: "secondary.light",
-    color: "secondary.contrastText",
-    fontWeight: 600,
+    background: "linear-gradient(180deg, #94a3b8 0%, #7b8799 100%)",
+    color: "#f8fafc",
+    borderColor: "rgba(71, 85, 105, 0.45)",
+    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.28) inset, 0 1px 2px rgba(30, 41, 59, 0.2)",
   } as const;
 
   const placeholderFormuleringNumberedSx = {
-    ...tokenSx,
-    bgcolor: "secondary.main",
-    color: "secondary.contrastText",
-    fontFamily: "monospace",
-    opacity: 0.9,
+    ...tokenPlaceholderSx,
+    bgcolor: "rgba(99, 102, 241, 0.14)",
+    color: "#3730a3",
+    borderColor: "rgba(79, 70, 229, 0.45)",
   } as const;
 
   const pickedFormuleringNumberedSx = {
     ...tokenSx,
-    bgcolor: "secondary.dark",
-    color: "secondary.contrastText",
-    fontWeight: 600,
+    background: "linear-gradient(180deg, #7f8ba3 0%, #697487 100%)",
+    color: "#f8fafc",
+    borderColor: "rgba(71, 85, 105, 0.48)",
+    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 1px 2px rgba(30, 41, 59, 0.22)",
   } as const;
 
   const pickedPrimarySx = {
     ...tokenSx,
-    bgcolor: "warning.light",
-    color: "warning.contrastText",
-    fontWeight: 600,
+    background: "linear-gradient(180deg, #ecae4d 0%, #df9124 100%)",
+    color: "#fffdfa",
+    borderColor: "rgba(146, 64, 14, 0.35)",
+    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 1px 2px rgba(120, 53, 15, 0.22)",
   } as const;
 
   const pickedSecondarySx = {
     ...tokenSx,
-    bgcolor: "success.light",
-    color: "success.contrastText",
-    fontWeight: 600,
+    background: "linear-gradient(180deg, #45bca2 0%, #29957b 100%)",
+    color: "#f7fffc",
+    borderColor: "rgba(6, 95, 70, 0.45)",
+    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.26) inset, 0 1px 2px rgba(6, 78, 59, 0.2)",
   } as const;
 
   const renderTokensInText = (t: string) => {

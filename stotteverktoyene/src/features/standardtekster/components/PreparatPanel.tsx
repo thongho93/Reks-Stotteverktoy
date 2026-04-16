@@ -118,12 +118,6 @@ export default function PreparatPanel({
   return (
     <Box>
       <Paper className={styles.preparatPaper}>
-        <Box className={styles.preparatHeader}>
-          <Typography variant="subtitle2" className={styles.preparatTitle}>
-            Preparater
-          </Typography>
-        </Box>
-
         <Stack
           direction="row"
           spacing={1}
@@ -249,6 +243,23 @@ export default function PreparatPanel({
                 },
               });
             }}
+            onManualPick={({ name, query }) => {
+              const manualName = String(name ?? "").trim();
+              if (!manualName) return;
+
+              const manualKey = `MANUAL:${String(query ?? "").trim()}:${manualName.toLowerCase()}`;
+
+              onPickText({
+                text: manualName,
+                key: manualKey,
+                rowData: {
+                  baseText: manualName,
+                  fullName: manualName,
+                  manufacturer: null,
+                  packSize: null,
+                },
+              });
+            }}
           />
         </Box>
 
@@ -259,7 +270,6 @@ export default function PreparatPanel({
             boxSizing: "border-box",
             alignSelf: "flex-start",
             flexShrink: 0,
-            px: 2.25,
             whiteSpace: "nowrap",
           }}
           onClick={onClear}
@@ -272,15 +282,7 @@ export default function PreparatPanel({
 
         </Stack>
 
-        <Box
-          sx={{
-            mt: 0.75,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1.5,
-            alignItems: "center",
-          }}
-        >
+        <Box className={styles.preparatToggleRow}>
         <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
           <FormControlLabel
             sx={{ m: 0 }}

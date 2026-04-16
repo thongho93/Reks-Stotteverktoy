@@ -600,10 +600,6 @@ export default function StandardTekstSidebar({
           </Box>
         )}
 
-        <Typography variant="subtitle2" className={styles.sidebarSectionTitle}>
-          Finn standardtekst
-        </Typography>
-
         <Box className={styles.sidebarSearch}>
           <TextField
             fullWidth
@@ -682,10 +678,12 @@ export default function StandardTekstSidebar({
                   disabled={disabled || groupedByCategory.length === 0}
                   sx={{
                     border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: 2,
+                    borderColor: "rgba(15, 23, 42, 0.14)",
+                    borderRadius: 999,
                     width: 30,
                     height: 30,
+                    bgcolor: "rgba(255,255,255,0.9)",
+                    "&:hover": { bgcolor: "rgba(185, 130, 154, 0.14)", borderColor: "rgba(185,130,154,0.42)" },
                   }}
                 >
                   <UnfoldLessIcon fontSize="small" />
@@ -701,10 +699,12 @@ export default function StandardTekstSidebar({
                   disabled={disabled || groupedByCategory.length === 0}
                   sx={{
                     border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: 2,
+                    borderColor: "rgba(15, 23, 42, 0.14)",
+                    borderRadius: 999,
                     width: 30,
                     height: 30,
+                    bgcolor: "rgba(255,255,255,0.9)",
+                    "&:hover": { bgcolor: "rgba(185, 130, 154, 0.14)", borderColor: "rgba(185,130,154,0.42)" },
                   }}
                 >
                   <UnfoldMoreIcon fontSize="small" />
@@ -770,26 +770,33 @@ export default function StandardTekstSidebar({
                     <ListItemButton
                       onClick={() => toggleCategory(group.category)}
                       sx={(theme) => ({
-                        py: 0.75,
+                        py: 0.8,
                         px: 1.25,
+                        mx: 1,
+                        mt: 0.35,
+                        borderRadius: 1.5,
                         position: "sticky",
-                        top: 0,
+                        top: 4,
                         zIndex: 3,
-                        backgroundColor: theme.palette.background.paper,
-                        backgroundImage: "none",
-                        boxShadow: `0 1px 0 ${theme.palette.divider}`,
-                        borderTop: isFirstGroup ? "none" : `1px solid ${theme.palette.divider}`,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.65)}`,
+                        background: `linear-gradient(180deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.default, 0.92)} 100%)`,
+                        boxShadow: `0 1px 3px ${alpha(theme.palette.common.black, 0.08)}`,
+                        borderTop: isFirstGroup ? `1px solid ${alpha(theme.palette.divider, 0.65)}` : undefined,
                         ...(isHidden
                           ? {
-                              opacity: 0.9,
+                              opacity: 0.85,
                             }
                           : {}),
                         "&::before": {
                           content: '""',
                           position: "absolute",
                           inset: 0,
-                          backgroundColor: theme.palette.background.paper,
+                          background: "transparent",
                           zIndex: -1,
+                        },
+                        "&:hover": {
+                          background: `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.06)} 100%)`,
+                          borderColor: alpha(theme.palette.primary.main, 0.3),
                         },
                         "&:hover .hide-category-btn": { opacity: 1 },
                         "&.Mui-selected .hide-category-btn": { opacity: 1 },
@@ -798,12 +805,13 @@ export default function StandardTekstSidebar({
                       <Box
                         aria-hidden
                         sx={{
-                          width: 8,
-                          height: 22,
-                          borderRadius: 1,
+                          width: 9,
+                          height: 24,
+                          borderRadius: 999,
                           mr: 1,
                           bgcolor: getCategoryMarkerColor(group.category, categoryColorMap),
                           flexShrink: 0,
+                          boxShadow: "0 0 0 1px rgba(0,0,0,0.06) inset",
                         }}
                       />
                       <ListItemText
@@ -834,11 +842,15 @@ export default function StandardTekstSidebar({
                                 e.stopPropagation();
                                 hideCategory(group.category);
                               }}
-                              sx={{
+                              sx={(theme) => ({
                                 mr: 0.5,
                                 opacity: 0,
                                 transition: "opacity 120ms ease",
-                              }}
+                                borderRadius: 999,
+                                "&:hover": {
+                                  bgcolor: alpha(theme.palette.error.main, 0.12),
+                                },
+                              })}
                             >
                               <VisibilityOffIcon fontSize="small" />
                             </IconButton>
@@ -851,7 +863,7 @@ export default function StandardTekstSidebar({
                         sx={{
                           transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
                           transition: "transform 120ms ease",
-                          opacity: 0.8,
+                          opacity: 0.75,
                         }}
                       />
                     </ListItemButton>
@@ -866,13 +878,17 @@ export default function StandardTekstSidebar({
                             className={styles.sidebarItem}
                             sx={(theme) => ({
                               pl: 2.25,
+                              pr: 0.75,
+                              py: 0.55,
                               position: "relative",
                               borderLeft: "4px solid transparent",
-                              transition: "background-color 120ms ease, border-color 120ms ease",
+                              transition:
+                                "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
 
                               "&.Mui-selected": {
                                 bgcolor: alpha(theme.palette.primary.main, 0.22),
                                 borderLeftColor: theme.palette.primary.main,
+                                boxShadow: `0 2px 6px ${alpha(theme.palette.primary.main, 0.18)}`,
                               },
 
                               "&.Mui-selected:hover": {
@@ -881,6 +897,7 @@ export default function StandardTekstSidebar({
 
                               "&:hover": {
                                 bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                transform: "translateX(1px)",
                               },
                             })}
                           >
@@ -933,6 +950,12 @@ export default function StandardTekstSidebar({
                                 e.stopPropagation();
                                 toggleFavorite(it.id);
                               }}
+                              sx={(theme) => ({
+                                borderRadius: 999,
+                                "&:hover": {
+                                  bgcolor: alpha(theme.palette.warning.main, 0.16),
+                                },
+                              })}
                             >
                               {favorites.includes(it.id) ? (
                                 <StarIcon fontSize="small" color="warning" />
