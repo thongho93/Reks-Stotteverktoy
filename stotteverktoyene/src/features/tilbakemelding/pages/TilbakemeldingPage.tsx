@@ -27,6 +27,7 @@ import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import CheckBoxOutlinedIcon from "@mui/icons-material/CheckBoxOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
+import CheckIcon from "@mui/icons-material/Check";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
@@ -44,6 +45,8 @@ const KEEP_CARD_COLORS = [
   "#E0F2F1",
   "#FFF3E0",
   "#E8EAF6",
+  "#F1F3F4",
+  "#FFEDE1",
 ];
 
 type PrivateNote = {
@@ -52,6 +55,7 @@ type PrivateNote = {
   title: string;
   content: string;
   checklistItems: NoteChecklistItem[];
+  color: string | null;
   updatedAtMs: number;
 };
 
@@ -89,10 +93,15 @@ function formatDateTime(ms: number): string {
   });
 }
 
-function getNoteColor(id: string): string {
+function isValidNoteColor(value: unknown): value is string {
+  return typeof value === "string" && KEEP_CARD_COLORS.includes(value);
+}
+
+function getNoteColor(note: Pick<PrivateNote, "id" | "color">): string {
+  if (note.color && isValidNoteColor(note.color)) return note.color;
   let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash << 5) - hash + id.charCodeAt(i);
+  for (let i = 0; i < note.id.length; i += 1) {
+    hash = (hash << 5) - hash + note.id.charCodeAt(i);
     hash |= 0;
   }
   return KEEP_CARD_COLORS[Math.abs(hash) % KEEP_CARD_COLORS.length];
@@ -201,6 +210,7 @@ export default function TilbakemeldingPage() {
   const [draftTitle, setDraftTitle] = React.useState("");
   const [draftContent, setDraftContent] = React.useState("");
   const [draftChecklistItems, setDraftChecklistItems] = React.useState<NoteChecklistItem[]>([]);
+  const [draftColor, setDraftColor] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
 
   const [loadingNotes, setLoadingNotes] = React.useState(true);
@@ -245,6 +255,7 @@ export default function TilbakemeldingPage() {
           setDraftTitle("");
           setDraftContent("");
           setDraftChecklistItems([]);
+          setDraftColor(null);
           setLoadingNotes(false);
         }
         return;
@@ -276,6 +287,7 @@ export default function TilbakemeldingPage() {
             title: String(data.title ?? ""),
             content,
             checklistItems,
+            color: isValidNoteColor(data.color) ? data.color : null,
             updatedAtMs: toMillis(data.updatedAt),
           };
         });
@@ -302,6 +314,7 @@ export default function TilbakemeldingPage() {
                 title: legacyTitle,
                 content: legacyText,
                 checklistItems: [],
+                color: null,
                 updatedAtMs: Date.now(),
               },
             ];
@@ -327,12 +340,14 @@ export default function TilbakemeldingPage() {
             setDraftTitle(loadedNotes[0].title);
             setDraftContent(loadedNotes[0].content);
             setDraftChecklistItems(loadedNotes[0].checklistItems);
+            setDraftColor(loadedNotes[0].color);
           } else {
             setSelectedNoteId(null);
             setDraftMode("text");
             setDraftTitle("");
             setDraftContent("");
             setDraftChecklistItems([]);
+            setDraftColor(null);
           }
         }
       } catch (err) {
@@ -387,6 +402,7 @@ export default function TilbakemeldingPage() {
     setDraftTitle("");
     setDraftContent("");
     setDraftChecklistItems([]);
+    setDraftColor(null);
     setError(null);
     setSuccess(null);
   }, []);
@@ -473,6 +489,7 @@ export default function TilbakemeldingPage() {
         content,
         noteMode: draftMode,
         checklistItems: draftMode === "checklist" ? normalizedChecklist : [],
+        color: draftColor ?? null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -483,6 +500,7 @@ export default function TilbakemeldingPage() {
         title,
         content,
         checklistItems: draftMode === "checklist" ? normalizedChecklist : [],
+        color: draftColor ?? null,
         updatedAtMs: Date.now(),
       };
 
@@ -497,6 +515,7 @@ export default function TilbakemeldingPage() {
       setDraftTitle("");
       setDraftContent("");
       setDraftChecklistItems([]);
+      setDraftColor(null);
       return true;
     } catch (err) {
       setError(mapFirebaseError(err, "Lagring feilet. Prøv igjen."));
@@ -506,6 +525,7 @@ export default function TilbakemeldingPage() {
     }
   }, [
     draftChecklistItems,
+    draftColor,
     draftContent,
     draftMode,
     draftTitle,
@@ -522,6 +542,7 @@ export default function TilbakemeldingPage() {
     setDraftTitle(note.title);
     setDraftContent(note.content);
     setDraftChecklistItems(note.checklistItems);
+    setDraftColor(note.color);
     setEditorOpen(true);
     setError(null);
     setSuccess(null);
@@ -532,7 +553,8 @@ export default function TilbakemeldingPage() {
       nextMode: "text" | "checklist",
       nextTitle: string,
       nextContent: string,
-      nextChecklistItems: NoteChecklistItem[]
+      nextChecklistItems: NoteChecklistItem[],
+      nextColor: string | null
     ) => {
       if (!user?.uid || !selectedNoteId) return false;
 
@@ -545,7 +567,8 @@ export default function TilbakemeldingPage() {
         current.title === computedTitle &&
         current.content === computedContent &&
         current.mode === nextMode &&
-        JSON.stringify(current.checklistItems) === JSON.stringify(normalizedChecklist)
+        JSON.stringify(current.checklistItems) === JSON.stringify(normalizedChecklist) &&
+        current.color === nextColor
       ) {
         return true;
       }
@@ -559,6 +582,7 @@ export default function TilbakemeldingPage() {
             content: computedContent,
             noteMode: nextMode,
             checklistItems: nextMode === "checklist" ? normalizedChecklist : [],
+            color: nextColor ?? null,
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -572,6 +596,7 @@ export default function TilbakemeldingPage() {
                   title: computedTitle,
                   content: computedContent,
                   checklistItems: nextMode === "checklist" ? normalizedChecklist : [],
+                  color: nextColor ?? null,
                   updatedAtMs: Date.now(),
                 }
               : note
@@ -598,16 +623,17 @@ export default function TilbakemeldingPage() {
       current.mode !== draftMode ||
       current.title !== buildNoteTitle(draftTitle, computedContent) ||
       current.content !== computedContent ||
-      JSON.stringify(current.checklistItems) !== JSON.stringify(normalizedChecklist)
+      JSON.stringify(current.checklistItems) !== JSON.stringify(normalizedChecklist) ||
+      current.color !== draftColor
     );
-  }, [draftChecklistItems, draftContent, draftMode, draftTitle, editorOpen, savedNotesList, selectedNoteId]);
+  }, [draftChecklistItems, draftColor, draftContent, draftMode, draftTitle, editorOpen, savedNotesList, selectedNoteId]);
 
   const handleCloseEditor = React.useCallback(() => {
     if (hasEditorPendingChanges) {
-      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems);
+      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems, draftColor);
     }
     setEditorOpen(false);
-  }, [draftChecklistItems, draftContent, draftMode, draftTitle, hasEditorPendingChanges, saveExistingNote]);
+  }, [draftChecklistItems, draftColor, draftContent, draftMode, draftTitle, hasEditorPendingChanges, saveExistingNote]);
 
   const handleDeleteNote = React.useCallback(async () => {
     if (!user?.uid || !selectedNoteId) return false;
@@ -632,12 +658,14 @@ export default function TilbakemeldingPage() {
         setDraftTitle(remaining[0].title);
         setDraftContent(remaining[0].content);
         setDraftChecklistItems(remaining[0].checklistItems);
+        setDraftColor(remaining[0].color);
       } else {
         setSelectedNoteId(null);
         setDraftMode("text");
         setDraftTitle("");
         setDraftContent("");
         setDraftChecklistItems([]);
+        setDraftColor(null);
       }
 
       setSuccess("Notatet er slettet.");
@@ -675,7 +703,7 @@ export default function TilbakemeldingPage() {
     if (!hasEditorPendingChanges) return;
 
     const timeout = window.setTimeout(() => {
-      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems);
+      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems, draftColor);
     }, 700);
 
     return () => {
@@ -683,6 +711,7 @@ export default function TilbakemeldingPage() {
     };
   }, [
     draftChecklistItems,
+    draftColor,
     draftContent,
     draftMode,
     draftTitle,
@@ -711,6 +740,11 @@ export default function TilbakemeldingPage() {
     () => savedNotesList.filter((note) => matchesSearchQuery(note, searchQuery)),
     [savedNotesList, searchQuery]
   );
+  const selectedNote = React.useMemo(
+    () => savedNotesList.find((note) => note.id === selectedNoteId) ?? null,
+    [savedNotesList, selectedNoteId]
+  );
+  const activeEditorColor = selectedNote ? draftColor ?? getNoteColor(selectedNote) : draftColor;
   const hasActiveSearch = searchQuery.trim().length >= 2;
 
   return (
@@ -1199,7 +1233,7 @@ export default function TilbakemeldingPage() {
                               : isSelected
                               ? "primary.main"
                               : "divider",
-                          bgcolor: getNoteColor(note.id),
+                          bgcolor: getNoteColor(note),
                           boxShadow: isSelected ? "0 0 0 1px rgba(25,118,210,0.35)" : "none",
                           transition: "transform 120ms ease, box-shadow 120ms ease",
                           opacity: draggingNoteId === note.id ? 0.55 : 1,
@@ -1365,7 +1399,7 @@ export default function TilbakemeldingPage() {
       >
         <DialogTitle>Rediger notat</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5, mb: 1.25 }}>
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mt: 1.5, mb: 1.25 }}>
             <InputBase
               value={draftTitle}
               onChange={(event) => {
@@ -1374,11 +1408,18 @@ export default function TilbakemeldingPage() {
               }}
               placeholder="Tittel"
               fullWidth
+              multiline
+              minRows={1}
+              maxRows={4}
               sx={{
                 px: 0.25,
                 fontSize: "1.35rem",
                 fontWeight: 600,
+                lineHeight: 1.3,
                 color: "text.primary",
+                "& textarea": {
+                  resize: "none",
+                },
               }}
             />
             <IconButton
@@ -1508,6 +1549,45 @@ export default function TilbakemeldingPage() {
           <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
             {editorSaving ? "Lagrer automatisk..." : "Endringer lagres automatisk"}
           </Typography>
+          <Box
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.6,
+              flexWrap: "wrap",
+              maxWidth: { xs: 220, sm: 320, md: 360 },
+              justifyContent: "flex-end",
+            }}
+          >
+            {KEEP_CARD_COLORS.map((color) => {
+              const isActive = activeEditorColor === color;
+              return (
+                <IconButton
+                  key={color}
+                  onClick={() => {
+                    setDraftColor(color);
+                    if (success) setSuccess(null);
+                  }}
+                  aria-label="Velg notatfarge"
+                  sx={{
+                    width: 26,
+                    height: 26,
+                    p: 0,
+                    border: "1px solid",
+                    borderColor: isActive ? "text.primary" : "rgba(15,23,42,0.22)",
+                    bgcolor: color,
+                    boxShadow: isActive ? "0 0 0 2px rgba(15,23,42,0.18)" : "none",
+                    "&:hover": {
+                      transform: "scale(1.08)",
+                      borderColor: "text.primary",
+                    },
+                  }}
+                >
+                  {isActive && <CheckIcon sx={{ fontSize: 16, color: "rgba(15,23,42,0.86)" }} />}
+                </IconButton>
+              );
+            })}
+          </Box>
           {selectedNoteId && (
             <Button
               color="error"
