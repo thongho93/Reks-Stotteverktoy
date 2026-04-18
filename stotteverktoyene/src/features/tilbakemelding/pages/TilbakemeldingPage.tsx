@@ -26,6 +26,7 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import CheckBoxOutlinedIcon from "@mui/icons-material/CheckBoxOutlined";
 import CloseIcon from "@mui/icons-material/Close";
+import SearchIcon from "@mui/icons-material/Search";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
@@ -164,6 +165,15 @@ function parseChecklistItems(raw: unknown): NoteChecklistItem[] {
   return sortChecklistItems(parsed);
 }
 
+function matchesSearchQuery(note: PrivateNote, query: string): boolean {
+  const normalizedQuery = query.toLocaleLowerCase("nb-NO").trim();
+  if (normalizedQuery.length < 2) return true;
+
+  const checklistText = note.checklistItems.map((item) => item.text).join(" ");
+  const haystack = `${note.title} ${note.content} ${checklistText}`.toLocaleLowerCase("nb-NO");
+  return haystack.includes(normalizedQuery);
+}
+
 function mapFirebaseError(error: unknown, fallback: string): string {
   const firebaseError = error as FirebaseError | undefined;
   const code = firebaseError?.code ?? "";
@@ -191,6 +201,7 @@ export default function TilbakemeldingPage() {
   const [draftTitle, setDraftTitle] = React.useState("");
   const [draftContent, setDraftContent] = React.useState("");
   const [draftChecklistItems, setDraftChecklistItems] = React.useState<NoteChecklistItem[]>([]);
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   const [loadingNotes, setLoadingNotes] = React.useState(true);
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -696,8 +707,14 @@ export default function TilbakemeldingPage() {
     };
   }, [composerExpanded, createNoteFromComposer, draftChecklistItems, draftContent, draftMode, draftTitle, selectedNoteId]);
 
+  const filteredNotes = React.useMemo(
+    () => savedNotesList.filter((note) => matchesSearchQuery(note, searchQuery)),
+    [savedNotesList, searchQuery]
+  );
+  const hasActiveSearch = searchQuery.trim().length >= 2;
+
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", width: "100%" }}>
+    <Box sx={{ width: "100%" }}>
       <Paper sx={{ mb: 2 }}>
         <Tabs
           value={tab}
@@ -772,265 +789,349 @@ export default function TilbakemeldingPage() {
             </Box>
           ) : (
             <>
-              <Box sx={{ maxWidth: 456, mx: "auto", mb: 2.5 }}>
-                {!composerExpanded ? (
-                  <Paper
-                    variant="outlined"
-                    onClick={handleOpenComposer}
-                    sx={{
-                      px: 2,
-                      py: 1.4,
-                      borderRadius: 2,
-                      borderColor: "rgba(15,23,42,0.12)",
-                      bgcolor: "rgba(255,255,255,0.95)",
-                      backgroundImage:
-                        "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(246,248,252,0.96) 100%)",
-                      boxShadow: "0 10px 24px rgba(15,23,42,0.08)",
-                      cursor: "text",
-                      transition: "box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease",
-                      "&:hover": {
-                        transform: "translateY(-1px)",
-                        boxShadow: "0 14px 28px rgba(15,23,42,0.12)",
-                        borderColor: "rgba(15,23,42,0.2)",
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5 }}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.1 }}>
-                        <Box
-                          sx={{
-                            width: 34,
-                            height: 34,
-                            borderRadius: 2,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            bgcolor: "rgba(15,23,42,0.06)",
-                            color: "text.primary",
-                          }}
-                        >
-                          <EditNoteRoundedIcon sx={{ fontSize: 21 }} />
-                        </Box>
-                        <Typography variant="body1" sx={{ color: "text.secondary", fontWeight: 500 }}>
-                          Skriv et notat
-                        </Typography>
-                      </Box>
-                      <IconButton
-                        size="small"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleOpenChecklistComposer();
-                        }}
-                        aria-label="Nytt sjekkliste-notat"
-                        sx={{
-                          color: "text.secondary",
-                          border: "1px solid",
-                          borderColor: "rgba(15,23,42,0.15)",
-                          bgcolor: "rgba(255,255,255,0.85)",
-                          "&:hover": {
-                            bgcolor: "rgba(15,23,42,0.06)",
-                          },
-                        }}
-                      >
-                        <CheckBoxOutlinedIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Paper>
-                ) : (
-                  <ClickAwayListener
-                    onClickAway={() => {
-                      void createNoteFromComposer();
-                      setComposerExpanded(false);
-                    }}
-                  >
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: { xs: "column", md: "row" },
+                  gap: { xs: 1.5, md: 2.5 },
+                  alignItems: "stretch",
+                  justifyContent: { xs: "stretch", md: "flex-start" },
+                  mb: 3,
+                }}
+              >
+                <Box sx={{ width: { xs: "100%", md: 442 }, maxWidth: { xs: "100%", md: 442 }, flexShrink: 0 }}>
+                  {!composerExpanded ? (
                     <Paper
                       variant="outlined"
+                      onClick={handleOpenComposer}
                       sx={{
                         px: 2,
-                        py: 1.5,
+                        py: 1.4,
                         borderRadius: 2,
-                        borderColor: "rgba(15,23,42,0.14)",
-                        bgcolor: "rgba(255,255,255,0.98)",
+                        borderColor: "rgba(186,104,200,0.5)",
+                        bgcolor: "rgba(255,255,255,0.95)",
                         backgroundImage:
-                          "linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(248,250,253,0.96) 100%)",
-                        boxShadow: "0 18px 34px rgba(15,23,42,0.12)",
+                          "linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(252,248,252,0.96) 100%)",
+                        boxShadow: "0 14px 30px rgba(186,104,200,0.18)",
+                        cursor: "text",
+                        transition: "box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease",
+                        "&:hover": {
+                          transform: "translateY(-1px)",
+                          boxShadow: "0 18px 34px rgba(186,104,200,0.22)",
+                          borderColor: "rgba(186,104,200,0.7)",
+                        },
                       }}
                     >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
-                        <InputBase
-                          value={draftTitle}
-                          onChange={(event) => {
-                            setDraftTitle(event.target.value);
-                            if (success) setSuccess(null);
-                          }}
-                          placeholder="Tittel"
-                          fullWidth
-                          autoFocus
-                          sx={{
-                            px: 0.25,
-                            fontSize: "1.35rem",
-                            fontWeight: 600,
-                            color: "text.primary",
-                            "& input::placeholder": {
-                              color: "text.secondary",
-                              opacity: 1,
-                            },
-                          }}
-                        />
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5 }}>
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.1 }}>
+                          <Box
+                            sx={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: 2,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              bgcolor: "rgba(15,23,42,0.06)",
+                              color: "text.primary",
+                            }}
+                          >
+                            <EditNoteRoundedIcon sx={{ fontSize: 21 }} />
+                          </Box>
+                          <Typography variant="body1" sx={{ color: "text.secondary", fontWeight: 500 }}>
+                            Skriv et notat
+                          </Typography>
+                        </Box>
                         <IconButton
                           size="small"
-                          onClick={toggleDraftChecklistMode}
-                          aria-label={draftMode === "checklist" ? "Bytt til vanlig notattekst" : "Bytt til sjekkliste"}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleOpenChecklistComposer();
+                          }}
+                          aria-label="Nytt sjekkliste-notat"
                           sx={{
-                            color: draftMode === "checklist" ? "primary.main" : "text.secondary",
+                            color: "text.secondary",
                             border: "1px solid",
-                            borderColor: draftMode === "checklist" ? "primary.main" : "divider",
-                            bgcolor: "background.paper",
+                            borderColor: "rgba(15,23,42,0.15)",
+                            bgcolor: "rgba(255,255,255,0.85)",
                             "&:hover": {
-                              bgcolor: "action.hover",
+                              bgcolor: "rgba(15,23,42,0.06)",
                             },
                           }}
                         >
                           <CheckBoxOutlinedIcon fontSize="small" />
                         </IconButton>
                       </Box>
-
-                      {draftMode === "checklist" ? (
-                        <Box>
-                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                            {sortChecklistItems(draftChecklistItems)
-                              .filter((item) => !item.done)
-                              .map((item, index, activeItems) => (
-                                <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                  <Checkbox
-                                    checked={item.done}
-                                    onChange={(event) => {
-                                      toggleChecklistItemDone(item.id, event.target.checked);
-                                      if (success) setSuccess(null);
-                                    }}
-                                    size="small"
-                                  />
-                                  <InputBase
-                                    value={item.text}
-                                    onChange={(event) => {
-                                      updateChecklistItemText(item.id, event.target.value);
-                                      if (success) setSuccess(null);
-                                    }}
-                                    onKeyDown={(event) => {
-                                      if (event.key === "Enter" && index === activeItems.length - 1) {
-                                        event.preventDefault();
-                                        addChecklistItem();
-                                      }
-                                    }}
-                                    placeholder="Listeelement"
-                                    fullWidth
-                                    sx={{
-                                      fontSize: "1.05rem",
-                                      color: "text.primary",
-                                      "& input::placeholder": {
-                                        color: "text.secondary",
-                                        opacity: 1,
-                                      },
-                                    }}
-                                  />
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => {
-                                      removeChecklistItem(item.id);
-                                      if (success) setSuccess(null);
-                                    }}
-                                    aria-label="Fjern punkt"
-                                  >
-                                    <CloseIcon fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              ))}
-                          </Box>
-
-                          <Button variant="text" size="small" onClick={addChecklistItem} sx={{ mt: 0.5 }}>
-                            + Listeelement
-                          </Button>
-
-                          {sortChecklistItems(draftChecklistItems).some((item) => item.done) && (
-                            <Box sx={{ mt: 1.25 }}>
-                              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-                                Fullført
-                              </Typography>
-                              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                                {sortChecklistItems(draftChecklistItems)
-                                  .filter((item) => item.done)
-                                  .map((item) => (
-                                    <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                      <Checkbox
-                                        checked={item.done}
-                                        onChange={(event) => {
-                                          toggleChecklistItemDone(item.id, event.target.checked);
-                                          if (success) setSuccess(null);
-                                        }}
-                                        size="small"
-                                      />
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          flex: 1,
-                                          textDecoration: "line-through",
-                                          color: "text.secondary",
-                                          wordBreak: "break-word",
-                                        }}
-                                      >
-                                        {item.text}
-                                      </Typography>
-                                    </Box>
-                                  ))}
-                              </Box>
-                            </Box>
-                          )}
-                        </Box>
-                      ) : (
-                        <InputBase
-                          value={draftContent}
-                          onChange={(event) => {
-                            setDraftContent(event.target.value);
-                            if (success) setSuccess(null);
-                          }}
-                          placeholder="Skriv et notat"
-                          fullWidth
-                          multiline
-                          minRows={3}
-                          maxRows={6}
-                          sx={{
-                            px: 0.25,
-                            fontSize: "1.1rem",
-                            lineHeight: 1.5,
-                            color: "text.primary",
-                            "& textarea::placeholder": {
-                              color: "text.secondary",
-                              opacity: 1,
-                            },
-                          }}
-                        />
-                      )}
                     </Paper>
-                  </ClickAwayListener>
-                )}
+                  ) : (
+                    <ClickAwayListener
+                      onClickAway={() => {
+                        void createNoteFromComposer();
+                        setComposerExpanded(false);
+                      }}
+                    >
+                      <Paper
+                        variant="outlined"
+                      sx={{
+                        px: 2,
+                        py: 1.5,
+                        borderRadius: 2,
+                        borderColor: "rgba(186,104,200,0.55)",
+                        bgcolor: "rgba(255,255,255,0.98)",
+                        backgroundImage:
+                          "linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(252,248,252,0.96) 100%)",
+                        boxShadow: "0 20px 36px rgba(186,104,200,0.2)",
+                      }}
+                    >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
+                          <InputBase
+                            value={draftTitle}
+                            onChange={(event) => {
+                              setDraftTitle(event.target.value);
+                              if (success) setSuccess(null);
+                            }}
+                            placeholder="Tittel"
+                            fullWidth
+                            autoFocus
+                            sx={{
+                              px: 0.25,
+                              fontSize: "1.35rem",
+                              fontWeight: 600,
+                              color: "text.primary",
+                              "& input::placeholder": {
+                                color: "text.secondary",
+                                opacity: 1,
+                              },
+                            }}
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={toggleDraftChecklistMode}
+                            aria-label={draftMode === "checklist" ? "Bytt til vanlig notattekst" : "Bytt til sjekkliste"}
+                            sx={{
+                              color: draftMode === "checklist" ? "primary.main" : "text.secondary",
+                              border: "1px solid",
+                              borderColor: draftMode === "checklist" ? "primary.main" : "divider",
+                              bgcolor: "background.paper",
+                              "&:hover": {
+                                bgcolor: "action.hover",
+                              },
+                            }}
+                          >
+                            <CheckBoxOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+
+                        {draftMode === "checklist" ? (
+                          <Box>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                              {sortChecklistItems(draftChecklistItems)
+                                .filter((item) => !item.done)
+                                .map((item, index, activeItems) => (
+                                  <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Checkbox
+                                      checked={item.done}
+                                      onChange={(event) => {
+                                        toggleChecklistItemDone(item.id, event.target.checked);
+                                        if (success) setSuccess(null);
+                                      }}
+                                      size="small"
+                                    />
+                                    <InputBase
+                                      value={item.text}
+                                      onChange={(event) => {
+                                        updateChecklistItemText(item.id, event.target.value);
+                                        if (success) setSuccess(null);
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter" && index === activeItems.length - 1) {
+                                          event.preventDefault();
+                                          addChecklistItem();
+                                        }
+                                      }}
+                                      placeholder="Listeelement"
+                                      fullWidth
+                                      sx={{
+                                        fontSize: "1.05rem",
+                                        color: "text.primary",
+                                        "& input::placeholder": {
+                                          color: "text.secondary",
+                                          opacity: 1,
+                                        },
+                                      }}
+                                    />
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        removeChecklistItem(item.id);
+                                        if (success) setSuccess(null);
+                                      }}
+                                      aria-label="Fjern punkt"
+                                    >
+                                      <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                  </Box>
+                                ))}
+                            </Box>
+
+                            <Button variant="text" size="small" onClick={addChecklistItem} sx={{ mt: 0.5 }}>
+                              + Listeelement
+                            </Button>
+
+                            {sortChecklistItems(draftChecklistItems).some((item) => item.done) && (
+                              <Box sx={{ mt: 1.25 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                                  Fullført
+                                </Typography>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                                  {sortChecklistItems(draftChecklistItems)
+                                    .filter((item) => item.done)
+                                    .map((item) => (
+                                      <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                        <Checkbox
+                                          checked={item.done}
+                                          onChange={(event) => {
+                                            toggleChecklistItemDone(item.id, event.target.checked);
+                                            if (success) setSuccess(null);
+                                          }}
+                                          size="small"
+                                        />
+                                        <Typography
+                                          variant="body2"
+                                          sx={{
+                                            flex: 1,
+                                            textDecoration: "line-through",
+                                            color: "text.secondary",
+                                            wordBreak: "break-word",
+                                          }}
+                                        >
+                                          {item.text}
+                                        </Typography>
+                                      </Box>
+                                    ))}
+                                </Box>
+                              </Box>
+                            )}
+                          </Box>
+                        ) : (
+                          <InputBase
+                            value={draftContent}
+                            onChange={(event) => {
+                              setDraftContent(event.target.value);
+                              if (success) setSuccess(null);
+                            }}
+                            placeholder="Skriv et notat"
+                            fullWidth
+                            multiline
+                            minRows={3}
+                            maxRows={6}
+                            sx={{
+                              px: 0.25,
+                              fontSize: "1.1rem",
+                              lineHeight: 1.5,
+                              color: "text.primary",
+                              "& textarea::placeholder": {
+                                color: "text.secondary",
+                                opacity: 1,
+                              },
+                            }}
+                          />
+                        )}
+                      </Paper>
+                    </ClickAwayListener>
+                  )}
+                </Box>
+
+                <Box
+                  sx={{
+                    display: { xs: "none", md: "block" },
+                    width: "1px",
+                    ml: { md: "auto" },
+                    bgcolor: "rgba(15,23,42,0.12)",
+                    borderRadius: 999,
+                    my: 2.25,
+                  }}
+                />
+
+                <Box sx={{ width: { xs: "100%", md: 340 }, maxWidth: { xs: "100%", md: 340 }, flexShrink: 0 }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      px: 1.7,
+                      py: 1.15,
+                      borderRadius: 2,
+                      borderColor: "rgba(15,23,42,0.16)",
+                      borderStyle: "dashed",
+                      bgcolor: "rgba(255,255,255,0.94)",
+                      backgroundImage:
+                        "linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(246,248,252,0.94) 100%)",
+                      boxShadow: "0 8px 18px rgba(15,23,42,0.07)",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                      <InputBase
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        placeholder="søk"
+                        fullWidth
+                        sx={{
+                          fontSize: "1rem",
+                          color: "text.primary",
+                          "& input::placeholder": {
+                            color: "text.secondary",
+                            opacity: 1,
+                          },
+                        }}
+                      />
+                      {searchQuery.trim().length > 0 && (
+                        <IconButton
+                          size="small"
+                          onClick={() => setSearchQuery("")}
+                          aria-label="Tøm søk"
+                          sx={{ color: "text.secondary" }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                  </Paper>
+                </Box>
               </Box>
 
               <Typography variant="h3" sx={{ mb: 1.25 }}>
-                Lagrede notater ({savedNotesList.length})
+                {`Lagrede notater (${filteredNotes.length}${searchQuery.trim() ? ` av ${savedNotesList.length}` : ""})`}
               </Typography>
 
               <Box
                 sx={{
-                  columnCount: { xs: 1, sm: 2, md: 3, xl: 4 },
-                  columnGap: 2,
+                  ...(hasActiveSearch
+                    ? {
+                        display: "grid",
+                        gridTemplateColumns: {
+                          xs: "1fr",
+                          sm: "repeat(2, minmax(0, 1fr))",
+                          lg: "repeat(3, minmax(0, 1fr))",
+                          xl: "repeat(4, minmax(0, 1fr))",
+                        },
+                        gap: 2,
+                      }
+                    : {
+                        columnCount: { xs: 1, sm: 2, md: 3, xl: 4 },
+                        columnGap: 2,
+                      }),
                 }}
               >
                 {savedNotesList.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
                     Ingen lagrede notater ennå.
                   </Typography>
+                ) : filteredNotes.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Ingen notater matcher søket ditt.
+                  </Typography>
                 ) : (
-                  savedNotesList.map((note) => {
+                  filteredNotes.map((note) => {
                     const isSelected = note.id === selectedNoteId;
 
                     return (
@@ -1087,10 +1188,10 @@ export default function TilbakemeldingPage() {
                         }}
                         sx={{
                           p: 1.5,
-                          mb: 2,
-                          display: "inline-block",
+                          mb: hasActiveSearch ? 0 : 2,
+                          display: hasActiveSearch ? "block" : "inline-block",
                           width: "100%",
-                          breakInside: "avoid",
+                          breakInside: hasActiveSearch ? "auto" : "avoid",
                           cursor: draggingNoteId === note.id ? "grabbing" : "pointer",
                           borderColor:
                             dragOverNoteId === note.id && draggingNoteId !== note.id
