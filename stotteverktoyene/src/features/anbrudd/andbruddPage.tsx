@@ -4,10 +4,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogContent,
-  DialogActions,
-  DialogTitle,
   Paper,
   Tab,
   Tabs,
@@ -41,7 +37,6 @@ export default function AndbruddPage() {
   const [tab, setTab] = useState<"form" | "sharepoint">("sharepoint");
   const [iframeError, setIframeError] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [showLoginHelp, setShowLoginHelp] = useState(false);
   const [refreshKeys, setRefreshKeys] = useState({ form: 0, sharepoint: 0 });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastLoadedAt, setLastLoadedAt] = useState<{ form: string | null; sharepoint: string | null }>({
@@ -92,10 +87,6 @@ export default function AndbruddPage() {
 
     return () => clearTimeout(timer);
   }, [current.src]);
-
-  useEffect(() => {
-    setShowLoginHelp(true);
-  }, []);
 
   const refreshCurrent = () => {
     setIframeError(false);
@@ -220,30 +211,6 @@ export default function AndbruddPage() {
       ) : (
         <Typography color="error">{current.missing}</Typography>
       )}
-
-      <Dialog
-        open={showLoginHelp}
-        onClose={() => {
-          setShowLoginHelp(false);
-        }}
-      >
-        <DialogTitle>Innlogging til SharePoint</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            Hvis innlogging kreves, fullfør dette før du bruker oversikten eller meldeskjema.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setShowLoginHelp(false);
-            }}
-          >
-            OK
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Paper>
   );
 }
