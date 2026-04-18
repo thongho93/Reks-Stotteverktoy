@@ -1372,7 +1372,13 @@ export default function StandardTekstPage() {
 
   // Preview for follow-up texts
   const followUpsPreview = selected?.followUps?.length ? (
-    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+    <Stack
+      direction="row"
+      spacing={1}
+      useFlexGap
+      flexWrap="wrap"
+      className={styles.followUpsPreviewRow}
+    >
       {(selected.followUps as StandardTekstFollowUp[]).map((fu: StandardTekstFollowUp) => (
         <Chip
           key={fu.id}
@@ -1384,6 +1390,7 @@ export default function StandardTekstPage() {
           icon={<OpenInNewIcon />}
           variant="outlined"
           size="small"
+          className={styles.followUpChip}
         />
       ))}
     </Stack>
