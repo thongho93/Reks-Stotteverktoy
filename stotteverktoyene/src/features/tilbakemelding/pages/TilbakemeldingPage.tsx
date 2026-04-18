@@ -10,9 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   Paper,
-  FormControlLabel,
   Snackbar,
-  Switch,
   Tab,
   Tabs,
   TextField,
@@ -20,7 +18,6 @@ import {
 } from "@mui/material";
 import type { FirebaseError } from "firebase/app";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
@@ -131,7 +128,6 @@ export default function TilbakemeldingPage() {
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [editorSaving, setEditorSaving] = React.useState(false);
   const [composerExpanded, setComposerExpanded] = React.useState(false);
-  const [autoCopyEnabled, setAutoCopyEnabled] = React.useState(true);
   const [copyToast, setCopyToast] = React.useState<{
     message: string;
     severity: "success" | "error" | "info";
@@ -426,9 +422,7 @@ export default function TilbakemeldingPage() {
         setDraftTitle(updated.title);
         setDraftContent(updated.content);
         setSuccess("Notatet er oppdatert.");
-        if (autoCopyEnabled) {
-          void copyNoteToClipboard(updated.content, "auto");
-        }
+        void copyNoteToClipboard(updated.content, "auto");
         return true;
       } else {
         const createdRef = await addDoc(collection(db, "users", user.uid, "privateNotes"), {
@@ -450,9 +444,7 @@ export default function TilbakemeldingPage() {
         setDraftTitle(created.title);
         setDraftContent(created.content);
         setSuccess("Nytt notat er lagret.");
-        if (autoCopyEnabled) {
-          void copyNoteToClipboard(created.content, "auto");
-        }
+        void copyNoteToClipboard(created.content, "auto");
         return true;
       }
     } catch (err) {
@@ -462,7 +454,6 @@ export default function TilbakemeldingPage() {
       setSavingNotes(false);
     }
   }, [
-    autoCopyEnabled,
     copyNoteToClipboard,
     hasDraftContent,
     normalizedDraftContent,
@@ -610,36 +601,6 @@ export default function TilbakemeldingPage() {
         </>
       ) : (
         <Paper sx={{ p: { xs: 2, md: 3 } }}>
-          <Box
-            sx={{
-              mb: 2,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 1,
-              flexWrap: "wrap",
-            }}
-          >
-            <Box>
-              <Typography variant="h2" sx={{ mb: 0.5 }}>
-                Private notater
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Dette er kun dine notater, lagret på din bruker.
-              </Typography>
-            </Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={autoCopyEnabled}
-                  onChange={(event) => setAutoCopyEnabled(event.target.checked)}
-                />
-              }
-              label="Kopi aktiv"
-              sx={{ mr: 0 }}
-            />
-          </Box>
-
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
@@ -779,7 +740,9 @@ export default function TilbakemeldingPage() {
                       <Paper
                         key={note.id}
                         variant="outlined"
-                        onClick={() => handleOpenEditor(note)}
+                        onClick={() => {
+                          void copyNoteToClipboard(note.content, "manual");
+                        }}
                         draggable
                         onDragStart={(event) => {
                           setDraggingNoteId(note.id);
@@ -828,7 +791,7 @@ export default function TilbakemeldingPage() {
                           display: "inline-block",
                           width: "100%",
                           breakInside: "avoid",
-                          cursor: draggingNoteId === note.id ? "grabbing" : "grab",
+                          cursor: draggingNoteId === note.id ? "grabbing" : "pointer",
                           borderColor:
                             dragOverNoteId === note.id && draggingNoteId !== note.id
                               ? "primary.main"
@@ -858,29 +821,44 @@ export default function TilbakemeldingPage() {
                           </Typography>
                           <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
                             <DragIndicatorIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                          <Box
-                            component="button"
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (!autoCopyEnabled) return;
-                              void copyNoteToClipboard(note.content, "manual");
-                            }}
-                            sx={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              color: "text.secondary",
-                              border: 0,
-                              bgcolor: "transparent",
-                              p: 0,
-                              cursor: autoCopyEnabled ? "pointer" : "not-allowed",
-                              opacity: autoCopyEnabled ? 1 : 0.45,
-                            }}
-                          >
-                            <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />
-                            <Typography variant="caption">Kopi</Typography>
-                          </Box>
+                            <Box
+                              component="button"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleOpenEditor(note);
+                              }}
+                              sx={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 0.75,
+                                color: "text.secondary",
+                                border: "1px solid",
+                                borderColor: "divider",
+                                bgcolor: "transparent",
+                                px: 1.2,
+                                py: 0.4,
+                                minHeight: 40,
+                                minWidth: 98,
+                                borderRadius: 1.25,
+                                cursor: "pointer",
+                                transition: "background-color 120ms ease, border-color 120ms ease",
+                                "&:hover": {
+                                  bgcolor: "action.hover",
+                                  borderColor: "text.secondary",
+                                },
+                                "&:focus-visible": {
+                                  outline: "2px solid",
+                                  outlineColor: "primary.main",
+                                  outlineOffset: 1,
+                                },
+                              }}
+                            >
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                Endre
+                              </Typography>
+                            </Box>
                           </Box>
                         </Box>
                         <Typography
