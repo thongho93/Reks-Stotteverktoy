@@ -26,6 +26,16 @@
   display: flex;
   flex-direction: column;
   overflow: visible;
+  --desktop-ui-scale: 1;
+}
+
+/* Desktop compact mode: scale down this page slightly at 100% browser zoom.
+   `zoom` is intentionally used because users primarily run Chrome desktop. */
+@media (min-width: 1200px) {
+  .page {
+    --desktop-ui-scale: 0.92;
+    zoom: var(--desktop-ui-scale);
+  }
 }
 
 .header {
@@ -72,7 +82,7 @@
 
 @media (min-width: 900px) {
   .grid {
-    grid-template-columns: var(--sidebar-width, 340px) 10px 1fr;
+    grid-template-columns: var(--sidebar-width, 340px) 16px 1fr;
     align-items: start;
   }
 }
@@ -107,45 +117,68 @@
   }
 
   .sidebarResizeHandle {
-    display: block;
+    display: flex;
     align-self: start;
     justify-self: stretch;
     position: sticky;
     top: 0;
     height: 100vh;
     min-height: 100vh;
+    width: 16px;
     cursor: col-resize;
     user-select: none;
     touch-action: none;
-    border-radius: 999px;
+    align-items: center;
+    justify-content: center;
+    outline: none;
+    z-index: 2;
   }
 
   .sidebarResizeHandle::before {
     content: "";
     position: absolute;
-    top: 10px;
-    bottom: 10px;
+    top: 0;
+    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
     width: 2px;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.08);
+    background: rgba(15, 23, 42, 0.14);
     transition:
-      width 120ms ease,
+      background 120ms ease;
+  }
+
+  .sidebarResizeHandle::after {
+    content: "";
+    position: relative;
+    width: 6px;
+    height: 46px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.65);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+    transition:
       background 120ms ease,
       box-shadow 120ms ease;
   }
 
   .sidebarResizeHandle:hover::before {
-    width: 4px;
-    background: rgba(0, 0, 0, 0.16);
-    box-shadow: 0 0 0 6px rgba(185, 130, 154, 0.12);
+    background: rgba(71, 85, 105, 0.5);
+  }
+
+  .sidebarResizeHandle:hover::after {
+    background: rgba(71, 85, 105, 0.66);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
   }
 
   .sidebarResizeHandle:global(:focus-visible)::before {
-    width: 4px;
-    background: rgba(0, 0, 0, 0.16);
-    box-shadow: 0 0 0 6px rgba(185, 130, 154, 0.18);
+    background: rgba(71, 85, 105, 0.5);
+  }
+
+  .sidebarResizeHandle:global(:focus-visible)::after {
+    background: rgba(71, 85, 105, 0.66);
+    box-shadow:
+      0 2px 8px rgba(15, 23, 42, 0.22),
+      0 0 0 3px rgba(148, 163, 184, 0.28);
   }
 }
 
@@ -359,12 +392,94 @@
 .headerRightWrap {
   margin-top: 8px;
   margin-bottom: 8px;
-  padding: 8px 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.85) 100%);
+  padding: 11px 12px;
+  border: 1px solid rgba(99, 102, 241, 0.26);
+  border-left: 4px solid rgba(79, 70, 229, 0.66);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(99, 102, 241, 0.12) 0%, rgba(99, 102, 241, 0) 38%),
+    linear-gradient(160deg, rgba(244, 247, 255, 0.98) 0%, rgba(237, 243, 255, 0.95) 56%, rgba(233, 241, 255, 0.92) 100%);
   width: fit-content;
   max-width: 100%;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 18px rgba(79, 70, 229, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  position: relative;
+  overflow: hidden;
+}
+
+.headerRightWrap::before {
+  content: "";
+  position: absolute;
+  top: -45%;
+  right: -22%;
+  width: 62%;
+  height: 160%;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0) 78%);
+}
+
+.headerRightWrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    135deg,
+    rgba(79, 70, 229, 0.05) 0%,
+    rgba(79, 70, 229, 0.05) 1px,
+    transparent 1px,
+    transparent 10px
+  );
+  opacity: 0.25;
+}
+
+.followUpsPreviewRow {
+  row-gap: 8px;
+  align-items: center;
+}
+
+.followUpChip {
+  border-radius: 999px !important;
+  border: 1px solid rgba(79, 70, 229, 0.28) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(242, 246, 255, 0.96) 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(15, 23, 42, 0.07);
+  transition:
+    transform 130ms ease,
+    box-shadow 130ms ease,
+    border-color 130ms ease,
+    background-color 130ms ease;
+}
+
+.followUpChip :global(.MuiChip-label) {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.followUpChip :global(.MuiChip-icon) {
+  color: #4f46e5;
+}
+
+.followUpChip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(79, 70, 229, 0.5) !important;
+  background: linear-gradient(180deg, #ffffff 0%, #edf2ff 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 8px 16px rgba(79, 70, 229, 0.16);
+}
+
+.followUpChip:active {
+  transform: translateY(0);
+}
+
+.followUpChip:global(.Mui-focusVisible) {
+  outline: 2px solid rgba(59, 130, 246, 0.42);
+  outline-offset: 2px;
 }
 
 .category {
@@ -611,7 +726,7 @@
 
 @media (min-width: 1200px) {
   .preparatPaper {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
     grid-template-areas:
       "search toggles"
       "chips toggles";
@@ -620,12 +735,15 @@
   }
 
   .preparatToggleRow {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 8px;
+    align-items: start;
+    justify-items: start;
+    justify-content: start;
     min-height: 0;
     width: max-content;
-    max-width: 360px;
+    max-width: 100%;
     justify-self: end;
     align-self: start;
   }
@@ -633,7 +751,9 @@
   .preparatToggleRow :global(.MuiFormControlLabel-root) {
     width: auto;
     max-width: 100%;
+    justify-self: start;
     justify-content: flex-start;
+    margin: 0;
   }
 }
 

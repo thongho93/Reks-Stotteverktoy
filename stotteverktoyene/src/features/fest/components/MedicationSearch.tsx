@@ -66,6 +66,7 @@ type Props = {
   onPick?: (med: Med) => void;
   onManualPick?: (payload: { name: string; query: string }) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  autoPasteNumericClipboard?: boolean;
 };
 
 const NOISE_TOKENS = new Set([
@@ -167,6 +168,13 @@ const normalizeIdToken = (value: string) => {
   const trimmed = String(value ?? "").trim();
   const stripped = trimmed.replace(/^0+/, "");
   return stripped || "0";
+};
+
+const getNumericClipboardValue = (value: string): string => {
+  const compact = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "");
+  return /^\d+$/.test(compact) ? compact : "";
 };
 
 const normalizeStrengthComparable = (value: string) =>
@@ -530,16 +538,21 @@ export default function MedicationSearch({
   onPick,
   onManualPick,
   inputRef,
+  autoPasteNumericClipboard = false,
 }: Props) {
   const [query, setQuery] = useState("");
+  const queryRef = useRef("");
   const [manualName, setManualName] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [allItems, setAllItems] = useState<Med[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const anchorRef = useRef<HTMLDivElement | null>(null);
+  const lastObservedClipboardDigitsRef = useRef("");
+  const lastAutoFilledQueryRef = useRef("");
 
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const effectiveInputRef = inputRef ?? internalInputRef;
@@ -569,6 +582,10 @@ export default function MedicationSearch({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
   const results = useMemo(() => {
     const tokens = toTokens(deferredQuery);
@@ -976,6 +993,63 @@ export default function MedicationSearch({
     pickResult(only);
   }, [query, results, allItems]);
 
+  useEffect(() => {
+    if (!autoPasteNumericClipboard) return;
+    if (!isInputFocused) return;
+    if (typeof navigator === "undefined") return;
+    if (!navigator.clipboard || typeof navigator.clipboard.readText !== "function") return;
+
+    let cancelled = false;
+    let inFlight = false;
+    let blocked = false;
+
+    const maybeAutofillFromClipboard = async () => {
+      if (cancelled || inFlight || blocked) return;
+      inFlight = true;
+      try {
+        const raw = await navigator.clipboard.readText();
+        if (cancelled) return;
+
+        const digits = getNumericClipboardValue(raw);
+        if (!digits) return;
+        if (digits === lastObservedClipboardDigitsRef.current) return;
+
+        // Ikke overstyr manuelt skrevet søk.
+        const currentQuery = queryRef.current;
+        const canOverwrite = !currentQuery.trim() || currentQuery === lastAutoFilledQueryRef.current;
+        if (!canOverwrite) return;
+
+        lastObservedClipboardDigitsRef.current = digits;
+        lastAutoFilledQueryRef.current = digits;
+        setQuery(digits);
+        setOpen(!isLoadingData && !loadError);
+      } catch {
+        // Clipboard-read kan være blokkert av browser policy.
+        // Unngå spam av exceptions mens feltet er aktivt.
+        blocked = true;
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void maybeAutofillFromClipboard();
+    const intervalId = window.setInterval(() => {
+      void maybeAutofillFromClipboard();
+    }, 650);
+
+    const onWindowFocus = () => {
+      void maybeAutofillFromClipboard();
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onWindowFocus);
+    };
+  }, [autoPasteNumericClipboard, isInputFocused, isLoadingData, loadError]);
+
   return (
     <Box>
       <TextField
@@ -991,11 +1065,15 @@ export default function MedicationSearch({
           setOpen(Boolean(next.trim()) && !isLoadingData && !loadError);
         }}
         onFocus={() => {
+          setIsInputFocused(true);
           // Clear the field on focus to make it ready for a new search
           if (query) {
             setQuery("");
           }
           setOpen(false);
+        }}
+        onBlur={() => {
+          setIsInputFocused(false);
         }}
         onKeyDown={(e) => {
           if (e.key === "Escape") {

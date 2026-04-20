@@ -26,9 +26,11 @@ type Props = {
   clearOnCopy?: boolean;
   includeManufacturerInText?: boolean;
   includePackSizeInText?: boolean;
+  autoPasteNumericClipboard?: boolean;
   onClearOnCopyChange?: (value: boolean) => void;
   onIncludeManufacturerInTextChange?: (value: boolean) => void;
   onIncludePackSizeInTextChange?: (value: boolean) => void;
+  onAutoPasteNumericClipboardChange?: (value: boolean) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onPickText: (pick: string | PickPayload) => void;
   onClear: () => void;
@@ -53,9 +55,11 @@ export default function PreparatPanel({
   clearOnCopy = false,
   includeManufacturerInText = false,
   includePackSizeInText = false,
+  autoPasteNumericClipboard = false,
   onClearOnCopyChange,
   onIncludeManufacturerInTextChange,
   onIncludePackSizeInTextChange,
+  onAutoPasteNumericClipboardChange,
   inputRef,
   onPickText,
   onClear,
@@ -127,6 +131,7 @@ export default function PreparatPanel({
         <Box className={styles.preparatSingleSearch} style={{ flex: 1 }}>
           <MedicationSearch
             inputRef={inputRef}
+            autoPasteNumericClipboard={autoPasteNumericClipboard}
             onPick={(med) => {
               const baseText = formatPreparatForTemplate(med);
               if (!baseText) return;
@@ -293,7 +298,7 @@ export default function PreparatPanel({
                 onChange={(e) => onClearOnCopyChange?.(e.target.checked)}
               />
             }
-            label={<Typography variant="caption">Tøm etter kopiering</Typography>}
+            label={<Typography variant="caption">Tøm etter kopi</Typography>}
           />
         </Tooltip>
 
@@ -307,7 +312,7 @@ export default function PreparatPanel({
                 onChange={(e) => onIncludeManufacturerInTextChange?.(e.target.checked)}
               />
             }
-            label={<Typography variant="caption">Vis produsent</Typography>}
+            label={<Typography variant="caption">Produsent</Typography>}
           />
         </Tooltip>
 
@@ -321,7 +326,21 @@ export default function PreparatPanel({
                 onChange={(e) => onIncludePackSizeInTextChange?.(e.target.checked)}
               />
             }
-            label={<Typography variant="caption">Vis pakningsstørrelse</Typography>}
+            label={<Typography variant="caption">Pakningsstørrelse</Typography>}
+          />
+        </Tooltip>
+
+        <Tooltip title="Når feltet er aktivt, limes kopiert tall automatisk inn i søket (f.eks. 3111).">
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Switch
+                size="small"
+                checked={autoPasteNumericClipboard}
+                onChange={(e) => onAutoPasteNumericClipboardChange?.(e.target.checked)}
+              />
+            }
+            label={<Typography variant="caption">Auto vnr</Typography>}
           />
         </Tooltip>
         </Box>
