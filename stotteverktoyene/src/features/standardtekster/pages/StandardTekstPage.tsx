@@ -752,6 +752,26 @@ export default function StandardTekstPage() {
     }
   }, [includePackSizeInPreparatText]);
 
+  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem("standardtekster.autoPasteNumericClipboard");
+      return raw === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "standardtekster.autoPasteNumericClipboard",
+        String(autoPasteNumericClipboard),
+      );
+    } catch {
+      // ignore
+    }
+  }, [autoPasteNumericClipboard]);
+
   const reformatPickedRows = useCallback(
     (includeManufacturer: boolean, includePackSize: boolean) => {
       reformatPickedPreparats((row) =>
@@ -1826,9 +1846,11 @@ export default function StandardTekstPage() {
                 clearOnCopy={clearOnCopy}
                 includeManufacturerInText={includeManufacturerInPreparatText}
                 includePackSizeInText={includePackSizeInPreparatText}
+                autoPasteNumericClipboard={autoPasteNumericClipboard}
                 onClearOnCopyChange={setClearOnCopy}
                 onIncludeManufacturerInTextChange={handleIncludeManufacturerInPreparatTextChange}
                 onIncludePackSizeInTextChange={handleIncludePackSizeInPreparatTextChange}
+                onAutoPasteNumericClipboardChange={setAutoPasteNumericClipboard}
                 inputRef={preparatSearchInputRef}
                 onPickText={(pick) => {
                   const text = typeof pick === "string" ? pick : pick.text;

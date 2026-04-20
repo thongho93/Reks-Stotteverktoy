@@ -22,17 +22,17 @@ import StarBorderIcon from "@mui/icons-material/StarBorder";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import IconButton from "@mui/material/IconButton";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import ClearIcon from "@mui/icons-material/Clear";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/Auth";
 import { logUsage } from "../../../shared/services/usage";
-import { standardTeksterApi } from "../services/standardTeksterApi";
 
 const storageKey = (base: string, uid?: string | null) =>
   uid ? `standardtekster:${uid}:${base}` : `standardtekster:${base}`;
@@ -226,43 +226,6 @@ export default function StandardTekstSidebar({
   const { user } = useAuthUser();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [favoritesHydrated, setFavoritesHydrated] = useState(false);
-  const [usageById, setUsageById] = useState<Record<string, number>>({});
-  // Load per-user standardtekst usage (click counts) for sorting favorites
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const uid = user?.uid;
-        if (!uid) {
-          if (!cancelled) setUsageById({});
-          return;
-        }
-
-        const colRef = collection(db, "users", uid, "standardtekstUsage");
-        const snap = await getDocs(colRef);
-
-        const next: Record<string, number> = {};
-        snap.forEach((d) => {
-          const data = d.data() as any;
-          const clicks = typeof data?.clicks === "number" ? data.clicks : 0;
-          next[d.id] = clicks;
-        });
-
-        if (!cancelled) setUsageById(next);
-      } catch {
-        if (!cancelled) setUsageById({});
-      } finally {
-        // no hydrated flag needed
-      }
-    };
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid]);
 
   // Category expand/collapse state (persisted locally)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -273,6 +236,11 @@ export default function StandardTekstSidebar({
   const [hiddenHydrated, setHiddenHydrated] = useState(false);
   const [showInactive, setShowInactive] = useState<boolean>(false);
   const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [draggingFavoriteId, setDraggingFavoriteId] = useState<string | null>(null);
+  const [favoriteDropTarget, setFavoriteDropTarget] = useState<{
+    id: string;
+    position: "before" | "after";
+  } | null>(null);
 
   // Hydrate expand/collapse state from localStorage on mount
   useEffect(() => {
@@ -371,13 +339,42 @@ export default function StandardTekstSidebar({
     setFavorites((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  const moveFavoriteTo = (
+    draggedId: string,
+    targetId: string,
+    position: "before" | "after"
+  ) => {
+    setFavorites((prev) => {
+      if (draggedId === targetId) return prev;
+
+      const fromIndex = prev.indexOf(draggedId);
+      const targetIndex = prev.indexOf(targetId);
+      if (fromIndex === -1 || targetIndex === -1) return prev;
+
+      const insertionBase = targetIndex - (fromIndex < targetIndex ? 1 : 0);
+      const insertionIndex = position === "after" ? insertionBase + 1 : insertionBase;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+
+      const clampedIndex = Math.max(0, Math.min(insertionIndex, next.length));
+      next.splice(clampedIndex, 0, moved);
+      return next;
+    });
+  };
+
   const isSearching = search.trim().length > 0;
   const visibleItems = useMemo(() => {
     if (isAdmin && showInactive) return filtered;
     return filtered.filter((it) => it.isActive !== false);
   }, [filtered, isAdmin, showInactive]);
 
-  // Sort items: favorites on top. Favorites are ordered by most used (clicks desc), then title.
+  const favoritesIndex = useMemo(() => {
+    const index = new Map<string, number>();
+    favorites.forEach((id, i) => index.set(id, i));
+    return index;
+  }, [favorites]);
+
+  // Sort items: favorites on top. Favorites follow manual user order.
   // Non-favorites are ordered by title.
   const sortedItems = useMemo(() => {
     const isSearchingNow = search.trim().length > 0;
@@ -394,17 +391,19 @@ export default function StandardTekstSidebar({
       if (aFav && !bFav) return -1;
       if (!aFav && bFav) return 1;
 
-      // If both are favorites, sort by usage desc (fallback to title)
+      // If both are favorites, keep manual order (fallback to title for safety)
       if (aFav && bFav) {
-        const aClicks = usageById[a.id] ?? 0;
-        const bClicks = usageById[b.id] ?? 0;
-        if (aClicks !== bClicks) return bClicks - aClicks;
+        const aPos = favoritesIndex.get(a.id);
+        const bPos = favoritesIndex.get(b.id);
+        if (typeof aPos === "number" && typeof bPos === "number" && aPos !== bPos) {
+          return aPos - bPos;
+        }
         return a.title.localeCompare(b.title, "nb");
       }
 
       return a.title.localeCompare(b.title, "nb");
     });
-  }, [visibleItems, favorites, search, usageById]);
+  }, [visibleItems, favorites, search, favoritesIndex]);
 
   // Group items by category, with favorites as a separate group on top
   const groupedByCategory = useMemo(() => {
@@ -524,20 +523,6 @@ export default function StandardTekstSidebar({
 
   const selectStandardTekst = (item: StandardTekst) => {
     logUsage("standardtekst_open", { standardtekstId: item.id });
-
-    const uid = user?.uid;
-    if (uid) {
-      // Optimistic local increment so favorites re-sort immediately
-      setUsageById((prev) => ({
-        ...prev,
-        [item.id]: (prev[item.id] ?? 0) + 1,
-      }));
-
-      // Firestore per-user usage: /users/{uid}/standardtekstUsage/{standardtekstId}
-      standardTeksterApi.trackUsage({ uid, standardtekstId: item.id }).catch(() => {
-        // ignore logging errors
-      });
-    }
 
     setSelectedId(item.id);
   };
@@ -870,11 +855,45 @@ export default function StandardTekstSidebar({
 
                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                       <List dense disablePadding>
-                        {group.items.map((it) => (
+                        {group.items.map((it) => {
+                          const isFavoritesGroup = group.category === "Favoritter" && !isSearching;
+                          const isDragTarget = favoriteDropTarget?.id === it.id;
+                          const dropBefore = isDragTarget && favoriteDropTarget?.position === "before";
+                          const dropAfter = isDragTarget && favoriteDropTarget?.position === "after";
+                          return (
                           <ListItemButton
                             key={it.id}
                             selected={it.id === selectedId}
                             onClick={() => selectStandardTekst(it)}
+                            draggable={isFavoritesGroup}
+                            onDragStart={(e) => {
+                              if (!isFavoritesGroup) return;
+                              setDraggingFavoriteId(it.id);
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", it.id);
+                            }}
+                            onDragOver={(e) => {
+                              if (!isFavoritesGroup || !draggingFavoriteId || draggingFavoriteId === it.id) return;
+                              e.preventDefault();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const position: "before" | "after" =
+                                e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+                              setFavoriteDropTarget({ id: it.id, position });
+                            }}
+                            onDrop={(e) => {
+                              if (!isFavoritesGroup || !draggingFavoriteId || draggingFavoriteId === it.id) return;
+                              e.preventDefault();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const position: "before" | "after" =
+                                e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+                              moveFavoriteTo(draggingFavoriteId, it.id, position);
+                              setDraggingFavoriteId(null);
+                              setFavoriteDropTarget(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingFavoriteId(null);
+                              setFavoriteDropTarget(null);
+                            }}
                             className={styles.sidebarItem}
                             sx={(theme) => ({
                               pl: 2.25,
@@ -899,12 +918,39 @@ export default function StandardTekstSidebar({
                                 bgcolor: alpha(theme.palette.primary.main, 0.08),
                                 transform: "translateX(1px)",
                               },
+                              ...(dropBefore
+                                ? {
+                                    boxShadow: `inset 0 2px 0 ${alpha(theme.palette.primary.main, 0.85)}`,
+                                  }
+                                : {}),
+                              ...(dropAfter
+                                ? {
+                                    boxShadow: `inset 0 -2px 0 ${alpha(theme.palette.primary.main, 0.85)}`,
+                                  }
+                                : {}),
                             })}
                           >
                             <ListItemText
                               primary={<TruncatedTitle title={it.title} />}
                               secondary={it.isActive === false ? "Deaktivert" : undefined}
                             />
+
+                            {isFavoritesGroup ? (
+                              <Tooltip title="Dra for å endre rekkefølge" placement="top" arrow>
+                                <Box
+                                  aria-hidden
+                                  sx={(theme) => ({
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    mr: 0.25,
+                                    color: alpha(theme.palette.text.primary, 0.5),
+                                    cursor: "grab",
+                                  })}
+                                >
+                                  <DragIndicatorIcon fontSize="small" />
+                                </Box>
+                              </Tooltip>
+                            ) : null}
 
                             {isAdmin && onToggleActive ? (
                               <Tooltip
@@ -964,7 +1010,7 @@ export default function StandardTekstSidebar({
                               )}
                             </IconButton>
                           </ListItemButton>
-                        ))}
+                        )})}
                       </List>
                     </Collapse>
 

@@ -726,7 +726,7 @@
 
 @media (min-width: 1200px) {
   .preparatPaper {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
     grid-template-areas:
       "search toggles"
       "chips toggles";
@@ -735,12 +735,15 @@
   }
 
   .preparatToggleRow {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 8px;
+    align-items: start;
+    justify-items: start;
+    justify-content: start;
     min-height: 0;
     width: max-content;
-    max-width: 360px;
+    max-width: 100%;
     justify-self: end;
     align-self: start;
   }
@@ -748,7 +751,9 @@
   .preparatToggleRow :global(.MuiFormControlLabel-root) {
     width: auto;
     max-width: 100%;
+    justify-self: start;
     justify-content: flex-start;
+    margin: 0;
   }
 }
 
