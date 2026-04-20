@@ -51,6 +51,13 @@ import { useAuthUser } from "../../../app/auth/useAuthUser";
 
 const HISTORY_KEY_PREFIX = "interaksjoner_history_v1";
 const HISTORY_LAST_UID_KEY = "interaksjoner_last_uid_v1";
+const SPLIT_RATIO_STORAGE_KEY = "interaksjoner_split_ratio_v1";
+const DEFAULT_SPLIT_RATIO = 0.35;
+const MIN_SPLIT_RATIO = 0.2;
+const MAX_SPLIT_RATIO = 0.8;
+const DIVIDER_WIDTH_PX = 16;
+const MIN_LEFT_PANEL_PX = 380;
+const MIN_RIGHT_PANEL_PX = 520;
 
 const PREPARAT_SUFFIX_RE = /\s*\(preparatnavn\)\s*$/i;
 
@@ -66,6 +73,10 @@ function normalizeForMatch(value: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 function renderHighlightedText(label: string, matchedTerms: string[]): React.ReactNode {
@@ -115,11 +126,39 @@ type HistoryItem = {
 export default function InteraksjonerPage() {
   const { index, loading, error, reload } = useInteractions();
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const splitContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const [isResizingSplit, setIsResizingSplit] = React.useState(false);
+  const [splitRatio, setSplitRatio] = React.useState<number>(() => {
+    try {
+      const raw = window.localStorage.getItem(SPLIT_RATIO_STORAGE_KEY);
+      if (!raw) return DEFAULT_SPLIT_RATIO;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? clamp(parsed, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO) : DEFAULT_SPLIT_RATIO;
+    } catch {
+      return DEFAULT_SPLIT_RATIO;
+    }
+  });
 
   const getEntityId = React.useCallback(
     (entity: InteractionEntity) => entity.id ?? (entity.atc ? `atc:${entity.atc}` : `name:${entity.key}`),
     []
   );
+
+  const getSplitRatioFromClientX = React.useCallback((clientX: number): number | null => {
+    const container = splitContainerRef.current;
+    if (!container) return null;
+
+    const rect = container.getBoundingClientRect();
+    const availableWidth = rect.width - DIVIDER_WIDTH_PX;
+    if (availableWidth <= 0) return null;
+
+    const minLeft = Math.min(MIN_LEFT_PANEL_PX, availableWidth * 0.45);
+    const minRight = Math.min(MIN_RIGHT_PANEL_PX, availableWidth * 0.55);
+    const maxLeft = availableWidth - minRight;
+    const safeMinLeft = Math.min(minLeft, maxLeft);
+    const leftPx = clamp(clientX - rect.left, safeMinLeft, maxLeft);
+    return clamp(leftPx / availableWidth, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO);
+  }, []);
 
   const { user, isAdmin } = useAuthUser();
   const lastKnownUidRef = React.useRef<string | null>(null);
@@ -467,6 +506,40 @@ export default function InteraksjonerPage() {
     setStandardtekstFilter("");
   }, [activeCtx?.interactionId]);
 
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(splitRatio));
+    } catch {
+      // ignore
+    }
+  }, [splitRatio]);
+
+  React.useEffect(() => {
+    if (!isResizingSplit) return;
+
+    const onPointerMove = (event: PointerEvent) => {
+      const nextRatio = getSplitRatioFromClientX(event.clientX);
+      if (nextRatio === null) return;
+      setSplitRatio(nextRatio);
+    };
+
+    const stopResizing = () => {
+      setIsResizingSplit(false);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", stopResizing);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizingSplit, getSplitRatioFromClientX]);
+
   return (
     <Box
       sx={{
@@ -482,11 +555,11 @@ export default function InteraksjonerPage() {
       }}
     >
       <Box
+        ref={splitContainerRef}
         sx={{
-          display: { xs: "block", md: "grid" },
-          gridTemplateColumns: { md: "minmax(460px, 1.1fr) minmax(780px, 2fr)" },
-          gap: { xs: 2.5, md: 3 },
-          alignItems: "start",
+          display: { xs: "block", md: "flex" },
+          gap: { xs: 2.5, md: 0 },
+          alignItems: { xs: "stretch", md: "stretch" },
           flex: 1,
           minHeight: 0,
         }}
@@ -495,6 +568,7 @@ export default function InteraksjonerPage() {
         <Paper
           sx={{
             p: { xs: 2.5, md: 3.5 },
+            flex: { xs: "initial", md: `0 0 calc((100% - ${DIVIDER_WIDTH_PX}px) * ${splitRatio})` },
             height: { xs: "auto", md: "100%" },
             overflow: { xs: "visible", md: "auto" },
           }}
@@ -801,9 +875,10 @@ export default function InteraksjonerPage() {
                               pushHistory(r);
                             }}
                             sx={{
-                              py: 1.25,
+                              py: { xs: 1.5, md: 1.75 },
                               alignItems: "flex-start",
                               gap: 1,
+                              minHeight: { xs: 112, md: 128 },
                             }}
                           >
                             <ListItemText
@@ -827,7 +902,7 @@ export default function InteraksjonerPage() {
                                     color="text.secondary"
                                     sx={{
                                       display: "-webkit-box",
-                                      WebkitLineClamp: 1,
+                                      WebkitLineClamp: { xs: 2, md: 3 },
                                       WebkitBoxOrient: "vertical",
                                       overflow: "hidden",
                                       mt: 0.25,
@@ -880,10 +955,78 @@ export default function InteraksjonerPage() {
           </Stack>
         </Paper>
 
+        <Box
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Juster bredde mellom panelene"
+          tabIndex={0}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            const nextRatio = getSplitRatioFromClientX(event.clientX);
+            if (nextRatio !== null) setSplitRatio(nextRatio);
+            setIsResizingSplit(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              setSplitRatio((prev) => clamp(prev - 0.02, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO));
+              return;
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              setSplitRatio((prev) => clamp(prev + 0.02, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO));
+            }
+          }}
+          sx={{
+            display: { xs: "none", md: "flex" },
+            width: DIVIDER_WIDTH_PX,
+            cursor: "col-resize",
+            alignSelf: "stretch",
+            alignItems: "center",
+            justifyContent: "center",
+            touchAction: "none",
+            outline: "none",
+            position: "relative",
+            zIndex: 2,
+            "&::before": {
+              content: '""',
+              width: 2,
+              height: "100%",
+              borderRadius: 999,
+              bgcolor: "divider",
+              transition: "background-color 120ms ease",
+              position: "absolute",
+              top: 0,
+              left: "50%",
+              transform: "translateX(-50%)",
+            },
+            "&::after": {
+              content: '""',
+              width: 6,
+              height: 46,
+              borderRadius: 999,
+              bgcolor: "action.disabled",
+              boxShadow: 1,
+              transition: "background-color 120ms ease",
+            },
+            "&:hover::before, &:focus-visible::before": {
+              bgcolor: "text.secondary",
+            },
+            "&:hover::after, &:focus-visible::after": {
+              bgcolor: "text.secondary",
+            },
+          }}
+        />
+
         {/* Right: Results + Details */}
         <Paper
           sx={{
             p: { xs: 2.5, md: 3.5 },
+            flex: {
+              xs: "initial",
+              md: `0 0 calc((100% - ${DIVIDER_WIDTH_PX}px) * ${1 - splitRatio})`,
+            },
             minHeight: { xs: 420, md: 560 },
             height: { xs: "auto", md: "100%" },
             overflow: { xs: "visible", md: "auto" },
