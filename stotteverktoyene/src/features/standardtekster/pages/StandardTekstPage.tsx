@@ -50,6 +50,7 @@ import { useStandardTekstHotkeys } from "../hooks/useStandardTekstHotkeys";
 import PreparatPanel from "../components/PreparatPanel";
 import { deleteStandardTekst } from "../utils/deleteStandardTekst";
 import type { StandardTekstFollowUp } from "../types";
+import { logUsage } from "../../../shared/services/usage";
 
 type OMEQStandardtekstPrefill = {
   requestId: number;
@@ -1396,16 +1397,16 @@ export default function StandardTekstPage() {
     </Stack>
   ) : null;
 
-  const copyBodyToClipboard = async () => {
-    if (!selected) return;
-    if (isEditing) return;
+  const copyBodyToClipboard = async (): Promise<boolean> => {
+    if (!selected) return false;
+    if (isEditing) return false;
     const selectedContent = activeTemplateContent;
 
     // If the user has marked (selected) text, do NOT auto-copy the full template.
     // This keeps normal text selection + Ctrl/Cmd+C working.
     const selectionText = window.getSelection?.()?.toString() ?? "";
     if (selectionText.trim().length > 0) {
-      return;
+      return false;
     }
 
     // Prevent copying if the template requires a number and it hasn't been filled in.
@@ -1415,14 +1416,14 @@ export default function StandardTekstPage() {
       if (missing.length) {
         const label = missing.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
         setErrorLocal(`Fyll inn feltet før du kopierer teksten: ${label}.`);
-        return;
+        return false;
       }
 
       const invalid = indices.filter((i) => !isTallValueValid(tallByIndex[i] ?? ""));
       if (invalid.length) {
         const label = invalid.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
         setErrorLocal(`Tallfelt må inneholde kun tall: ${label}.`);
-        return;
+        return false;
       }
     }
 
@@ -1430,13 +1431,13 @@ export default function StandardTekstPage() {
       const clockLabel = formatClockTallValue(clockTime, clockDay).trim();
       if (!clockLabel) {
         setErrorLocal("Velg klokkeslett før du kopierer teksten.");
-        return;
+        return false;
       }
     }
 
     if (templateHasVirkestoffToken(selectedContent) && !resolvedVirkestoff) {
       setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
-      return;
+      return false;
     }
     if (templateHasFormuleringTokens(selectedContent)) {
       const indices = getFormuleringTokenIndices(selectedContent);
@@ -1461,7 +1462,7 @@ export default function StandardTekstPage() {
       if (missingLabels.size) {
         const label = Array.from(missingLabels).join(", ");
         setErrorLocal(`Fyll inn formulering før du kopierer teksten: ${label}.`);
-        return;
+        return false;
       }
     }
 
@@ -1554,11 +1555,12 @@ export default function StandardTekstPage() {
     }
 
     text = (text ?? "").trim();
-    if (!text) return;
+    if (!text) return false;
 
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      logUsage("standardtekst_copy", { standardtekstId: selected.id });
 
       if (clearOnCopy) {
         clearPreparats();
@@ -1596,7 +1598,7 @@ export default function StandardTekstPage() {
         preparatSearchInputRef.current?.select?.();
       });
 
-      return;
+      return true;
     } catch {
       // Fallback for eldre nettlesere / usikre kontekster
       try {
@@ -1610,6 +1612,7 @@ export default function StandardTekstPage() {
         document.execCommand("copy");
         document.body.removeChild(el);
         setCopied(true);
+        logUsage("standardtekst_copy", { standardtekstId: selected.id });
 
         if (clearOnCopy) {
           clearPreparats();
@@ -1645,8 +1648,10 @@ export default function StandardTekstPage() {
           preparatSearchInputRef.current?.focus();
           preparatSearchInputRef.current?.select?.();
         });
+        return true;
       } catch {
         // ignore
+        return false;
       }
     }
   };

@@ -17,7 +17,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
-import { logUsage } from "../../../shared/services/usage";
 import { STANDARDTEKST_TOKEN_DEFS } from "../utils/preparat";
 
 type Props = {
@@ -41,7 +40,7 @@ type Props = {
   onDelete: () => void;
   deleting: boolean;
 
-  onCopy: () => void;
+  onCopy: () => Promise<boolean>;
 
   editorTools?: ReactNode;
   belowContent?: ReactNode;
@@ -252,9 +251,7 @@ export default function StandardTekstContent({
   }, [tokenPickerOpen]);
 
   const handleCopy = () => {
-    // Log copy without storing sensitive text
-    logUsage("standardtekst_copy");
-    onCopy();
+    void onCopy();
   };
 
   const lockBeforeEdit = Boolean(selected && !isEditing && selected.title === "Ny standardtekst");
