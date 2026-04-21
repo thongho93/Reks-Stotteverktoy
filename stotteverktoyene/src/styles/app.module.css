@@ -177,3 +177,16 @@
   font-size: 1.25rem;
   color: var(--mui-palette-primary-main);
 }
+
+:global([data-app-theme="dark"]) .addRowButton {
+  border-color: var(--app-border-soft);
+  background: var(--app-surface-3);
+}
+
+:global([data-app-theme="dark"]) .totalOmeqBox {
+  background: var(--app-muted-fill);
+}
+
+:global([data-app-theme="dark"]) .totalOmeqLabel {
+  color: var(--app-text-muted);
+}

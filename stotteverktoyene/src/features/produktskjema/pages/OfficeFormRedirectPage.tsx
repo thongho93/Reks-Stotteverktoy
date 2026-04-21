@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, Typography } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 
 const OFFICE_FORM_URL = import.meta.env.VITE_OFFICE_FORM_URL as string;
@@ -32,8 +32,10 @@ export default function OfficeFormRedirectPage() {
             display: "grid",
             placeItems: "center",
             gap: 1.5,
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,252,0.98) 100%)",
+            background: (theme) =>
+              theme.palette.mode === "dark"
+                ? "linear-gradient(180deg, rgba(16,22,32,0.96) 0%, rgba(12,18,27,0.98) 100%)"
+                : "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,252,0.98) 100%)",
             zIndex: 1,
             textAlign: "center",
             pointerEvents: "none",
@@ -50,34 +52,18 @@ export default function OfficeFormRedirectPage() {
       )}
 
       {iframeError && (
-        <div style={{ padding: 12, position: "relative", zIndex: 2 }}>
+        <Box sx={{ p: 1.5, position: "relative", zIndex: 2 }}>
           Bruk knappen hvis skjemaet ikke lastes automatisk:
           <br />
-          <button
+          <Button
+            variant="contained"
+            size="small"
             onClick={() => window.open(OFFICE_FORM_URL, "_blank", "noopener,noreferrer")}
-            style={{
-              appearance: "none",
-              border: "1px solid #cfa3b3",
-              backgroundColor: "#d28aa2ff",
-              color: "#ffff",
-              padding: "8px 15px",
-              borderRadius: 999,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: "pointer",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
-              marginTop: 8,
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = "#d99aac";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = "#e6b6c6";
-            }}
+            sx={{ mt: 1, borderRadius: 999, textTransform: "none", px: 2 }}
           >
             Åpne skjema
-          </button>
-        </div>
+          </Button>
+        </Box>
       )}
 
       <iframe

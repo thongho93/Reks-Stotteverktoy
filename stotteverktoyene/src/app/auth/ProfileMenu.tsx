@@ -1,13 +1,28 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Avatar, Box, Divider, IconButton, Menu, MenuItem, Typography } from "@mui/material";
+import {
+  Avatar,
+  Box,
+  Divider,
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Switch,
+  Typography,
+} from "@mui/material";
+import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
+import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/firebase";
 import { useAuthUser } from "./useAuthUser";
+import { useColorMode } from "../../styles/colorModeContext";
 import styles from "../../styles/standardTekstPage.module.css";
 
 export function ProfileMenu() {
   const { user, loading, isAdmin, isOwner, firstName, avatarUrl } = useAuthUser();
+  const { mode, toggleMode } = useColorMode();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const navigate = useNavigate();
   const open = Boolean(anchorEl);
@@ -70,6 +85,31 @@ export function ProfileMenu() {
           }}
         >
           Min profil
+        </MenuItem>
+
+        <MenuItem
+          className={styles.profileThemeToggleItem}
+          onClick={(event) => {
+            event.preventDefault();
+            toggleMode();
+          }}
+        >
+          <ListItemIcon>
+            {mode === "dark" ? (
+              <DarkModeRoundedIcon fontSize="small" />
+            ) : (
+              <LightModeRoundedIcon fontSize="small" />
+            )}
+          </ListItemIcon>
+          <ListItemText primary="Mørk modus" />
+          <Switch
+            size="small"
+            edge="end"
+            checked={mode === "dark"}
+            onChange={() => toggleMode()}
+            onClick={(event) => event.stopPropagation()}
+            inputProps={{ "aria-label": "Bytt mellom lys og mørk modus" }}
+          />
         </MenuItem>
 
         <MenuItem onClick={handleLogout} className={styles.profileMenuLogout}>

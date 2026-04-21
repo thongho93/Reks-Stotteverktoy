@@ -1114,13 +1114,19 @@ export default function StatistikkPage() {
 
                       {rows.length > 0 && (
                         <TableRow
-                          sx={{
-                            backgroundColor: "rgba(0,0,0,0.03)",
+                          sx={(theme) => ({
+                            backgroundColor:
+                              theme.palette.mode === "dark"
+                                ? "rgba(165, 177, 198, 0.09)"
+                                : "rgba(0,0,0,0.03)",
                             "& td": {
                               fontWeight: 700,
-                              borderTop: "2px solid rgba(0,0,0,0.12)",
+                              borderTop:
+                                theme.palette.mode === "dark"
+                                  ? "2px solid rgba(165, 177, 198, 0.24)"
+                                  : "2px solid rgba(0,0,0,0.12)",
                             },
-                          }}
+                          })}
                         >
                           <TableCell>Sum</TableCell>
                           <TableCell align="center">{numberFormatter.format(tableTotals.pageViews)}</TableCell>

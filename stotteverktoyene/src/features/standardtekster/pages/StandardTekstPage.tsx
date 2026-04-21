@@ -2423,7 +2423,10 @@ export default function StandardTekstPage() {
             px: 2,
             py: 0.75,
             alignItems: "center",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 14px 34px rgba(2,6,18,0.56)"
+                : "0 10px 30px rgba(0,0,0,0.18)",
           }}
         >
           Standardtekst kopiert

@@ -297,14 +297,21 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
           }}
           componentsProps={{
             tooltip: {
-              sx: {
-                backgroundColor: "rgba(97, 97, 97, 1)", // default MUI grey, 100% opacity
-              },
+              sx: (theme) => ({
+                backgroundColor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(230, 237, 250, 0.95)"
+                    : "rgba(97, 97, 97, 1)",
+                color: theme.palette.mode === "dark" ? "#0f1622" : "#fff",
+              }),
             },
             arrow: {
-              sx: {
-                color: "rgba(97, 97, 97, 1)",
-              },
+              sx: (theme) => ({
+                color:
+                  theme.palette.mode === "dark"
+                    ? "rgba(230, 237, 250, 0.95)"
+                    : "rgba(97, 97, 97, 1)",
+              }),
             },
           }}
           disableFocusListener
@@ -364,7 +371,7 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
                   "&:hover fieldset": {
                     borderColor: "primary.main",
                   },
-                  "&.MTooltipsed fieldset": {
+                  "&.Mui-focused fieldset": {
                     borderColor: "primary.main",
                   },
                   "& .MuiOutlinedInput-input": {
@@ -430,7 +437,10 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
                 px: 1,
                 py: 0.35,
                 borderRadius: 1.5,
-                backgroundColor: "rgba(25, 118, 210, 0.08)",
+                backgroundColor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(96, 165, 250, 0.18)"
+                    : "rgba(25, 118, 210, 0.08)",
                 color: "text.primary",
                 fontSize: "0.7rem",
                 border: "none",
