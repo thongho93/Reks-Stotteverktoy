@@ -389,16 +389,6 @@ export default function StandardTekstPage() {
     "XX, farmasøyt\n" +
     "Farmasiet";
 
-  // For auto-focus glow effect on preparat / standardtekst search inputs
-  const [autoFocusGlowTarget, setAutoFocusGlowTarget] = useState<"standard" | "preparat" | null>(
-    null,
-  );
-
-  const triggerGlow = (target: "standard" | "preparat") => {
-    setAutoFocusGlowTarget(target);
-    window.setTimeout(() => setAutoFocusGlowTarget(null), 1000);
-  };
-
   // Hotkeys for preparat search focus/clearing and standardtekster search focus
   useStandardTekstHotkeys({
     preparatRows,
@@ -1004,7 +994,6 @@ export default function StandardTekstPage() {
         requestAnimationFrame(() => {
           preparatSearchInputRef.current?.focus();
           preparatSearchInputRef.current?.select();
-          triggerGlow("preparat");
         });
       }
     }
@@ -1756,14 +1745,7 @@ export default function StandardTekstPage() {
         className={styles.grid}
         style={{ ["--sidebar-width" as any]: `${sidebarWidth}px` }}
       >
-        <Box
-          className={[
-            styles.sidebar,
-            autoFocusGlowTarget === "standard" ? styles.autoFocusGlow : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
+        <Box className={styles.sidebar}>
           <StandardTekstSidebar
             disabled={lockBeforeEdit}
             isAdmin={canManageStandardTekster}
@@ -1827,10 +1809,7 @@ export default function StandardTekstPage() {
               />
             )}
 
-            <Box
-              ref={preparatSectionRef}
-              className={autoFocusGlowTarget === "preparat" ? styles.autoFocusGlow : undefined}
-            >
+            <Box ref={preparatSectionRef}>
               <PreparatPanel
                 preparatRows={preparatRows}
                 clearOnCopy={clearOnCopy}
