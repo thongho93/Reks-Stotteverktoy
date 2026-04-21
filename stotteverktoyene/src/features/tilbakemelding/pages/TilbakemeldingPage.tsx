@@ -1044,21 +1044,6 @@ export default function TilbakemeldingPage() {
     selectedNoteId,
   ]);
 
-  React.useEffect(() => {
-    if (!composerExpanded || selectedNoteId) return;
-    if (!draftTitle.trim()) return;
-    if (draftMode === "text" && !draftContent.trim()) return;
-    if (draftMode === "checklist" && normalizeChecklistItems(draftChecklistItems).length === 0) return;
-
-    const timeout = window.setTimeout(() => {
-      void createNoteFromComposer();
-    }, 700);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [composerExpanded, createNoteFromComposer, draftChecklistItems, draftContent, draftMode, draftTitle, selectedNoteId]);
-
   const filteredNotes = React.useMemo(
     () => savedNotesList.filter((note) => matchesSearchQuery(note, searchQuery)),
     [savedNotesList, searchQuery]
