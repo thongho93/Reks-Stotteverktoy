@@ -6,7 +6,6 @@ type UseStandardTekstHotkeysArgs = {
   clearPreparats: () => void;
   clearNumbersAndDate?: () => void;
   preparatSearchInputRef: React.RefObject<HTMLInputElement | null>;
-  standardTekstSearchInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
 export function useStandardTekstHotkeys({
@@ -14,7 +13,6 @@ export function useStandardTekstHotkeys({
   clearPreparats,
   clearNumbersAndDate,
   preparatSearchInputRef,
-  standardTekstSearchInputRef,
 }: UseStandardTekstHotkeysArgs) {
   // Escape -> clear picked preparats (if any) and optionally clear numbers/date
   useEffect(() => {
@@ -39,10 +37,10 @@ export function useStandardTekstHotkeys({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [clearPreparats, clearNumbersAndDate, preparatRows]);
 
-  // Ctrl/Cmd + F -> focus preparat search (override browser find)
+  // Ctrl/Cmd + S -> focus "Søk etter preparat" (prevent browser Save dialog)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const isCombo = (e.shiftKey && (e.ctrlKey || e.metaKey) && e.code === "KeyF");
+      const isCombo = (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
       if (!isCombo) return;
 
       e.preventDefault();
@@ -53,19 +51,4 @@ export function useStandardTekstHotkeys({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [preparatSearchInputRef]);
-
-  // Ctrl/Cmd + S -> focus "Søk i standardtekster" (prevent browser Save dialog)
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const isCombo = (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
-      if (!isCombo) return;
-
-      e.preventDefault();
-      standardTekstSearchInputRef.current?.focus();
-      standardTekstSearchInputRef.current?.select();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [standardTekstSearchInputRef]);
 }

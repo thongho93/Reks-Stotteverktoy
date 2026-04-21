@@ -404,7 +404,6 @@ export default function StandardTekstPage() {
     preparatRows,
     clearPreparats,
     preparatSearchInputRef,
-    standardTekstSearchInputRef,
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
@@ -2385,8 +2384,7 @@ export default function StandardTekstPage() {
           sx={{ display: "flex", alignItems: "center" }}
         >
           <span className={styles.preparatHintKeys}>
-            <span className={styles.preparatHintKeyLabel}>Søk tekst:</span> Ctrl+S ·{" "}
-            <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl+Shift+F ·{" "}
+            <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl + S ·{" "}
             <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
           </span>
         </Typography>
