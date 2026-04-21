@@ -404,6 +404,8 @@ export default function StandardTekstPage() {
     preparatRows,
     clearPreparats,
     preparatSearchInputRef,
+    standardTekstSearchInputRef,
+    isEditing,
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
@@ -1040,7 +1042,6 @@ export default function StandardTekstPage() {
     requestAnimationFrame(() => {
       standardTekstSearchInputRef.current?.focus();
       standardTekstSearchInputRef.current?.select();
-      triggerGlow("standard");
     });
   }, [loading, selected]);
 
