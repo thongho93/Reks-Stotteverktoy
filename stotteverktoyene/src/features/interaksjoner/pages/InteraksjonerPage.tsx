@@ -875,44 +875,27 @@ export default function InteraksjonerPage() {
                               pushHistory(r);
                             }}
                             sx={{
+                              display: "grid",
+                              gridTemplateColumns: kind ? "1fr auto" : "1fr",
                               py: { xs: 1.5, md: 1.75 },
                               alignItems: "flex-start",
                               gap: 1,
                               minHeight: { xs: 112, md: 128 },
                             }}
                           >
-                            <ListItemText
-                              primary={
-                                <Typography
-                                  sx={{
-                                    fontWeight: 800,
-                                    lineHeight: 1.2,
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: "vertical",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  {label}
-                                </Typography>
-                              }
-                              secondary={
-                                it.kliniskKonsekvens ? (
-                                  <Typography
-                                    color="text.secondary"
-                                    sx={{
-                                      display: "-webkit-box",
-                                      WebkitLineClamp: { xs: 2, md: 3 },
-                                      WebkitBoxOrient: "vertical",
-                                      overflow: "hidden",
-                                      mt: 0.25,
-                                    }}
-                                  >
-                                    {it.kliniskKonsekvens}
-                                  </Typography>
-                                ) : null
-                              }
-                            />
+                            <Typography
+                              sx={{
+                                fontWeight: 800,
+                                lineHeight: 1.2,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                gridColumn: "1 / 2",
+                              }}
+                            >
+                              {label}
+                            </Typography>
                             {kind ? (
                               <Chip
                                 size="small"
@@ -923,6 +906,8 @@ export default function InteraksjonerPage() {
                                   mt: 0.25,
                                   fontWeight: 700,
                                   maxWidth: 180,
+                                  gridColumn: "2 / 3",
+                                  justifySelf: "end",
                                   "& .MuiChip-label": {
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
@@ -930,6 +915,21 @@ export default function InteraksjonerPage() {
                                   },
                                 }}
                               />
+                            ) : null}
+                            {it.kliniskKonsekvens ? (
+                              <Typography
+                                color="text.secondary"
+                                sx={{
+                                  gridColumn: "1 / -1",
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: { xs: 3, md: 4 },
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                  mt: 0.25,
+                                }}
+                              >
+                                {it.kliniskKonsekvens}
+                              </Typography>
                             ) : null}
                           </ListItemButton>
                           {i !== results.length - 1 ? <Divider /> : null}
