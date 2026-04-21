@@ -1611,12 +1611,6 @@ export default function StandardTekstPage() {
         }
       }
 
-      // Focus back to preparat search for fast next use
-      requestAnimationFrame(() => {
-        preparatSearchInputRef.current?.focus();
-        preparatSearchInputRef.current?.select?.();
-      });
-
       return true;
     } catch {
       // Fallback for eldre nettlesere / usikre kontekster
@@ -1663,10 +1657,6 @@ export default function StandardTekstPage() {
           }
         }
 
-        requestAnimationFrame(() => {
-          preparatSearchInputRef.current?.focus();
-          preparatSearchInputRef.current?.select?.();
-        });
         return true;
       } catch {
         // ignore
