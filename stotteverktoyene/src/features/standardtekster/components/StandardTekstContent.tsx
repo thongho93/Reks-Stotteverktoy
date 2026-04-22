@@ -593,7 +593,7 @@ export default function StandardTekstContent({
                         variant="contained"
                         size="small"
                         color="primary"
-                        sx={{ color: "#fff" }}
+                        sx={{ color: "primary.contrastText" }}
                         onClick={(e) => {
                           e.stopPropagation();
                           onStartEdit();

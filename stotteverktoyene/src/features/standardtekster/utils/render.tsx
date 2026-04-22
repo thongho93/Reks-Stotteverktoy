@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import type { Theme } from "@mui/material/styles";
 
 export function renderContentWithPreparatHighlight(
   text: string,
@@ -28,9 +29,14 @@ export function renderContentWithPreparatHighlight(
     fontWeight: 650,
     letterSpacing: "0.01em",
     border: "1px solid transparent",
-    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.12)",
+    boxShadow: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "0 1px 2px rgba(2, 6, 18, 0.45)"
+        : "0 1px 2px rgba(15, 23, 42, 0.12)",
     whiteSpace: "nowrap",
     verticalAlign: "baseline",
+    textShadow: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "0 1px 0 rgba(2, 6, 18, 0.45)" : "none",
   } as const;
 
   const tokenPlaceholderSx = {
@@ -43,91 +49,140 @@ export function renderContentWithPreparatHighlight(
 
   const placeholderPreparatSx = {
     ...tokenPlaceholderSx,
-    bgcolor: "rgba(234, 179, 8, 0.18)",
-    color: "#7a3f00",
-    borderColor: "rgba(217, 119, 6, 0.55)",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(180, 83, 9, 0.52)" : "rgba(234, 179, 8, 0.18)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#FFE7C2" : "#7A3F00"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(251, 191, 36, 0.82)" : "rgba(217, 119, 6, 0.55)",
   } as const;
 
   const placeholderPreparat1Sx = {
     ...tokenPlaceholderSx,
-    bgcolor: "rgba(16, 185, 129, 0.16)",
-    color: "#065f46",
-    borderColor: "rgba(5, 150, 105, 0.5)",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(6, 95, 70, 0.48)" : "rgba(16, 185, 129, 0.16)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#D1FAE5" : "#065F46"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.8)" : "rgba(5, 150, 105, 0.5)",
   } as const;
 
   const placeholderTallSx = {
     ...tokenPlaceholderSx,
-    bgcolor: "rgba(14, 165, 233, 0.16)",
-    color: "#075985",
-    borderColor: "rgba(2, 132, 199, 0.5)",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(3, 105, 161, 0.5)" : "rgba(14, 165, 233, 0.16)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#D6F4FF" : "#075985"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(56, 189, 248, 0.82)" : "rgba(2, 132, 199, 0.5)",
   } as const;
 
   const placeholderDatoSx = {
     ...tokenPlaceholderSx,
-    bgcolor: "rgba(236, 72, 153, 0.14)",
-    color: "#9d174d",
-    borderColor: "rgba(219, 39, 119, 0.45)",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(157, 23, 77, 0.44)" : "rgba(236, 72, 153, 0.14)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#FFE0EF" : "#9D174D"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(244, 114, 182, 0.8)" : "rgba(219, 39, 119, 0.45)",
   } as const;
 
   const placeholderVirkestoffSx = {
     ...tokenPlaceholderSx,
-    bgcolor: "rgba(236, 72, 153, 0.14)",
-    color: "#861657",
-    borderColor: "rgba(190, 24, 93, 0.45)",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(131, 24, 67, 0.44)" : "rgba(236, 72, 153, 0.14)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#FFE2F0" : "#861657"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(236, 72, 153, 0.78)" : "rgba(190, 24, 93, 0.45)",
   } as const;
 
   const pickedVirkestoffSx = {
     ...tokenSx,
-    background: "linear-gradient(180deg, #f5bfd9 0%, #e8a7c8 100%)",
-    color: "#321223",
-    borderColor: "rgba(165, 28, 97, 0.35)",
-    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 1px 2px rgba(70, 19, 45, 0.14)",
+    background: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "linear-gradient(180deg, rgba(190, 24, 93, 0.62) 0%, rgba(157, 23, 77, 0.56) 100%)"
+        : "linear-gradient(180deg, #f5bfd9 0%, #e8a7c8 100%)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#FFE9F4" : "#321223"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(244, 114, 182, 0.78)" : "rgba(165, 28, 97, 0.35)",
+    boxShadow: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 1px 2px rgba(30, 7, 20, 0.42)"
+        : "0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 1px 2px rgba(70, 19, 45, 0.14)",
   } as const;
 
   const placeholderFormuleringSx = {
     ...tokenPlaceholderSx,
-    bgcolor: "rgba(148, 163, 184, 0.18)",
-    color: "#334155",
-    borderColor: "rgba(100, 116, 139, 0.45)",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(71, 85, 105, 0.52)" : "rgba(148, 163, 184, 0.18)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#E2E8F0" : "#334155"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(148, 163, 184, 0.82)" : "rgba(100, 116, 139, 0.45)",
   } as const;
 
   const pickedFormuleringSx = {
     ...tokenSx,
-    background: "linear-gradient(180deg, #94a3b8 0%, #7b8799 100%)",
-    color: "#f8fafc",
-    borderColor: "rgba(71, 85, 105, 0.45)",
-    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.28) inset, 0 1px 2px rgba(30, 41, 59, 0.2)",
+    background: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "linear-gradient(180deg, rgba(100, 116, 139, 0.78) 0%, rgba(71, 85, 105, 0.72) 100%)"
+        : "linear-gradient(180deg, #94a3b8 0%, #7b8799 100%)",
+    color: "#F8FAFC",
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(148, 163, 184, 0.84)" : "rgba(71, 85, 105, 0.45)",
+    boxShadow: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 1px 2px rgba(15, 23, 42, 0.35)"
+        : "0 1px 0 rgba(255, 255, 255, 0.28) inset, 0 1px 2px rgba(30, 41, 59, 0.2)",
   } as const;
 
   const placeholderFormuleringNumberedSx = {
     ...tokenPlaceholderSx,
-    bgcolor: "rgba(99, 102, 241, 0.14)",
-    color: "#3730a3",
-    borderColor: "rgba(79, 70, 229, 0.45)",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(67, 56, 202, 0.5)" : "rgba(99, 102, 241, 0.14)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#E2E7FF" : "#3730A3"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(129, 140, 248, 0.82)" : "rgba(79, 70, 229, 0.45)",
   } as const;
 
   const pickedFormuleringNumberedSx = {
     ...tokenSx,
-    background: "linear-gradient(180deg, #7f8ba3 0%, #697487 100%)",
-    color: "#f8fafc",
-    borderColor: "rgba(71, 85, 105, 0.48)",
-    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 1px 2px rgba(30, 41, 59, 0.22)",
+    background: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "linear-gradient(180deg, rgba(79, 70, 229, 0.56) 0%, rgba(67, 56, 202, 0.5) 100%)"
+        : "linear-gradient(180deg, #7f8ba3 0%, #697487 100%)",
+    color: "#F8FAFC",
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(129, 140, 248, 0.8)" : "rgba(71, 85, 105, 0.48)",
+    boxShadow: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 1px 2px rgba(30, 41, 59, 0.36)"
+        : "0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 1px 2px rgba(30, 41, 59, 0.22)",
   } as const;
 
   const pickedPrimarySx = {
     ...tokenSx,
-    background: "linear-gradient(180deg, #ecae4d 0%, #df9124 100%)",
-    color: "#fffdfa",
-    borderColor: "rgba(146, 64, 14, 0.35)",
-    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 1px 2px rgba(120, 53, 15, 0.22)",
+    background: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "linear-gradient(180deg, rgba(180, 83, 9, 0.92) 0%, rgba(146, 64, 14, 0.9) 100%)"
+        : "linear-gradient(180deg, #ecae4d 0%, #df9124 100%)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#FFF7ED" : "#FFFDFA"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(252, 211, 77, 0.92)" : "rgba(146, 64, 14, 0.35)",
+    boxShadow: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 1px 2px rgba(120, 53, 15, 0.42)"
+        : "0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 1px 2px rgba(120, 53, 15, 0.22)",
   } as const;
 
   const pickedSecondarySx = {
     ...tokenSx,
-    background: "linear-gradient(180deg, #45bca2 0%, #29957b 100%)",
-    color: "#f7fffc",
-    borderColor: "rgba(6, 95, 70, 0.45)",
-    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.26) inset, 0 1px 2px rgba(6, 78, 59, 0.2)",
+    background: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "linear-gradient(180deg, rgba(6, 95, 70, 0.9) 0%, rgba(4, 120, 87, 0.88) 100%)"
+        : "linear-gradient(180deg, #45bca2 0%, #29957b 100%)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#ECFDF5" : "#F7FFFC"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(110, 231, 183, 0.88)" : "rgba(6, 95, 70, 0.45)",
+    boxShadow: (theme: Theme) =>
+      theme.palette.mode === "dark"
+        ? "0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 1px 2px rgba(6, 78, 59, 0.42)"
+        : "0 1px 0 rgba(255, 255, 255, 0.26) inset, 0 1px 2px rgba(6, 78, 59, 0.2)",
   } as const;
 
   const renderTokensInText = (t: string) => {

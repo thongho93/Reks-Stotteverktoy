@@ -159,8 +159,10 @@ export default function AndbruddPage() {
                   display: "grid",
                   placeItems: "center",
                   gap: 1.5,
-                  background:
-                    "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,252,0.98) 100%)",
+                  background: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "linear-gradient(180deg, rgba(16,22,32,0.96) 0%, rgba(12,18,27,0.98) 100%)"
+                      : "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,252,0.98) 100%)",
                   zIndex: 1,
                   textAlign: "center",
                   pointerEvents: "none",

@@ -1044,21 +1044,6 @@ export default function TilbakemeldingPage() {
     selectedNoteId,
   ]);
 
-  React.useEffect(() => {
-    if (!composerExpanded || selectedNoteId) return;
-    if (!draftTitle.trim()) return;
-    if (draftMode === "text" && !draftContent.trim()) return;
-    if (draftMode === "checklist" && normalizeChecklistItems(draftChecklistItems).length === 0) return;
-
-    const timeout = window.setTimeout(() => {
-      void createNoteFromComposer();
-    }, 700);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [composerExpanded, createNoteFromComposer, draftChecklistItems, draftContent, draftMode, draftTitle, selectedNoteId]);
-
   const filteredNotes = React.useMemo(
     () => savedNotesList.filter((note) => matchesSearchQuery(note, searchQuery)),
     [savedNotesList, searchQuery]
@@ -1681,7 +1666,10 @@ export default function TilbakemeldingPage() {
                 flexDirection: "column",
                 minHeight: 0,
                 flexShrink: 0,
-                bgcolor: "rgba(248,249,251,0.9)",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(21, 28, 39, 0.92)"
+                    : "rgba(248,249,251,0.9)",
               }}
             >
               <Box
@@ -1835,7 +1823,10 @@ export default function TilbakemeldingPage() {
                               height: 24,
                               color: isActive || isRenaming ? "#9D174D" : "text.secondary",
                               "&:hover": {
-                                bgcolor: "rgba(15,23,42,0.08)",
+                                bgcolor: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(165,177,198,0.16)"
+                                    : "rgba(15,23,42,0.08)",
                               },
                             }}
                           >
@@ -2004,7 +1995,10 @@ export default function TilbakemeldingPage() {
                           borderRadius: 1.1,
                           fontSize: 21,
                           "&:hover": {
-                            bgcolor: "rgba(15,23,42,0.08)",
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(165,177,198,0.16)"
+                                : "rgba(15,23,42,0.08)",
                           },
                         }}
                       >
@@ -2046,7 +2040,7 @@ export default function TilbakemeldingPage() {
                 minHeight: 0,
                 display: "flex",
                 flexDirection: "column",
-                bgcolor: "#fff",
+                bgcolor: "background.paper",
               }}
             >
               {selectedRoutineDocument ? (
@@ -2061,7 +2055,10 @@ export default function TilbakemeldingPage() {
                       alignItems: "center",
                       gap: 0.7,
                       flexWrap: "wrap",
-                      bgcolor: "rgba(248,250,252,0.95)",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(24, 33, 46, 0.9)"
+                          : "rgba(248,250,252,0.95)",
                     }}
                   >
                     <TextField
@@ -2107,7 +2104,12 @@ export default function TilbakemeldingPage() {
                           height: 34,
                           border: "1px solid",
                           borderColor: routineFormatState.bold ? "primary.main" : "divider",
-                          bgcolor: routineFormatState.bold ? "rgba(25,118,210,0.12)" : "transparent",
+                          bgcolor: (theme) =>
+                            routineFormatState.bold
+                              ? theme.palette.mode === "dark"
+                                ? "rgba(96,165,250,0.24)"
+                                : "rgba(25,118,210,0.12)"
+                              : "transparent",
                         }}
                       >
                         <FormatBoldIcon sx={{ fontSize: 20 }} />
@@ -2121,7 +2123,12 @@ export default function TilbakemeldingPage() {
                           height: 34,
                           border: "1px solid",
                           borderColor: routineFormatState.italic ? "primary.main" : "divider",
-                          bgcolor: routineFormatState.italic ? "rgba(25,118,210,0.12)" : "transparent",
+                          bgcolor: (theme) =>
+                            routineFormatState.italic
+                              ? theme.palette.mode === "dark"
+                                ? "rgba(96,165,250,0.24)"
+                                : "rgba(25,118,210,0.12)"
+                              : "transparent",
                         }}
                       >
                         <FormatItalicIcon sx={{ fontSize: 20 }} />
@@ -2135,7 +2142,12 @@ export default function TilbakemeldingPage() {
                           height: 34,
                           border: "1px solid",
                           borderColor: routineFormatState.underline ? "primary.main" : "divider",
-                          bgcolor: routineFormatState.underline ? "rgba(25,118,210,0.12)" : "transparent",
+                          bgcolor: (theme) =>
+                            routineFormatState.underline
+                              ? theme.palette.mode === "dark"
+                                ? "rgba(96,165,250,0.24)"
+                                : "rgba(25,118,210,0.12)"
+                              : "transparent",
                         }}
                       >
                         <FormatUnderlinedIcon sx={{ fontSize: 20 }} />
@@ -2159,7 +2171,13 @@ export default function TilbakemeldingPage() {
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 0.35,
-                          "&:hover": { borderColor: "text.secondary", bgcolor: "rgba(15,23,42,0.04)" },
+                          "&:hover": {
+                            borderColor: "text.secondary",
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(165,177,198,0.12)"
+                                : "rgba(15,23,42,0.04)",
+                          },
                         }}
                       >
                         <FormatColorTextIcon sx={{ fontSize: 18 }} />
@@ -2213,9 +2231,11 @@ export default function TilbakemeldingPage() {
                                 bgcolor: color,
                                 cursor: "pointer",
                                 outline: "none",
-                                boxShadow:
+                                boxShadow: (theme) =>
                                   color === routineTextColor
-                                    ? "0 0 0 2px #fff, 0 0 0 4px rgba(59,130,246,0.75)"
+                                    ? theme.palette.mode === "dark"
+                                      ? "0 0 0 2px #0f172a, 0 0 0 4px rgba(96,165,250,0.78)"
+                                      : "0 0 0 2px #fff, 0 0 0 4px rgba(59,130,246,0.75)"
                                     : "none",
                                 transition: "transform 120ms ease",
                                 "&:hover": {
@@ -2317,17 +2337,34 @@ export default function TilbakemeldingPage() {
                         px: 2,
                         py: 1.4,
                         borderRadius: 2,
-                        borderColor: "rgba(186,104,200,0.5)",
-                        bgcolor: "rgba(255,255,255,0.95)",
-                        backgroundImage:
-                          "linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(252,248,252,0.96) 100%)",
-                        boxShadow: "0 14px 30px rgba(186,104,200,0.18)",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(230,165,190,0.45)"
+                            : "rgba(186,104,200,0.5)",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(21,29,40,0.96)"
+                            : "rgba(255,255,255,0.95)",
+                        backgroundImage: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "linear-gradient(135deg, rgba(27,36,50,0.99) 0%, rgba(24,32,45,0.96) 100%)"
+                            : "linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(252,248,252,0.96) 100%)",
+                        boxShadow: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "0 14px 30px rgba(2,6,18,0.38)"
+                            : "0 14px 30px rgba(186,104,200,0.18)",
                         cursor: "text",
                         transition: "box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease",
                         "&:hover": {
                           transform: "translateY(-1px)",
-                          boxShadow: "0 18px 34px rgba(186,104,200,0.22)",
-                          borderColor: "rgba(186,104,200,0.7)",
+                          boxShadow: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "0 20px 38px rgba(2,6,18,0.46)"
+                              : "0 18px 34px rgba(186,104,200,0.22)",
+                          borderColor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(230,165,190,0.62)"
+                              : "rgba(186,104,200,0.7)",
                         },
                       }}
                     >
@@ -2341,7 +2378,10 @@ export default function TilbakemeldingPage() {
                               display: "inline-flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              bgcolor: "rgba(15,23,42,0.06)",
+                              bgcolor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(165,177,198,0.16)"
+                                  : "rgba(15,23,42,0.06)",
                               color: "text.primary",
                             }}
                           >
@@ -2361,10 +2401,19 @@ export default function TilbakemeldingPage() {
                           sx={{
                             color: "text.secondary",
                             border: "1px solid",
-                            borderColor: "rgba(15,23,42,0.15)",
-                            bgcolor: "rgba(255,255,255,0.85)",
+                            borderColor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(165,177,198,0.32)"
+                                : "rgba(15,23,42,0.15)",
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(24,33,46,0.88)"
+                                : "rgba(255,255,255,0.85)",
                             "&:hover": {
-                              bgcolor: "rgba(15,23,42,0.06)",
+                              bgcolor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(165,177,198,0.16)"
+                                  : "rgba(15,23,42,0.06)",
                             },
                           }}
                         >
@@ -2385,11 +2434,22 @@ export default function TilbakemeldingPage() {
                         px: 2,
                         py: 1.5,
                         borderRadius: 2,
-                        borderColor: "rgba(186,104,200,0.55)",
-                        bgcolor: "rgba(255,255,255,0.98)",
-                        backgroundImage:
-                          "linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(252,248,252,0.96) 100%)",
-                        boxShadow: "0 20px 36px rgba(186,104,200,0.2)",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(230,165,190,0.5)"
+                            : "rgba(186,104,200,0.55)",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(22,31,43,0.98)"
+                            : "rgba(255,255,255,0.98)",
+                        backgroundImage: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "linear-gradient(160deg, rgba(28,38,53,0.99) 0%, rgba(22,31,43,0.96) 100%)"
+                            : "linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(252,248,252,0.96) 100%)",
+                        boxShadow: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "0 20px 36px rgba(2,6,18,0.44)"
+                            : "0 20px 36px rgba(186,104,200,0.2)",
                       }}
                     >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
@@ -2552,15 +2612,18 @@ export default function TilbakemeldingPage() {
                 </Box>
 
                 <Box
-                  sx={{
-                    display: { xs: "none", md: "block" },
-                    width: "1px",
-                    ml: { md: "auto" },
-                    bgcolor: "rgba(15,23,42,0.12)",
-                    borderRadius: 999,
-                    my: 2.25,
-                  }}
-                />
+                sx={{
+                  display: { xs: "none", md: "block" },
+                  width: "1px",
+                  ml: { md: "auto" },
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(165,177,198,0.22)"
+                      : "rgba(15,23,42,0.12)",
+                  borderRadius: 999,
+                  my: 2.25,
+                }}
+              />
 
                 <Box sx={{ width: { xs: "100%", md: 340 }, maxWidth: { xs: "100%", md: 340 }, flexShrink: 0 }}>
                   <Paper
@@ -2569,12 +2632,23 @@ export default function TilbakemeldingPage() {
                       px: 1.7,
                       py: 1.15,
                       borderRadius: 2,
-                      borderColor: "rgba(15,23,42,0.16)",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(165,177,198,0.26)"
+                          : "rgba(15,23,42,0.16)",
                       borderStyle: "dashed",
-                      bgcolor: "rgba(255,255,255,0.94)",
-                      backgroundImage:
-                        "linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(246,248,252,0.94) 100%)",
-                      boxShadow: "0 8px 18px rgba(15,23,42,0.07)",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(20,28,39,0.94)"
+                          : "rgba(255,255,255,0.94)",
+                      backgroundImage: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "linear-gradient(135deg, rgba(26,36,51,0.99) 0%, rgba(21,30,43,0.94) 100%)"
+                          : "linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(246,248,252,0.94) 100%)",
+                      boxShadow: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "0 8px 18px rgba(2,6,18,0.35)"
+                          : "0 8px 18px rgba(15,23,42,0.07)",
                     }}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -2642,6 +2716,7 @@ export default function TilbakemeldingPage() {
                 ) : (
                   filteredNotes.map((note) => {
                     const isSelected = note.id === selectedNoteId;
+                    const noteBackground = getNoteColor(note);
 
                     return (
                       <Paper
@@ -2708,13 +2783,18 @@ export default function TilbakemeldingPage() {
                               : isSelected
                               ? "primary.main"
                               : "divider",
-                          bgcolor: getNoteColor(note),
+                          bgcolor: noteBackground,
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#1A2B40" : theme.palette.text.primary,
                           boxShadow: isSelected ? "0 0 0 1px rgba(25,118,210,0.35)" : "none",
                           transition: "transform 120ms ease, box-shadow 120ms ease",
                           opacity: draggingNoteId === note.id ? 0.55 : 1,
                           "&:hover": {
                             transform: "translateY(-2px)",
-                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                            boxShadow: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "0 10px 26px rgba(2,6,18,0.42)"
+                                : "0 8px 24px rgba(0,0,0,0.12)",
                           },
                         }}
                       >
@@ -2730,7 +2810,13 @@ export default function TilbakemeldingPage() {
                             {note.title || "Uten tittel"}
                           </Typography>
                           <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-                            <DragIndicatorIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                            <DragIndicatorIcon
+                              sx={{
+                                fontSize: 18,
+                                color: (theme) =>
+                                  theme.palette.mode === "dark" ? "#516987" : theme.palette.text.secondary,
+                              }}
+                            />
                             <Box
                               component="button"
                               type="button"
@@ -2743,10 +2829,17 @@ export default function TilbakemeldingPage() {
                                 alignItems: "center",
                                 justifyContent: "center",
                                 gap: 0.75,
-                                color: "text.secondary",
+                                color: (theme) =>
+                                  theme.palette.mode === "dark" ? "#253A55" : theme.palette.text.secondary,
                                 border: "1px solid",
-                                borderColor: "divider",
-                                bgcolor: "transparent",
+                                borderColor: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(31,42,58,0.24)"
+                                    : theme.palette.divider,
+                                bgcolor: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(255,255,255,0.48)"
+                                    : "transparent",
                                 px: 1.2,
                                 py: 0.4,
                                 minHeight: 40,
@@ -2755,8 +2848,14 @@ export default function TilbakemeldingPage() {
                                 cursor: "pointer",
                                 transition: "background-color 120ms ease, border-color 120ms ease",
                                 "&:hover": {
-                                  bgcolor: "action.hover",
-                                  borderColor: "text.secondary",
+                                  bgcolor: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "rgba(255,255,255,0.62)"
+                                      : theme.palette.action.hover,
+                                  borderColor: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "rgba(31,42,58,0.35)"
+                                      : theme.palette.text.secondary,
                                 },
                                 "&:focus-visible": {
                                   outline: "2px solid",
@@ -2781,8 +2880,12 @@ export default function TilbakemeldingPage() {
                                   <Typography
                                     key={item.id}
                                     variant="body2"
-                                    color="text.secondary"
-                                    sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                                    sx={{
+                                      color: (theme) =>
+                                        theme.palette.mode === "dark" ? "#334D6A" : theme.palette.text.secondary,
+                                      whiteSpace: "pre-wrap",
+                                      wordBreak: "break-word",
+                                    }}
                                   >
                                     • {item.text}
                                   </Typography>
@@ -2791,7 +2894,15 @@ export default function TilbakemeldingPage() {
 
                             {note.checklistItems.some((item) => item.done) && (
                               <Box sx={{ mt: 0.75 }}>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.25 }}>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: (theme) =>
+                                      theme.palette.mode === "dark" ? "#425E7C" : theme.palette.text.secondary,
+                                    display: "block",
+                                    mb: 0.25,
+                                  }}
+                                >
                                   Fullført ({note.checklistItems.filter((item) => item.done).length})
                                 </Typography>
                                 {note.checklistItems
@@ -2802,7 +2913,8 @@ export default function TilbakemeldingPage() {
                                       key={item.id}
                                       variant="body2"
                                       sx={{
-                                        color: "text.secondary",
+                                        color: (theme) =>
+                                          theme.palette.mode === "dark" ? "#4A6584" : theme.palette.text.secondary,
                                         textDecoration: "line-through",
                                         whiteSpace: "pre-wrap",
                                         wordBreak: "break-word",
@@ -2817,8 +2929,9 @@ export default function TilbakemeldingPage() {
                         ) : (
                           <Typography
                             variant="body2"
-                            color="text.secondary"
                             sx={{
+                              color: (theme) =>
+                                theme.palette.mode === "dark" ? "#334D6A" : theme.palette.text.secondary,
                               mt: 0.75,
                               whiteSpace: "pre-wrap",
                               wordBreak: "break-word",
@@ -2827,7 +2940,15 @@ export default function TilbakemeldingPage() {
                             {note.content}
                           </Typography>
                         )}
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1.25, display: "block" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#425E7C" : theme.palette.text.secondary,
+                            mt: 1.25,
+                            display: "block",
+                          }}
+                        >
                           Oppdatert: {formatDateTime(note.updatedAtMs)}
                         </Typography>
                       </Paper>
@@ -2855,7 +2976,10 @@ export default function TilbakemeldingPage() {
             px: 2,
             py: 0.75,
             alignItems: "center",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 14px 32px rgba(2,6,18,0.58)"
+                : "0 10px 30px rgba(0,0,0,0.18)",
           }}
         >
           {copyToast?.message ?? ""}
@@ -3049,16 +3173,34 @@ export default function TilbakemeldingPage() {
                     height: 26,
                     p: 0,
                     border: "1px solid",
-                    borderColor: isActive ? "text.primary" : "rgba(15,23,42,0.22)",
+                    borderColor: (theme) =>
+                      isActive
+                        ? theme.palette.text.primary
+                        : theme.palette.mode === "dark"
+                          ? "rgba(165,177,198,0.38)"
+                          : "rgba(15,23,42,0.22)",
                     bgcolor: color,
-                    boxShadow: isActive ? "0 0 0 2px rgba(15,23,42,0.18)" : "none",
+                    boxShadow: (theme) =>
+                      isActive
+                        ? theme.palette.mode === "dark"
+                          ? "0 0 0 2px rgba(165,177,198,0.34)"
+                          : "0 0 0 2px rgba(15,23,42,0.18)"
+                        : "none",
                     "&:hover": {
                       transform: "scale(1.08)",
                       borderColor: "text.primary",
                     },
                   }}
                 >
-                  {isActive && <CheckIcon sx={{ fontSize: 16, color: "rgba(15,23,42,0.86)" }} />}
+                  {isActive && (
+                    <CheckIcon
+                      sx={{
+                        fontSize: 16,
+                        color: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(248,250,252,0.94)" : "rgba(15,23,42,0.86)",
+                      }}
+                    />
+                  )}
                 </IconButton>
               );
             })}

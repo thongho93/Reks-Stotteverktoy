@@ -389,22 +389,13 @@ export default function StandardTekstPage() {
     "XX, farmasøyt\n" +
     "Farmasiet";
 
-  // For auto-focus glow effect on preparat / standardtekst search inputs
-  const [autoFocusGlowTarget, setAutoFocusGlowTarget] = useState<"standard" | "preparat" | null>(
-    null,
-  );
-
-  const triggerGlow = (target: "standard" | "preparat") => {
-    setAutoFocusGlowTarget(target);
-    window.setTimeout(() => setAutoFocusGlowTarget(null), 1000);
-  };
-
   // Hotkeys for preparat search focus/clearing and standardtekster search focus
   useStandardTekstHotkeys({
     preparatRows,
     clearPreparats,
     preparatSearchInputRef,
     standardTekstSearchInputRef,
+    isEditing,
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
@@ -1003,7 +994,6 @@ export default function StandardTekstPage() {
         requestAnimationFrame(() => {
           preparatSearchInputRef.current?.focus();
           preparatSearchInputRef.current?.select();
-          triggerGlow("preparat");
         });
       }
     }
@@ -1041,7 +1031,6 @@ export default function StandardTekstPage() {
     requestAnimationFrame(() => {
       standardTekstSearchInputRef.current?.focus();
       standardTekstSearchInputRef.current?.select();
-      triggerGlow("standard");
     });
   }, [loading, selected]);
 
@@ -1612,12 +1601,6 @@ export default function StandardTekstPage() {
         }
       }
 
-      // Focus back to preparat search for fast next use
-      requestAnimationFrame(() => {
-        preparatSearchInputRef.current?.focus();
-        preparatSearchInputRef.current?.select?.();
-      });
-
       return true;
     } catch {
       // Fallback for eldre nettlesere / usikre kontekster
@@ -1664,10 +1647,6 @@ export default function StandardTekstPage() {
           }
         }
 
-        requestAnimationFrame(() => {
-          preparatSearchInputRef.current?.focus();
-          preparatSearchInputRef.current?.select?.();
-        });
         return true;
       } catch {
         // ignore
@@ -1766,14 +1745,7 @@ export default function StandardTekstPage() {
         className={styles.grid}
         style={{ ["--sidebar-width" as any]: `${sidebarWidth}px` }}
       >
-        <Box
-          className={[
-            styles.sidebar,
-            autoFocusGlowTarget === "standard" ? styles.autoFocusGlow : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
+        <Box className={styles.sidebar}>
           <StandardTekstSidebar
             disabled={lockBeforeEdit}
             isAdmin={canManageStandardTekster}
@@ -1837,10 +1809,7 @@ export default function StandardTekstPage() {
               />
             )}
 
-            <Box
-              ref={preparatSectionRef}
-              className={autoFocusGlowTarget === "preparat" ? styles.autoFocusGlow : undefined}
-            >
+            <Box ref={preparatSectionRef}>
               <PreparatPanel
                 preparatRows={preparatRows}
                 clearOnCopy={clearOnCopy}
@@ -2385,8 +2354,7 @@ export default function StandardTekstPage() {
           sx={{ display: "flex", alignItems: "center" }}
         >
           <span className={styles.preparatHintKeys}>
-            <span className={styles.preparatHintKeyLabel}>Søk tekst:</span> Ctrl+S ·{" "}
-            <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl+Shift+F ·{" "}
+            <span className={styles.preparatHintKeyLabel}>Søk preparat:</span> Ctrl + S ·{" "}
             <span className={styles.preparatHintKeyLabel}>Tøm:</span> Escape
           </span>
         </Typography>
@@ -2435,7 +2403,10 @@ export default function StandardTekstPage() {
             px: 2,
             py: 0.75,
             alignItems: "center",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 14px 34px rgba(2,6,18,0.56)"
+                : "0 10px 30px rgba(0,0,0,0.18)",
           }}
         >
           Standardtekst kopiert

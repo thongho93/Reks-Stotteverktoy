@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -174,7 +174,7 @@ const getNumericClipboardValue = (value: string): string => {
   const compact = String(value ?? "")
     .trim()
     .replace(/\s+/g, "");
-  return /^\d+$/.test(compact) ? compact : "";
+  return /^\d{3,6}$/.test(compact) ? compact : "";
 };
 
 const normalizeStrengthComparable = (value: string) =>
@@ -553,6 +553,8 @@ export default function MedicationSearch({
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const lastObservedClipboardDigitsRef = useRef("");
   const lastAutoFilledQueryRef = useRef("");
+  const clipboardReadBlockedRef = useRef(false);
+  const clipboardReadInFlightRef = useRef(false);
 
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const effectiveInputRef = inputRef ?? internalInputRef;
@@ -586,6 +588,42 @@ export default function MedicationSearch({
   useEffect(() => {
     queryRef.current = query;
   }, [query]);
+
+  const maybeAutofillFromClipboard = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = Boolean(opts?.force);
+      if (!autoPasteNumericClipboard) return;
+      if (!force && !isInputFocused) return;
+      if (typeof navigator === "undefined") return;
+      if (!navigator.clipboard || typeof navigator.clipboard.readText !== "function") return;
+      if (clipboardReadInFlightRef.current || clipboardReadBlockedRef.current) return;
+
+      clipboardReadInFlightRef.current = true;
+      try {
+        const raw = await navigator.clipboard.readText();
+        const digits = getNumericClipboardValue(raw);
+        if (!digits) return;
+        if (digits === lastObservedClipboardDigitsRef.current) return;
+
+        // Ikke overstyr manuelt skrevet søk.
+        const currentQuery = queryRef.current;
+        const canOverwrite = !currentQuery.trim() || currentQuery === lastAutoFilledQueryRef.current;
+        if (!canOverwrite) return;
+
+        lastObservedClipboardDigitsRef.current = digits;
+        lastAutoFilledQueryRef.current = digits;
+        setQuery(digits);
+        setOpen(!isLoadingData && !loadError);
+      } catch {
+        // Clipboard-read kan være blokkert av browser policy.
+        // Unngå spam av exceptions mens feltet er aktivt.
+        clipboardReadBlockedRef.current = true;
+      } finally {
+        clipboardReadInFlightRef.current = false;
+      }
+    },
+    [autoPasteNumericClipboard, isInputFocused, isLoadingData, loadError],
+  );
 
   const results = useMemo(() => {
     const tokens = toTokens(deferredQuery);
@@ -996,49 +1034,20 @@ export default function MedicationSearch({
   useEffect(() => {
     if (!autoPasteNumericClipboard) return;
     if (!isInputFocused) return;
-    if (typeof navigator === "undefined") return;
-    if (!navigator.clipboard || typeof navigator.clipboard.readText !== "function") return;
 
     let cancelled = false;
-    let inFlight = false;
-    let blocked = false;
-
-    const maybeAutofillFromClipboard = async () => {
-      if (cancelled || inFlight || blocked) return;
-      inFlight = true;
-      try {
-        const raw = await navigator.clipboard.readText();
-        if (cancelled) return;
-
-        const digits = getNumericClipboardValue(raw);
-        if (!digits) return;
-        if (digits === lastObservedClipboardDigitsRef.current) return;
-
-        // Ikke overstyr manuelt skrevet søk.
-        const currentQuery = queryRef.current;
-        const canOverwrite = !currentQuery.trim() || currentQuery === lastAutoFilledQueryRef.current;
-        if (!canOverwrite) return;
-
-        lastObservedClipboardDigitsRef.current = digits;
-        lastAutoFilledQueryRef.current = digits;
-        setQuery(digits);
-        setOpen(!isLoadingData && !loadError);
-      } catch {
-        // Clipboard-read kan være blokkert av browser policy.
-        // Unngå spam av exceptions mens feltet er aktivt.
-        blocked = true;
-      } finally {
-        inFlight = false;
-      }
+    const safeAttempt = () => {
+      if (cancelled) return;
+      void maybeAutofillFromClipboard();
     };
 
-    void maybeAutofillFromClipboard();
+    safeAttempt();
     const intervalId = window.setInterval(() => {
-      void maybeAutofillFromClipboard();
+      safeAttempt();
     }, 650);
 
     const onWindowFocus = () => {
-      void maybeAutofillFromClipboard();
+      safeAttempt();
     };
 
     window.addEventListener("focus", onWindowFocus);
@@ -1048,7 +1057,7 @@ export default function MedicationSearch({
       window.clearInterval(intervalId);
       window.removeEventListener("focus", onWindowFocus);
     };
-  }, [autoPasteNumericClipboard, isInputFocused, isLoadingData, loadError]);
+  }, [autoPasteNumericClipboard, isInputFocused, maybeAutofillFromClipboard]);
 
   return (
     <Box>
@@ -1069,8 +1078,14 @@ export default function MedicationSearch({
           // Clear the field on focus to make it ready for a new search
           if (query) {
             setQuery("");
+            queryRef.current = "";
           }
           setOpen(false);
+          // Allow same clipboard digits to auto-fill again after re-focusing the field.
+          lastObservedClipboardDigitsRef.current = "";
+          // New user action: retry clipboard-read even if previous attempt was blocked.
+          clipboardReadBlockedRef.current = false;
+          void maybeAutofillFromClipboard({ force: true });
         }}
         onBlur={() => {
           setIsInputFocused(false);

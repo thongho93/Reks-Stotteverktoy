@@ -908,3 +908,181 @@
     0 0 0 1px rgba(185, 130, 154, 0.25),
     0 0 16px 6px rgba(185, 130, 154, 0.35);
 }
+
+.profileThemeToggleItem {
+  gap: 8px;
+}
+
+:global([data-app-theme="dark"]) .headerLinkButton {
+  color: #d9e2f2 !important;
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(35, 44, 58, 0.88);
+}
+
+:global([data-app-theme="dark"]) .headerLinkButton:hover {
+  background: rgba(45, 55, 72, 0.92) !important;
+  border-color: rgba(165, 177, 198, 0.58);
+}
+
+:global([data-app-theme="dark"]) .sidebar {
+  border-color: rgba(165, 177, 198, 0.24) !important;
+  background: rgba(20, 27, 37, 0.98);
+  box-shadow: 0 14px 36px rgba(2, 6, 18, 0.38);
+}
+
+:global([data-app-theme="dark"]) .sidebarHeader {
+  background: rgba(26, 34, 46, 0.98);
+  border-bottom-color: rgba(165, 177, 198, 0.2);
+}
+
+:global([data-app-theme="dark"]) .sidebarItem {
+  border-color: rgba(165, 177, 198, 0.2);
+}
+
+:global([data-app-theme="dark"]) .sidebarItem:hover {
+  box-shadow: 0 4px 10px rgba(2, 6, 18, 0.36);
+}
+
+:global([data-app-theme="dark"]) .sidebarResizeHandle::before {
+  background: rgba(165, 177, 198, 0.3);
+}
+
+:global([data-app-theme="dark"]) .sidebarResizeHandle::after {
+  background: rgba(123, 137, 157, 0.75);
+  box-shadow: 0 1px 6px rgba(2, 6, 18, 0.52);
+}
+
+:global([data-app-theme="dark"]) .preparatPaper {
+  border-color: rgba(165, 177, 198, 0.26) !important;
+  background: rgba(20, 27, 37, 0.98);
+  box-shadow: 0 14px 30px rgba(2, 6, 18, 0.34);
+}
+
+:global([data-app-theme="dark"]) .contentPaper {
+  border-color: rgba(165, 177, 198, 0.24);
+  background: rgba(20, 27, 37, 0.98);
+  box-shadow: 0 18px 42px rgba(2, 6, 18, 0.4);
+}
+
+:global([data-app-theme="dark"]) .contentPaper::before {
+  background: rgba(121, 137, 163, 0.52);
+}
+
+:global([data-app-theme="dark"]) .headerRightWrap {
+  border-color: rgba(148, 163, 184, 0.34);
+  border-left-color: rgba(148, 163, 184, 0.62);
+  background: rgba(28, 37, 51, 0.96);
+  box-shadow: 0 8px 20px rgba(2, 6, 18, 0.32);
+}
+
+:global([data-app-theme="dark"]) .headerRightWrap::before,
+:global([data-app-theme="dark"]) .headerRightWrap::after {
+  display: none;
+}
+
+:global([data-app-theme="dark"]) .followUpChip {
+  border-color: rgba(148, 163, 184, 0.46) !important;
+  background: rgba(24, 32, 45, 0.98) !important;
+  box-shadow: 0 1px 2px rgba(2, 6, 18, 0.35);
+}
+
+:global([data-app-theme="dark"]) .followUpChip :global(.MuiChip-icon) {
+  color: #aab4c8;
+}
+
+:global([data-app-theme="dark"]) .followUpChip:hover {
+  border-color: rgba(165, 177, 198, 0.62) !important;
+  background: rgba(30, 39, 53, 0.98) !important;
+  box-shadow: 0 8px 16px rgba(2, 6, 18, 0.28);
+}
+
+:global([data-app-theme="dark"]) .body {
+  color: var(--app-text-strong);
+}
+
+:global([data-app-theme="dark"]) .metaText {
+  color: var(--app-text-muted);
+}
+
+:global([data-app-theme="dark"]) .sidebarBody::-webkit-scrollbar-thumb {
+  background: rgba(123, 137, 157, 0.6);
+  background-clip: content-box;
+}
+
+:global([data-app-theme="dark"]) .preparatClearButton {
+  background: rgba(165, 177, 198, 0.12);
+}
+
+:global([data-app-theme="dark"]) .preparatChip {
+  border-color: rgba(165, 177, 198, 0.4) !important;
+  background: rgba(30, 39, 53, 0.98) !important;
+  box-shadow: 0 1px 2px rgba(2, 6, 18, 0.42);
+}
+
+:global([data-app-theme="dark"]) .preparatToggleRow {
+  border-color: rgba(165, 177, 198, 0.3);
+  background: rgba(27, 36, 50, 0.98);
+}
+
+:global([data-app-theme="dark"]) .preparatToggleRow :global(.MuiFormControlLabel-root) {
+  border-color: rgba(165, 177, 198, 0.36);
+  background: rgba(31, 40, 56, 0.98);
+}
+
+:global([data-app-theme="dark"]) .preparatToggleRow :global(.MuiTypography-caption) {
+  color: var(--app-text-strong);
+}
+
+:global([data-app-theme="dark"]) .inputControlCard {
+  border-color: rgba(165, 177, 198, 0.36) !important;
+  background: rgba(27, 36, 50, 0.98) !important;
+  box-shadow: 0 1px 2px rgba(2, 6, 18, 0.35);
+}
+
+:global([data-app-theme="dark"]) .timeDateCard {
+  border-color: rgba(165, 177, 198, 0.4) !important;
+  background: rgba(31, 40, 56, 0.98) !important;
+  box-shadow:
+    0 1px 2px rgba(2, 6, 18, 0.28),
+    0 8px 16px rgba(2, 6, 18, 0.24);
+}
+
+:global([data-app-theme="dark"]) .profileIconButton:hover {
+  background: rgba(165, 177, 198, 0.14);
+}
+
+:global([data-app-theme="dark"]) .profileAvatar,
+:global([data-app-theme="dark"]) .profileMenuAvatarSmall {
+  color: #fce7f3;
+  background: linear-gradient(180deg, rgba(230, 165, 190, 0.92) 0%, rgba(208, 129, 159, 0.92) 100%);
+}
+
+:global([data-app-theme="dark"]) .profileMenuPaper {
+  border: 1px solid rgba(165, 177, 198, 0.22);
+  box-shadow: 0 22px 46px rgba(2, 6, 18, 0.62);
+}
+
+:global([data-app-theme="dark"]) .profileMenuRolePill {
+  background: rgba(230, 165, 190, 0.22);
+  color: #ffd6e5;
+}
+
+:global([data-app-theme="dark"]) .profileMenuEmail {
+  opacity: 0.84;
+}
+
+:global([data-app-theme="dark"]) .profileMenuLogout:hover {
+  background: rgba(165, 177, 198, 0.14);
+}
+
+:global([data-app-theme="dark"]) .autoFocusGlow :global(.MuiOutlinedInput-root) {
+  box-shadow:
+    0 0 0 1px rgba(230, 165, 190, 0.28),
+    0 0 12px 3px rgba(230, 165, 190, 0.3);
+}
+
+:global([data-app-theme="dark"]) .autoFocusGlow :global(.MuiOutlinedInput-root.Mui-focused) {
+  box-shadow:
+    0 0 0 1px rgba(230, 165, 190, 0.36),
+    0 0 16px 6px rgba(230, 165, 190, 0.4);
+}

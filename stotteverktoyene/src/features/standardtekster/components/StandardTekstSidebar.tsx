@@ -181,17 +181,26 @@ function TruncatedTitle({ title }: { title: string }) {
       disableHoverListener={!isTruncated}
       slotProps={{
         tooltip: {
-          sx: {
-            backgroundColor: "rgba(32, 32, 32, 0.95)",
-            color: "#fff",
+          sx: (theme) => ({
+            backgroundColor:
+              theme.palette.mode === "dark"
+                ? "rgba(230, 237, 250, 0.95)"
+                : "rgba(32, 32, 32, 0.95)",
+            color: theme.palette.mode === "dark" ? "#0f1622" : "#fff",
             fontSize: 13,
-            boxShadow: "0 6px 18px rgba(0,0,0,0.45)",
-          },
+            boxShadow:
+              theme.palette.mode === "dark"
+                ? "0 8px 22px rgba(2,6,18,0.38)"
+                : "0 6px 18px rgba(0,0,0,0.45)",
+          }),
         },
         arrow: {
-          sx: {
-            color: "rgba(32, 32, 32, 0.95)",
-          },
+          sx: (theme) => ({
+            color:
+              theme.palette.mode === "dark"
+                ? "rgba(230, 237, 250, 0.95)"
+                : "rgba(32, 32, 32, 0.95)",
+          }),
         },
       }}
     >
@@ -663,12 +672,21 @@ export default function StandardTekstSidebar({
                   disabled={disabled || groupedByCategory.length === 0}
                   sx={{
                     border: "1px solid",
-                    borderColor: "rgba(15, 23, 42, 0.14)",
+                    borderColor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(165, 177, 198, 0.34)"
+                        : "rgba(15, 23, 42, 0.14)",
                     borderRadius: 999,
                     width: 30,
                     height: 30,
-                    bgcolor: "rgba(255,255,255,0.9)",
-                    "&:hover": { bgcolor: "rgba(185, 130, 154, 0.14)", borderColor: "rgba(185,130,154,0.42)" },
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(24, 33, 46, 0.9)"
+                        : "rgba(255,255,255,0.9)",
+                    "&:hover": {
+                      bgcolor: "rgba(185, 130, 154, 0.14)",
+                      borderColor: "rgba(185,130,154,0.42)",
+                    },
                   }}
                 >
                   <UnfoldLessIcon fontSize="small" />
@@ -684,12 +702,21 @@ export default function StandardTekstSidebar({
                   disabled={disabled || groupedByCategory.length === 0}
                   sx={{
                     border: "1px solid",
-                    borderColor: "rgba(15, 23, 42, 0.14)",
+                    borderColor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(165, 177, 198, 0.34)"
+                        : "rgba(15, 23, 42, 0.14)",
                     borderRadius: 999,
                     width: 30,
                     height: 30,
-                    bgcolor: "rgba(255,255,255,0.9)",
-                    "&:hover": { bgcolor: "rgba(185, 130, 154, 0.14)", borderColor: "rgba(185,130,154,0.42)" },
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(24, 33, 46, 0.9)"
+                        : "rgba(255,255,255,0.9)",
+                    "&:hover": {
+                      bgcolor: "rgba(185, 130, 154, 0.14)",
+                      borderColor: "rgba(185,130,154,0.42)",
+                    },
                   }}
                 >
                   <UnfoldMoreIcon fontSize="small" />
@@ -796,7 +823,8 @@ export default function StandardTekstSidebar({
                           mr: 1,
                           bgcolor: getCategoryMarkerColor(group.category, categoryColorMap),
                           flexShrink: 0,
-                          boxShadow: "0 0 0 1px rgba(0,0,0,0.06) inset",
+                          boxShadow: (theme) =>
+                            `0 0 0 1px ${alpha(theme.palette.common.black, theme.palette.mode === "dark" ? 0.22 : 0.06)} inset`,
                         }}
                       />
                       <ListItemText

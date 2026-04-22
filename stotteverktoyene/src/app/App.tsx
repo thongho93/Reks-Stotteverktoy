@@ -213,8 +213,10 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           sx={{
             fontWeight: 800,
             fontSize: collapsed ? 20 : 35,
-            color: "#C05A7A", // mørk rosa
+            color: "primary.main",
             letterSpacing: "0.04em",
+            textShadow: (theme) =>
+              theme.palette.mode === "dark" ? "0 4px 16px rgba(230, 165, 190, 0.22)" : "none",
           }}
         >
           REKS+
