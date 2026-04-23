@@ -6,11 +6,13 @@ import {
   Collapse,
   Container,
   Divider,
+  FormControlLabel,
   IconButton,
   List,
   ListItem,
   ListItemText,
   Paper,
+  Switch,
   Tooltip,
   Typography,
   Table,
@@ -31,15 +33,90 @@ import { alpha } from "@mui/material/styles";
 import styles from "../../../styles/app.module.css";
 
 import { OMEQRow, type OMEQRowValue } from "../components/OMEQRow";
-import { buildProductIndex, parseMedicationInput } from "../lib/parseMedicationInput";
+import {
+  buildProductIndex,
+  parseMedicationInput,
+  type ProductIndexItem,
+} from "../lib/parseMedicationInput";
 import { calculateOMEQ } from "../lib/calc";
 import { OPIOIDS } from "../data/opioids";
+import { formToRoute } from "../data/atcProducts";
 
 type Row = OMEQRowValue & { id: string };
 const OMEQ_STANDARDTEKST_TITLE = "OMEQ overstiger vedtak";
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
 const stripProductNumberSuffix = (value: string) => value.replace(/\s*\(\d+\)\s*$/g, "").trim();
+const normalizeMedicationIdentityText = (value: string) =>
+  value.toLowerCase().replace(/\s+/g, " ").trim();
+const normalizeStrengthIdentity = (
+  strength: ReturnType<typeof parseMedicationInput>["strength"],
+): string | null => {
+  if (!strength) return null;
+
+  const numeric = Number(String(strength.value).replace(",", ".").trim());
+  if (!Number.isFinite(numeric)) return null;
+
+  const unitRaw = String(strength.unit).trim().toLowerCase();
+  const unit = unitRaw === "ug" ? "µg" : unitRaw;
+  const perHourSuffix = strength.perHour ? "/time" : "";
+  return `${numeric}${unit}${perHourSuffix}`;
+};
+const resolveMedicationIdentity = (
+  medicationText: string,
+  productIndex: ProductIndexItem[],
+): {
+  substance: string | null;
+  formulation: string | null;
+  strength: string | null;
+} => {
+  const raw = medicationText.trim();
+  if (!raw) {
+    return {
+      substance: null,
+      formulation: null,
+      strength: null,
+    };
+  }
+
+  const parsed = parseMedicationInput(raw, productIndex);
+  const formulation = parsed.product?.form ? normalizeMedicationIdentityText(parsed.product.form) : null;
+  const route = parsed.product?.form ? formToRoute(parsed.product.form) : undefined;
+  const substance = parsed.product && route
+    ? normalizeMedicationIdentityText(
+        OPIOIDS.find((o) => o.atcCode.includes(parsed.product!.atcCode) && o.route.includes(route))
+          ?.substance ?? "",
+      ) || null
+    : null;
+  const strength = normalizeStrengthIdentity(parsed.strength);
+
+  return { substance, formulation, strength };
+};
+const isDuplicateMedicationEntry = (
+  rows: Row[],
+  rowId: string,
+  medicationText: string,
+  productIndex: ProductIndexItem[],
+) => {
+  const nextIdentity = resolveMedicationIdentity(medicationText, productIndex);
+  if (!nextIdentity.substance || !nextIdentity.formulation || !nextIdentity.strength) return false;
+
+  return rows.some((row) => {
+    if (row.id === rowId) return false;
+    if (!row.medicationText.trim()) return false;
+
+    const existingIdentity = resolveMedicationIdentity(row.medicationText, productIndex);
+
+    return (
+      !!existingIdentity.substance &&
+      !!existingIdentity.formulation &&
+      !!existingIdentity.strength &&
+      nextIdentity.substance === existingIdentity.substance &&
+      nextIdentity.formulation === existingIdentity.formulation &&
+      nextIdentity.strength === existingIdentity.strength
+    );
+  });
+};
 
 const makeRow = (): Row => ({
   id: crypto.randomUUID(),
@@ -53,10 +130,36 @@ export default function OMEQPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
+  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem("omeq.autoPasteNumericClipboard");
+      return raw === "true";
+    } catch {
+      return false;
+    }
+  });
+  const productIndex = useMemo(() => buildProductIndex(), []);
 
-  const setRowById = (id: string, next: OMEQRowValue) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...next } : r)));
-  };
+  const setRowById = useCallback(
+    (id: string, next: OMEQRowValue) => {
+      setRows((prev) => {
+        const existingRow = prev.find((r) => r.id === id);
+        if (!existingRow) return prev;
+
+        const medicationChanged = existingRow.medicationText !== next.medicationText;
+        if (
+          medicationChanged &&
+          next.medicationText.trim() &&
+          isDuplicateMedicationEntry(prev, id, next.medicationText, productIndex)
+        ) {
+          return prev;
+        }
+
+        return prev.map((r) => (r.id === id ? { ...r, ...next } : r));
+      });
+    },
+    [productIndex],
+  );
 
   const addRow = () => {
     const newRow = makeRow();
@@ -97,9 +200,15 @@ export default function OMEQPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [resetAll]);
 
-  const showDividers = useMemo(() => rows.length > 1, [rows.length]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("omeq.autoPasteNumericClipboard", String(autoPasteNumericClipboard));
+    } catch {
+      // ignore
+    }
+  }, [autoPasteNumericClipboard]);
 
-  const productIndex = useMemo(() => buildProductIndex(), []);
+  const showDividers = useMemo(() => rows.length > 1, [rows.length]);
 
   // Always compute a number (0 when nothing is valid), so we can show Total OMEQ even with 1 row
   const totalOmeq = useMemo(() => {
@@ -286,6 +395,20 @@ export default function OMEQPage() {
           >
             {showInfoTable ? "Skjul OMEQ-tabell" : "Vis OMEQ-tabell"}
           </Button>
+
+          <Tooltip title="Når feltet er aktivt, limes kopiert varenummer automatisk inn i preparatfeltet.">
+            <FormControlLabel
+              sx={{ m: 0 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={autoPasteNumericClipboard}
+                  onChange={(e) => setAutoPasteNumericClipboard(e.target.checked)}
+                />
+              }
+              label={<Typography variant="caption">Auto vnr</Typography>}
+            />
+          </Tooltip>
         </Box>
       </Box>
 
@@ -413,6 +536,7 @@ export default function OMEQPage() {
               value={r}
               onChange={(next) => setRowById(r.id, next)}
               autoFocusMedicationInput={idx === 0 || r.id === focusRowId}
+              autoPasteNumericClipboard={autoPasteNumericClipboard}
             />
 
             {idx < rows.length - 1 && showDividers && <Divider sx={{ my: 2 }} />}

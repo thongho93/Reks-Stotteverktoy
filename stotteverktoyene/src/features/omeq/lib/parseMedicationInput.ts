@@ -4,6 +4,7 @@ import type { ProductForm } from "../data/atcProducts";
 
 export interface ProductIndexItem {
   name: string; // visningsnavn (matcher input)
+  manufacturer?: string;
   atcCode: ATCcode;
   form?: ProductForm;
 }
@@ -33,6 +34,7 @@ export const buildProductIndex = (): ProductIndexItem[] => {
     .flatMap(([atcCode, products]) =>
       (products ?? []).map((p) => ({
         name: p.name,
+        manufacturer: p.manufacturer,
         atcCode: atcCode as ATCcode,
         form: p.form,
       }))
@@ -135,6 +137,7 @@ const findByProductNumber = (input: string): VariantHit | null => {
           return {
             product: {
               name: p.name,
+              manufacturer: p.manufacturer,
               atcCode: atcCode as ATCcode,
               form: p.form,
             },
