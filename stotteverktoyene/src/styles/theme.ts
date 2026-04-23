@@ -13,14 +13,14 @@ export function createAppTheme(mode: PaletteMode) {
         main: isDark ? "#96A6BF" : "#6B7280",
       },
       background: {
-        default: isDark ? "#0E131B" : "#F9FAFB",
-        paper: isDark ? "#151C26" : "#FFFFFF",
+        default: isDark ? "#060B12" : "#F9FAFB",
+        paper: isDark ? "#0E1521" : "#FFFFFF",
       },
       text: {
         primary: isDark ? "#EDF3FC" : "#111827",
         secondary: isDark ? "#A5B1C6" : "#4B5563",
       },
-      divider: isDark ? "rgba(165, 177, 198, 0.24)" : "rgba(17, 24, 39, 0.1)",
+      divider: isDark ? "rgba(165, 177, 198, 0.34)" : "rgba(17, 24, 39, 0.1)",
       error: {
         main: isDark ? "#F07178" : "#B91C1C",
       },
@@ -31,8 +31,8 @@ export function createAppTheme(mode: PaletteMode) {
         main: isDark ? "#42C18D" : "#047857",
       },
       action: {
-        hover: isDark ? "rgba(165, 177, 198, 0.08)" : "rgba(17, 24, 39, 0.04)",
-        selected: isDark ? "rgba(230, 165, 190, 0.2)" : "rgba(210, 147, 172, 0.18)",
+        hover: isDark ? "rgba(165, 177, 198, 0.11)" : "rgba(17, 24, 39, 0.04)",
+        selected: isDark ? "rgba(230, 165, 190, 0.24)" : "rgba(210, 147, 172, 0.18)",
       },
     },
 
@@ -83,7 +83,7 @@ export function createAppTheme(mode: PaletteMode) {
       MuiPaper: {
         styleOverrides: {
           root: {
-            border: `1px solid ${alpha(isDark ? "#C7D2E6" : "#111827", isDark ? 0.16 : 0.08)}`,
+            border: `1px solid ${alpha(isDark ? "#C7D2E6" : "#111827", isDark ? 0.2 : 0.08)}`,
             backgroundImage: "none",
           },
         },
@@ -92,8 +92,11 @@ export function createAppTheme(mode: PaletteMode) {
         styleOverrides: {
           paper: {
             backgroundImage: isDark
-              ? "linear-gradient(180deg, rgba(26, 34, 46, 0.98) 0%, rgba(20, 27, 37, 0.98) 100%)"
+              ? "linear-gradient(180deg, rgba(11, 18, 29, 0.99) 0%, rgba(8, 14, 24, 0.99) 100%)"
               : undefined,
+            borderRight: isDark
+              ? "1px solid rgba(165, 177, 198, 0.34)"
+              : "1px solid rgba(17, 24, 39, 0.1)",
           },
         },
       },
@@ -137,6 +140,11 @@ export function createAppTheme(mode: PaletteMode) {
       MuiListItemButton: {
         styleOverrides: {
           root: {
+            "&:hover": {
+              backgroundColor: isDark
+                ? alpha("#E6A5BE", 0.12)
+                : alpha("#D293AC", 0.1),
+            },
             "&.Mui-selected": {
               backgroundColor: isDark
                 ? alpha("#E6A5BE", 0.22)

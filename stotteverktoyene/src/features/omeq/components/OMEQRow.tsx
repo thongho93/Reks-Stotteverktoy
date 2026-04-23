@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Box, InputAdornment, TextField, Tooltip, Typography } from "@mui/material";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 
@@ -19,13 +19,20 @@ interface Props {
   value: OMEQRowValue;
   onChange: (next: OMEQRowValue) => void;
   autoFocusMedicationInput?: boolean;
+  autoPasteNumericClipboard?: boolean;
 }
 
-export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) => {
+export const OMEQRow = ({
+  value,
+  onChange,
+  autoFocusMedicationInput,
+  autoPasteNumericClipboard,
+}: Props) => {
   const productIndex = useMemo(() => buildProductIndex(), []);
 
   const doseInputRef = useRef<HTMLInputElement | null>(null);
   const prevSelectedProductKeyRef = useRef<string>("");
+  const autoVnrFocusRequestedRef = useRef(false);
 
   const parsed = useMemo(
     () => parseMedicationInput(value.medicationText, productIndex),
@@ -67,6 +74,24 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
     prevSelectedProductKeyRef.current = key;
 
     // Wait a tick so MUI input is mounted/updated before focusing
+    requestAnimationFrame(() => {
+      doseInputRef.current?.focus();
+      doseInputRef.current?.select?.();
+    });
+  }, [parsed.product, isPatch]);
+
+  const requestDoseFocusFromAutoVnr = useCallback(() => {
+    autoVnrFocusRequestedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!autoVnrFocusRequestedRef.current) return;
+    if (!parsed.product) return;
+
+    // Request is consumed once product is resolved from the pasted varenummer.
+    autoVnrFocusRequestedRef.current = false;
+    if (isPatch) return;
+
     requestAnimationFrame(() => {
       doseInputRef.current?.focus();
       doseInputRef.current?.select?.();
@@ -241,6 +266,8 @@ export const OMEQRow = ({ value, onChange, autoFocusMedicationInput }: Props) =>
           value={value.medicationText}
           onChange={(text) => onChange({ ...value, medicationText: text })}
           autoFocus={autoFocusMedicationInput}
+          autoPasteNumericClipboard={autoPasteNumericClipboard}
+          onAutoPastedVnr={requestDoseFocusFromAutoVnr}
         />
       </Box>
 

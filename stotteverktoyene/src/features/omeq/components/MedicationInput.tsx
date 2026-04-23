@@ -8,6 +8,8 @@ interface MedicationInputProps {
   value: string;
   onChange: (value: string) => void;
   autoFocus?: boolean;
+  autoPasteNumericClipboard?: boolean;
+  onAutoPastedVnr?: () => void;
 }
 
 type SuggestionOption = {
@@ -74,11 +76,32 @@ const getFilteredOptions = (
   return [...starts, ...contains].slice(0, 25);
 };
 
-export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputProps) => {
+const getNumericClipboardValue = (value: string): string => {
+  const compact = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "");
+
+  return /^\d{5,7}$/.test(compact) ? compact : "";
+};
+
+export const MedicationInput = ({
+  value,
+  onChange,
+  autoFocus,
+  autoPasteNumericClipboard = false,
+  onAutoPastedVnr,
+}: MedicationInputProps) => {
   const productIndex = useMemo(() => buildProductIndex(), []);
   const [open, setOpen] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   const inputElRef = useRef<HTMLInputElement | null>(null);
+  const valueRef = useRef(value);
+  const lastObservedClipboardDigitsRef = useRef("");
+  const lastAutoFilledDigitsRef = useRef("");
+  const pendingAutoPastedRef = useRef<{ digits: string; previousValue: string } | null>(null);
+  const clipboardReadBlockedRef = useRef(false);
+  const clipboardReadInFlightRef = useRef(false);
 
   const wireInputRef = useCallback((node: HTMLInputElement | null, muiInputRef?: any) => {
     inputElRef.current = node;
@@ -101,6 +124,10 @@ export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputP
       inputElRef.current?.select?.();
     });
   }, [autoFocus]);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   const options = useMemo<SuggestionOption[]>(() => {
     return Object.values(ATC_PRODUCTS)
@@ -256,6 +283,115 @@ export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputP
     lastAutoSelectedRef.current = null;
   }, [isPureVarenummerInput, isExactOptionSelected, onChange, options, productByVarenummer, value]);
 
+  const maybeAutofillFromClipboard = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = Boolean(opts?.force);
+      if (!autoPasteNumericClipboard) return;
+      if (!force && !isInputFocused) return;
+      if (typeof navigator === "undefined") return;
+      if (!navigator.clipboard || typeof navigator.clipboard.readText !== "function") return;
+      if (clipboardReadInFlightRef.current || clipboardReadBlockedRef.current) return;
+
+      clipboardReadInFlightRef.current = true;
+      try {
+        const raw = await navigator.clipboard.readText();
+        const digits = getNumericClipboardValue(raw);
+        if (!digits) return;
+        if (digits === lastObservedClipboardDigitsRef.current) return;
+
+        const normalizedDigits = digits.replace(/^0+/, "") || "0";
+        const hasProductMatch = productByVarenummer.has(normalizedDigits);
+        const hasOptionMatch = options.some((o) => {
+          const m = o.label.match(/\((\d+)\)\s*$/);
+          return m?.[1] === normalizedDigits;
+        });
+
+        if (!hasProductMatch && !hasOptionMatch) {
+          // Ingen treff for kopiert varenummer:
+          // behold feltet tomt og vent til clipboard får nytt tall.
+          lastObservedClipboardDigitsRef.current = digits;
+          pendingAutoPastedRef.current = null;
+          setOpen(false);
+          return;
+        }
+
+        // Ikke overstyr manuelt skrevet tekst.
+        const currentValue = valueRef.current.trim();
+        const canOverwrite =
+          !currentValue || currentValue === lastAutoFilledDigitsRef.current || /^0*\d+$/.test(currentValue);
+        if (!canOverwrite) return;
+
+        lastObservedClipboardDigitsRef.current = digits;
+        lastAutoFilledDigitsRef.current = normalizedDigits;
+        pendingAutoPastedRef.current = { digits: normalizedDigits, previousValue: currentValue };
+        onChange(normalizedDigits);
+        setOpen(false);
+      } catch {
+        // Clipboard-read kan være blokkert av browser policy.
+        clipboardReadBlockedRef.current = true;
+      } finally {
+        clipboardReadInFlightRef.current = false;
+      }
+    },
+    [autoPasteNumericClipboard, isInputFocused, onChange, options, productByVarenummer],
+  );
+
+  useEffect(() => {
+    const pending = pendingAutoPastedRef.current;
+    if (!pending) return;
+
+    // Verdien ble ikke oppdatert (f.eks. avvist av duplikat-sperre).
+    if (value.trim() === pending.previousValue) {
+      pendingAutoPastedRef.current = null;
+      return;
+    }
+
+    // Hvis verdien ble avvist (f.eks. duplikat-sperre), dropp pending-flagget.
+    if (!value.trim()) {
+      pendingAutoPastedRef.current = null;
+      return;
+    }
+
+    if (!resolvedProduct) return;
+
+    const currentDigits = value.trim().match(/^0*(\d+)/)?.[1] ?? null;
+    const hasPendingDigits =
+      currentDigits === pending.digits || value.includes(`(${pending.digits})`);
+
+    if (!hasPendingDigits) return;
+
+    pendingAutoPastedRef.current = null;
+    onAutoPastedVnr?.();
+  }, [onAutoPastedVnr, resolvedProduct, value]);
+
+  useEffect(() => {
+    if (!autoPasteNumericClipboard) return;
+    if (!isInputFocused) return;
+
+    let cancelled = false;
+    const safeAttempt = () => {
+      if (cancelled) return;
+      void maybeAutofillFromClipboard();
+    };
+
+    safeAttempt();
+    const intervalId = window.setInterval(() => {
+      safeAttempt();
+    }, 650);
+
+    const onWindowFocus = () => {
+      safeAttempt();
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onWindowFocus);
+    };
+  }, [autoPasteNumericClipboard, isInputFocused, maybeAutofillFromClipboard]);
+
   return (
     <Box className="medicationInput">
       <Autocomplete
@@ -288,6 +424,21 @@ export const MedicationInput = ({ value, onChange, autoFocus }: MedicationInputP
             fullWidth
             inputProps={{
               ...params.inputProps,
+              onFocus: (e) => {
+                setIsInputFocused(true);
+                // New user action: retry clipboard-read even if previous attempt was blocked.
+                clipboardReadBlockedRef.current = false;
+                // Allow same clipboard digits to auto-fill again after re-focusing the field.
+                lastObservedClipboardDigitsRef.current = "";
+                void maybeAutofillFromClipboard({ force: true });
+                // @ts-expect-error: MUI inputProps typing doesn't always include onFocus
+                params.inputProps?.onFocus?.(e);
+              },
+              onBlur: (e) => {
+                setIsInputFocused(false);
+                // @ts-expect-error: MUI inputProps typing doesn't always include onBlur
+                params.inputProps?.onBlur?.(e);
+              },
               onKeyDown: (e) => {
                 // Prevent full page reload / form submit when pressing Enter in this field.
                 // BUT allow Enter to select an option when the Autocomplete popup is open.

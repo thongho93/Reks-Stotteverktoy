@@ -189,6 +189,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           width,
           boxSizing: "border-box",
           overflowX: "hidden",
+          overflowY: "hidden",
           transition: "width 180ms ease",
           display: "flex",
           flexDirection: "column",
@@ -239,7 +240,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
       <Divider />
 
-      <List>
+      <List sx={{ py: 0.5 }}>
         {mainItems.map((item, index) => (
           <React.Fragment key={item.path}>
             <Tooltip title={collapsed ? item.label : ""} placement="right">
@@ -252,7 +253,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                 sx={{
                   justifyContent: collapsed ? "center" : "flex-start",
                   px: collapsed ? 1 : 2,
-                  py: collapsed ? 1.8 : 1.2,
+                  py: collapsed ? 0.85 : 0.95,
+                  minHeight: collapsed ? 58 : 48,
                 }}
               >
                 <ListItemIcon
@@ -265,7 +267,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                     color: item.color,
                   }}
                 >
-                  <item.Icon sx={{ fontSize: collapsed ? 45 : 35 }} />
+                  <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
                 </ListItemIcon>
                 {!collapsed && <ListItemText primary={item.label} />}
               </ListItemButton>
@@ -309,6 +311,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                   sx={{
                     justifyContent: collapsed ? "center" : "flex-start",
                     px: collapsed ? 1 : 2,
+                    py: collapsed ? 0.85 : 0.95,
+                    minHeight: collapsed ? 58 : 48,
                   }}
                 >
                   <ListItemIcon
@@ -321,7 +325,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       color: item.color,
                     }}
                   >
-                    <item.Icon sx={{ fontSize: collapsed ? 45 : 35 }} />
+                    <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
                   </ListItemIcon>
                   {!collapsed && <ListItemText primary={item.label} />}
                 </ListItemButton>
@@ -336,7 +340,11 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         sx={{
           display: "flex",
           justifyContent: "center",
-          py: 1.5,
+          py: 0.75,
+          "& .MuiAvatar-root": {
+            width: collapsed ? 54 : 58,
+            height: collapsed ? 54 : 58,
+          },
         }}
       >
         <ProfileMenu />

@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -44,6 +45,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutline";
 import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
+import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
@@ -54,6 +56,8 @@ const MELDESKJEMA_RESPONSES_URL =
   "https://docs.google.com/forms/d/1dQq_pvU1lXf295odpYPWXs0_zX693iLbKxSFfNS3sAQ/edit#responses";
 const SHARED_ROUTINES_COLLECTION = "sharedRoutines";
 const SHARED_ROUTINES_DOC_ID = "global";
+const ROUTINE_TAB_QUERY_KEY = "tab";
+const ROUTINE_DOC_QUERY_KEY = "rutine";
 const ROUTINE_TEXT_STYLE_OPTIONS = [
   { value: "p", label: "Normal tekst" },
   { value: "h1", label: "Tittel" },
@@ -111,6 +115,9 @@ type RoutineDocument = {
   id: string;
   title: string;
   content: string;
+  updatedAtMs: number;
+  updatedByUid?: string | null;
+  updatedByName?: string | null;
   parentId?: string | null;
   emoji?: string | null;
 };
@@ -122,6 +129,13 @@ type RoutineEmojiOption = {
   label: string;
   keywords: string[];
   category: RoutineEmojiCategory;
+};
+type RoutineSearchOption = {
+  id: string;
+  docId: string;
+  title: string;
+  matchType: "title" | "content";
+  snippet: string;
 };
 
 const ROUTINE_EMOJI_OPTIONS: RoutineEmojiOption[] = [
@@ -336,6 +350,89 @@ function formatDateTime(ms: number): string {
   });
 }
 
+function extractTextFromHtml(html: string): string {
+  if (!html) return "";
+  if (typeof window === "undefined") {
+    return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  return (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildRoutineMatchSnippet(text: string, query: string): string {
+  const source = text.replace(/\s+/g, " ").trim();
+  if (!source) return "";
+  const normalizedQuery = query.trim().toLocaleLowerCase("nb-NO");
+  if (!normalizedQuery) return source.slice(0, 120);
+
+  const lower = source.toLocaleLowerCase("nb-NO");
+  const index = lower.indexOf(normalizedQuery);
+  if (index < 0) return source.slice(0, 120);
+
+  let sentenceStart = index;
+  while (sentenceStart > 0 && !/[.!?]/.test(source[sentenceStart - 1])) {
+    sentenceStart -= 1;
+  }
+
+  let sentenceEnd = index + normalizedQuery.length;
+  while (sentenceEnd < source.length && !/[.!?]/.test(source[sentenceEnd])) {
+    sentenceEnd += 1;
+  }
+  if (sentenceEnd < source.length) sentenceEnd += 1;
+
+  let snippet = source.slice(sentenceStart, sentenceEnd).trim();
+  if (!snippet) snippet = source.slice(Math.max(0, index - 48), Math.min(source.length, index + normalizedQuery.length + 68)).trim();
+
+  const tooLong = snippet.length > 180;
+  if (tooLong) {
+    const localMatch = snippet.toLocaleLowerCase("nb-NO").indexOf(normalizedQuery);
+    const fallbackStart = Math.max(0, localMatch - 42);
+    const fallbackEnd = Math.min(snippet.length, localMatch + normalizedQuery.length + 72);
+    const prefix = fallbackStart > 0 ? "..." : "";
+    const suffix = fallbackEnd < snippet.length ? "..." : "";
+    return `${prefix}${snippet.slice(fallbackStart, fallbackEnd)}${suffix}`;
+  }
+
+  const prefix = sentenceStart > 0 ? "..." : "";
+  const suffix = sentenceEnd < source.length ? "..." : "";
+  return `${prefix}${snippet}${suffix}`;
+}
+
+function renderHighlightedText(text: string, query: string): React.ReactNode {
+  const value = String(text ?? "");
+  const search = query.trim();
+  if (!search) return value;
+
+  const pattern = new RegExp(`(${escapeRegExp(search)})`, "gi");
+  const parts = value.split(pattern);
+  if (parts.length === 1) return value;
+  const normalized = search.toLocaleLowerCase("nb-NO");
+
+  return parts.map((part, index) => {
+    const isMatch = part.toLocaleLowerCase("nb-NO") === normalized;
+    if (!isMatch) return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+    return (
+      <Box
+        key={`${part}-${index}`}
+        component="mark"
+        sx={{
+          px: 0.35,
+          borderRadius: 0.6,
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(251,191,36,0.24)" : "rgba(250,204,21,0.35)"),
+          color: "inherit",
+        }}
+      >
+        {part}
+      </Box>
+    );
+  });
+}
+
 function isValidNoteColor(value: unknown): value is string {
   return typeof value === "string" && KEEP_CARD_COLORS.includes(value);
 }
@@ -495,8 +592,24 @@ function mapFirebaseError(error: unknown, fallback: string): string {
 }
 
 export default function TilbakemeldingPage() {
-  const { user, isOwner } = useAuthUser();
-  const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">("notater");
+  const initialRouteState = React.useMemo(() => {
+    if (typeof window === "undefined") {
+      return { initialTab: "notater" as "meldeskjema" | "rutiner" | "notater", routineDocId: null as string | null };
+    }
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get(ROUTINE_TAB_QUERY_KEY);
+    const routineDocId = (params.get(ROUTINE_DOC_QUERY_KEY) ?? "").trim() || null;
+    const initialTab: "meldeskjema" | "rutiner" | "notater" =
+      tabParam === "meldeskjema" || tabParam === "rutiner" || tabParam === "notater"
+        ? tabParam
+        : routineDocId
+          ? "rutiner"
+          : "notater";
+    return { initialTab, routineDocId };
+  }, []);
+
+  const { user, isOwner, firstName } = useAuthUser();
+  const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">(initialRouteState.initialTab);
 
   const [savedNotesList, setSavedNotesList] = React.useState<PrivateNote[]>([]);
   const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
@@ -515,12 +628,18 @@ export default function TilbakemeldingPage() {
   const [routineFontFamily, setRoutineFontFamily] = React.useState<(typeof ROUTINE_FONT_OPTIONS)[number]>("Arial");
   const [routineTextColor, setRoutineTextColor] = React.useState("#111827");
   const [routineColorAnchorEl, setRoutineColorAnchorEl] = React.useState<HTMLElement | null>(null);
+  const [routineLinkAnchorEl, setRoutineLinkAnchorEl] = React.useState<HTMLElement | null>(null);
+  const [routineLinkLabel, setRoutineLinkLabel] = React.useState("");
+  const [routineLinkUrl, setRoutineLinkUrl] = React.useState("");
+  const [routineLinkError, setRoutineLinkError] = React.useState<string | null>(null);
   const [routineDocMenuAnchorEl, setRoutineDocMenuAnchorEl] = React.useState<HTMLElement | null>(null);
   const [routineDocMenuTargetId, setRoutineDocMenuTargetId] = React.useState<string | null>(null);
   const [routineEmojiPickerAnchorEl, setRoutineEmojiPickerAnchorEl] = React.useState<HTMLElement | null>(null);
   const [routineEmojiPickerTargetId, setRoutineEmojiPickerTargetId] = React.useState<string | null>(null);
   const [routineEmojiQuery, setRoutineEmojiQuery] = React.useState("");
   const [routineEmojiCategory, setRoutineEmojiCategory] = React.useState<RoutineEmojiCategory>("smileys");
+  const [routineSearchQuery, setRoutineSearchQuery] = React.useState("");
+  const [routineUserNameByUid, setRoutineUserNameByUid] = React.useState<Record<string, string>>({});
   const [editingRoutineDocId, setEditingRoutineDocId] = React.useState<string | null>(null);
   const [editingRoutineDocTitle, setEditingRoutineDocTitle] = React.useState("");
   const [routineFormatState, setRoutineFormatState] = React.useState({
@@ -530,8 +649,11 @@ export default function TilbakemeldingPage() {
   });
   const routineLayoutRef = React.useRef<HTMLDivElement | null>(null);
   const routineEditorRef = React.useRef<HTMLDivElement | null>(null);
+  const routineSearchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const notesSearchInputRef = React.useRef<HTMLInputElement | null>(null);
   const routineRenameInputRef = React.useRef<HTMLInputElement | null>(null);
   const routineRenameTimerRef = React.useRef<number | null>(null);
+  const pendingDeepLinkedRoutineIdRef = React.useRef<string | null>(initialRouteState.routineDocId);
   const activeRoutineDocRef = React.useRef<string | null>(null);
   const routineSelectionRef = React.useRef<Range | null>(null);
   const routineSyncSignatureRef = React.useRef("");
@@ -550,6 +672,10 @@ export default function TilbakemeldingPage() {
   } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
+  const routineActorName = React.useMemo(
+    () => firstName?.trim() || user?.displayName?.trim() || user?.email?.trim() || "Ukjent bruker",
+    [firstName, user?.displayName, user?.email]
+  );
 
   const persistNotesOrder = React.useCallback(
     async (notes: PrivateNote[]) => {
@@ -1062,12 +1188,21 @@ export default function TilbakemeldingPage() {
     () => routineDocuments.find((docItem) => docItem.id === selectedRoutineDocumentId) ?? null,
     [routineDocuments, selectedRoutineDocumentId]
   );
+  const selectedRoutineUpdatedByLabel = React.useMemo(() => {
+    if (!selectedRoutineDocument) return "Ukjent bruker";
+    if (selectedRoutineDocument.updatedByName?.trim()) return selectedRoutineDocument.updatedByName.trim();
+    const updatedUid = selectedRoutineDocument.updatedByUid?.trim();
+    if (updatedUid && routineUserNameByUid[updatedUid]) return routineUserNameByUid[updatedUid];
+    if (updatedUid && user?.uid && updatedUid === user.uid) return routineActorName;
+    return "Ukjent bruker";
+  }, [routineActorName, routineUserNameByUid, selectedRoutineDocument, user?.uid]);
   const routineDocumentsById = React.useMemo(
     () => new Map(routineDocuments.map((docItem) => [docItem.id, docItem])),
     [routineDocuments]
   );
   const showRoutineLabels = tab !== "rutiner" || routineSidebarWidth >= 170;
   const routineColorMenuOpen = Boolean(routineColorAnchorEl);
+  const routineLinkMenuOpen = Boolean(routineLinkAnchorEl);
   const routineDocMenuOpen = Boolean(routineDocMenuAnchorEl);
   const routineEmojiPickerOpen = Boolean(routineEmojiPickerAnchorEl);
   const routineDocMenuTarget =
@@ -1080,6 +1215,42 @@ export default function TilbakemeldingPage() {
     () => ROUTINE_EMOJI_CATEGORIES.find((category) => category.id === routineEmojiCategory) ?? ROUTINE_EMOJI_CATEGORIES[0],
     [routineEmojiCategory]
   );
+  const routineSearchOptions = React.useMemo(() => {
+    const rawQuery = routineSearchQuery.trim();
+    const query = rawQuery.toLocaleLowerCase("nb-NO");
+    if (query.length < 2) return [];
+
+    const titleMatches: RoutineSearchOption[] = [];
+    const contentMatches: RoutineSearchOption[] = [];
+
+    routineDocuments.forEach((docItem) => {
+      const title = (docItem.title || "Uten tittel").trim();
+      const titleLower = title.toLocaleLowerCase("nb-NO");
+      if (titleLower.includes(query)) {
+        titleMatches.push({
+          id: `${docItem.id}-title`,
+          docId: docItem.id,
+          title,
+          matchType: "title",
+          snippet: "",
+        });
+        return;
+      }
+
+      const plainText = extractTextFromHtml(docItem.content);
+      const plainLower = plainText.toLocaleLowerCase("nb-NO");
+      if (!plainLower.includes(query)) return;
+      contentMatches.push({
+        id: `${docItem.id}-content`,
+        docId: docItem.id,
+        title,
+        matchType: "content",
+        snippet: buildRoutineMatchSnippet(plainText, rawQuery),
+      });
+    });
+
+    return [...titleMatches, ...contentMatches];
+  }, [routineDocuments, routineSearchQuery]);
   const routineFilteredEmojis = React.useMemo(() => {
     const query = routineEmojiQuery.trim().toLocaleLowerCase("nb-NO");
     return ROUTINE_EMOJI_OPTIONS.filter((option) => {
@@ -1122,15 +1293,60 @@ export default function TilbakemeldingPage() {
     return () => window.cancelAnimationFrame(raf);
   }, [editingRoutineDocId]);
 
+  React.useEffect(() => {
+    if (!user?.uid || routineDocuments.length === 0) return;
+
+    const missingUids = Array.from(
+      new Set(
+        routineDocuments
+          .map((docItem) => docItem.updatedByUid?.trim())
+          .filter((uid): uid is string => Boolean(uid) && !routineUserNameByUid[uid!])
+      )
+    );
+    if (missingUids.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      missingUids.map(async (uid) => {
+        try {
+          const snap = await getDoc(doc(db, "users", uid));
+          const data = snap.exists() ? (snap.data() as any) : null;
+          const firstName = typeof data?.firstName === "string" ? data.firstName.trim() : "";
+          if (firstName) return [uid, firstName] as const;
+          return [uid, "Ukjent bruker"] as const;
+        } catch {
+          return [uid, "Ukjent bruker"] as const;
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) return;
+      setRoutineUserNameByUid((prev) => {
+        const next = { ...prev };
+        entries.forEach(([uid, name]) => {
+          next[uid] = name;
+        });
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [routineDocuments, routineUserNameByUid, user?.uid]);
+
   const createDefaultRoutineDocument = React.useCallback(
     (): RoutineDocument => ({
       id: createRoutineDocId(),
       title: "Fane 1",
       content: "",
+      updatedAtMs: Date.now(),
+      updatedByUid: user?.uid ?? null,
+      updatedByName: routineActorName,
       parentId: null,
       emoji: null,
     }),
-    []
+    [routineActorName, user?.uid]
   );
 
   React.useEffect(() => {
@@ -1148,6 +1364,7 @@ export default function TilbakemeldingPage() {
       sharedRoutineDocRef,
       (snapshot) => {
         const data = snapshot.exists() ? (snapshot.data() as any) : null;
+        const sharedUpdatedAtMs = toMillis(data?.updatedAt);
         const docs = Array.isArray(data?.documents)
           ? data.documents
               .map((docItem: unknown): RoutineDocument | null => {
@@ -1163,6 +1380,22 @@ export default function TilbakemeldingPage() {
                   id: (docItem as any).id,
                   title: (docItem as any).title,
                   content: (docItem as any).content,
+                  updatedAtMs:
+                    typeof (docItem as any).updatedAtMs === "number"
+                      ? (docItem as any).updatedAtMs
+                      : toMillis((docItem as any).updatedAt) || sharedUpdatedAtMs || Date.now(),
+                  updatedByUid:
+                    typeof (docItem as any).updatedByUid === "string"
+                      ? (docItem as any).updatedByUid
+                      : typeof data?.updatedBy === "string"
+                        ? data.updatedBy
+                        : null,
+                  updatedByName:
+                    typeof (docItem as any).updatedByName === "string"
+                      ? (docItem as any).updatedByName
+                      : typeof data?.updatedByName === "string"
+                        ? data.updatedByName
+                        : null,
                   parentId: typeof (docItem as any).parentId === "string" ? (docItem as any).parentId : null,
                   emoji: typeof (docItem as any).emoji === "string" ? (docItem as any).emoji : null,
                 };
@@ -1215,13 +1448,29 @@ export default function TilbakemeldingPage() {
         ...payload,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
+        updatedByName: routineActorName,
       },
       { merge: true }
     ).catch((err) => {
       routineSyncSignatureRef.current = "";
       setError(mapFirebaseError(err, "Kunne ikke lagre rutiner."));
     });
-  }, [routineDocuments, routineLoaded, selectedRoutineDocumentId, sharedRoutineDocRef, user?.uid]);
+  }, [routineActorName, routineDocuments, routineLoaded, selectedRoutineDocumentId, sharedRoutineDocRef, user?.uid]);
+
+  React.useEffect(() => {
+    const deepLinkedRoutineId = pendingDeepLinkedRoutineIdRef.current;
+    if (!deepLinkedRoutineId) return;
+    const match = routineDocuments.find((docItem) => docItem.id === deepLinkedRoutineId);
+    if (match) {
+      setSelectedRoutineDocumentId(match.id);
+      setTab("rutiner");
+      pendingDeepLinkedRoutineIdRef.current = null;
+      return;
+    }
+    if (routineLoaded) {
+      pendingDeepLinkedRoutineIdRef.current = null;
+    }
+  }, [routineDocuments, routineLoaded]);
 
   React.useEffect(() => {
     if (!isRoutineResizing) return;
@@ -1251,13 +1500,16 @@ export default function TilbakemeldingPage() {
         id: createRoutineDocId(),
         title: `Fane ${nextCount}`,
         content: "",
+        updatedAtMs: Date.now(),
+        updatedByUid: user?.uid ?? null,
+        updatedByName: routineActorName,
         parentId: null,
         emoji: null,
       };
       setSelectedRoutineDocumentId(created.id);
       return [...prev, created];
     });
-  }, []);
+  }, [routineActorName, user?.uid]);
 
   const closeRoutineDocMenu = React.useCallback(() => {
     setRoutineDocMenuAnchorEl(null);
@@ -1289,6 +1541,9 @@ export default function TilbakemeldingPage() {
         id: createRoutineDocId(),
         title: `${parent.title} - underfane`,
         content: "",
+        updatedAtMs: Date.now(),
+        updatedByUid: user?.uid ?? null,
+        updatedByName: routineActorName,
         parentId: parent.id,
         emoji: null,
       };
@@ -1308,11 +1563,12 @@ export default function TilbakemeldingPage() {
       return next;
     });
     closeRoutineDocMenu();
-  }, [closeRoutineDocMenu, routineDocMenuTarget]);
+  }, [closeRoutineDocMenu, routineActorName, routineDocMenuTarget, user?.uid]);
 
   const commitRoutineDocRename = React.useCallback(() => {
     if (!editingRoutineDocId) return;
     const nextName = editingRoutineDocTitle.trim();
+    const now = Date.now();
     if (nextName) {
       setRoutineDocuments((prev) =>
         prev.map((docItem) =>
@@ -1320,6 +1576,9 @@ export default function TilbakemeldingPage() {
             ? {
                 ...docItem,
                 title: nextName,
+                updatedAtMs: docItem.title === nextName ? docItem.updatedAtMs : now,
+                updatedByUid: docItem.title === nextName ? docItem.updatedByUid ?? null : user?.uid ?? null,
+                updatedByName: docItem.title === nextName ? docItem.updatedByName ?? null : routineActorName,
               }
             : docItem
         )
@@ -1327,7 +1586,7 @@ export default function TilbakemeldingPage() {
     }
     setEditingRoutineDocId(null);
     setEditingRoutineDocTitle("");
-  }, [editingRoutineDocId, editingRoutineDocTitle]);
+  }, [editingRoutineDocId, editingRoutineDocTitle, routineActorName, user?.uid]);
 
   const cancelRoutineDocRename = React.useCallback(() => {
     setEditingRoutineDocId(null);
@@ -1352,19 +1611,23 @@ export default function TilbakemeldingPage() {
   const applyRoutineDocEmoji = React.useCallback(
     (nextEmoji: string | null) => {
       if (!routineEmojiPickerTargetId) return;
+      const now = Date.now();
       setRoutineDocuments((prev) =>
         prev.map((docItem) =>
           docItem.id === routineEmojiPickerTargetId
             ? {
                 ...docItem,
                 emoji: nextEmoji?.trim() ? nextEmoji.trim() : null,
+                updatedAtMs: docItem.emoji === (nextEmoji?.trim() || null) ? docItem.updatedAtMs : now,
+                updatedByUid: docItem.emoji === (nextEmoji?.trim() || null) ? docItem.updatedByUid ?? null : user?.uid ?? null,
+                updatedByName: docItem.emoji === (nextEmoji?.trim() || null) ? docItem.updatedByName ?? null : routineActorName,
               }
             : docItem
         )
       );
       closeRoutineEmojiPicker();
     },
-    [closeRoutineEmojiPicker, routineEmojiPickerTargetId]
+    [closeRoutineEmojiPicker, routineActorName, routineEmojiPickerTargetId, user?.uid]
   );
 
   const handleSetRoutineDocEmoji = React.useCallback(() => {
@@ -1391,6 +1654,12 @@ export default function TilbakemeldingPage() {
     setRoutineEmojiQuery(event.target.value);
   }, []);
 
+  const handleSelectRoutineSearchOption = React.useCallback((option: RoutineSearchOption | null) => {
+    if (!option) return;
+    setSelectedRoutineDocumentId(option.docId);
+    setRoutineSearchQuery("");
+  }, []);
+
   const handleDeleteRoutineDoc = React.useCallback(() => {
     if (!routineDocMenuTarget) return;
 
@@ -1409,6 +1678,9 @@ export default function TilbakemeldingPage() {
           id: createRoutineDocId(),
           title: "Fane 1",
           content: "",
+          updatedAtMs: Date.now(),
+          updatedByUid: user?.uid ?? null,
+          updatedByName: routineActorName,
           parentId: null,
           emoji: null,
         };
@@ -1423,16 +1695,55 @@ export default function TilbakemeldingPage() {
       return next;
     });
     closeRoutineDocMenu();
-  }, [closeRoutineDocMenu, routineDocMenuTarget, selectedRoutineDocumentId]);
+  }, [closeRoutineDocMenu, routineActorName, routineDocMenuTarget, selectedRoutineDocumentId, user?.uid]);
+
+  const handleCopyRoutineDocLink = React.useCallback(async () => {
+    if (!routineDocMenuTarget) return;
+    closeRoutineDocMenu();
+
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        setCopyToast({
+          message: "Utklippstavle er ikke tilgjengelig i denne nettleseren.",
+          severity: "error",
+        });
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set(ROUTINE_TAB_QUERY_KEY, "rutiner");
+      url.searchParams.set(ROUTINE_DOC_QUERY_KEY, routineDocMenuTarget.id);
+      await navigator.clipboard.writeText(url.toString());
+      setCopyToast({
+        message: `Lenke kopiert for "${routineDocMenuTarget.title || "fane"}".`,
+        severity: "success",
+      });
+    } catch {
+      setCopyToast({
+        message: "Kunne ikke kopiere lenke.",
+        severity: "error",
+      });
+    }
+  }, [closeRoutineDocMenu, routineDocMenuTarget]);
 
   const handleRoutineContentChange = React.useCallback((value: string) => {
     if (!selectedRoutineDocumentId) return;
+    const now = Date.now();
     setRoutineDocuments((prev) =>
       prev.map((docItem) =>
-        docItem.id === selectedRoutineDocumentId ? { ...docItem, content: value } : docItem
+        docItem.id === selectedRoutineDocumentId
+          ? docItem.content === value
+            ? docItem
+            : {
+                ...docItem,
+                content: value,
+                updatedAtMs: now,
+                updatedByUid: user?.uid ?? null,
+                updatedByName: routineActorName,
+              }
+          : docItem
       )
     );
-  }, [selectedRoutineDocumentId]);
+  }, [routineActorName, selectedRoutineDocumentId, user?.uid]);
 
   const isNodeInsideRoutineEditor = React.useCallback((node: Node | null) => {
     const editor = routineEditorRef.current;
@@ -1461,13 +1772,56 @@ export default function TilbakemeldingPage() {
     }
   }, []);
 
+  const detectRoutineStyleFromSelection = React.useCallback((): RoutineTextStyle | null => {
+    const editor = routineEditorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection || selection.rangeCount === 0) return null;
+
+    const range = selection.getRangeAt(0);
+    if (!isNodeInsideRoutineEditor(range.commonAncestorContainer)) return null;
+
+    const mapBlockTagToStyle = (rawValue: string | null | undefined): RoutineTextStyle | null => {
+      if (!rawValue) return null;
+      const normalized = rawValue.toLowerCase().replace(/[<>]/g, "").trim();
+      if (normalized === "h1") return "h1";
+      if (normalized === "h2" || normalized === "h3" || normalized === "h4" || normalized === "h5" || normalized === "h6") {
+        return "h2";
+      }
+      if (normalized === "p" || normalized === "div" || normalized === "li") return "p";
+      return null;
+    };
+
+    const formatBlockValue = mapBlockTagToStyle(document.queryCommandValue("formatBlock"));
+    if (formatBlockValue) {
+      return formatBlockValue;
+    }
+
+    const anchorNode = selection.anchorNode ?? range.startContainer;
+    let element =
+      anchorNode.nodeType === Node.ELEMENT_NODE
+        ? (anchorNode as Element)
+        : anchorNode.parentElement;
+
+    while (element && element !== editor) {
+      const mapped = mapBlockTagToStyle(element.tagName);
+      if (mapped) return mapped;
+      element = element.parentElement;
+    }
+
+    return "p";
+  }, [isNodeInsideRoutineEditor]);
+
   const updateRoutineFormatState = React.useCallback(() => {
     setRoutineFormatState({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
       underline: document.queryCommandState("underline"),
     });
-  }, []);
+    const nextStyle = detectRoutineStyleFromSelection();
+    if (nextStyle) {
+      setRoutineTextStyle(nextStyle);
+    }
+  }, [detectRoutineStyleFromSelection]);
 
   const syncRoutineEditorContent = React.useCallback(() => {
     const editor = routineEditorRef.current;
@@ -1490,14 +1844,20 @@ export default function TilbakemeldingPage() {
     [captureRoutineSelection, restoreRoutineSelection, syncRoutineEditorContent, updateRoutineFormatState]
   );
 
+  const getRoutineFormatBlockValue = React.useCallback((style: RoutineTextStyle) => {
+    if (style === "h1") return "<h1>";
+    if (style === "h2") return "<h2>";
+    return "<p>";
+  }, []);
+
   const handleRoutineStyleChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const nextStyle = event.target.value as RoutineTextStyle;
       setRoutineTextStyle(nextStyle);
-      const formatValue = nextStyle === "p" ? "<p>" : nextStyle === "h1" ? "<h1>" : "<h2>";
+      const formatValue = getRoutineFormatBlockValue(nextStyle);
       runRoutineCommand("formatBlock", formatValue);
     },
-    [runRoutineCommand]
+    [getRoutineFormatBlockValue, runRoutineCommand]
   );
 
   const handleRoutineFontChange = React.useCallback(
@@ -1529,6 +1889,139 @@ export default function TilbakemeldingPage() {
       setRoutineColorAnchorEl(null);
     },
     [runRoutineCommand]
+  );
+
+  const normalizeRoutineLinkUrl = React.useCallback((rawUrl: string): string | null => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return null;
+    const withProtocol = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      const parsed = new URL(withProtocol);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const handleOpenRoutineLinkMenu = React.useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      captureRoutineSelection();
+      const selection = window.getSelection();
+      const selectedText =
+        selection &&
+        selection.rangeCount > 0 &&
+        isNodeInsideRoutineEditor(selection.getRangeAt(0).commonAncestorContainer)
+          ? selection.toString().trim()
+          : "";
+      setRoutineLinkLabel(selectedText);
+      setRoutineLinkUrl("");
+      setRoutineLinkError(null);
+      setRoutineLinkAnchorEl(event.currentTarget);
+    },
+    [captureRoutineSelection, isNodeInsideRoutineEditor]
+  );
+
+  const handleCloseRoutineLinkMenu = React.useCallback(() => {
+    setRoutineLinkAnchorEl(null);
+    setRoutineLinkError(null);
+  }, []);
+
+  const handleInsertRoutineLink = React.useCallback(() => {
+    const normalizedUrl = normalizeRoutineLinkUrl(routineLinkUrl);
+    if (!normalizedUrl) {
+      setRoutineLinkError("Skriv en gyldig lenke (http/https).");
+      return;
+    }
+
+    const linkLabel = routineLinkLabel.trim() || normalizedUrl;
+    const editor = routineEditorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    restoreRoutineSelection();
+
+    const selection = window.getSelection();
+    const canInsertAtSelection =
+      selection !== null &&
+      selection.rangeCount > 0 &&
+      isNodeInsideRoutineEditor(selection.getRangeAt(0).commonAncestorContainer);
+
+    const anchor = document.createElement("a");
+    anchor.href = normalizedUrl;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.textContent = linkLabel;
+
+    if (canInsertAtSelection && selection) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(anchor);
+      range.setStartAfter(anchor);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      editor.appendChild(anchor);
+      editor.appendChild(document.createTextNode(" "));
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    captureRoutineSelection();
+    syncRoutineEditorContent();
+    window.setTimeout(updateRoutineFormatState, 0);
+    setRoutineLinkAnchorEl(null);
+    setRoutineLinkError(null);
+    setCopyToast({ message: "Lenke lagt til.", severity: "success" });
+  }, [
+    captureRoutineSelection,
+    isNodeInsideRoutineEditor,
+    normalizeRoutineLinkUrl,
+    restoreRoutineSelection,
+    routineLinkLabel,
+    routineLinkUrl,
+    syncRoutineEditorContent,
+    updateRoutineFormatState,
+  ]);
+
+  const handleRoutineEditorClick = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const link = target?.closest("a[href]") as HTMLAnchorElement | null;
+    if (!link) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.open(link.href, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const handleRoutineEditorKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Enter") return;
+      if (routineTextStyle === "p") return;
+
+      window.setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        if (!isNodeInsideRoutineEditor(selection.getRangeAt(0).commonAncestorContainer)) return;
+        document.execCommand("styleWithCSS", false, "true");
+        document.execCommand("formatBlock", false, getRoutineFormatBlockValue(routineTextStyle));
+        captureRoutineSelection();
+        syncRoutineEditorContent();
+        window.setTimeout(updateRoutineFormatState, 0);
+      }, 0);
+    },
+    [
+      captureRoutineSelection,
+      getRoutineFormatBlockValue,
+      isNodeInsideRoutineEditor,
+      routineTextStyle,
+      syncRoutineEditorContent,
+      updateRoutineFormatState,
+    ]
   );
 
   const handleRoutineEditorInput = React.useCallback(() => {
@@ -1578,6 +2071,46 @@ export default function TilbakemeldingPage() {
       document.removeEventListener("selectionchange", onSelectionChange);
     };
   }, [captureRoutineSelection, tab, updateRoutineFormatState]);
+
+  React.useEffect(() => {
+    const handleRoutineSearchShortcut = (event: KeyboardEvent) => {
+      const isSaveShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
+      if (isSaveShortcut) {
+        if (tab === "rutiner") {
+          event.preventDefault();
+          const input = routineSearchInputRef.current;
+          if (!input) return;
+          input.focus();
+          input.select();
+          return;
+        }
+
+        if (tab === "notater") {
+          event.preventDefault();
+          const input = notesSearchInputRef.current;
+          if (!input) return;
+          input.focus();
+          input.select();
+          return;
+        }
+      }
+
+      if (event.key !== "Escape" || tab !== "notater") return;
+      const input = notesSearchInputRef.current;
+      if (!input || document.activeElement !== input) return;
+
+      event.preventDefault();
+      setSearchQuery("");
+      window.requestAnimationFrame(() => {
+        input.focus();
+      });
+    };
+
+    window.addEventListener("keydown", handleRoutineSearchShortcut);
+    return () => {
+      window.removeEventListener("keydown", handleRoutineSearchShortcut);
+    };
+  }, [tab]);
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -1642,7 +2175,7 @@ export default function TilbakemeldingPage() {
         <Paper
           sx={{
             minHeight: 520,
-            height: { xs: "calc(100vh - 230px)", md: "calc(100vh - 190px)" },
+            height: { xs: "calc(100dvh - 230px)", md: "calc(100dvh - 130px)" },
             overflow: "hidden",
           }}
         >
@@ -1873,6 +2406,12 @@ export default function TilbakemeldingPage() {
                   </ListItemIcon>
                   <ListItemText primary="Gi nytt navn" primaryTypographyProps={{ fontSize: "0.82rem" }} />
                 </MenuItem>
+                <MenuItem onClick={handleCopyRoutineDocLink} sx={{ minHeight: 34, py: 0.35, px: 1.1 }}>
+                  <ListItemIcon sx={{ minWidth: 28 }}>
+                    <LinkOutlinedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Kopier lenke" primaryTypographyProps={{ fontSize: "0.82rem" }} />
+                </MenuItem>
                 <MenuItem onClick={handleSetRoutineDocEmoji} sx={{ minHeight: 34, py: 0.35, px: 1.1 }}>
                   <ListItemIcon sx={{ minWidth: 28 }}>
                     <EmojiEmotionsOutlinedIcon fontSize="small" />
@@ -2100,8 +2639,8 @@ export default function TilbakemeldingPage() {
                         onClick={() => runRoutineCommand("bold")}
                         aria-label="Fet skrift"
                         sx={{
-                          width: 34,
-                          height: 34,
+                          width: 36,
+                          height: 36,
                           border: "1px solid",
                           borderColor: routineFormatState.bold ? "primary.main" : "divider",
                           bgcolor: (theme) =>
@@ -2112,15 +2651,15 @@ export default function TilbakemeldingPage() {
                               : "transparent",
                         }}
                       >
-                        <FormatBoldIcon sx={{ fontSize: 20 }} />
+                        <FormatBoldIcon sx={{ fontSize: 19 }} />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => runRoutineCommand("italic")}
                         aria-label="Kursiv"
                         sx={{
-                          width: 34,
-                          height: 34,
+                          width: 36,
+                          height: 36,
                           border: "1px solid",
                           borderColor: routineFormatState.italic ? "primary.main" : "divider",
                           bgcolor: (theme) =>
@@ -2131,15 +2670,15 @@ export default function TilbakemeldingPage() {
                               : "transparent",
                         }}
                       >
-                        <FormatItalicIcon sx={{ fontSize: 20 }} />
+                        <FormatItalicIcon sx={{ fontSize: 19 }} />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => runRoutineCommand("underline")}
                         aria-label="Understreket"
                         sx={{
-                          width: 34,
-                          height: 34,
+                          width: 36,
+                          height: 36,
                           border: "1px solid",
                           borderColor: routineFormatState.underline ? "primary.main" : "divider",
                           bgcolor: (theme) =>
@@ -2150,7 +2689,7 @@ export default function TilbakemeldingPage() {
                               : "transparent",
                         }}
                       >
-                        <FormatUnderlinedIcon sx={{ fontSize: 20 }} />
+                        <FormatUnderlinedIcon sx={{ fontSize: 19 }} />
                       </IconButton>
                     </Box>
 
@@ -2162,8 +2701,10 @@ export default function TilbakemeldingPage() {
                         onClick={handleOpenRoutineColorMenu}
                         sx={{
                           minWidth: 0,
-                          px: 0.75,
-                          py: 0.32,
+                          height: 36,
+                          minHeight: 36,
+                          px: 0.95,
+                          py: 0,
                           borderRadius: 1.25,
                           borderColor: "divider",
                           color: "text.secondary",
@@ -2247,47 +2788,240 @@ export default function TilbakemeldingPage() {
                         </Box>
                       </Popover>
                     </Box>
+
+                    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={handleOpenRoutineLinkMenu}
+                        startIcon={<LinkOutlinedIcon sx={{ fontSize: 18 }} />}
+                        sx={{
+                          minWidth: 0,
+                          height: 36,
+                          minHeight: 36,
+                          px: 1.25,
+                          py: 0,
+                          borderRadius: 1.25,
+                          borderColor: "divider",
+                          color: "text.secondary",
+                          textTransform: "none",
+                          fontSize: "0.95rem",
+                          fontWeight: 700,
+                          "&:hover": {
+                            borderColor: "text.secondary",
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(165,177,198,0.12)"
+                                : "rgba(15,23,42,0.04)",
+                          },
+                        }}
+                      >
+                        Lenke
+                      </Button>
+                      <Popover
+                        open={routineLinkMenuOpen}
+                        anchorEl={routineLinkAnchorEl}
+                        onClose={handleCloseRoutineLinkMenu}
+                        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                        transformOrigin={{ vertical: "top", horizontal: "left" }}
+                        slotProps={{
+                          paper: {
+                            sx: {
+                              mt: 0.8,
+                              p: 1,
+                              width: 300,
+                              borderRadius: 1.4,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            },
+                          },
+                        }}
+                      >
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9 }}>
+                          <TextField
+                            size="small"
+                            label="Kallenavn"
+                            value={routineLinkLabel}
+                            onChange={(event) => setRoutineLinkLabel(event.target.value)}
+                            placeholder="f.eks. Prisjakt"
+                          />
+                          <TextField
+                            size="small"
+                            label="Lenke"
+                            value={routineLinkUrl}
+                            onChange={(event) => {
+                              setRoutineLinkUrl(event.target.value);
+                              if (routineLinkError) setRoutineLinkError(null);
+                            }}
+                            placeholder="https://example.no"
+                            error={Boolean(routineLinkError)}
+                            helperText={routineLinkError ?? "Åpnes i ny fane ved klikk."}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleInsertRoutineLink();
+                              }
+                            }}
+                          />
+                          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 0.7 }}>
+                            <Button size="small" onClick={handleCloseRoutineLinkMenu}>
+                              Avbryt
+                            </Button>
+                            <Button size="small" variant="contained" onClick={handleInsertRoutineLink}>
+                              Sett inn
+                            </Button>
+                          </Box>
+                        </Box>
+                      </Popover>
+                    </Box>
+
+                    <Box sx={{ ml: { xs: 0, md: "auto" }, width: { xs: "100%", md: 360 }, maxWidth: "100%" }}>
+                      <Autocomplete<RoutineSearchOption, false, false, false>
+                        size="small"
+                        options={routineSearchOptions}
+                        value={null}
+                        inputValue={routineSearchQuery}
+                        onInputChange={(_, nextValue, reason) => {
+                          if (reason === "reset") return;
+                          setRoutineSearchQuery(nextValue);
+                        }}
+                        onChange={(_, option) => handleSelectRoutineSearchOption(option)}
+                        open={routineSearchQuery.trim().length >= 2}
+                        filterOptions={(options) => options}
+                        getOptionLabel={(option) => option.title}
+                        noOptionsText="Ingen rutiner funnet"
+                        isOptionEqualToValue={(option, value) => option.id === value.id}
+                        slotProps={{
+                          paper: {
+                            sx: {
+                              mt: 0.6,
+                              borderRadius: 1.2,
+                              border: "1px solid",
+                              borderColor: "divider",
+                              overflow: "hidden",
+                            },
+                          },
+                        }}
+                        renderOption={(props, option) => (
+                          <Box
+                            component="li"
+                            {...props}
+                            sx={{
+                              py: 0.85,
+                              px: 1,
+                              borderLeft: "3px solid",
+                              borderLeftColor:
+                                option.matchType === "title"
+                                  ? "rgba(236,72,153,0.45)"
+                                  : "rgba(59,130,246,0.35)",
+                            }}
+                          >
+                            <Box sx={{ minWidth: 0, width: "100%" }}>
+                              <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.2, mb: option.snippet ? 0.35 : 0 }}>
+                                {renderHighlightedText(option.title, routineSearchQuery)}
+                              </Typography>
+                              {option.snippet && (
+                                <Typography sx={{ fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.35 }}>
+                                  {renderHighlightedText(option.snippet, routineSearchQuery)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        )}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            inputRef={routineSearchInputRef}
+                            placeholder="Søk i rutiner"
+                            sx={{
+                              "& .MuiInputBase-root": {
+                                height: 34,
+                                fontSize: "0.82rem",
+                              },
+                            }}
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <>
+                                  <SearchIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.6 }} />
+                                  {params.InputProps.startAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
+                    </Box>
                   </Box>
-                  <Box sx={{ p: 0, flex: 1, minHeight: 0 }}>
+                  <Box sx={{ p: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                    <Box sx={{ flex: 1, minHeight: 0 }}>
+                      <Box
+                        key={selectedRoutineDocument.id}
+                        ref={routineEditorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={handleRoutineEditorInput}
+                        onClick={handleRoutineEditorClick}
+                        onKeyDown={handleRoutineEditorKeyDown}
+                        onMouseUp={() => {
+                          captureRoutineSelection();
+                          updateRoutineFormatState();
+                        }}
+                        onKeyUp={() => {
+                          captureRoutineSelection();
+                          updateRoutineFormatState();
+                        }}
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          overflow: "auto",
+                          p: "30px 34px",
+                          color: "text.primary",
+                          lineHeight: 1.7,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          outline: "none",
+                          "& p": { m: 0, mb: 1.35 },
+                          "& h1": {
+                            m: 0,
+                            mb: 1.35,
+                            lineHeight: 1.22,
+                            fontWeight: 700,
+                          },
+                          "& h2": {
+                            m: 0,
+                            mb: 1.25,
+                            lineHeight: 1.28,
+                            fontWeight: 700,
+                          },
+                          "& a": {
+                            color: "primary.main",
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                          },
+                        }}
+                      />
+                    </Box>
                     <Box
-                      key={selectedRoutineDocument.id}
-                      ref={routineEditorRef}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={handleRoutineEditorInput}
-                      onMouseUp={() => {
-                        captureRoutineSelection();
-                        updateRoutineFormatState();
-                      }}
-                      onKeyUp={() => {
-                        captureRoutineSelection();
-                        updateRoutineFormatState();
-                      }}
                       sx={{
-                        width: "100%",
-                        height: "100%",
-                        overflow: "auto",
-                        p: "30px 34px",
-                        color: "text.primary",
-                        lineHeight: 1.7,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        outline: "none",
-                        "& p": { m: 0, mb: 1.35 },
-                        "& h1": {
-                          m: 0,
-                          mb: 1.35,
-                          lineHeight: 1.22,
-                          fontWeight: 700,
-                        },
-                        "& h2": {
-                          m: 0,
-                          mb: 1.25,
-                          lineHeight: 1.28,
-                          fontWeight: 700,
-                        },
+                        px: 1.6,
+                        py: 0.5,
+                        borderTop: "1px solid",
+                        borderColor: "divider",
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(24, 33, 46, 0.9)" : "rgba(248,250,252,0.95)",
                       }}
-                    />
+                    >
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Sist oppdatert:{" "}
+                        {selectedRoutineDocument.updatedAtMs ? formatDateTime(selectedRoutineDocument.updatedAtMs) : "Ikke oppdatert"}
+                        {" "}
+                        | Bruker: {selectedRoutineUpdatedByLabel}
+                      </Typography>
+                    </Box>
                   </Box>
                 </>
               ) : (
@@ -2654,6 +3388,7 @@ export default function TilbakemeldingPage() {
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
                       <InputBase
+                        inputRef={notesSearchInputRef}
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
                         placeholder="søk"
