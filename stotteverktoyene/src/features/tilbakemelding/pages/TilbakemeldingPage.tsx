@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -123,6 +124,13 @@ type RoutineEmojiOption = {
   label: string;
   keywords: string[];
   category: RoutineEmojiCategory;
+};
+type RoutineSearchOption = {
+  id: string;
+  docId: string;
+  title: string;
+  matchType: "title" | "content";
+  snippet: string;
 };
 
 const ROUTINE_EMOJI_OPTIONS: RoutineEmojiOption[] = [
@@ -337,6 +345,89 @@ function formatDateTime(ms: number): string {
   });
 }
 
+function extractTextFromHtml(html: string): string {
+  if (!html) return "";
+  if (typeof window === "undefined") {
+    return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  return (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildRoutineMatchSnippet(text: string, query: string): string {
+  const source = text.replace(/\s+/g, " ").trim();
+  if (!source) return "";
+  const normalizedQuery = query.trim().toLocaleLowerCase("nb-NO");
+  if (!normalizedQuery) return source.slice(0, 120);
+
+  const lower = source.toLocaleLowerCase("nb-NO");
+  const index = lower.indexOf(normalizedQuery);
+  if (index < 0) return source.slice(0, 120);
+
+  let sentenceStart = index;
+  while (sentenceStart > 0 && !/[.!?]/.test(source[sentenceStart - 1])) {
+    sentenceStart -= 1;
+  }
+
+  let sentenceEnd = index + normalizedQuery.length;
+  while (sentenceEnd < source.length && !/[.!?]/.test(source[sentenceEnd])) {
+    sentenceEnd += 1;
+  }
+  if (sentenceEnd < source.length) sentenceEnd += 1;
+
+  let snippet = source.slice(sentenceStart, sentenceEnd).trim();
+  if (!snippet) snippet = source.slice(Math.max(0, index - 48), Math.min(source.length, index + normalizedQuery.length + 68)).trim();
+
+  const tooLong = snippet.length > 180;
+  if (tooLong) {
+    const localMatch = snippet.toLocaleLowerCase("nb-NO").indexOf(normalizedQuery);
+    const fallbackStart = Math.max(0, localMatch - 42);
+    const fallbackEnd = Math.min(snippet.length, localMatch + normalizedQuery.length + 72);
+    const prefix = fallbackStart > 0 ? "..." : "";
+    const suffix = fallbackEnd < snippet.length ? "..." : "";
+    return `${prefix}${snippet.slice(fallbackStart, fallbackEnd)}${suffix}`;
+  }
+
+  const prefix = sentenceStart > 0 ? "..." : "";
+  const suffix = sentenceEnd < source.length ? "..." : "";
+  return `${prefix}${snippet}${suffix}`;
+}
+
+function renderHighlightedText(text: string, query: string): React.ReactNode {
+  const value = String(text ?? "");
+  const search = query.trim();
+  if (!search) return value;
+
+  const pattern = new RegExp(`(${escapeRegExp(search)})`, "gi");
+  const parts = value.split(pattern);
+  if (parts.length === 1) return value;
+  const normalized = search.toLocaleLowerCase("nb-NO");
+
+  return parts.map((part, index) => {
+    const isMatch = part.toLocaleLowerCase("nb-NO") === normalized;
+    if (!isMatch) return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+    return (
+      <Box
+        key={`${part}-${index}`}
+        component="mark"
+        sx={{
+          px: 0.35,
+          borderRadius: 0.6,
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(251,191,36,0.24)" : "rgba(250,204,21,0.35)"),
+          color: "inherit",
+        }}
+      >
+        {part}
+      </Box>
+    );
+  });
+}
+
 function isValidNoteColor(value: unknown): value is string {
   return typeof value === "string" && KEEP_CARD_COLORS.includes(value);
 }
@@ -522,6 +613,7 @@ export default function TilbakemeldingPage() {
   const [routineEmojiPickerTargetId, setRoutineEmojiPickerTargetId] = React.useState<string | null>(null);
   const [routineEmojiQuery, setRoutineEmojiQuery] = React.useState("");
   const [routineEmojiCategory, setRoutineEmojiCategory] = React.useState<RoutineEmojiCategory>("smileys");
+  const [routineSearchQuery, setRoutineSearchQuery] = React.useState("");
   const [editingRoutineDocId, setEditingRoutineDocId] = React.useState<string | null>(null);
   const [editingRoutineDocTitle, setEditingRoutineDocTitle] = React.useState("");
   const [routineFormatState, setRoutineFormatState] = React.useState({
@@ -1081,6 +1173,42 @@ export default function TilbakemeldingPage() {
     () => ROUTINE_EMOJI_CATEGORIES.find((category) => category.id === routineEmojiCategory) ?? ROUTINE_EMOJI_CATEGORIES[0],
     [routineEmojiCategory]
   );
+  const routineSearchOptions = React.useMemo(() => {
+    const rawQuery = routineSearchQuery.trim();
+    const query = rawQuery.toLocaleLowerCase("nb-NO");
+    if (query.length < 2) return [];
+
+    const titleMatches: RoutineSearchOption[] = [];
+    const contentMatches: RoutineSearchOption[] = [];
+
+    routineDocuments.forEach((docItem) => {
+      const title = (docItem.title || "Uten tittel").trim();
+      const titleLower = title.toLocaleLowerCase("nb-NO");
+      if (titleLower.includes(query)) {
+        titleMatches.push({
+          id: `${docItem.id}-title`,
+          docId: docItem.id,
+          title,
+          matchType: "title",
+          snippet: "",
+        });
+        return;
+      }
+
+      const plainText = extractTextFromHtml(docItem.content);
+      const plainLower = plainText.toLocaleLowerCase("nb-NO");
+      if (!plainLower.includes(query)) return;
+      contentMatches.push({
+        id: `${docItem.id}-content`,
+        docId: docItem.id,
+        title,
+        matchType: "content",
+        snippet: buildRoutineMatchSnippet(plainText, rawQuery),
+      });
+    });
+
+    return [...titleMatches, ...contentMatches];
+  }, [routineDocuments, routineSearchQuery]);
   const routineFilteredEmojis = React.useMemo(() => {
     const query = routineEmojiQuery.trim().toLocaleLowerCase("nb-NO");
     return ROUTINE_EMOJI_OPTIONS.filter((option) => {
@@ -1402,6 +1530,12 @@ export default function TilbakemeldingPage() {
 
   const handleEmojiQueryChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setRoutineEmojiQuery(event.target.value);
+  }, []);
+
+  const handleSelectRoutineSearchOption = React.useCallback((option: RoutineSearchOption | null) => {
+    if (!option) return;
+    setSelectedRoutineDocumentId(option.docId);
+    setRoutineSearchQuery("");
   }, []);
 
   const handleDeleteRoutineDoc = React.useCallback(() => {
@@ -2265,6 +2399,83 @@ export default function TilbakemeldingPage() {
                           ))}
                         </Box>
                       </Popover>
+                    </Box>
+
+                    <Box sx={{ ml: { xs: 0, md: "auto" }, width: { xs: "100%", md: 360 }, maxWidth: "100%" }}>
+                      <Autocomplete<RoutineSearchOption, false, false, false>
+                        size="small"
+                        options={routineSearchOptions}
+                        value={null}
+                        inputValue={routineSearchQuery}
+                        onInputChange={(_, nextValue, reason) => {
+                          if (reason === "reset") return;
+                          setRoutineSearchQuery(nextValue);
+                        }}
+                        onChange={(_, option) => handleSelectRoutineSearchOption(option)}
+                        open={routineSearchQuery.trim().length >= 2}
+                        filterOptions={(options) => options}
+                        getOptionLabel={(option) => option.title}
+                        noOptionsText="Ingen rutiner funnet"
+                        isOptionEqualToValue={(option, value) => option.id === value.id}
+                        slotProps={{
+                          paper: {
+                            sx: {
+                              mt: 0.6,
+                              borderRadius: 1.2,
+                              border: "1px solid",
+                              borderColor: "divider",
+                              overflow: "hidden",
+                            },
+                          },
+                        }}
+                        renderOption={(props, option) => (
+                          <Box
+                            component="li"
+                            {...props}
+                            sx={{
+                              py: 0.85,
+                              px: 1,
+                              borderLeft: "3px solid",
+                              borderLeftColor:
+                                option.matchType === "title"
+                                  ? "rgba(236,72,153,0.45)"
+                                  : "rgba(59,130,246,0.35)",
+                            }}
+                          >
+                            <Box sx={{ minWidth: 0, width: "100%" }}>
+                              <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.2, mb: option.snippet ? 0.35 : 0 }}>
+                                {renderHighlightedText(option.title, routineSearchQuery)}
+                              </Typography>
+                              {option.snippet && (
+                                <Typography sx={{ fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.35 }}>
+                                  {renderHighlightedText(option.snippet, routineSearchQuery)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        )}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Søk i rutiner"
+                            sx={{
+                              "& .MuiInputBase-root": {
+                                height: 34,
+                                fontSize: "0.82rem",
+                              },
+                            }}
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <>
+                                  <SearchIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.6 }} />
+                                  {params.InputProps.startAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
                     </Box>
                   </Box>
                   <Box sx={{ p: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
