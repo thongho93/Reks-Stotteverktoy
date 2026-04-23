@@ -45,6 +45,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutline";
 import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
+import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
@@ -55,6 +56,8 @@ const MELDESKJEMA_RESPONSES_URL =
   "https://docs.google.com/forms/d/1dQq_pvU1lXf295odpYPWXs0_zX693iLbKxSFfNS3sAQ/edit#responses";
 const SHARED_ROUTINES_COLLECTION = "sharedRoutines";
 const SHARED_ROUTINES_DOC_ID = "global";
+const ROUTINE_TAB_QUERY_KEY = "tab";
+const ROUTINE_DOC_QUERY_KEY = "rutine";
 const ROUTINE_TEXT_STYLE_OPTIONS = [
   { value: "p", label: "Normal tekst" },
   { value: "h1", label: "Tittel" },
@@ -589,8 +592,24 @@ function mapFirebaseError(error: unknown, fallback: string): string {
 }
 
 export default function TilbakemeldingPage() {
+  const initialRouteState = React.useMemo(() => {
+    if (typeof window === "undefined") {
+      return { initialTab: "notater" as "meldeskjema" | "rutiner" | "notater", routineDocId: null as string | null };
+    }
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get(ROUTINE_TAB_QUERY_KEY);
+    const routineDocId = (params.get(ROUTINE_DOC_QUERY_KEY) ?? "").trim() || null;
+    const initialTab: "meldeskjema" | "rutiner" | "notater" =
+      tabParam === "meldeskjema" || tabParam === "rutiner" || tabParam === "notater"
+        ? tabParam
+        : routineDocId
+          ? "rutiner"
+          : "notater";
+    return { initialTab, routineDocId };
+  }, []);
+
   const { user, isOwner, firstName } = useAuthUser();
-  const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">("notater");
+  const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">(initialRouteState.initialTab);
 
   const [savedNotesList, setSavedNotesList] = React.useState<PrivateNote[]>([]);
   const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
@@ -630,6 +649,7 @@ export default function TilbakemeldingPage() {
   const notesSearchInputRef = React.useRef<HTMLInputElement | null>(null);
   const routineRenameInputRef = React.useRef<HTMLInputElement | null>(null);
   const routineRenameTimerRef = React.useRef<number | null>(null);
+  const pendingDeepLinkedRoutineIdRef = React.useRef<string | null>(initialRouteState.routineDocId);
   const activeRoutineDocRef = React.useRef<string | null>(null);
   const routineSelectionRef = React.useRef<Range | null>(null);
   const routineSyncSignatureRef = React.useRef("");
@@ -1433,6 +1453,21 @@ export default function TilbakemeldingPage() {
   }, [routineActorName, routineDocuments, routineLoaded, selectedRoutineDocumentId, sharedRoutineDocRef, user?.uid]);
 
   React.useEffect(() => {
+    const deepLinkedRoutineId = pendingDeepLinkedRoutineIdRef.current;
+    if (!deepLinkedRoutineId) return;
+    const match = routineDocuments.find((docItem) => docItem.id === deepLinkedRoutineId);
+    if (match) {
+      setSelectedRoutineDocumentId(match.id);
+      setTab("rutiner");
+      pendingDeepLinkedRoutineIdRef.current = null;
+      return;
+    }
+    if (routineLoaded) {
+      pendingDeepLinkedRoutineIdRef.current = null;
+    }
+  }, [routineDocuments, routineLoaded]);
+
+  React.useEffect(() => {
     if (!isRoutineResizing) return;
 
     const onMove = (event: MouseEvent) => {
@@ -1656,6 +1691,34 @@ export default function TilbakemeldingPage() {
     });
     closeRoutineDocMenu();
   }, [closeRoutineDocMenu, routineActorName, routineDocMenuTarget, selectedRoutineDocumentId, user?.uid]);
+
+  const handleCopyRoutineDocLink = React.useCallback(async () => {
+    if (!routineDocMenuTarget) return;
+    closeRoutineDocMenu();
+
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        setCopyToast({
+          message: "Utklippstavle er ikke tilgjengelig i denne nettleseren.",
+          severity: "error",
+        });
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set(ROUTINE_TAB_QUERY_KEY, "rutiner");
+      url.searchParams.set(ROUTINE_DOC_QUERY_KEY, routineDocMenuTarget.id);
+      await navigator.clipboard.writeText(url.toString());
+      setCopyToast({
+        message: `Lenke kopiert for "${routineDocMenuTarget.title || "fane"}".`,
+        severity: "success",
+      });
+    } catch {
+      setCopyToast({
+        message: "Kunne ikke kopiere lenke.",
+        severity: "error",
+      });
+    }
+  }, [closeRoutineDocMenu, routineDocMenuTarget]);
 
   const handleRoutineContentChange = React.useCallback((value: string) => {
     if (!selectedRoutineDocumentId) return;
@@ -2155,6 +2218,12 @@ export default function TilbakemeldingPage() {
                     <DriveFileRenameOutlineIcon fontSize="small" />
                   </ListItemIcon>
                   <ListItemText primary="Gi nytt navn" primaryTypographyProps={{ fontSize: "0.82rem" }} />
+                </MenuItem>
+                <MenuItem onClick={handleCopyRoutineDocLink} sx={{ minHeight: 34, py: 0.35, px: 1.1 }}>
+                  <ListItemIcon sx={{ minWidth: 28 }}>
+                    <LinkOutlinedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Kopier lenke" primaryTypographyProps={{ fontSize: "0.82rem" }} />
                 </MenuItem>
                 <MenuItem onClick={handleSetRoutineDocEmoji} sx={{ minHeight: 34, py: 0.35, px: 1.1 }}>
                   <ListItemIcon sx={{ minWidth: 28 }}>
