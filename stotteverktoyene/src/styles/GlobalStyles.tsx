@@ -27,11 +27,11 @@ export function GlobalStyles() {
           "--app-surface-1": theme.palette.background.paper,
           "--app-surface-2":
             theme.palette.mode === "dark"
-              ? "rgba(15, 21, 30, 0.92)"
+              ? "rgba(9, 14, 23, 0.94)"
               : "rgba(255, 255, 255, 0.98)",
           "--app-surface-3":
             theme.palette.mode === "dark"
-              ? "rgba(24, 33, 46, 0.78)"
+              ? "rgba(15, 23, 35, 0.82)"
               : "rgba(247, 250, 252, 0.98)",
           "--app-surface-hover":
             theme.palette.mode === "dark"
@@ -62,7 +62,7 @@ export function GlobalStyles() {
           backgroundColor: theme.palette.background.default,
           backgroundImage:
             theme.palette.mode === "dark"
-              ? "radial-gradient(circle at 20% -20%, rgba(230, 165, 190, 0.16) 0%, rgba(230, 165, 190, 0) 38%), radial-gradient(circle at 90% 0%, rgba(96, 165, 250, 0.12) 0%, rgba(96, 165, 250, 0) 35%)"
+              ? "radial-gradient(circle at 20% -20%, rgba(230, 165, 190, 0.1) 0%, rgba(230, 165, 190, 0) 38%), radial-gradient(circle at 90% 0%, rgba(96, 165, 250, 0.08) 0%, rgba(96, 165, 250, 0) 35%)"
               : "none",
           backgroundAttachment: "fixed",
           color: theme.palette.text.primary,
