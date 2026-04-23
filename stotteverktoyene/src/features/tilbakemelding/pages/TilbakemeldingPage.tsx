@@ -113,6 +113,8 @@ type RoutineDocument = {
   title: string;
   content: string;
   updatedAtMs: number;
+  updatedByUid?: string | null;
+  updatedByName?: string | null;
   parentId?: string | null;
   emoji?: string | null;
 };
@@ -587,7 +589,7 @@ function mapFirebaseError(error: unknown, fallback: string): string {
 }
 
 export default function TilbakemeldingPage() {
-  const { user, isOwner } = useAuthUser();
+  const { user, isOwner, firstName } = useAuthUser();
   const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">("notater");
 
   const [savedNotesList, setSavedNotesList] = React.useState<PrivateNote[]>([]);
@@ -614,6 +616,7 @@ export default function TilbakemeldingPage() {
   const [routineEmojiQuery, setRoutineEmojiQuery] = React.useState("");
   const [routineEmojiCategory, setRoutineEmojiCategory] = React.useState<RoutineEmojiCategory>("smileys");
   const [routineSearchQuery, setRoutineSearchQuery] = React.useState("");
+  const [routineUserNameByUid, setRoutineUserNameByUid] = React.useState<Record<string, string>>({});
   const [editingRoutineDocId, setEditingRoutineDocId] = React.useState<string | null>(null);
   const [editingRoutineDocTitle, setEditingRoutineDocTitle] = React.useState("");
   const [routineFormatState, setRoutineFormatState] = React.useState({
@@ -645,6 +648,10 @@ export default function TilbakemeldingPage() {
   } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
+  const routineActorName = React.useMemo(
+    () => firstName?.trim() || user?.displayName?.trim() || user?.email?.trim() || "Ukjent bruker",
+    [firstName, user?.displayName, user?.email]
+  );
 
   const persistNotesOrder = React.useCallback(
     async (notes: PrivateNote[]) => {
@@ -1157,6 +1164,14 @@ export default function TilbakemeldingPage() {
     () => routineDocuments.find((docItem) => docItem.id === selectedRoutineDocumentId) ?? null,
     [routineDocuments, selectedRoutineDocumentId]
   );
+  const selectedRoutineUpdatedByLabel = React.useMemo(() => {
+    if (!selectedRoutineDocument) return "Ukjent bruker";
+    if (selectedRoutineDocument.updatedByName?.trim()) return selectedRoutineDocument.updatedByName.trim();
+    const updatedUid = selectedRoutineDocument.updatedByUid?.trim();
+    if (updatedUid && routineUserNameByUid[updatedUid]) return routineUserNameByUid[updatedUid];
+    if (updatedUid && user?.uid && updatedUid === user.uid) return routineActorName;
+    return "Ukjent bruker";
+  }, [routineActorName, routineUserNameByUid, selectedRoutineDocument, user?.uid]);
   const routineDocumentsById = React.useMemo(
     () => new Map(routineDocuments.map((docItem) => [docItem.id, docItem])),
     [routineDocuments]
@@ -1253,16 +1268,60 @@ export default function TilbakemeldingPage() {
     return () => window.cancelAnimationFrame(raf);
   }, [editingRoutineDocId]);
 
+  React.useEffect(() => {
+    if (!user?.uid || routineDocuments.length === 0) return;
+
+    const missingUids = Array.from(
+      new Set(
+        routineDocuments
+          .map((docItem) => docItem.updatedByUid?.trim())
+          .filter((uid): uid is string => Boolean(uid) && !routineUserNameByUid[uid!])
+      )
+    );
+    if (missingUids.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      missingUids.map(async (uid) => {
+        try {
+          const snap = await getDoc(doc(db, "users", uid));
+          const data = snap.exists() ? (snap.data() as any) : null;
+          const firstName = typeof data?.firstName === "string" ? data.firstName.trim() : "";
+          if (firstName) return [uid, firstName] as const;
+          return [uid, "Ukjent bruker"] as const;
+        } catch {
+          return [uid, "Ukjent bruker"] as const;
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) return;
+      setRoutineUserNameByUid((prev) => {
+        const next = { ...prev };
+        entries.forEach(([uid, name]) => {
+          next[uid] = name;
+        });
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [routineDocuments, routineUserNameByUid, user?.uid]);
+
   const createDefaultRoutineDocument = React.useCallback(
     (): RoutineDocument => ({
       id: createRoutineDocId(),
       title: "Fane 1",
       content: "",
       updatedAtMs: Date.now(),
+      updatedByUid: user?.uid ?? null,
+      updatedByName: routineActorName,
       parentId: null,
       emoji: null,
     }),
-    []
+    [routineActorName, user?.uid]
   );
 
   React.useEffect(() => {
@@ -1300,6 +1359,18 @@ export default function TilbakemeldingPage() {
                     typeof (docItem as any).updatedAtMs === "number"
                       ? (docItem as any).updatedAtMs
                       : toMillis((docItem as any).updatedAt) || sharedUpdatedAtMs || Date.now(),
+                  updatedByUid:
+                    typeof (docItem as any).updatedByUid === "string"
+                      ? (docItem as any).updatedByUid
+                      : typeof data?.updatedBy === "string"
+                        ? data.updatedBy
+                        : null,
+                  updatedByName:
+                    typeof (docItem as any).updatedByName === "string"
+                      ? (docItem as any).updatedByName
+                      : typeof data?.updatedByName === "string"
+                        ? data.updatedByName
+                        : null,
                   parentId: typeof (docItem as any).parentId === "string" ? (docItem as any).parentId : null,
                   emoji: typeof (docItem as any).emoji === "string" ? (docItem as any).emoji : null,
                 };
@@ -1352,13 +1423,14 @@ export default function TilbakemeldingPage() {
         ...payload,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
+        updatedByName: routineActorName,
       },
       { merge: true }
     ).catch((err) => {
       routineSyncSignatureRef.current = "";
       setError(mapFirebaseError(err, "Kunne ikke lagre rutiner."));
     });
-  }, [routineDocuments, routineLoaded, selectedRoutineDocumentId, sharedRoutineDocRef, user?.uid]);
+  }, [routineActorName, routineDocuments, routineLoaded, selectedRoutineDocumentId, sharedRoutineDocRef, user?.uid]);
 
   React.useEffect(() => {
     if (!isRoutineResizing) return;
@@ -1389,13 +1461,15 @@ export default function TilbakemeldingPage() {
         title: `Fane ${nextCount}`,
         content: "",
         updatedAtMs: Date.now(),
+        updatedByUid: user?.uid ?? null,
+        updatedByName: routineActorName,
         parentId: null,
         emoji: null,
       };
       setSelectedRoutineDocumentId(created.id);
       return [...prev, created];
     });
-  }, []);
+  }, [routineActorName, user?.uid]);
 
   const closeRoutineDocMenu = React.useCallback(() => {
     setRoutineDocMenuAnchorEl(null);
@@ -1428,6 +1502,8 @@ export default function TilbakemeldingPage() {
         title: `${parent.title} - underfane`,
         content: "",
         updatedAtMs: Date.now(),
+        updatedByUid: user?.uid ?? null,
+        updatedByName: routineActorName,
         parentId: parent.id,
         emoji: null,
       };
@@ -1447,7 +1523,7 @@ export default function TilbakemeldingPage() {
       return next;
     });
     closeRoutineDocMenu();
-  }, [closeRoutineDocMenu, routineDocMenuTarget]);
+  }, [closeRoutineDocMenu, routineActorName, routineDocMenuTarget, user?.uid]);
 
   const commitRoutineDocRename = React.useCallback(() => {
     if (!editingRoutineDocId) return;
@@ -1461,6 +1537,8 @@ export default function TilbakemeldingPage() {
                 ...docItem,
                 title: nextName,
                 updatedAtMs: docItem.title === nextName ? docItem.updatedAtMs : now,
+                updatedByUid: docItem.title === nextName ? docItem.updatedByUid ?? null : user?.uid ?? null,
+                updatedByName: docItem.title === nextName ? docItem.updatedByName ?? null : routineActorName,
               }
             : docItem
         )
@@ -1468,7 +1546,7 @@ export default function TilbakemeldingPage() {
     }
     setEditingRoutineDocId(null);
     setEditingRoutineDocTitle("");
-  }, [editingRoutineDocId, editingRoutineDocTitle]);
+  }, [editingRoutineDocId, editingRoutineDocTitle, routineActorName, user?.uid]);
 
   const cancelRoutineDocRename = React.useCallback(() => {
     setEditingRoutineDocId(null);
@@ -1501,13 +1579,15 @@ export default function TilbakemeldingPage() {
                 ...docItem,
                 emoji: nextEmoji?.trim() ? nextEmoji.trim() : null,
                 updatedAtMs: docItem.emoji === (nextEmoji?.trim() || null) ? docItem.updatedAtMs : now,
+                updatedByUid: docItem.emoji === (nextEmoji?.trim() || null) ? docItem.updatedByUid ?? null : user?.uid ?? null,
+                updatedByName: docItem.emoji === (nextEmoji?.trim() || null) ? docItem.updatedByName ?? null : routineActorName,
               }
             : docItem
         )
       );
       closeRoutineEmojiPicker();
     },
-    [closeRoutineEmojiPicker, routineEmojiPickerTargetId]
+    [closeRoutineEmojiPicker, routineActorName, routineEmojiPickerTargetId, user?.uid]
   );
 
   const handleSetRoutineDocEmoji = React.useCallback(() => {
@@ -1559,6 +1639,8 @@ export default function TilbakemeldingPage() {
           title: "Fane 1",
           content: "",
           updatedAtMs: Date.now(),
+          updatedByUid: user?.uid ?? null,
+          updatedByName: routineActorName,
           parentId: null,
           emoji: null,
         };
@@ -1573,7 +1655,7 @@ export default function TilbakemeldingPage() {
       return next;
     });
     closeRoutineDocMenu();
-  }, [closeRoutineDocMenu, routineDocMenuTarget, selectedRoutineDocumentId]);
+  }, [closeRoutineDocMenu, routineActorName, routineDocMenuTarget, selectedRoutineDocumentId, user?.uid]);
 
   const handleRoutineContentChange = React.useCallback((value: string) => {
     if (!selectedRoutineDocumentId) return;
@@ -1583,11 +1665,17 @@ export default function TilbakemeldingPage() {
         docItem.id === selectedRoutineDocumentId
           ? docItem.content === value
             ? docItem
-            : { ...docItem, content: value, updatedAtMs: now }
+            : {
+                ...docItem,
+                content: value,
+                updatedAtMs: now,
+                updatedByUid: user?.uid ?? null,
+                updatedByName: routineActorName,
+              }
           : docItem
       )
     );
-  }, [selectedRoutineDocumentId]);
+  }, [routineActorName, selectedRoutineDocumentId, user?.uid]);
 
   const isNodeInsideRoutineEditor = React.useCallback((node: Node | null) => {
     const editor = routineEditorRef.current;
@@ -2578,6 +2666,8 @@ export default function TilbakemeldingPage() {
                       <Typography variant="caption" sx={{ color: "text.secondary" }}>
                         Sist oppdatert:{" "}
                         {selectedRoutineDocument.updatedAtMs ? formatDateTime(selectedRoutineDocument.updatedAtMs) : "Ikke oppdatert"}
+                        {" "}
+                        | Bruker: {selectedRoutineUpdatedByLabel}
                       </Typography>
                     </Box>
                   </Box>
