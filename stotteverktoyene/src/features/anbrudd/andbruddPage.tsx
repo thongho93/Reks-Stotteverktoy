@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -35,7 +34,6 @@ const formatRefreshTime = (value: string | null) => {
 
 export default function AndbruddPage() {
   const [tab, setTab] = useState<"form" | "sharepoint">("sharepoint");
-  const [iframeError, setIframeError] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [refreshKeys, setRefreshKeys] = useState({ form: 0, sharepoint: 0 });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -70,18 +68,16 @@ export default function AndbruddPage() {
     if (!current.src) {
       hasLoadedRef.current = true;
       setIframeLoaded(true);
-      setIframeError(false);
       setIsRefreshing(false);
       return;
     }
 
     hasLoadedRef.current = false;
     setIframeLoaded(false);
-    setIframeError(false);
 
     const timer = setTimeout(() => {
       if (!hasLoadedRef.current) {
-        setIframeError(true);
+        setIsRefreshing(false);
       }
     }, 4000);
 
@@ -89,7 +85,6 @@ export default function AndbruddPage() {
   }, [current.src]);
 
   const refreshCurrent = () => {
-    setIframeError(false);
     setIsRefreshing(true);
     setRefreshKeys((prev) => ({
       ...prev,
@@ -143,13 +138,6 @@ export default function AndbruddPage() {
 
       {current.src ? (
         <>
-          {iframeError && (
-            <Alert severity="warning" sx={{ mb: 1.5 }}>
-              Innholdet kunne ikke lastes stabilt i appen. Prøv `Oppdater`, eller bruk `Åpne for
-              redigering`.
-            </Alert>
-          )}
-
           <Box sx={{ position: "relative", minHeight: current.height }}>
             {!iframeLoaded && (
               <Box
@@ -190,7 +178,6 @@ export default function AndbruddPage() {
               onLoad={() => {
                 hasLoadedRef.current = true;
                 setIframeLoaded(true);
-                setIframeError(false);
                 setIsRefreshing(false);
                 setLastLoadedAt((prev) => ({
                   ...prev,
@@ -200,7 +187,6 @@ export default function AndbruddPage() {
               onError={() => {
                 hasLoadedRef.current = true;
                 setIframeLoaded(true);
-                setIframeError(true);
                 setIsRefreshing(false);
               }}
               frameBorder={0}
