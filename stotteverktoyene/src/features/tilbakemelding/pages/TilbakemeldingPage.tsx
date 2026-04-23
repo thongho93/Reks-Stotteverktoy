@@ -111,6 +111,7 @@ type RoutineDocument = {
   id: string;
   title: string;
   content: string;
+  updatedAtMs: number;
   parentId?: string | null;
   emoji?: string | null;
 };
@@ -1127,6 +1128,7 @@ export default function TilbakemeldingPage() {
       id: createRoutineDocId(),
       title: "Fane 1",
       content: "",
+      updatedAtMs: Date.now(),
       parentId: null,
       emoji: null,
     }),
@@ -1148,6 +1150,7 @@ export default function TilbakemeldingPage() {
       sharedRoutineDocRef,
       (snapshot) => {
         const data = snapshot.exists() ? (snapshot.data() as any) : null;
+        const sharedUpdatedAtMs = toMillis(data?.updatedAt);
         const docs = Array.isArray(data?.documents)
           ? data.documents
               .map((docItem: unknown): RoutineDocument | null => {
@@ -1163,6 +1166,10 @@ export default function TilbakemeldingPage() {
                   id: (docItem as any).id,
                   title: (docItem as any).title,
                   content: (docItem as any).content,
+                  updatedAtMs:
+                    typeof (docItem as any).updatedAtMs === "number"
+                      ? (docItem as any).updatedAtMs
+                      : toMillis((docItem as any).updatedAt) || sharedUpdatedAtMs || Date.now(),
                   parentId: typeof (docItem as any).parentId === "string" ? (docItem as any).parentId : null,
                   emoji: typeof (docItem as any).emoji === "string" ? (docItem as any).emoji : null,
                 };
@@ -1251,6 +1258,7 @@ export default function TilbakemeldingPage() {
         id: createRoutineDocId(),
         title: `Fane ${nextCount}`,
         content: "",
+        updatedAtMs: Date.now(),
         parentId: null,
         emoji: null,
       };
@@ -1289,6 +1297,7 @@ export default function TilbakemeldingPage() {
         id: createRoutineDocId(),
         title: `${parent.title} - underfane`,
         content: "",
+        updatedAtMs: Date.now(),
         parentId: parent.id,
         emoji: null,
       };
@@ -1313,6 +1322,7 @@ export default function TilbakemeldingPage() {
   const commitRoutineDocRename = React.useCallback(() => {
     if (!editingRoutineDocId) return;
     const nextName = editingRoutineDocTitle.trim();
+    const now = Date.now();
     if (nextName) {
       setRoutineDocuments((prev) =>
         prev.map((docItem) =>
@@ -1320,6 +1330,7 @@ export default function TilbakemeldingPage() {
             ? {
                 ...docItem,
                 title: nextName,
+                updatedAtMs: docItem.title === nextName ? docItem.updatedAtMs : now,
               }
             : docItem
         )
@@ -1352,12 +1363,14 @@ export default function TilbakemeldingPage() {
   const applyRoutineDocEmoji = React.useCallback(
     (nextEmoji: string | null) => {
       if (!routineEmojiPickerTargetId) return;
+      const now = Date.now();
       setRoutineDocuments((prev) =>
         prev.map((docItem) =>
           docItem.id === routineEmojiPickerTargetId
             ? {
                 ...docItem,
                 emoji: nextEmoji?.trim() ? nextEmoji.trim() : null,
+                updatedAtMs: docItem.emoji === (nextEmoji?.trim() || null) ? docItem.updatedAtMs : now,
               }
             : docItem
         )
@@ -1409,6 +1422,7 @@ export default function TilbakemeldingPage() {
           id: createRoutineDocId(),
           title: "Fane 1",
           content: "",
+          updatedAtMs: Date.now(),
           parentId: null,
           emoji: null,
         };
@@ -1427,9 +1441,14 @@ export default function TilbakemeldingPage() {
 
   const handleRoutineContentChange = React.useCallback((value: string) => {
     if (!selectedRoutineDocumentId) return;
+    const now = Date.now();
     setRoutineDocuments((prev) =>
       prev.map((docItem) =>
-        docItem.id === selectedRoutineDocumentId ? { ...docItem, content: value } : docItem
+        docItem.id === selectedRoutineDocumentId
+          ? docItem.content === value
+            ? docItem
+            : { ...docItem, content: value, updatedAtMs: now }
+          : docItem
       )
     );
   }, [selectedRoutineDocumentId]);
@@ -1642,7 +1661,7 @@ export default function TilbakemeldingPage() {
         <Paper
           sx={{
             minHeight: 520,
-            height: { xs: "calc(100vh - 230px)", md: "calc(100vh - 190px)" },
+            height: { xs: "calc(100dvh - 230px)", md: "calc(100dvh - 130px)" },
             overflow: "hidden",
           }}
         >
@@ -2248,46 +2267,65 @@ export default function TilbakemeldingPage() {
                       </Popover>
                     </Box>
                   </Box>
-                  <Box sx={{ p: 0, flex: 1, minHeight: 0 }}>
+                  <Box sx={{ p: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                    <Box sx={{ flex: 1, minHeight: 0 }}>
+                      <Box
+                        key={selectedRoutineDocument.id}
+                        ref={routineEditorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={handleRoutineEditorInput}
+                        onMouseUp={() => {
+                          captureRoutineSelection();
+                          updateRoutineFormatState();
+                        }}
+                        onKeyUp={() => {
+                          captureRoutineSelection();
+                          updateRoutineFormatState();
+                        }}
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          overflow: "auto",
+                          p: "30px 34px",
+                          color: "text.primary",
+                          lineHeight: 1.7,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          outline: "none",
+                          "& p": { m: 0, mb: 1.35 },
+                          "& h1": {
+                            m: 0,
+                            mb: 1.35,
+                            lineHeight: 1.22,
+                            fontWeight: 700,
+                          },
+                          "& h2": {
+                            m: 0,
+                            mb: 1.25,
+                            lineHeight: 1.28,
+                            fontWeight: 700,
+                          },
+                        }}
+                      />
+                    </Box>
                     <Box
-                      key={selectedRoutineDocument.id}
-                      ref={routineEditorRef}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={handleRoutineEditorInput}
-                      onMouseUp={() => {
-                        captureRoutineSelection();
-                        updateRoutineFormatState();
-                      }}
-                      onKeyUp={() => {
-                        captureRoutineSelection();
-                        updateRoutineFormatState();
-                      }}
                       sx={{
-                        width: "100%",
-                        height: "100%",
-                        overflow: "auto",
-                        p: "30px 34px",
-                        color: "text.primary",
-                        lineHeight: 1.7,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        outline: "none",
-                        "& p": { m: 0, mb: 1.35 },
-                        "& h1": {
-                          m: 0,
-                          mb: 1.35,
-                          lineHeight: 1.22,
-                          fontWeight: 700,
-                        },
-                        "& h2": {
-                          m: 0,
-                          mb: 1.25,
-                          lineHeight: 1.28,
-                          fontWeight: 700,
-                        },
+                        px: 1.6,
+                        py: 0.5,
+                        borderTop: "1px solid",
+                        borderColor: "divider",
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(24, 33, 46, 0.9)" : "rgba(248,250,252,0.95)",
                       }}
-                    />
+                    >
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Sist oppdatert:{" "}
+                        {selectedRoutineDocument.updatedAtMs ? formatDateTime(selectedRoutineDocument.updatedAtMs) : "Ikke oppdatert"}
+                      </Typography>
+                    </Box>
                   </Box>
                 </>
               ) : (
