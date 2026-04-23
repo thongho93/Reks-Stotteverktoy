@@ -623,6 +623,8 @@ export default function TilbakemeldingPage() {
   });
   const routineLayoutRef = React.useRef<HTMLDivElement | null>(null);
   const routineEditorRef = React.useRef<HTMLDivElement | null>(null);
+  const routineSearchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const notesSearchInputRef = React.useRef<HTMLInputElement | null>(null);
   const routineRenameInputRef = React.useRef<HTMLInputElement | null>(null);
   const routineRenameTimerRef = React.useRef<number | null>(null);
   const activeRoutineDocRef = React.useRef<string | null>(null);
@@ -1732,6 +1734,46 @@ export default function TilbakemeldingPage() {
     };
   }, [captureRoutineSelection, tab, updateRoutineFormatState]);
 
+  React.useEffect(() => {
+    const handleRoutineSearchShortcut = (event: KeyboardEvent) => {
+      const isSaveShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
+      if (isSaveShortcut) {
+        if (tab === "rutiner") {
+          event.preventDefault();
+          const input = routineSearchInputRef.current;
+          if (!input) return;
+          input.focus();
+          input.select();
+          return;
+        }
+
+        if (tab === "notater") {
+          event.preventDefault();
+          const input = notesSearchInputRef.current;
+          if (!input) return;
+          input.focus();
+          input.select();
+          return;
+        }
+      }
+
+      if (event.key !== "Escape" || tab !== "notater") return;
+      const input = notesSearchInputRef.current;
+      if (!input || document.activeElement !== input) return;
+
+      event.preventDefault();
+      setSearchQuery("");
+      window.requestAnimationFrame(() => {
+        input.focus();
+      });
+    };
+
+    window.addEventListener("keydown", handleRoutineSearchShortcut);
+    return () => {
+      window.removeEventListener("keydown", handleRoutineSearchShortcut);
+    };
+  }, [tab]);
+
   return (
     <Box sx={{ width: "100%" }}>
       <Paper sx={{ mb: 2 }}>
@@ -2457,6 +2499,7 @@ export default function TilbakemeldingPage() {
                         renderInput={(params) => (
                           <TextField
                             {...params}
+                            inputRef={routineSearchInputRef}
                             placeholder="Søk i rutiner"
                             sx={{
                               "& .MuiInputBase-root": {
@@ -2903,6 +2946,7 @@ export default function TilbakemeldingPage() {
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
                       <InputBase
+                        inputRef={notesSearchInputRef}
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
                         placeholder="søk"
