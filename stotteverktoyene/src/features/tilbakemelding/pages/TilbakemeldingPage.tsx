@@ -628,6 +628,10 @@ export default function TilbakemeldingPage() {
   const [routineFontFamily, setRoutineFontFamily] = React.useState<(typeof ROUTINE_FONT_OPTIONS)[number]>("Arial");
   const [routineTextColor, setRoutineTextColor] = React.useState("#111827");
   const [routineColorAnchorEl, setRoutineColorAnchorEl] = React.useState<HTMLElement | null>(null);
+  const [routineLinkAnchorEl, setRoutineLinkAnchorEl] = React.useState<HTMLElement | null>(null);
+  const [routineLinkLabel, setRoutineLinkLabel] = React.useState("");
+  const [routineLinkUrl, setRoutineLinkUrl] = React.useState("");
+  const [routineLinkError, setRoutineLinkError] = React.useState<string | null>(null);
   const [routineDocMenuAnchorEl, setRoutineDocMenuAnchorEl] = React.useState<HTMLElement | null>(null);
   const [routineDocMenuTargetId, setRoutineDocMenuTargetId] = React.useState<string | null>(null);
   const [routineEmojiPickerAnchorEl, setRoutineEmojiPickerAnchorEl] = React.useState<HTMLElement | null>(null);
@@ -1198,6 +1202,7 @@ export default function TilbakemeldingPage() {
   );
   const showRoutineLabels = tab !== "rutiner" || routineSidebarWidth >= 170;
   const routineColorMenuOpen = Boolean(routineColorAnchorEl);
+  const routineLinkMenuOpen = Boolean(routineLinkAnchorEl);
   const routineDocMenuOpen = Boolean(routineDocMenuAnchorEl);
   const routineEmojiPickerOpen = Boolean(routineEmojiPickerAnchorEl);
   const routineDocMenuTarget =
@@ -1767,13 +1772,56 @@ export default function TilbakemeldingPage() {
     }
   }, []);
 
+  const detectRoutineStyleFromSelection = React.useCallback((): RoutineTextStyle | null => {
+    const editor = routineEditorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection || selection.rangeCount === 0) return null;
+
+    const range = selection.getRangeAt(0);
+    if (!isNodeInsideRoutineEditor(range.commonAncestorContainer)) return null;
+
+    const mapBlockTagToStyle = (rawValue: string | null | undefined): RoutineTextStyle | null => {
+      if (!rawValue) return null;
+      const normalized = rawValue.toLowerCase().replace(/[<>]/g, "").trim();
+      if (normalized === "h1") return "h1";
+      if (normalized === "h2" || normalized === "h3" || normalized === "h4" || normalized === "h5" || normalized === "h6") {
+        return "h2";
+      }
+      if (normalized === "p" || normalized === "div" || normalized === "li") return "p";
+      return null;
+    };
+
+    const formatBlockValue = mapBlockTagToStyle(document.queryCommandValue("formatBlock"));
+    if (formatBlockValue) {
+      return formatBlockValue;
+    }
+
+    const anchorNode = selection.anchorNode ?? range.startContainer;
+    let element =
+      anchorNode.nodeType === Node.ELEMENT_NODE
+        ? (anchorNode as Element)
+        : anchorNode.parentElement;
+
+    while (element && element !== editor) {
+      const mapped = mapBlockTagToStyle(element.tagName);
+      if (mapped) return mapped;
+      element = element.parentElement;
+    }
+
+    return "p";
+  }, [isNodeInsideRoutineEditor]);
+
   const updateRoutineFormatState = React.useCallback(() => {
     setRoutineFormatState({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
       underline: document.queryCommandState("underline"),
     });
-  }, []);
+    const nextStyle = detectRoutineStyleFromSelection();
+    if (nextStyle) {
+      setRoutineTextStyle(nextStyle);
+    }
+  }, [detectRoutineStyleFromSelection]);
 
   const syncRoutineEditorContent = React.useCallback(() => {
     const editor = routineEditorRef.current;
@@ -1796,14 +1844,20 @@ export default function TilbakemeldingPage() {
     [captureRoutineSelection, restoreRoutineSelection, syncRoutineEditorContent, updateRoutineFormatState]
   );
 
+  const getRoutineFormatBlockValue = React.useCallback((style: RoutineTextStyle) => {
+    if (style === "h1") return "<h1>";
+    if (style === "h2") return "<h2>";
+    return "<p>";
+  }, []);
+
   const handleRoutineStyleChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const nextStyle = event.target.value as RoutineTextStyle;
       setRoutineTextStyle(nextStyle);
-      const formatValue = nextStyle === "p" ? "<p>" : nextStyle === "h1" ? "<h1>" : "<h2>";
+      const formatValue = getRoutineFormatBlockValue(nextStyle);
       runRoutineCommand("formatBlock", formatValue);
     },
-    [runRoutineCommand]
+    [getRoutineFormatBlockValue, runRoutineCommand]
   );
 
   const handleRoutineFontChange = React.useCallback(
@@ -1835,6 +1889,139 @@ export default function TilbakemeldingPage() {
       setRoutineColorAnchorEl(null);
     },
     [runRoutineCommand]
+  );
+
+  const normalizeRoutineLinkUrl = React.useCallback((rawUrl: string): string | null => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return null;
+    const withProtocol = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      const parsed = new URL(withProtocol);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const handleOpenRoutineLinkMenu = React.useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      captureRoutineSelection();
+      const selection = window.getSelection();
+      const selectedText =
+        selection &&
+        selection.rangeCount > 0 &&
+        isNodeInsideRoutineEditor(selection.getRangeAt(0).commonAncestorContainer)
+          ? selection.toString().trim()
+          : "";
+      setRoutineLinkLabel(selectedText);
+      setRoutineLinkUrl("");
+      setRoutineLinkError(null);
+      setRoutineLinkAnchorEl(event.currentTarget);
+    },
+    [captureRoutineSelection, isNodeInsideRoutineEditor]
+  );
+
+  const handleCloseRoutineLinkMenu = React.useCallback(() => {
+    setRoutineLinkAnchorEl(null);
+    setRoutineLinkError(null);
+  }, []);
+
+  const handleInsertRoutineLink = React.useCallback(() => {
+    const normalizedUrl = normalizeRoutineLinkUrl(routineLinkUrl);
+    if (!normalizedUrl) {
+      setRoutineLinkError("Skriv en gyldig lenke (http/https).");
+      return;
+    }
+
+    const linkLabel = routineLinkLabel.trim() || normalizedUrl;
+    const editor = routineEditorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    restoreRoutineSelection();
+
+    const selection = window.getSelection();
+    const canInsertAtSelection =
+      selection !== null &&
+      selection.rangeCount > 0 &&
+      isNodeInsideRoutineEditor(selection.getRangeAt(0).commonAncestorContainer);
+
+    const anchor = document.createElement("a");
+    anchor.href = normalizedUrl;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.textContent = linkLabel;
+
+    if (canInsertAtSelection && selection) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(anchor);
+      range.setStartAfter(anchor);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      editor.appendChild(anchor);
+      editor.appendChild(document.createTextNode(" "));
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    captureRoutineSelection();
+    syncRoutineEditorContent();
+    window.setTimeout(updateRoutineFormatState, 0);
+    setRoutineLinkAnchorEl(null);
+    setRoutineLinkError(null);
+    setCopyToast({ message: "Lenke lagt til.", severity: "success" });
+  }, [
+    captureRoutineSelection,
+    isNodeInsideRoutineEditor,
+    normalizeRoutineLinkUrl,
+    restoreRoutineSelection,
+    routineLinkLabel,
+    routineLinkUrl,
+    syncRoutineEditorContent,
+    updateRoutineFormatState,
+  ]);
+
+  const handleRoutineEditorClick = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const link = target?.closest("a[href]") as HTMLAnchorElement | null;
+    if (!link) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.open(link.href, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const handleRoutineEditorKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Enter") return;
+      if (routineTextStyle === "p") return;
+
+      window.setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        if (!isNodeInsideRoutineEditor(selection.getRangeAt(0).commonAncestorContainer)) return;
+        document.execCommand("styleWithCSS", false, "true");
+        document.execCommand("formatBlock", false, getRoutineFormatBlockValue(routineTextStyle));
+        captureRoutineSelection();
+        syncRoutineEditorContent();
+        window.setTimeout(updateRoutineFormatState, 0);
+      }, 0);
+    },
+    [
+      captureRoutineSelection,
+      getRoutineFormatBlockValue,
+      isNodeInsideRoutineEditor,
+      routineTextStyle,
+      syncRoutineEditorContent,
+      updateRoutineFormatState,
+    ]
   );
 
   const handleRoutineEditorInput = React.useCallback(() => {
@@ -2452,8 +2639,8 @@ export default function TilbakemeldingPage() {
                         onClick={() => runRoutineCommand("bold")}
                         aria-label="Fet skrift"
                         sx={{
-                          width: 34,
-                          height: 34,
+                          width: 36,
+                          height: 36,
                           border: "1px solid",
                           borderColor: routineFormatState.bold ? "primary.main" : "divider",
                           bgcolor: (theme) =>
@@ -2464,15 +2651,15 @@ export default function TilbakemeldingPage() {
                               : "transparent",
                         }}
                       >
-                        <FormatBoldIcon sx={{ fontSize: 20 }} />
+                        <FormatBoldIcon sx={{ fontSize: 19 }} />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => runRoutineCommand("italic")}
                         aria-label="Kursiv"
                         sx={{
-                          width: 34,
-                          height: 34,
+                          width: 36,
+                          height: 36,
                           border: "1px solid",
                           borderColor: routineFormatState.italic ? "primary.main" : "divider",
                           bgcolor: (theme) =>
@@ -2483,15 +2670,15 @@ export default function TilbakemeldingPage() {
                               : "transparent",
                         }}
                       >
-                        <FormatItalicIcon sx={{ fontSize: 20 }} />
+                        <FormatItalicIcon sx={{ fontSize: 19 }} />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => runRoutineCommand("underline")}
                         aria-label="Understreket"
                         sx={{
-                          width: 34,
-                          height: 34,
+                          width: 36,
+                          height: 36,
                           border: "1px solid",
                           borderColor: routineFormatState.underline ? "primary.main" : "divider",
                           bgcolor: (theme) =>
@@ -2502,7 +2689,7 @@ export default function TilbakemeldingPage() {
                               : "transparent",
                         }}
                       >
-                        <FormatUnderlinedIcon sx={{ fontSize: 20 }} />
+                        <FormatUnderlinedIcon sx={{ fontSize: 19 }} />
                       </IconButton>
                     </Box>
 
@@ -2514,8 +2701,10 @@ export default function TilbakemeldingPage() {
                         onClick={handleOpenRoutineColorMenu}
                         sx={{
                           minWidth: 0,
-                          px: 0.75,
-                          py: 0.32,
+                          height: 36,
+                          minHeight: 36,
+                          px: 0.95,
+                          py: 0,
                           borderRadius: 1.25,
                           borderColor: "divider",
                           color: "text.secondary",
@@ -2596,6 +2785,93 @@ export default function TilbakemeldingPage() {
                               }}
                             />
                           ))}
+                        </Box>
+                      </Popover>
+                    </Box>
+
+                    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={handleOpenRoutineLinkMenu}
+                        startIcon={<LinkOutlinedIcon sx={{ fontSize: 18 }} />}
+                        sx={{
+                          minWidth: 0,
+                          height: 36,
+                          minHeight: 36,
+                          px: 1.25,
+                          py: 0,
+                          borderRadius: 1.25,
+                          borderColor: "divider",
+                          color: "text.secondary",
+                          textTransform: "none",
+                          fontSize: "0.95rem",
+                          fontWeight: 700,
+                          "&:hover": {
+                            borderColor: "text.secondary",
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(165,177,198,0.12)"
+                                : "rgba(15,23,42,0.04)",
+                          },
+                        }}
+                      >
+                        Lenke
+                      </Button>
+                      <Popover
+                        open={routineLinkMenuOpen}
+                        anchorEl={routineLinkAnchorEl}
+                        onClose={handleCloseRoutineLinkMenu}
+                        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                        transformOrigin={{ vertical: "top", horizontal: "left" }}
+                        slotProps={{
+                          paper: {
+                            sx: {
+                              mt: 0.8,
+                              p: 1,
+                              width: 300,
+                              borderRadius: 1.4,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            },
+                          },
+                        }}
+                      >
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9 }}>
+                          <TextField
+                            size="small"
+                            label="Kallenavn"
+                            value={routineLinkLabel}
+                            onChange={(event) => setRoutineLinkLabel(event.target.value)}
+                            placeholder="f.eks. Prisjakt"
+                          />
+                          <TextField
+                            size="small"
+                            label="Lenke"
+                            value={routineLinkUrl}
+                            onChange={(event) => {
+                              setRoutineLinkUrl(event.target.value);
+                              if (routineLinkError) setRoutineLinkError(null);
+                            }}
+                            placeholder="https://example.no"
+                            error={Boolean(routineLinkError)}
+                            helperText={routineLinkError ?? "Åpnes i ny fane ved klikk."}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleInsertRoutineLink();
+                              }
+                            }}
+                          />
+                          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 0.7 }}>
+                            <Button size="small" onClick={handleCloseRoutineLinkMenu}>
+                              Avbryt
+                            </Button>
+                            <Button size="small" variant="contained" onClick={handleInsertRoutineLink}>
+                              Sett inn
+                            </Button>
+                          </Box>
                         </Box>
                       </Popover>
                     </Box>
@@ -2686,6 +2962,8 @@ export default function TilbakemeldingPage() {
                         contentEditable
                         suppressContentEditableWarning
                         onInput={handleRoutineEditorInput}
+                        onClick={handleRoutineEditorClick}
+                        onKeyDown={handleRoutineEditorKeyDown}
                         onMouseUp={() => {
                           captureRoutineSelection();
                           updateRoutineFormatState();
@@ -2716,6 +2994,11 @@ export default function TilbakemeldingPage() {
                             mb: 1.25,
                             lineHeight: 1.28,
                             fontWeight: 700,
+                          },
+                          "& a": {
+                            color: "primary.main",
+                            textDecoration: "underline",
+                            cursor: "pointer",
                           },
                         }}
                       />
