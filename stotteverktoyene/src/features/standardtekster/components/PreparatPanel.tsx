@@ -27,6 +27,7 @@ type Props = {
   includeManufacturerInText?: boolean;
   includePackSizeInText?: boolean;
   autoPasteNumericClipboard?: boolean;
+  searchResetSignal?: string | number | null;
   onClearOnCopyChange?: (value: boolean) => void;
   onIncludeManufacturerInTextChange?: (value: boolean) => void;
   onIncludePackSizeInTextChange?: (value: boolean) => void;
@@ -56,6 +57,7 @@ export default function PreparatPanel({
   includeManufacturerInText = false,
   includePackSizeInText = false,
   autoPasteNumericClipboard = false,
+  searchResetSignal = null,
   onClearOnCopyChange,
   onIncludeManufacturerInTextChange,
   onIncludePackSizeInTextChange,
@@ -132,6 +134,7 @@ export default function PreparatPanel({
           <MedicationSearch
             inputRef={inputRef}
             autoPasteNumericClipboard={autoPasteNumericClipboard}
+            resetSignal={searchResetSignal}
             onPick={(med) => {
               const baseText = formatPreparatForTemplate(med);
               if (!baseText) return;

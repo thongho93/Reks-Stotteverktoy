@@ -1863,11 +1863,13 @@ export default function StandardTekstPage() {
 
             <Box ref={preparatSectionRef}>
               <PreparatPanel
+                key={selectedId ?? "none"}
                 preparatRows={preparatRows}
                 clearOnCopy={clearOnCopy}
                 includeManufacturerInText={includeManufacturerInPreparatText}
                 includePackSizeInText={includePackSizeInPreparatText}
                 autoPasteNumericClipboard={autoPasteNumericClipboard}
+                searchResetSignal={selectedId}
                 onClearOnCopyChange={setClearOnCopy}
                 onIncludeManufacturerInTextChange={handleIncludeManufacturerInPreparatTextChange}
                 onIncludePackSizeInTextChange={handleIncludePackSizeInPreparatTextChange}

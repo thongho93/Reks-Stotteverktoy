@@ -700,25 +700,13 @@
 .sidebarBody {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
   padding-bottom: 8px;
-  scrollbar-gutter: stable;
+  scrollbar-width: none; /* Firefox */
 }
 
 .sidebarBody::-webkit-scrollbar {
-  width: 10px;
-}
-
-.sidebarBody::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.sidebarBody::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
-  background-clip: content-box;
+  display: none; /* Chrome/Safari — completely hidden, content still scrollable */
 }
 
 .editRowBottom {
@@ -1143,10 +1131,7 @@
   color: var(--app-text-muted);
 }
 
-:global([data-app-theme="dark"]) .sidebarBody::-webkit-scrollbar-thumb {
-  background: rgba(123, 137, 157, 0.6);
-  background-clip: content-box;
-}
+/* sidebarBody scrollbar is hidden globally — no dark-mode override needed */
 
 :global([data-app-theme="dark"]) .preparatClearButton {
   background: rgba(165, 177, 198, 0.12);

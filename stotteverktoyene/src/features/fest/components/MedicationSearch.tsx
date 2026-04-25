@@ -67,6 +67,7 @@ type Props = {
   onManualPick?: (payload: { name: string; query: string }) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   autoPasteNumericClipboard?: boolean;
+  resetSignal?: string | number | null;
 };
 
 const NOISE_TOKENS = new Set([
@@ -539,6 +540,7 @@ export default function MedicationSearch({
   onManualPick,
   inputRef,
   autoPasteNumericClipboard = false,
+  resetSignal = null,
 }: Props) {
   const [query, setQuery] = useState("");
   const queryRef = useRef("");
@@ -558,6 +560,15 @@ export default function MedicationSearch({
 
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const effectiveInputRef = inputRef ?? internalInputRef;
+
+  useEffect(() => {
+    setQuery("");
+    queryRef.current = "";
+    setManualName("");
+    setOpen(false);
+    setHighlightedIndex(-1);
+    lastAutoFilledQueryRef.current = "";
+  }, [resetSignal]);
 
   useEffect(() => {
     let cancelled = false;
