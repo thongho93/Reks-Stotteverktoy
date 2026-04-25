@@ -301,7 +301,16 @@ export default function StandardTekstContent({
     >
       {!selected && !loading && (
         <Box className={styles.emptyState}>
-          <Typography variant="body2" color="text.secondary" className={styles.emptyStateTitle}>
+          <Typography
+            variant="h4"
+            color="text.secondary"
+            className={styles.emptyStateTitle}
+            sx={{
+              fontSize: "clamp(2rem, 1.45rem + 1.15vw)",
+              fontWeight: 700,
+              lineHeight: 1.18,
+            }}
+          >
             Søk eller velg en standardtekst fra listen
           </Typography>
           <Box

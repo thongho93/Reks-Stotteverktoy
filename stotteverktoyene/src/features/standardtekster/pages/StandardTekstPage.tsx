@@ -800,6 +800,8 @@ export default function StandardTekstPage() {
   const [followUpPick, setFollowUpPick] = useState<{ id: string; title: string } | null>(null);
   const [followUpLabel, setFollowUpLabel] = useState<string>("");
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
+  const draggingFollowUpIdRef = useRef<string | null>(null);
+  const [dragOverFollowUpId, setDragOverFollowUpId] = useState<string | null>(null);
 
   const pickedPreparats = useMemo(
     () => preparatRows.map((r) => r.picked).filter(Boolean) as string[],
@@ -1336,6 +1338,52 @@ export default function StandardTekstPage() {
     setEditingFollowUpId(followUp.id);
   };
 
+  const moveFollowUp = (fromId: string, toId: string) => {
+    if (!fromId || !toId || fromId === toId) return;
+    setDraftFollowUps((prev) => {
+      const fromIndex = prev.findIndex((item) => item.id === fromId);
+      const toIndex = prev.findIndex((item) => item.id === toId);
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev;
+
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const handleFollowUpDragStart = (id: string) => {
+    if (!isEditing) return;
+    draggingFollowUpIdRef.current = id;
+    setDragOverFollowUpId(id);
+  };
+
+  const handleFollowUpDragEnd = () => {
+    draggingFollowUpIdRef.current = null;
+    setDragOverFollowUpId(null);
+  };
+
+  const handleFollowUpDragOver = (event: React.DragEvent, overId: string) => {
+    if (!isEditing) return;
+    const draggingId = draggingFollowUpIdRef.current;
+    if (!draggingId || draggingId === overId) return;
+    event.preventDefault();
+    if (dragOverFollowUpId !== overId) {
+      setDragOverFollowUpId(overId);
+    }
+  };
+
+  const handleFollowUpDrop = (event: React.DragEvent, dropId: string) => {
+    if (!isEditing) return;
+    event.preventDefault();
+    const draggingId = draggingFollowUpIdRef.current;
+    if (draggingId && draggingId !== dropId) {
+      moveFollowUp(draggingId, dropId);
+    }
+    draggingFollowUpIdRef.current = null;
+    setDragOverFollowUpId(null);
+  };
+
   const openFollowUp = (id: string) => {
     preserveInputsOnNextSelectRef.current = true;
     setSelectedId(id);
@@ -1348,7 +1396,7 @@ export default function StandardTekstPage() {
         Legg til oppfølgingstekster som knapper for denne standardteksten.
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-        Klikk på en chip for å endre navn.
+        Klikk på en chip for å endre navn. Dra og slipp for å endre rekkefølge.
       </Typography>
 
       {draftFollowUps.length > 0 ? (
@@ -1369,6 +1417,17 @@ export default function StandardTekstPage() {
               icon={<OpenInNewIcon />}
               variant={editingFollowUpId === fu.id ? "filled" : "outlined"}
               color={editingFollowUpId === fu.id ? "primary" : "default"}
+              draggable={canManageStandardTekster && isEditing}
+              onDragStart={() => handleFollowUpDragStart(fu.id)}
+              onDragEnd={handleFollowUpDragEnd}
+              onDragOver={(event) => handleFollowUpDragOver(event, fu.id)}
+              onDrop={(event) => handleFollowUpDrop(event, fu.id)}
+              sx={{
+                cursor: canManageStandardTekster && isEditing ? "grab" : "pointer",
+                opacity:
+                  draggingFollowUpIdRef.current && draggingFollowUpIdRef.current === fu.id ? 0.8 : 1,
+                borderStyle: dragOverFollowUpId === fu.id ? "dashed" : undefined,
+              }}
             />
           ))}
         </Stack>
