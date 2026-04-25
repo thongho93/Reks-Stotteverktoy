@@ -348,10 +348,19 @@ export default function PreparatPanel({
         <Box className={styles.preparatChipsWrap}>
           {preparatRows
             .filter((r) => r.picked)
-            .map((r) => (
+            .map((r, index) => (
               <Chip
                 key={String(r.id)}
-                label={r.picked as string}
+                label={
+                  <Box component="span" className={styles.preparatChipLabel}>
+                    <Box component="span" className={styles.preparatChipIndex}>
+                      Preparat {index + 1}
+                    </Box>
+                    <Box component="span" className={styles.preparatChipText}>
+                      {r.picked as string}
+                    </Box>
+                  </Box>
+                }
                 onDelete={() => onRemove(r.id)}
                 className={styles.preparatChip}
               />

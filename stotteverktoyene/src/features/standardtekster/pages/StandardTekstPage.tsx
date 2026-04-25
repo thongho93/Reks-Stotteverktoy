@@ -1382,28 +1382,23 @@ export default function StandardTekstPage() {
 
   // Preview for follow-up texts
   const followUpsPreview = selected?.followUps?.length ? (
-    <Stack
-      direction="row"
-      spacing={1}
-      useFlexGap
-      flexWrap="wrap"
-      className={styles.followUpsPreviewRow}
-    >
+    <Box className={styles.followUpsPreviewRow}>
       {(selected.followUps as StandardTekstFollowUp[]).map((fu: StandardTekstFollowUp) => (
-        <Chip
+        <Button
           key={fu.id}
-          label={fu.label}
           onClick={(e) => {
             e.stopPropagation();
             openFollowUp(fu.id);
           }}
-          icon={<OpenInNewIcon />}
           variant="outlined"
           size="small"
+          startIcon={<OpenInNewIcon />}
           className={styles.followUpChip}
-        />
+        >
+          {fu.label}
+        </Button>
       ))}
-    </Stack>
+    </Box>
   ) : null;
 
   const copyBodyToClipboard = async (): Promise<boolean> => {

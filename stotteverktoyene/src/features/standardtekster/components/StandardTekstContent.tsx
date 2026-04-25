@@ -328,13 +328,12 @@ export default function StandardTekstContent({
             <Typography variant="h2" className={styles.title}>
               {selected.title}
             </Typography>
+            {!isEditing && headerRight ? (
+              <Box className={styles.headerRightWrap} onClick={(e) => e.stopPropagation()}>
+                {headerRight}
+              </Box>
+            ) : null}
           </Box>
-
-          {!isEditing && headerRight ? (
-            <Box className={styles.headerRightWrap} onClick={(e) => e.stopPropagation()}>
-              {headerRight}
-            </Box>
-          ) : null}
 
           {isAdmin && isEditing && (
             <Typography variant="body2" color="text.secondary" className={styles.category}>
