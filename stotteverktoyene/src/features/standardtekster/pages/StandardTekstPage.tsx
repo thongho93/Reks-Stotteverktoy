@@ -799,6 +799,7 @@ export default function StandardTekstPage() {
   const [draftFollowUps, setDraftFollowUps] = useState<StandardTekstFollowUp[]>([]);
   const [followUpPick, setFollowUpPick] = useState<{ id: string; title: string } | null>(null);
   const [followUpLabel, setFollowUpLabel] = useState<string>("");
+  const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
 
   const pickedPreparats = useMemo(
     () => preparatRows.map((r) => r.picked).filter(Boolean) as string[],
@@ -944,6 +945,7 @@ export default function StandardTekstPage() {
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
+    setEditingFollowUpId(null);
 
     if (shouldApplyOmeqPrefill && selected && pending) {
       resetPreparatRows();
@@ -1070,6 +1072,7 @@ export default function StandardTekstPage() {
     setDraftFollowUps((selected.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
+    setEditingFollowUpId(null);
     setIsEditing(true);
   };
 
@@ -1080,6 +1083,7 @@ export default function StandardTekstPage() {
     setDraftFollowUps((selected?.followUps ?? []) as StandardTekstFollowUp[]);
     setFollowUpPick(null);
     setFollowUpLabel("");
+    setEditingFollowUpId(null);
     setIsEditing(false);
   };
 
@@ -1095,8 +1099,13 @@ export default function StandardTekstPage() {
         if (!followUpPick) return draftFollowUps;
 
         const label = followUpLabel.trim() || `Oppfølging: ${followUpPick.title}`;
-        const exists = draftFollowUps.some((p) => p.id === followUpPick.id);
-        if (exists) return draftFollowUps;
+        const index = draftFollowUps.findIndex((p) => p.id === followUpPick.id);
+        if (index >= 0) {
+          if (draftFollowUps[index]?.label === label) return draftFollowUps;
+          const next = [...draftFollowUps];
+          next[index] = { ...next[index], label };
+          return next;
+        }
 
         return [...draftFollowUps, { id: followUpPick.id, label }];
       })();
@@ -1134,6 +1143,7 @@ export default function StandardTekstPage() {
       setDraftFollowUps(followUpsToSave);
       setFollowUpPick(null);
       setFollowUpLabel("");
+      setEditingFollowUpId(null);
 
       setIsEditing(false);
     } catch (e) {
@@ -1270,6 +1280,10 @@ export default function StandardTekstPage() {
       .map((t) => ({ id: t.id, title: t.title }));
   }, [items, selected?.id]);
 
+  const followUpOptionsById = useMemo(() => {
+    return new Map(followUpOptions.map((option) => [option.id, option] as const));
+  }, [followUpOptions]);
+
   const categoryOptions = useMemo(() => {
     const categories = new Set<string>();
 
@@ -1291,16 +1305,35 @@ export default function StandardTekstPage() {
     const label = followUpLabel.trim() || `Oppfølging: ${followUpPick.title}`;
 
     setDraftFollowUps((prev) => {
-      if (prev.some((p) => p.id === followUpPick.id)) return prev;
+      const index = prev.findIndex((p) => p.id === followUpPick.id);
+      if (index >= 0) {
+        if (prev[index]?.label === label) return prev;
+        const next = [...prev];
+        next[index] = { ...next[index], label };
+        return next;
+      }
       return [...prev, { id: followUpPick.id, label }];
     });
 
     setFollowUpPick(null);
     setFollowUpLabel("");
+    setEditingFollowUpId(null);
   };
 
   const removeFollowUp = (id: string) => {
     setDraftFollowUps((prev) => prev.filter((p) => p.id !== id));
+    if (editingFollowUpId === id) {
+      setFollowUpPick(null);
+      setFollowUpLabel("");
+      setEditingFollowUpId(null);
+    }
+  };
+
+  const startRenameFollowUp = (followUp: StandardTekstFollowUp) => {
+    const option = followUpOptionsById.get(followUp.id);
+    setFollowUpPick(option ?? { id: followUp.id, title: followUp.label });
+    setFollowUpLabel(followUp.label ?? "");
+    setEditingFollowUpId(followUp.id);
   };
 
   const openFollowUp = (id: string) => {
@@ -1314,6 +1347,9 @@ export default function StandardTekstPage() {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Legg til oppfølgingstekster som knapper for denne standardteksten.
       </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+        Klikk på en chip for å endre navn.
+      </Typography>
 
       {draftFollowUps.length > 0 ? (
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1.25 }}>
@@ -1321,11 +1357,18 @@ export default function StandardTekstPage() {
             <Chip
               key={fu.id}
               label={fu.label}
-              onClick={() => openFollowUp(fu.id)}
+              onClick={() => {
+                if (canManageStandardTekster && isEditing) {
+                  startRenameFollowUp(fu);
+                  return;
+                }
+                openFollowUp(fu.id);
+              }}
               onDelete={canManageStandardTekster && isEditing ? () => removeFollowUp(fu.id) : undefined}
               deleteIcon={canManageStandardTekster && isEditing ? <DeleteOutlineIcon /> : undefined}
               icon={<OpenInNewIcon />}
-              variant="outlined"
+              variant={editingFollowUpId === fu.id ? "filled" : "outlined"}
+              color={editingFollowUpId === fu.id ? "primary" : "default"}
             />
           ))}
         </Stack>
@@ -1344,7 +1387,21 @@ export default function StandardTekstPage() {
           size="small"
           disabled={!isEditing}
           value={followUpPick}
-          onChange={(_, v) => setFollowUpPick(v)}
+          onChange={(_, v) => {
+            setFollowUpPick(v);
+            if (!v) {
+              setEditingFollowUpId(null);
+              return;
+            }
+            const existing = draftFollowUps.find((p) => p.id === v.id);
+            if (existing) {
+              setFollowUpLabel(existing.label ?? "");
+              setEditingFollowUpId(existing.id);
+            } else {
+              setFollowUpLabel("");
+              setEditingFollowUpId(null);
+            }
+          }}
           options={followUpOptions}
           getOptionLabel={(o) => o.title}
           renderInput={(params) => <TextField {...params} label="Velg oppfølgingstekst" />}
@@ -1365,7 +1422,7 @@ export default function StandardTekstPage() {
         />
 
         <IconButton
-          aria-label="Legg til oppfølging"
+          aria-label={editingFollowUpId ? "Oppdater oppfølging" : "Legg til oppfølging"}
           disabled={!isEditing || !followUpPick}
           onClick={addFollowUp}
         >
@@ -2319,6 +2376,7 @@ export default function StandardTekstPage() {
               ) : null
             }
             headerRight={!isEditing ? followUpsPreview : null}
+            headerRightCount={selected?.followUps?.length ?? 0}
             categoryOptions={categoryOptions}
           />
         </Box>

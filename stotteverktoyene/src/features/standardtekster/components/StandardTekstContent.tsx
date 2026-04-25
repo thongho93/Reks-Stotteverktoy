@@ -45,10 +45,27 @@ type Props = {
   editorTools?: ReactNode;
   belowContent?: ReactNode;
   headerRight?: ReactNode;
+  headerRightCount?: number;
 
   previewNode: ReactNode;
   categoryOptions?: string[];
 };
+
+function renderTitleWithBreak(title: string, forceBreak: boolean): ReactNode {
+  if (!forceBreak) return title;
+
+  const match = title.match(/^(.+?\s[-–])\s+(.+)$/);
+  if (!match) return title;
+
+  return (
+    <>
+      {match[1]}
+      <Box component="span" sx={{ display: "block" }}>
+        {match[2]}
+      </Box>
+    </>
+  );
+}
 
 export default function StandardTekstContent({
   selected,
@@ -71,10 +88,14 @@ export default function StandardTekstContent({
   editorTools,
   belowContent,
   headerRight,
+  headerRightCount = 0,
   previewNode,
   categoryOptions = [],
 }: Props) {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const hasHeaderRight = !isEditing && headerRightCount > 0;
+  const hasCompactHeaderRight = hasHeaderRight && headerRightCount <= 2;
+  const hasFewHeaderRight = hasHeaderRight && headerRightCount >= 3 && headerRightCount < 4;
 
   const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const didInitNewStandardtekstContentRef = useRef(false);
@@ -269,28 +290,18 @@ export default function StandardTekstContent({
       sx={{ position: "relative" }}
       onClick={selected && !isEditing && !lockBeforeEdit ? handleCopy : undefined}
       className={
-        selected && !isEditing
-          ? `${styles.contentPaper} ${styles.contentPaperCopy}`
-          : styles.contentPaper
+        [
+          styles.contentPaper,
+          !selected ? styles.contentPaperEmpty : "",
+          selected && !isEditing ? styles.contentPaperCopy : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
       }
     >
       {!selected && !loading && (
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            minHeight: 360,
-            px: 2,
-          }}
-        >
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ fontWeight: 600, fontSize: 25, mt: 2 }}
-          >
+        <Box className={styles.emptyState}>
+          <Typography variant="body2" color="text.secondary" className={styles.emptyStateTitle}>
             Søk eller velg en standardtekst fra listen
           </Typography>
           <Box
@@ -299,12 +310,7 @@ export default function StandardTekstContent({
             alt="Velg standardtekst"
             loading="lazy"
             decoding="async"
-            sx={{
-              width: 450,
-              maxWidth: "80%",
-              mt: 2,
-              opacity: 0.95,
-            }}
+            className={styles.emptyStateImage}
           />
         </Box>
       )}
@@ -324,12 +330,27 @@ export default function StandardTekstContent({
               }}
             />
           ) : null}
-          <Box className={styles.contentHeader}>
-            <Typography variant="h2" className={styles.title}>
-              {selected.title}
+          <Box
+            className={`${styles.contentHeader} ${
+              !hasHeaderRight ? styles.contentHeaderNoFollowUps : ""
+            } ${hasCompactHeaderRight ? styles.contentHeaderCompactRight : ""}`}
+          >
+            <Typography
+              variant="h2"
+              className={`${styles.title} ${
+                hasFewHeaderRight ? styles.titleWithFewFollowUps : ""
+              } ${!hasHeaderRight || hasCompactHeaderRight ? styles.titleNoFollowUps : ""}
+              `}
+            >
+              {renderTitleWithBreak(selected.title, hasHeaderRight && !hasCompactHeaderRight)}
             </Typography>
             {!isEditing && headerRight ? (
-              <Box className={styles.headerRightWrap} onClick={(e) => e.stopPropagation()}>
+              <Box
+                className={`${styles.headerRightWrap} ${
+                  hasFewHeaderRight ? styles.headerRightWrapFew : ""
+                } ${hasCompactHeaderRight ? styles.headerRightWrapCompact : ""}`}
+                onClick={(e) => e.stopPropagation()}
+              >
                 {headerRight}
               </Box>
             ) : null}
