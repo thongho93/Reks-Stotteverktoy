@@ -526,9 +526,9 @@ export default function StandardTekstSidebar({
   const prevSelectedIdRef = useRef<string | null>(null);
 
   const categoryColorMap = useMemo(() => {
-    const cats = groupedByCategory.map((g) => g.category);
+    const cats = visibleItems.map((it) => (it.category ?? "").trim() || "Uten kategori");
     return buildCategoryColorMap(cats);
-  }, [groupedByCategory]);
+  }, [visibleItems]);
 
   const selectStandardTekst = (item: StandardTekst) => {
     logUsage("standardtekst_open", { standardtekstId: item.id });
@@ -888,6 +888,10 @@ export default function StandardTekstSidebar({
                           const isDragTarget = favoriteDropTarget?.id === it.id;
                           const dropBefore = isDragTarget && favoriteDropTarget?.position === "before";
                           const dropAfter = isDragTarget && favoriteDropTarget?.position === "after";
+                          const itemCategoryColor = getCategoryMarkerColor(
+                            (it.category ?? "").trim() || "Uten kategori",
+                            categoryColorMap,
+                          );
                           return (
                           <ListItemButton
                             key={it.id}
@@ -924,36 +928,64 @@ export default function StandardTekstSidebar({
                             }}
                             className={styles.sidebarItem}
                             sx={(theme) => ({
-                              pl: 2.25,
+                              pl: 2.15,
                               pr: 0.75,
                               py: 0.55,
                               position: "relative",
-                              borderLeft: "4px solid transparent",
+                              border: `1px solid ${alpha(
+                                itemCategoryColor,
+                                theme.palette.mode === "dark" ? 0.58 : 0.34,
+                              )} !important`,
+                              backgroundColor: `${alpha(
+                                itemCategoryColor,
+                                theme.palette.mode === "dark" ? 0.18 : 0.1,
+                              )} !important`,
                               transition:
                                 "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
+                              "&::before": {
+                                content: '""',
+                                position: "absolute",
+                                left: 0,
+                                top: 6,
+                                bottom: 6,
+                                width: 5,
+                                borderRadius: "0 999px 999px 0",
+                                backgroundColor: itemCategoryColor,
+                                boxShadow: `0 0 0 1px ${alpha(theme.palette.common.black, 0.08)}`,
+                              },
 
                               "&.Mui-selected": {
-                                bgcolor: alpha(theme.palette.primary.main, 0.22),
-                                borderLeftColor: theme.palette.primary.main,
-                                boxShadow: `0 2px 6px ${alpha(theme.palette.primary.main, 0.18)}`,
+                                backgroundColor: `${alpha(
+                                  itemCategoryColor,
+                                  theme.palette.mode === "dark" ? 0.32 : 0.2,
+                                )} !important`,
+                                borderColor: `${alpha(itemCategoryColor, 0.72)} !important`,
+                                boxShadow: `0 2px 8px ${alpha(itemCategoryColor, 0.3)}`,
                               },
 
                               "&.Mui-selected:hover": {
-                                bgcolor: alpha(theme.palette.primary.main, 0.26),
+                                backgroundColor: `${alpha(
+                                  itemCategoryColor,
+                                  theme.palette.mode === "dark" ? 0.38 : 0.26,
+                                )} !important`,
                               },
 
                               "&:hover": {
-                                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                backgroundColor: `${alpha(
+                                  itemCategoryColor,
+                                  theme.palette.mode === "dark" ? 0.25 : 0.15,
+                                )} !important`,
+                                borderColor: `${alpha(itemCategoryColor, 0.66)} !important`,
                                 transform: "translateX(1px)",
                               },
                               ...(dropBefore
                                 ? {
-                                    boxShadow: `inset 0 2px 0 ${alpha(theme.palette.primary.main, 0.85)}`,
+                                    boxShadow: `inset 0 2px 0 ${alpha(itemCategoryColor, 0.9)}`,
                                   }
                                 : {}),
                               ...(dropAfter
                                 ? {
-                                    boxShadow: `inset 0 -2px 0 ${alpha(theme.palette.primary.main, 0.85)}`,
+                                    boxShadow: `inset 0 -2px 0 ${alpha(itemCategoryColor, 0.9)}`,
                                   }
                                 : {}),
                             })}
