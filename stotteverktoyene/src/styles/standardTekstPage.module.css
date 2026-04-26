@@ -21,8 +21,8 @@
   outline-offset: 2px;
 }
 .page {
-  min-height: calc(100vh - 24px);
-  padding: 12px;
+  min-height: calc(100vh - 16px);
+  padding: 8px;
   display: flex;
   flex-direction: column;
   overflow: visible;
@@ -75,14 +75,14 @@
   min-height: auto;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 10px;
   align-items: stretch;
   overflow: visible;
 }
 
 @media (min-width: 900px) {
   .grid {
-    grid-template-columns: var(--sidebar-width, 340px) 16px 1fr;
+    grid-template-columns: var(--sidebar-width, 318px) 12px 1fr;
     align-items: start;
   }
 }
@@ -124,7 +124,7 @@
     top: 0;
     height: 100vh;
     min-height: 100vh;
-    width: 16px;
+    width: 12px;
     cursor: col-resize;
     user-select: none;
     touch-action: none;
@@ -189,13 +189,13 @@
 
 /* Sidebar readability improvements */
 .sidebarHeader {
-  padding-left: 16px;
-  padding-right: 16px;
-  padding-top: 14px;
-  padding-bottom: 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+  padding-top: 12px;
+  padding-bottom: 10px;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 9px;
   background: linear-gradient(180deg, rgba(185, 130, 154, 0.08) 0%, rgba(185, 130, 154, 0.02) 100%);
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
@@ -277,7 +277,7 @@
 }
 
 .preparatPaper {
-  padding: 14px 16px 12px;
+  padding: 12px 14px 10px;
   border: 1px solid rgba(15, 23, 42, 0.1) !important;
   border-radius: 20px !important;
   background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
@@ -328,11 +328,11 @@
 
 .contentPaper {
   flex: 1;
-  min-height: 75%;
+  min-height: 0;
   overflow: hidden;
   margin: 4px 0 0;
   width: 100%;
-  max-width: 940px;
+  max-width: none;
   position: relative;
   isolation: isolate;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -341,6 +341,11 @@
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 14px 32px rgba(15, 23, 42, 0.06);
+}
+
+.contentPaperEmpty {
+  display: flex;
+  align-items: stretch;
 }
 
 .contentPaper::before {
@@ -359,12 +364,39 @@
 
 @media (min-width: 900px) {
   .contentPaper {
-    padding: 30px 32px 24px;
+    padding: 24px 26px 20px;
   }
 }
 
 .contentPaperCopy {
   cursor: copy;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  min-height: clamp(320px, 56vh, 700px);
+  padding: clamp(10px, 1.8vh, 18px) 16px clamp(12px, 2.2vh, 22px);
+  gap: clamp(10px, 1.4vh, 18px);
+}
+
+.emptyStateTitle {
+  font-weight: 600;
+  font-size: clamp(2rem, 1.45rem + 1.15vw, 2.7rem);
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.emptyStateImage {
+  width: clamp(220px, 34vw, 620px);
+  max-width: min(86%, 760px);
+  max-height: min(52vh, calc(100dvh - 320px));
+  object-fit: contain;
+  opacity: 0.97;
 }
 
 .editRow {
@@ -383,71 +415,107 @@
   max-width: none;
 }
 
+.titleWithFewFollowUps {
+  max-width: 16ch;
+}
+
+.titleNoFollowUps {
+  max-width: none;
+}
+
 .contentHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: flex-start;
-  justify-content: flex-start;
+  gap: 12px;
+}
+
+.contentHeaderNoFollowUps {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.contentHeaderCompactRight {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1200px) {
+  .contentHeader {
+    grid-template-columns: minmax(340px, 0.95fr) minmax(560px, 1.15fr);
+    gap: 18px;
+  }
+
+  .contentHeaderNoFollowUps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .contentHeaderCompactRight {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .titleNoFollowUps {
+    white-space: nowrap;
+    text-wrap: nowrap;
+  }
 }
 
 .headerRightWrap {
-  margin-top: 8px;
-  margin-bottom: 8px;
-  padding: 11px 12px;
-  border: 1px solid rgba(99, 102, 241, 0.26);
-  border-left: 4px solid rgba(79, 70, 229, 0.66);
-  border-radius: 16px;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(99, 102, 241, 0.12) 0%, rgba(99, 102, 241, 0) 38%),
-    linear-gradient(160deg, rgba(244, 247, 255, 0.98) 0%, rgba(237, 243, 255, 0.95) 56%, rgba(233, 241, 255, 0.92) 100%);
-  width: fit-content;
+  margin-top: 0;
+  margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  width: 100%;
   max-width: 100%;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 8px 18px rgba(79, 70, 229, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  box-shadow: none;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  justify-self: end;
+}
+
+.headerRightWrapFew {
+  width: auto;
+  justify-self: start;
+}
+
+.headerRightWrapCompact {
+  width: auto;
+  max-width: max-content;
+  justify-self: end;
 }
 
 .headerRightWrap::before {
-  content: "";
-  position: absolute;
-  top: -45%;
-  right: -22%;
-  width: 62%;
-  height: 160%;
-  border-radius: 999px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0) 78%);
+  display: none;
 }
 
 .headerRightWrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(
-    135deg,
-    rgba(79, 70, 229, 0.05) 0%,
-    rgba(79, 70, 229, 0.05) 1px,
-    transparent 1px,
-    transparent 10px
-  );
-  opacity: 0.25;
+  display: none;
 }
 
 .followUpsPreviewRow {
-  row-gap: 8px;
-  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+  width: 100%;
+  justify-content: flex-end;
 }
 
 .followUpChip {
+  width: auto;
+  min-width: fit-content !important;
+  max-width: none !important;
+  flex: 0 0 auto;
+  justify-content: flex-start !important;
+  text-transform: none !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
   border-radius: 999px !important;
-  border: 1px solid rgba(79, 70, 229, 0.28) !important;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(242, 246, 255, 0.96) 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 1px 2px rgba(15, 23, 42, 0.07);
+  border: 1px solid rgba(148, 163, 184, 0.36) !important;
+  background: rgba(248, 250, 252, 0.72) !important;
+  color: #182337 !important;
+  box-shadow: none;
+  padding: 3px 9px !important;
   transition:
     transform 130ms ease,
     box-shadow 130ms ease,
@@ -455,22 +523,41 @@
     background-color 130ms ease;
 }
 
-.followUpChip :global(.MuiChip-label) {
-  font-weight: 600;
-  letter-spacing: 0.01em;
+.followUpChip :global(.MuiButton-startIcon) {
+  flex-shrink: 0;
+  margin-left: 0;
+  margin-right: 4px;
+  color: #64748b;
 }
 
-.followUpChip :global(.MuiChip-icon) {
-  color: #4f46e5;
+.followUpChip :global(.MuiButton-startIcon svg) {
+  font-size: 16px;
+}
+
+.followUpChip :global(.MuiButtonBase-root),
+.followUpChip :global(.MuiButton-label) {
+  font-weight: 600;
+}
+
+.followUpChip :global(.MuiButton-endIcon),
+.followUpChip :global(.MuiButton-startIcon),
+.followUpChip {
+  font-size: 0.85rem !important;
+  line-height: 1.2 !important;
+}
+
+.followUpChip :global(.MuiButton-label),
+.followUpChip :global(.MuiButton-startIcon + *) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .followUpChip:hover {
   transform: translateY(-1px);
-  border-color: rgba(79, 70, 229, 0.5) !important;
-  background: linear-gradient(180deg, #ffffff 0%, #edf2ff 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 8px 16px rgba(79, 70, 229, 0.16);
+  border-color: rgba(100, 116, 139, 0.62) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
 }
 
 .followUpChip:active {
@@ -510,12 +597,28 @@
   font-size: clamp(1.05rem, 1rem + 0.14vw, 1.15rem);
   color: #182337;
   padding-top: 8px;
-  padding-right: clamp(28px, 10vw, 210px);
+  padding-right: clamp(18px, 6vw, 132px);
 }
 
 @media (max-width: 899px) {
   .contentPaper {
     max-width: 100%;
+  }
+
+  .emptyState {
+    min-height: clamp(260px, 42vh, 460px);
+    padding: 8px 12px 12px;
+    gap: 10px;
+  }
+
+  .emptyStateTitle {
+    font-size: clamp(1.55rem, 1.1rem + 1.05vw, 2.05rem);
+  }
+
+  .emptyStateImage {
+    width: clamp(180px, 62vw, 420px);
+    max-width: 84%;
+    max-height: min(38vh, 280px);
   }
 
   .body {
@@ -604,25 +707,13 @@
 .sidebarBody {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
   padding-bottom: 8px;
-  scrollbar-gutter: stable;
+  scrollbar-width: none; /* Firefox */
 }
 
 .sidebarBody::-webkit-scrollbar {
-  width: 10px;
-}
-
-.sidebarBody::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.sidebarBody::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
-  background-clip: content-box;
+  display: none; /* Chrome/Safari — completely hidden, content still scrollable */
 }
 
 .editRowBottom {
@@ -685,6 +776,34 @@
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
+.preparatChipLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.preparatChipIndex {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: rgba(15, 23, 42, 0.08);
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.preparatChipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preparatSearchRow {
   align-items: flex-start;
   gap: 12px;
@@ -726,12 +845,12 @@
 
 @media (min-width: 1200px) {
   .preparatPaper {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 392px);
     grid-template-areas:
       "search toggles"
       "chips toggles";
-    column-gap: 18px;
-    row-gap: 10px;
+    column-gap: 14px;
+    row-gap: 8px;
   }
 
   .preparatToggleRow {
@@ -913,30 +1032,41 @@
   gap: 8px;
 }
 
+:global([data-app-theme="dark"]) .page {
+  --std-surface: rgba(20, 27, 37, 0.98);
+  --std-surface-raised: rgba(26, 34, 46, 0.98);
+  --std-surface-soft: rgba(31, 40, 54, 0.98);
+  --std-border: rgba(165, 177, 198, 0.26);
+  --std-border-strong: rgba(165, 177, 198, 0.42);
+  --std-text: var(--app-text-strong);
+  --std-text-muted: var(--app-text-muted);
+  --std-shadow: rgba(2, 6, 18, 0.36);
+}
+
 :global([data-app-theme="dark"]) .headerLinkButton {
   color: #d9e2f2 !important;
-  border-color: rgba(148, 163, 184, 0.42);
-  background: rgba(35, 44, 58, 0.88);
+  border-color: var(--std-border-strong);
+  background: var(--std-surface-soft);
 }
 
 :global([data-app-theme="dark"]) .headerLinkButton:hover {
-  background: rgba(45, 55, 72, 0.92) !important;
-  border-color: rgba(165, 177, 198, 0.58);
+  background: rgba(39, 49, 65, 0.98) !important;
+  border-color: rgba(190, 200, 218, 0.54);
 }
 
 :global([data-app-theme="dark"]) .sidebar {
-  border-color: rgba(165, 177, 198, 0.24) !important;
-  background: rgba(20, 27, 37, 0.98);
-  box-shadow: 0 14px 36px rgba(2, 6, 18, 0.38);
+  border-color: var(--std-border) !important;
+  background: var(--std-surface);
+  box-shadow: 0 14px 36px var(--std-shadow);
 }
 
 :global([data-app-theme="dark"]) .sidebarHeader {
-  background: rgba(26, 34, 46, 0.98);
+  background: var(--std-surface-raised);
   border-bottom-color: rgba(165, 177, 198, 0.2);
 }
 
 :global([data-app-theme="dark"]) .sidebarItem {
-  border-color: rgba(165, 177, 198, 0.2);
+  border-color: rgba(165, 177, 198, 0.18);
 }
 
 :global([data-app-theme="dark"]) .sidebarItem:hover {
@@ -953,14 +1083,14 @@
 }
 
 :global([data-app-theme="dark"]) .preparatPaper {
-  border-color: rgba(165, 177, 198, 0.26) !important;
-  background: rgba(20, 27, 37, 0.98);
+  border-color: var(--std-border) !important;
+  background: var(--std-surface);
   box-shadow: 0 14px 30px rgba(2, 6, 18, 0.34);
 }
 
 :global([data-app-theme="dark"]) .contentPaper {
-  border-color: rgba(165, 177, 198, 0.24);
-  background: rgba(20, 27, 37, 0.98);
+  border-color: var(--std-border);
+  background: var(--std-surface);
   box-shadow: 0 18px 42px rgba(2, 6, 18, 0.4);
 }
 
@@ -968,11 +1098,14 @@
   background: rgba(121, 137, 163, 0.52);
 }
 
+:global([data-app-theme="dark"]) .emptyStateTitle {
+  color: rgba(226, 232, 240, 0.88);
+}
+
 :global([data-app-theme="dark"]) .headerRightWrap {
-  border-color: rgba(148, 163, 184, 0.34);
-  border-left-color: rgba(148, 163, 184, 0.62);
-  background: rgba(28, 37, 51, 0.96);
-  box-shadow: 0 8px 20px rgba(2, 6, 18, 0.32);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 :global([data-app-theme="dark"]) .headerRightWrap::before,
@@ -981,19 +1114,20 @@
 }
 
 :global([data-app-theme="dark"]) .followUpChip {
-  border-color: rgba(148, 163, 184, 0.46) !important;
-  background: rgba(24, 32, 45, 0.98) !important;
-  box-shadow: 0 1px 2px rgba(2, 6, 18, 0.35);
+  border-color: var(--std-border-strong) !important;
+  background: rgba(26, 34, 46, 0.74) !important;
+  color: var(--std-text) !important;
+  box-shadow: none;
 }
 
-:global([data-app-theme="dark"]) .followUpChip :global(.MuiChip-icon) {
+:global([data-app-theme="dark"]) .followUpChip :global(.MuiButton-startIcon) {
   color: #aab4c8;
 }
 
 :global([data-app-theme="dark"]) .followUpChip:hover {
   border-color: rgba(165, 177, 198, 0.62) !important;
-  background: rgba(30, 39, 53, 0.98) !important;
-  box-shadow: 0 8px 16px rgba(2, 6, 18, 0.28);
+  background: var(--std-surface-soft) !important;
+  box-shadow: 0 4px 10px rgba(2, 6, 18, 0.22);
 }
 
 :global([data-app-theme="dark"]) .body {
@@ -1004,29 +1138,35 @@
   color: var(--app-text-muted);
 }
 
-:global([data-app-theme="dark"]) .sidebarBody::-webkit-scrollbar-thumb {
-  background: rgba(123, 137, 157, 0.6);
-  background-clip: content-box;
-}
+/* sidebarBody scrollbar is hidden globally — no dark-mode override needed */
 
 :global([data-app-theme="dark"]) .preparatClearButton {
   background: rgba(165, 177, 198, 0.12);
 }
 
 :global([data-app-theme="dark"]) .preparatChip {
-  border-color: rgba(165, 177, 198, 0.4) !important;
-  background: rgba(30, 39, 53, 0.98) !important;
+  border-color: var(--std-border-strong) !important;
+  background: var(--std-surface-soft) !important;
   box-shadow: 0 1px 2px rgba(2, 6, 18, 0.42);
 }
 
+:global([data-app-theme="dark"]) .preparatChipIndex {
+  background: rgba(203, 213, 225, 0.12);
+  color: #d9e2f2;
+}
+
+:global([data-app-theme="dark"]) .preparatChipText {
+  color: var(--std-text);
+}
+
 :global([data-app-theme="dark"]) .preparatToggleRow {
-  border-color: rgba(165, 177, 198, 0.3);
-  background: rgba(27, 36, 50, 0.98);
+  border-color: var(--std-border);
+  background: var(--std-surface-raised);
 }
 
 :global([data-app-theme="dark"]) .preparatToggleRow :global(.MuiFormControlLabel-root) {
-  border-color: rgba(165, 177, 198, 0.36);
-  background: rgba(31, 40, 56, 0.98);
+  border-color: var(--std-border-strong);
+  background: var(--std-surface-soft);
 }
 
 :global([data-app-theme="dark"]) .preparatToggleRow :global(.MuiTypography-caption) {
@@ -1034,14 +1174,14 @@
 }
 
 :global([data-app-theme="dark"]) .inputControlCard {
-  border-color: rgba(165, 177, 198, 0.36) !important;
-  background: rgba(27, 36, 50, 0.98) !important;
+  border-color: var(--std-border-strong) !important;
+  background: var(--std-surface-raised) !important;
   box-shadow: 0 1px 2px rgba(2, 6, 18, 0.35);
 }
 
 :global([data-app-theme="dark"]) .timeDateCard {
-  border-color: rgba(165, 177, 198, 0.4) !important;
-  background: rgba(31, 40, 56, 0.98) !important;
+  border-color: var(--std-border-strong) !important;
+  background: var(--std-surface-soft) !important;
   box-shadow:
     0 1px 2px rgba(2, 6, 18, 0.28),
     0 8px 16px rgba(2, 6, 18, 0.24);
