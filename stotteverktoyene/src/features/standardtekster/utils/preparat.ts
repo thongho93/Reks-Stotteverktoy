@@ -353,6 +353,8 @@ export function formatPreparatForTemplate(med: {
   // Handles "... 24 24 stk." (Norwegian pack-size format) and plain trailing numbers like "... 120".
   // Keep strengths intact (we already extracted `strength` separately).
   rawName = rawName
+    .replace(/\s+\d+\s*x\s*\d+\s*(?:doser?|stk\.?)\s*$/gi, " ") // "3x56 doser", "3 x 56 stk."
+    .replace(/\s+\d+\s*(?:doser?|stk\.?)\s*$/gi, " ")            // "120 doser", "60 stk"
     .replace(/(?:\s+\d+)+\s*stk\.?\s*$/gi, " ")  // "24 24 stk." / "24stk"
     .replace(/(?:\s+\d+){2,}\s*$/g, " ")           // "24 24" (two+ consecutive pack-count numbers)
     .replace(/\s+\d+(?:[.,]\d+)?\s*$/g, " ")       // single trailing number or decimal

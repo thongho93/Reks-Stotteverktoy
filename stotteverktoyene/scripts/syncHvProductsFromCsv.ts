@@ -61,7 +61,13 @@ type ResolvedHeaders = {
 };
 
 const COLUMN_ALIASES: Record<CanonicalColumn, readonly string[]> = {
-  name: ["Name", "Varenavn", "Name (Product)", "Product name"],
+  name: [
+    "Name",
+    "Varenavn",
+    "Varenavn (navn, produsent, styrke, antall)",
+    "Name (Product)",
+    "Product name",
+  ],
   farmaloggNumber: [
     "farmaloggNumber",
     "Farmalogg number",

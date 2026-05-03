@@ -158,16 +158,27 @@ export default function PreparatPanel({
                   "",
               ).trim();
 
-              const cleanedFullName = fullName
-                ? fullName
+              const normalizedFullName = fullName.replace(/\s+/g, " ").trim();
+
+              const trailingPackMatch = normalizedFullName.match(
+                /\s(\d+\s*x\s*\d+\s*(?:doser?|stk\.?)|\d+\s*(?:doser?|stk\.?)|\d+)\s*$/i,
+              );
+              const packSize = trailingPackMatch?.[1]?.replace(/\s+/g, " ").trim() ?? "";
+
+              const fullNameWithoutPack = packSize
+                ? normalizedFullName.replace(
+                    new RegExp(`\\s${packSize.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"),
+                    "",
+                  )
+                : normalizedFullName;
+
+              const cleanedFullName = fullNameWithoutPack
+                ? fullNameWithoutPack
                     .replace(/(\d)\s*(mg|mcg|µg|g|ml)\b/gi, "$1 $2")
                     .replace(/\b(tab|tbl|tablett|kapsel|mikstur|depottablett|depot)\b/gi, "")
                     .replace(/\s{2,}/g, " ")
                     .trim()
                 : "";
-
-              const packSizeMatch = cleanedFullName.match(/\s(\d+)\s*$/);
-              const packSize = packSizeMatch?.[1] ?? "";
 
               const text = formatPreparatRowText(
                 {
