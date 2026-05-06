@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -89,12 +89,14 @@ const matchesQuery = (product: AdviceProduct, terms: string[]): boolean => {
 };
 
 export default function ProduktOgRadPage() {
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState("");
   const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
+  const [expandedAdviceIds, setExpandedAdviceIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     let active = true;
@@ -154,9 +156,35 @@ export default function ProduktOgRadPage() {
     () => filtered.slice(0, renderLimit),
     [filtered, renderLimit]
   );
+  const showFullCards = filtered.length <= 2;
 
   useEffect(() => {
     setRenderLimit(MAX_RENDERED_RESULTS);
+    setExpandedAdviceIds(new Set());
+  }, [query]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+
+      if ((event.ctrlKey || event.metaKey) && key === "s") {
+        event.preventDefault();
+        const input = searchInputRef.current;
+        if (!input) return;
+        input.focus();
+        input.select();
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (!query) return;
+        event.preventDefault();
+        setQuery("");
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [query]);
 
   const copyPlainText = async (value: string): Promise<boolean> => {
@@ -185,6 +213,15 @@ export default function ProduktOgRadPage() {
     if (!digits) return;
     const ok = await copyPlainText(digits);
     if (ok) setCopiedMessage(`${label} kopiert: ${digits}`);
+  };
+
+  const toggleExpandedAdvice = (productId: string) => {
+    setExpandedAdviceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
   };
 
   return (
@@ -256,6 +293,7 @@ export default function ProduktOgRadPage() {
           >
             <SearchRoundedIcon sx={{ fontSize: 21, color: "#9E4F7D" }} />
             <InputBase
+              inputRef={searchInputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Søk med varenummer, SKU, varenavn eller ATC-kode"
@@ -329,6 +367,9 @@ export default function ProduktOgRadPage() {
             }}
           >
             {visibleProducts.map((product) => (
+              (() => {
+                const isExpanded = showFullCards || expandedAdviceIds.has(product.id);
+                return (
               <Paper
                 key={product.id}
                 elevation={0}
@@ -340,8 +381,9 @@ export default function ProduktOgRadPage() {
                   boxShadow: "0 8px 20px rgba(94,21,71,0.08)",
                   display: "grid",
                   gap: 0.95,
-                  height: { xs: 220, lg: 240 },
-                  gridTemplateRows: "auto 1fr",
+                  minHeight: showFullCards ? 0 : { xs: 250, lg: 270 },
+                  height: showFullCards ? "auto" : isExpanded ? "auto" : { xs: 250, lg: 270 },
+                  gridTemplateRows: "auto 1fr auto",
                 }}
               >
                 <Stack
@@ -433,27 +475,15 @@ export default function ProduktOgRadPage() {
                       mt: 0,
                       mb: 0,
                       pl: 2.1,
-                      pr: 0.5,
                       display: "grid",
-                      gap: 0.22,
-                      overflowY: "auto",
-                      minHeight: 0,
+                      gap: 0.18,
+                      overflow: "hidden",
                       alignContent: "start",
-                      "&::-webkit-scrollbar": {
-                        width: 8,
-                      },
-                      "&::-webkit-scrollbar-track": {
-                        backgroundColor: "#F8EDF4",
-                        borderRadius: 999,
-                      },
-                      "&::-webkit-scrollbar-thumb": {
-                        backgroundColor: "#DFA1C3",
-                        borderRadius: 999,
-                      },
+                      justifyContent: "start",
                       "& li": {
                         color: "#3D2A36",
                         fontSize: { xs: 13.5, md: 14 },
-                        lineHeight: 1.4,
+                        lineHeight: 1.34,
                       },
                       "& li::marker": {
                         color: "#D24D94",
@@ -461,14 +491,39 @@ export default function ProduktOgRadPage() {
                       },
                     }}
                   >
-                    {product.advicePoints.map((point, idx) => <li key={`${product.id}-${idx}`}>{point}</li>)}
+                    {(isExpanded ? product.advicePoints : product.advicePoints.slice(0, 3)).map((point, idx) => (
+                      <li key={`${product.id}-${idx}`}>{point}</li>
+                    ))}
                   </Box>
                 ) : (
                   <Typography sx={{ mt: 0.25, color: "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
                     Ingen farmasøytisk råd registrert for dette produktet.
                   </Typography>
                 )}
+                {!showFullCards && product.advicePoints.length > 3 ? (
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => toggleExpandedAdvice(product.id)}
+                    sx={{
+                      width: "fit-content",
+                      minWidth: 0,
+                      mt: 0.1,
+                      px: 0,
+                      color: "#9D1D66",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textTransform: "none",
+                    }}
+                  >
+                    {isExpanded
+                      ? "Vis færre"
+                      : `Vis mer (${product.advicePoints.length})`}
+                  </Button>
+                ) : null}
               </Paper>
+                );
+              })()
             ))}
             {filtered.length > visibleProducts.length ? (
               <Box sx={{ pt: 0.25 }}>
