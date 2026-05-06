@@ -13,15 +13,16 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
-import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
@@ -37,13 +38,13 @@ const StandardTekstPage = React.lazy(
 const InteraksjonerPage = React.lazy(
   () => import("../features/interaksjoner/pages/InteraksjonerPage")
 );
+const ProduktOgRadPage = React.lazy(
+  () => import("../features/produktograd/pages/ProduktOgRadPage")
+);
 const ProfilePage = React.lazy(() =>
   import("./auth/ProfilePage").then((module) => ({ default: module.ProfilePage }))
 );
 const StatistikkPage = React.lazy(() => import("../features/statistikk/pages/StatistikkPage"));
-const OfficeFormRedirectPage = React.lazy(
-  () => import("../features/produktskjema/pages/OfficeFormRedirectPage")
-);
 const AndbruddPage = React.lazy(() => import("../features/anbrudd/andbruddPage"));
 const TilbakemeldingPage = React.lazy(
   () => import("../features/tilbakemelding/pages/TilbakemeldingPage")
@@ -53,7 +54,6 @@ const LoginPage = React.lazy(() =>
   import("./auth/LoginPage").then((module) => ({ default: module.LoginPage }))
 );
 const PendingApprovalPage = React.lazy(() => import("./auth/PendingApprovalPage"));
-const OFFICE_FORM_URL = import.meta.env.VITE_OFFICE_FORM_URL as string | undefined;
 const ANBRUDD_FORM_URL = "https://forms.office.com/e/CC67JNYpcr?embed=true";
 const ANBRUDD_SHAREPOINT_URL = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
   import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
@@ -61,11 +61,19 @@ const ANBRUDD_SHAREPOINT_URL = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_UR
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 
+type SidebarItem = {
+  label: string;
+  path: string;
+  Icon: React.ElementType;
+  color: string;
+};
+
 function pathToUsagePage(pathname: string): UsagePage {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/omeq")) return "omeq";
   if (pathname.startsWith("/standardtekster")) return "standardtekster";
   if (pathname.startsWith("/interaksjoner")) return "interaksjoner";
+  if (pathname.startsWith("/produkt-og-rad")) return "produktograd";
   if (pathname.startsWith("/profil")) return "profil";
   if (pathname.startsWith("/statistikk")) return "statistikk";
   if (pathname.startsWith("/produktskjema")) return "produktskjema";
@@ -133,48 +141,72 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
-  const mainItems = [
-    { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#1E88E5" },
+  const navItemButtonSx = (item: SidebarItem) => ({
+    justifyContent: collapsed ? "center" : "flex-start",
+    px: collapsed ? 1 : 2,
+    py: collapsed ? 0.85 : 0.95,
+    minHeight: collapsed ? 58 : 48,
+    borderLeft: "3px solid transparent",
+    transition: "background-color 160ms ease, border-color 160ms ease, transform 120ms ease",
+    "&:hover": {
+      backgroundColor: alpha(item.color, 0.12),
+      borderLeftColor: alpha(item.color, 0.6),
+      transform: collapsed ? "none" : "translateX(1px)",
+    },
+    "&.Mui-selected": {
+      backgroundColor: alpha(item.color, 0.2),
+      borderLeftColor: item.color,
+    },
+    "&.Mui-selected:hover": {
+      backgroundColor: alpha(item.color, 0.24),
+    },
+    "& .MuiListItemIcon-root": {
+      color: item.color,
+    },
+  });
+
+  const mainItems: SidebarItem[] = [
+    { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#29A1FF" },
     {
       label: "Standardtekster",
       path: "/standardtekster",
       Icon: DescriptionIcon,
-      color: "#43A047",
+      color: "#4BC76A",
     },
     {
       label: "Interaksjonssøk",
       path: "/interaksjoner",
       Icon: CompareArrowsIcon,
-      color: "#D32F2F",
+      color: "#FF5E5B",
     },
     {
-      label: "Produktskjema",
-      path: "/produktskjema",
-      Icon: LocalShippingIcon,
-      color: "#00897B",
-    },
-    {
-      label: "Anbrudd",
-      path: "/anbrudd",
-      Icon: ChecklistRoundedIcon,
-      color: "#FB8C00",
+      label: "Produkt og råd",
+      path: "/produkt-og-rad",
+      Icon: TipsAndUpdatesRoundedIcon,
+      color: "#C93586",
     },
     {
       label: "Innspill og notater",
       path: "/tilbakemelding",
       Icon: FeedbackRoundedIcon,
-      color: "#8E24AA",
+      color: "#B648E8",
+    },
+    {
+      label: "Innkjøp og anbrudd",
+      path: "/anbrudd",
+      Icon: ChecklistRoundedIcon,
+      color: "#FFA726",
     },
   ];
 
-  const adminItems =
+  const adminItems: SidebarItem[] =
     hasRekspertAccess
       ? [
           {
             label: "Rekspert",
             path: "/rekspert",
             Icon: ConstructionIcon,
-            color: "#004b74ff",
+            color: "#00A3D7",
           },
         ]
       : [];
@@ -250,12 +282,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                   logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
                   navigate(item.path);
                 }}
-                sx={{
-                  justifyContent: collapsed ? "center" : "flex-start",
-                  px: collapsed ? 1 : 2,
-                  py: collapsed ? 0.85 : 0.95,
-                  minHeight: collapsed ? 58 : 48,
-                }}
+                sx={navItemButtonSx(item)}
               >
                 <ListItemIcon
                   sx={{
@@ -264,7 +291,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                     justifyContent: "center",
                     display: "flex",
                     alignItems: "center",
-                    color: item.color,
                   }}
                 >
                   <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
@@ -308,12 +334,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                     logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
                     navigate(item.path);
                   }}
-                  sx={{
-                    justifyContent: collapsed ? "center" : "flex-start",
-                    px: collapsed ? 1 : 2,
-                    py: collapsed ? 0.85 : 0.95,
-                    minHeight: collapsed ? 58 : 48,
-                  }}
+                  sx={navItemButtonSx(item)}
                 >
                   <ListItemIcon
                     sx={{
@@ -322,7 +343,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       justifyContent: "center",
                       display: "flex",
                       alignItems: "center",
-                      color: item.color,
                     }}
                   >
                     <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
@@ -369,7 +389,6 @@ function Layout() {
   }, []);
 
   React.useEffect(() => {
-    warmConnection(OFFICE_FORM_URL);
     warmConnection(ANBRUDD_FORM_URL);
     warmConnection(ANBRUDD_SHAREPOINT_URL);
   }, []);
@@ -389,9 +408,10 @@ function Layout() {
             <Route path="/omeq" element={<OMEQPage />} />
             <Route path="/standardtekster" element={<StandardTekstPage />} />
             <Route path="/interaksjoner" element={<InteraksjonerPage />} />
+            <Route path="/produkt-og-rad" element={<ProduktOgRadPage />} />
             <Route path="/profil" element={<ProfilePage />} />
             <Route path="/statistikk" element={<StatistikkPage />} />
-            <Route path="/produktskjema" element={<OfficeFormRedirectPage />} />
+            <Route path="/produktskjema" element={<Navigate to="/anbrudd" replace />} />
             <Route path="/anbrudd" element={<AndbruddPage />} />
             <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
             <Route element={<RequireRekspert />}>

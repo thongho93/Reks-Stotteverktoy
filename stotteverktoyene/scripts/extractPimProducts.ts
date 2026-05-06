@@ -13,8 +13,8 @@ const INPUT_FILE = path.resolve(__dirname, "../rxkatalog/PIM product export - 18
 // Legg output der du allerede har data for søk (samme sted som hvProducts/meds)
 const OUTPUT_FILE = path.resolve(__dirname, "../src/features/fest/components/pimProducts.json");
 
-// Hvis Excel-kolonnene heter noe annet, endre disse strengene så de matcher nøyaktig.
-const COL_FARMALOGG = "Farmalogg number";
+// Tillat både gamle og nye kolonnenavn fra PIM-eksport.
+const COL_FARMALOGG_CANDIDATES = ["Farmalogg number", "Farmalogg"];
 const COL_NAME = "Name";
 const COL_NAME_FORM_STRENGTH = "Name, form, strength";
 
@@ -26,6 +26,28 @@ type PimProduct = {
 
 function asString(v: unknown) {
   return (v ?? "").toString().trim();
+}
+
+function resolveColumnKey(
+  row: Record<string, unknown>,
+  candidates: string[],
+  label: string
+): string {
+  const keys = Object.keys(row);
+
+  for (const candidate of candidates) {
+    const exact = keys.find((k) => k === candidate);
+    if (exact) return exact;
+  }
+
+  for (const candidate of candidates) {
+    const normalized = keys.find((k) => k.trim().toLowerCase() === candidate.trim().toLowerCase());
+    if (normalized) return normalized;
+  }
+
+  throw new Error(
+    `Mangler kolonne '${label}'. Fant keys: ${keys.join(", ")}. Prøv å oppdatere kandidatlisten i scriptet.`
+  );
 }
 
 function main() {
@@ -43,22 +65,21 @@ function main() {
     raw: false,
   });
 
-  // Valider at kolonner finnes (første rad holder)
+  // Finn kolonner dynamisk (første rad holder)
   const first = rows[0] ?? {};
-  const missing = [COL_FARMALOGG, COL_NAME, COL_NAME_FORM_STRENGTH].filter((k) => !(k in first));
-  if (missing.length > 0) {
-    throw new Error(
-      `Mangler kolonner i Excel-arket (${sheetName}). Fant keys: ${Object.keys(first).join(
-        ", "
-      )}. Mangler: ${missing.join(", ")}`
-    );
-  }
+  const colFarmalogg = resolveColumnKey(first, COL_FARMALOGG_CANDIDATES, "Farmalogg number/Farmalogg");
+  const colName = resolveColumnKey(first, [COL_NAME], COL_NAME);
+  const colNameFormStrength = resolveColumnKey(
+    first,
+    [COL_NAME_FORM_STRENGTH],
+    COL_NAME_FORM_STRENGTH
+  );
 
   const out: PimProduct[] = rows
     .map((r) => {
-      const farmaloggNumber = asString(r[COL_FARMALOGG]);
-      const name = asString(r[COL_NAME]);
-      const nameFormStrength = asString(r[COL_NAME_FORM_STRENGTH]);
+      const farmaloggNumber = asString(r[colFarmalogg]);
+      const name = asString(r[colName]);
+      const nameFormStrength = asString(r[colNameFormStrength]);
 
       if (!farmaloggNumber || !name) return null;
 
