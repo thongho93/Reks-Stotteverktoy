@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -8,12 +9,14 @@ import {
   IconButton,
   InputBase,
   Paper,
+  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 type AdviceProduct = {
   id: string;
@@ -48,6 +51,7 @@ const normalizeSearch = (value: string): string =>
 const toDigits = (value: string): string => value.replace(/\D+/g, "");
 const NUMERIC_QUERY_RE = /^\d+$/;
 const MAX_RENDERED_RESULTS = 120;
+const PAGE_MAX_WIDTH = 1500;
 
 const buildSearchBlob = (row: AdviceProductRow): AdviceProduct => {
   const atc = (row.atcCode ?? "").toUpperCase().trim();
@@ -90,6 +94,7 @@ export default function ProduktOgRadPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);
+  const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -154,6 +159,34 @@ export default function ProduktOgRadPage() {
     setRenderLimit(MAX_RENDERED_RESULTS);
   }, [query]);
 
+  const copyPlainText = async (value: string): Promise<boolean> => {
+    if (!value) return false;
+
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      // Fallback for environments where Clipboard API is blocked.
+      const textarea = document.createElement("textarea");
+      textarea.value = value;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return copied;
+    }
+  };
+
+  const handleCopyNumber = async (rawValue: string, label: "Vnr" | "SKU") => {
+    const digits = toDigits(rawValue);
+    if (!digits) return;
+    const ok = await copyPlainText(digits);
+    if (ok) setCopiedMessage(`${label} kopiert: ${digits}`);
+  };
+
   return (
     <Box
       sx={{
@@ -173,7 +206,7 @@ export default function ProduktOgRadPage() {
       >
         <Box
           sx={{
-            maxWidth: 1120,
+            maxWidth: PAGE_MAX_WIDTH,
             mx: "auto",
             borderRadius: 4,
             px: { xs: 2, md: 3 },
@@ -185,9 +218,9 @@ export default function ProduktOgRadPage() {
           }}
         >
           <Stack
-            direction={{ xs: "column", sm: "row" }}
+            direction="column"
             spacing={1}
-            alignItems={{ xs: "flex-start", sm: "center" }}
+            alignItems="center"
           >
             <Typography
               sx={{
@@ -197,6 +230,7 @@ export default function ProduktOgRadPage() {
                 lineHeight: 1.15,
                 color: "#FBE3F1",
                 fontFamily: "'Sora', 'Avenir Next', 'Segoe UI', sans-serif",
+                textAlign: "center",
               }}
             >
               Produkt og råd
@@ -207,6 +241,9 @@ export default function ProduktOgRadPage() {
             elevation={0}
             sx={{
               mt: 1.75,
+              mx: "auto",
+              width: "100%",
+              maxWidth: 980,
               display: "flex",
               alignItems: "center",
               gap: 1,
@@ -243,15 +280,23 @@ export default function ProduktOgRadPage() {
         </Box>
       </Box>
 
-      <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 2, md: 4 }, py: 1.5 }}>
-        <Typography sx={{ fontSize: 14, color: "#7E5B74", fontWeight: 600 }}>
+      <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 2, md: 3 }, py: 1.5 }}>
+        <Typography sx={{ fontSize: 14, color: "#7E5B74", fontWeight: 600, textAlign: "center" }}>
           Treff:{" "}
           <Box component="span" sx={{ color: "#C93586", fontWeight: 800 }}>
             {filtered.length}
           </Box>
         </Typography>
 
-        <Divider sx={{ mt: 1.25, mb: 2.25, borderColor: alpha("#D79BBB", 0.45) }} />
+        <Divider
+          sx={{
+            mt: 1.25,
+            mb: 2.25,
+            borderColor: alpha("#D79BBB", 0.45),
+            maxWidth: 980,
+            mx: "auto",
+          }}
+        />
 
         {isLoading ? (
           <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
@@ -272,29 +317,53 @@ export default function ProduktOgRadPage() {
             </Typography>
           </Paper>
         ) : (
-          <Stack spacing={1.5}>
+          <Box
+            sx={{
+              display: "grid",
+              gap: 1.25,
+              gridTemplateColumns: {
+                xs: "1fr",
+                lg: "repeat(2, minmax(0, 1fr))",
+              },
+              alignItems: "start",
+            }}
+          >
             {visibleProducts.map((product) => (
               <Paper
                 key={product.id}
                 elevation={0}
                 sx={{
-                  p: { xs: 1.6, md: 2 },
+                  p: { xs: 1.4, md: 1.7 },
                   borderRadius: 2.5,
                   border: "1px solid #ECD3E1",
                   bgcolor: "#FFFFFF",
                   boxShadow: "0 8px 20px rgba(94,21,71,0.08)",
+                  display: "grid",
+                  gap: 0.95,
+                  height: { xs: 220, lg: 240 },
+                  gridTemplateRows: "auto 1fr",
                 }}
               >
                 <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  justifyContent="space-between"
-                  alignItems={{ xs: "flex-start", md: "center" }}
-                  spacing={1.5}
+                  direction="column"
+                  alignItems="flex-start"
+                  spacing={0.8}
                 >
-                  <Typography sx={{ fontSize: { xs: 18, md: 20 }, fontWeight: 700, color: "#31192C" }}>
+                  <Typography
+                    sx={{
+                      fontSize: { xs: 17, md: 18 },
+                      fontWeight: 700,
+                      color: "#31192C",
+                      lineHeight: 1.3,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
                     {product.name}
                   </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={0.8} flexWrap="wrap">
                     {product.atcCode ? (
                       <Chip
                         label={product.atcCode}
@@ -303,37 +372,55 @@ export default function ProduktOgRadPage() {
                           bgcolor: "#FFE7F4",
                           color: "#9D1D66",
                           fontWeight: 800,
-                          fontSize: 12,
+                          fontSize: 11,
                           borderRadius: 999,
                           border: "1px solid #F2B9DA",
-                          height: 28,
+                          height: 26,
                         }}
                       />
                     ) : null}
                     <Chip
                       label={`Vnr ${product.farmaloggNumber || "-"}`}
                       size="small"
-                      sx={{
-                        bgcolor: "#FAF1F7",
-                        color: "#6F4D64",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        borderRadius: 999,
-                        border: "1px solid #EBD6E3",
-                        height: 28,
+                      onClick={() => {
+                        void handleCopyNumber(product.farmaloggNumber, "Vnr");
+                      }}
+                        sx={{
+                          bgcolor: "#FAF1F7",
+                          color: "#6F4D64",
+                          fontWeight: 600,
+                          fontSize: 11,
+                          borderRadius: 999,
+                          border: "1px solid #EBD6E3",
+                          height: 26,
+                          cursor: toDigits(product.farmaloggNumber) ? "pointer" : "default",
+                          transition: "transform 120ms ease, background-color 120ms ease",
+                          "&:hover": {
+                          bgcolor: "#F7E7F1",
+                          transform: "translateY(-1px)",
+                        },
                       }}
                     />
                     <Chip
                       label={`SKU ${product.sku || "-"}`}
                       size="small"
-                      sx={{
-                        bgcolor: "#FAF1F7",
-                        color: "#6F4D64",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        borderRadius: 999,
-                        border: "1px solid #EBD6E3",
-                        height: 28,
+                      onClick={() => {
+                        void handleCopyNumber(product.sku, "SKU");
+                      }}
+                        sx={{
+                          bgcolor: "#FAF1F7",
+                          color: "#6F4D64",
+                          fontWeight: 600,
+                          fontSize: 11,
+                          borderRadius: 999,
+                          border: "1px solid #EBD6E3",
+                          height: 26,
+                          cursor: toDigits(product.sku) ? "pointer" : "default",
+                          transition: "transform 120ms ease, background-color 120ms ease",
+                          "&:hover": {
+                          bgcolor: "#F7E7F1",
+                          transform: "translateY(-1px)",
+                        },
                       }}
                     />
                   </Stack>
@@ -343,15 +430,30 @@ export default function ProduktOgRadPage() {
                   <Box
                     component="ul"
                     sx={{
-                      mt: 1,
+                      mt: 0,
                       mb: 0,
-                      pl: 2.4,
+                      pl: 2.1,
+                      pr: 0.5,
                       display: "grid",
-                      gap: 0.3,
+                      gap: 0.22,
+                      overflowY: "auto",
+                      minHeight: 0,
+                      alignContent: "start",
+                      "&::-webkit-scrollbar": {
+                        width: 8,
+                      },
+                      "&::-webkit-scrollbar-track": {
+                        backgroundColor: "#F8EDF4",
+                        borderRadius: 999,
+                      },
+                      "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: "#DFA1C3",
+                        borderRadius: 999,
+                      },
                       "& li": {
                         color: "#3D2A36",
-                        fontSize: { xs: 14, md: 15 },
-                        lineHeight: 1.45,
+                        fontSize: { xs: 13.5, md: 14 },
+                        lineHeight: 1.4,
                       },
                       "& li::marker": {
                         color: "#D24D94",
@@ -362,7 +464,7 @@ export default function ProduktOgRadPage() {
                     {product.advicePoints.map((point, idx) => <li key={`${product.id}-${idx}`}>{point}</li>)}
                   </Box>
                 ) : (
-                  <Typography sx={{ mt: 1, color: "#8C647D", fontSize: 13, fontStyle: "italic" }}>
+                  <Typography sx={{ mt: 0.25, color: "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
                     Ingen farmasøytisk råd registrert for dette produktet.
                   </Typography>
                 )}
@@ -395,9 +497,42 @@ export default function ProduktOgRadPage() {
                 </Button>
               </Box>
             ) : null}
-          </Stack>
+          </Box>
         )}
       </Box>
+      <Snackbar
+        open={Boolean(copiedMessage)}
+        autoHideDuration={1500}
+        onClose={() => setCopiedMessage(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setCopiedMessage(null)}
+          severity="info"
+          variant="filled"
+          icon={<CheckCircleIcon fontSize="inherit" />}
+          sx={{
+            borderRadius: 999,
+            px: 2,
+            py: 0.75,
+            alignItems: "center",
+            bgcolor: "#8D2F67",
+            color: "#FFEAF5",
+            "& .MuiAlert-icon": {
+              color: "#FFD4EA",
+            },
+            "& .MuiAlert-action .MuiIconButton-root": {
+              color: "#FFD4EA",
+            },
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 14px 34px rgba(2,6,18,0.56)"
+                : "0 10px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          {copiedMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

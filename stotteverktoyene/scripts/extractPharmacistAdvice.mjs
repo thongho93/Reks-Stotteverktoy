@@ -50,19 +50,12 @@ function splitAdvicePoints(advice) {
 
   if (!cleaned) return [];
 
-  const primaryParts = cleaned
+  // Keep each spreadsheet column/cell as one advice point by default.
+  // Only split when the content is explicitly separated by newline/semicolon/bullet markers.
+  return cleaned
     .split("\n")
     .map((part) => part.trim())
     .filter(Boolean);
-
-  if (primaryParts.length > 1) return primaryParts;
-
-  const sentenceParts = cleaned
-    .split(/(?<=[.!?])\s+(?=[A-ZÆØÅ])/u)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  return sentenceParts.length > 0 ? sentenceParts : [cleaned];
 }
 
 function collectAdvicePointsFromRow(row, keys, adviceColumn) {
