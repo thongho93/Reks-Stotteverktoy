@@ -11,6 +11,8 @@ import {
   Paper,
   Snackbar,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -91,15 +93,13 @@ const matchesQuery = (product: AdviceProduct, terms: string[]): boolean => {
     const termDigits = toDigits(term);
     if (!termDigits) return false;
 
-    return (
-      product.farmaloggDigits.includes(termDigits) ||
-      product.skuDigits.includes(termDigits)
-    );
+    return product.farmaloggDigits.includes(termDigits) || product.skuDigits.includes(termDigits);
   });
 };
 
 export default function ProduktOgRadPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
   const [query, setQuery] = useState("");
   const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
   const [isLoading, setIsLoading] = useState(true);
@@ -161,10 +161,7 @@ export default function ProduktOgRadPage() {
     return products.filter((product) => matchesQuery(product, terms));
   }, [products, query]);
 
-  const visibleProducts = useMemo(
-    () => filtered.slice(0, renderLimit),
-    [filtered, renderLimit]
-  );
+  const visibleProducts = useMemo(() => filtered.slice(0, renderLimit), [filtered, renderLimit]);
   const showFullCards = filtered.length <= 2;
 
   useEffect(() => {
@@ -178,10 +175,13 @@ export default function ProduktOgRadPage() {
 
       if ((event.ctrlKey || event.metaKey) && key === "s") {
         event.preventDefault();
-        const input = searchInputRef.current;
-        if (!input) return;
-        input.focus();
-        input.select();
+        if (activeTab !== 0) setActiveTab(0);
+        requestAnimationFrame(() => {
+          const input = searchInputRef.current;
+          if (!input) return;
+          input.focus();
+          input.select();
+        });
         return;
       }
 
@@ -194,7 +194,7 @@ export default function ProduktOgRadPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [query]);
+  }, [activeTab, query]);
 
   const copyPlainText = async (value: string): Promise<boolean> => {
     if (!value) return false;
@@ -203,7 +203,6 @@ export default function ProduktOgRadPage() {
       await navigator.clipboard.writeText(value);
       return true;
     } catch {
-      // Fallback for environments where Clipboard API is blocked.
       const textarea = document.createElement("textarea");
       textarea.value = value;
       textarea.setAttribute("readonly", "");
@@ -263,11 +262,7 @@ export default function ProduktOgRadPage() {
             boxShadow: "0 16px 34px rgba(88,20,70,0.28)",
           }}
         >
-          <Stack
-            direction="column"
-            spacing={1}
-            alignItems="center"
-          >
+          <Stack direction="column" spacing={1} alignItems="center">
             <Typography
               sx={{
                 fontSize: { xs: 24, md: 30 },
@@ -283,287 +278,354 @@ export default function ProduktOgRadPage() {
             </Typography>
           </Stack>
 
-          <Paper
-            elevation={0}
+          <Tabs
+            value={activeTab}
+            onChange={(_, newValue: number) => setActiveTab(newValue)}
+            variant="fullWidth"
             sx={{
-              mt: 1.75,
+              mt: 1.35,
               mx: "auto",
               width: "100%",
               maxWidth: 980,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              px: 1.4,
-              py: 0.8,
-              borderRadius: 2.5,
-              border: "1px solid rgba(233,155,198,0.5)",
-              bgcolor: "#FFF8FC",
+              minHeight: 44,
+              borderRadius: 2.25,
+              bgcolor: "rgba(24,9,33,0.34)",
+              border: "1px solid rgba(224,165,201,0.25)",
+              "& .MuiTabs-indicator": {
+                height: 2.5,
+                borderRadius: 99,
+                backgroundColor: "#F2A2D0",
+              },
             }}
           >
-            <SearchRoundedIcon sx={{ fontSize: 21, color: "#9E4F7D" }} />
-            <InputBase
-              inputRef={searchInputRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Søk med varenummer, SKU, varenavn eller ATC-kode"
+            <Tab
+              disableRipple
+              label="Produkt og råd"
               sx={{
-                flex: 1,
-                fontSize: { xs: 15, md: 16 },
-                color: "#412039",
-                "& input::placeholder": { color: "#9C6F89", opacity: 1 },
+                minHeight: 44,
+                textTransform: "none",
+                fontSize: { xs: 16, md: 18 },
+                fontWeight: 700,
+                color: "#D5D7E6",
+                "&.Mui-selected": {
+                  color: "#F3A6D1",
+                },
               }}
             />
-            {query ? (
-              <IconButton
-                aria-label="Tøm søk"
-                size="small"
-                onClick={() => setQuery("")}
-                sx={{ color: "#A05C82" }}
-              >
-                <CloseRoundedIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-            ) : null}
-          </Paper>
+            <Tab
+              disableRipple
+              label="Faglig inhhold"
+              sx={{
+                minHeight: 44,
+                textTransform: "none",
+                fontSize: { xs: 16, md: 18 },
+                fontWeight: 700,
+                color: "#D5D7E6",
+                "&.Mui-selected": {
+                  color: "#F3A6D1",
+                },
+              }}
+            />
+          </Tabs>
+
+          {activeTab === 0 ? (
+            <Paper
+              elevation={0}
+              sx={{
+                mt: 1.35,
+                mx: "auto",
+                width: "100%",
+                maxWidth: 980,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1.4,
+                py: 0.8,
+                borderRadius: 2.5,
+                border: "1px solid rgba(233,155,198,0.5)",
+                bgcolor: "#FFF8FC",
+              }}
+            >
+              <SearchRoundedIcon sx={{ fontSize: 21, color: "#9E4F7D" }} />
+              <InputBase
+                inputRef={searchInputRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Søk med varenummer, SKU, varenavn eller ATC-kode"
+                sx={{
+                  flex: 1,
+                  fontSize: { xs: 15, md: 16 },
+                  color: "#412039",
+                  "& input::placeholder": { color: "#9C6F89", opacity: 1 },
+                }}
+              />
+              {query ? (
+                <IconButton
+                  aria-label="Tøm søk"
+                  size="small"
+                  onClick={() => setQuery("")}
+                  sx={{ color: "#A05C82" }}
+                >
+                  <CloseRoundedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              ) : null}
+            </Paper>
+          ) : null}
         </Box>
       </Box>
 
-      <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 2, md: 3 }, py: 1.5 }}>
-        <Typography sx={{ fontSize: 14, color: "#7E5B74", fontWeight: 600, textAlign: "center" }}>
-          Treff:{" "}
-          <Box component="span" sx={{ color: "#C93586", fontWeight: 800 }}>
-            {filtered.length}
-          </Box>
-        </Typography>
+      {activeTab === 0 ? (
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 2, md: 3 }, py: 1.5 }}>
+          <Typography sx={{ fontSize: 14, color: "#7E5B74", fontWeight: 600, textAlign: "center" }}>
+            Treff:{" "}
+            <Box component="span" sx={{ color: "#C93586", fontWeight: 800 }}>
+              {filtered.length}
+            </Box>
+          </Typography>
 
-        <Divider
-          sx={{
-            mt: 1.25,
-            mb: 2.25,
-            borderColor: alpha("#D79BBB", 0.45),
-            maxWidth: 980,
-            mx: "auto",
-          }}
-        />
-
-        {isLoading ? (
-          <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
-            <CircularProgress size={34} />
-            <Typography color="text.secondary">Laster produktdata...</Typography>
-          </Box>
-        ) : error ? (
-          <Paper sx={{ p: 2, borderRadius: 2.5, border: "1px solid #EFCFE1", bgcolor: "#FFF8FC" }}>
-            <Typography sx={{ fontWeight: 700, color: "#8E2E67" }}>{error}</Typography>
-          </Paper>
-        ) : filtered.length === 0 ? (
-          <Paper sx={{ p: 2.5, borderRadius: 2.5, border: "1px solid #EFCFE1", bgcolor: "#FFF8FC" }}>
-            <Typography sx={{ fontSize: 18, fontWeight: 700, color: "#854265" }}>
-              Ingen treff på søket ditt.
-            </Typography>
-            <Typography sx={{ mt: 0.5, fontSize: 14, color: "#8E6A82" }}>
-              Prøv å søke på ATC-kode, varenummer, SKU eller deler av varenavn.
-            </Typography>
-          </Paper>
-        ) : (
-          <Box
+          <Divider
             sx={{
-              display: "grid",
-              gap: 1.25,
-              gridTemplateColumns: {
-                xs: "1fr",
-                lg: "repeat(2, minmax(0, 1fr))",
-              },
-              alignItems: "start",
+              mt: 1.25,
+              mb: 2.25,
+              borderColor: alpha("#D79BBB", 0.45),
+              maxWidth: 980,
+              mx: "auto",
             }}
-          >
-            {visibleProducts.map((product) => (
-              (() => {
-                const isExpanded = showFullCards || expandedAdviceIds.has(product.id);
-                return (
-              <Paper
-                key={product.id}
-                elevation={0}
-                sx={{
-                  p: { xs: 1.4, md: 1.7 },
-                  borderRadius: 2.5,
-                  border: "1px solid #ECD3E1",
-                  bgcolor: "#FFFFFF",
-                  boxShadow: "0 8px 20px rgba(94,21,71,0.08)",
-                  display: "grid",
-                  gap: 0.95,
-                  minHeight: showFullCards ? 0 : { xs: 250, lg: 270 },
-                  height: showFullCards ? "auto" : isExpanded ? "auto" : { xs: 250, lg: 270 },
-                  gridTemplateRows: "auto 1fr auto",
-                }}
-              >
-                <Stack
-                  direction="column"
-                  alignItems="flex-start"
-                  spacing={0.8}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: { xs: 17, md: 18 },
-                      fontWeight: 700,
-                      color: "#31192C",
-                      lineHeight: 1.3,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {product.name}
-                  </Typography>
-                  <Stack direction="row" spacing={0.8} flexWrap="wrap">
-                    {product.atcCode ? (
-                      <Chip
-                        label={product.atcCode}
-                        size="small"
-                        sx={{
-                          bgcolor: "#FFE7F4",
-                          color: "#9D1D66",
-                          fontWeight: 800,
-                          fontSize: 11,
-                          borderRadius: 999,
-                          border: "1px solid #F2B9DA",
-                          height: 26,
-                        }}
-                      />
-                    ) : null}
-                    <Chip
-                      label={`Vnr ${product.farmaloggNumber || "-"}`}
-                      size="small"
-                      onClick={() => {
-                        void handleCopyNumber(product.farmaloggNumber, "Vnr");
-                      }}
-                        sx={{
-                          bgcolor: "#FAF1F7",
-                          color: "#6F4D64",
-                          fontWeight: 600,
-                          fontSize: 11,
-                          borderRadius: 999,
-                          border: "1px solid #EBD6E3",
-                          height: 26,
-                          cursor: toDigits(product.farmaloggNumber) ? "pointer" : "default",
-                          transition: "transform 120ms ease, background-color 120ms ease",
-                          "&:hover": {
-                          bgcolor: "#F7E7F1",
-                          transform: "translateY(-1px)",
-                        },
-                      }}
-                    />
-                    <Chip
-                      label={`SKU ${product.sku || "-"}`}
-                      size="small"
-                      onClick={() => {
-                        void handleCopyNumber(product.sku, "SKU");
-                      }}
-                        sx={{
-                          bgcolor: "#FAF1F7",
-                          color: "#6F4D64",
-                          fontWeight: 600,
-                          fontSize: 11,
-                          borderRadius: 999,
-                          border: "1px solid #EBD6E3",
-                          height: 26,
-                          cursor: toDigits(product.sku) ? "pointer" : "default",
-                          transition: "transform 120ms ease, background-color 120ms ease",
-                          "&:hover": {
-                          bgcolor: "#F7E7F1",
-                          transform: "translateY(-1px)",
-                        },
-                      }}
-                    />
-                  </Stack>
-                </Stack>
+          />
 
-                {product.advicePoints.length > 0 ? (
-                  <Box
-                    component="ul"
+          {isLoading ? (
+            <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
+              <CircularProgress size={34} />
+              <Typography color="text.secondary">Laster produktdata...</Typography>
+            </Box>
+          ) : error ? (
+            <Paper sx={{ p: 2, borderRadius: 2.5, border: "1px solid #EFCFE1", bgcolor: "#FFF8FC" }}>
+              <Typography sx={{ fontWeight: 700, color: "#8E2E67" }}>{error}</Typography>
+            </Paper>
+          ) : filtered.length === 0 ? (
+            <Paper sx={{ p: 2.5, borderRadius: 2.5, border: "1px solid #EFCFE1", bgcolor: "#FFF8FC" }}>
+              <Typography sx={{ fontSize: 18, fontWeight: 700, color: "#854265" }}>
+                Ingen treff på søket ditt.
+              </Typography>
+              <Typography sx={{ mt: 0.5, fontSize: 14, color: "#8E6A82" }}>
+                Prøv å søke på ATC-kode, varenummer, SKU eller deler av varenavn.
+              </Typography>
+            </Paper>
+          ) : (
+            <Box
+              sx={{
+                display: "grid",
+                gap: 1.25,
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  lg: "repeat(2, minmax(0, 1fr))",
+                },
+                alignItems: "start",
+              }}
+            >
+              {visibleProducts.map((product) => {
+                const isExpanded = showFullCards || expandedAdviceIds.has(product.id);
+
+                return (
+                  <Paper
+                    key={product.id}
+                    elevation={0}
                     sx={{
-                      mt: 0,
-                      mb: 0,
-                      pl: 2.1,
+                      p: { xs: 1.4, md: 1.7 },
+                      borderRadius: 2.5,
+                      border: "1px solid #ECD3E1",
+                      bgcolor: "#FFFFFF",
+                      boxShadow: "0 8px 20px rgba(94,21,71,0.08)",
                       display: "grid",
-                      gap: 0.18,
-                      overflow: "hidden",
-                      alignContent: "start",
-                      justifyContent: "start",
-                      "& li": {
-                        color: "#3D2A36",
-                        fontSize: { xs: 13.5, md: 14 },
-                        lineHeight: 1.34,
-                      },
-                      "& li::marker": {
-                        color: "#D24D94",
-                        fontSize: "1em",
-                      },
+                      gap: 0.95,
+                      minHeight: showFullCards ? 0 : { xs: 250, lg: 270 },
+                      height: showFullCards ? "auto" : isExpanded ? "auto" : { xs: 250, lg: 270 },
+                      gridTemplateRows: "auto 1fr auto",
                     }}
                   >
-                    {(isExpanded ? product.advicePoints : product.advicePoints.slice(0, 3)).map((point, idx) => (
-                      <li key={`${product.id}-${idx}`}>{point}</li>
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography sx={{ mt: 0.25, color: "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
-                    Ingen farmasøytisk råd registrert for dette produktet.
+                    <Stack direction="column" alignItems="flex-start" spacing={0.8}>
+                      <Typography
+                        sx={{
+                          fontSize: { xs: 17, md: 18 },
+                          fontWeight: 700,
+                          color: "#31192C",
+                          lineHeight: 1.3,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {product.name}
+                      </Typography>
+                      <Stack direction="row" spacing={0.8} flexWrap="wrap">
+                        {product.atcCode ? (
+                          <Chip
+                            label={product.atcCode}
+                            size="small"
+                            sx={{
+                              bgcolor: "#FFE7F4",
+                              color: "#9D1D66",
+                              fontWeight: 800,
+                              fontSize: 11,
+                              borderRadius: 999,
+                              border: "1px solid #F2B9DA",
+                              height: 26,
+                            }}
+                          />
+                        ) : null}
+                        <Chip
+                          label={`Vnr ${product.farmaloggNumber || "-"}`}
+                          size="small"
+                          onClick={() => {
+                            void handleCopyNumber(product.farmaloggNumber, "Vnr");
+                          }}
+                          sx={{
+                            bgcolor: "#FAF1F7",
+                            color: "#6F4D64",
+                            fontWeight: 600,
+                            fontSize: 11,
+                            borderRadius: 999,
+                            border: "1px solid #EBD6E3",
+                            height: 26,
+                            cursor: toDigits(product.farmaloggNumber) ? "pointer" : "default",
+                            transition: "transform 120ms ease, background-color 120ms ease",
+                            "&:hover": {
+                              bgcolor: "#F7E7F1",
+                              transform: "translateY(-1px)",
+                            },
+                          }}
+                        />
+                        <Chip
+                          label={`SKU ${product.sku || "-"}`}
+                          size="small"
+                          onClick={() => {
+                            void handleCopyNumber(product.sku, "SKU");
+                          }}
+                          sx={{
+                            bgcolor: "#FAF1F7",
+                            color: "#6F4D64",
+                            fontWeight: 600,
+                            fontSize: 11,
+                            borderRadius: 999,
+                            border: "1px solid #EBD6E3",
+                            height: 26,
+                            cursor: toDigits(product.sku) ? "pointer" : "default",
+                            transition: "transform 120ms ease, background-color 120ms ease",
+                            "&:hover": {
+                              bgcolor: "#F7E7F1",
+                              transform: "translateY(-1px)",
+                            },
+                          }}
+                        />
+                      </Stack>
+                    </Stack>
+
+                    {product.advicePoints.length > 0 ? (
+                      <Box
+                        component="ul"
+                        sx={{
+                          mt: 0,
+                          mb: 0,
+                          pl: 2.1,
+                          display: "grid",
+                          gap: 0.18,
+                          overflow: "hidden",
+                          alignContent: "start",
+                          justifyContent: "start",
+                          "& li": {
+                            color: "#3D2A36",
+                            fontSize: { xs: 13.5, md: 14 },
+                            lineHeight: 1.34,
+                          },
+                          "& li::marker": {
+                            color: "#D24D94",
+                            fontSize: "1em",
+                          },
+                        }}
+                      >
+                        {(isExpanded ? product.advicePoints : product.advicePoints.slice(0, 3)).map((point, idx) => (
+                          <li key={`${product.id}-${idx}`}>{point}</li>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography sx={{ mt: 0.25, color: "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
+                        Ingen farmasøytisk råd registrert for dette produktet.
+                      </Typography>
+                    )}
+                    {!showFullCards && product.advicePoints.length > 3 ? (
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => toggleExpandedAdvice(product.id)}
+                        sx={{
+                          width: "fit-content",
+                          minWidth: 0,
+                          mt: 0.1,
+                          px: 0,
+                          color: "#9D1D66",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: "none",
+                        }}
+                      >
+                        {isExpanded ? "Vis færre" : `Vis mer (${product.advicePoints.length})`}
+                      </Button>
+                    ) : null}
+                  </Paper>
+                );
+              })}
+              {filtered.length > visibleProducts.length ? (
+                <Box sx={{ pt: 0.25 }}>
+                  <Typography sx={{ fontSize: 13, color: "#8A6380", mb: 0.75 }}>
+                    Flere treff tilgjengelig
                   </Typography>
-                )}
-                {!showFullCards && product.advicePoints.length > 3 ? (
                   <Button
                     size="small"
-                    variant="text"
-                    onClick={() => toggleExpandedAdvice(product.id)}
+                    variant="outlined"
+                    onClick={() => setRenderLimit((prev) => prev + MAX_RENDERED_RESULTS)}
                     sx={{
-                      width: "fit-content",
-                      minWidth: 0,
-                      mt: 0.1,
-                      px: 0,
-                      color: "#9D1D66",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textTransform: "none",
+                      borderRadius: 2.5,
+                      px: 1.4,
+                      py: 0.4,
+                      fontSize: 13,
+                      border: "1px solid #E1B8CF",
+                      color: "#8D2F67",
+                      bgcolor: "#FFF7FB",
+                      "&:hover": {
+                        border: "1px solid #DDA8C5",
+                        bgcolor: "#FDEDF7",
+                      },
                     }}
                   >
-                    {isExpanded
-                      ? "Vis færre"
-                      : `Vis mer (${product.advicePoints.length})`}
+                    Vis flere
                   </Button>
-                ) : null}
-              </Paper>
-                );
-              })()
-            ))}
-            {filtered.length > visibleProducts.length ? (
-              <Box sx={{ pt: 0.25 }}>
-                <Typography sx={{ fontSize: 13, color: "#8A6380", mb: 0.75 }}>
-                  Flere treff tilgjengelig
-                </Typography>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => setRenderLimit((prev) => prev + MAX_RENDERED_RESULTS)}
-                  sx={{
-                    borderRadius: 2.5,
-                    px: 1.4,
-                    py: 0.4,
-                    fontSize: 13,
-                    border: "1px solid #E1B8CF",
-                    color: "#8D2F67",
-                    bgcolor: "#FFF7FB",
-                    "&:hover": {
-                      border: "1px solid #DDA8C5",
-                      bgcolor: "#FDEDF7",
-                    },
-                  }}
-                >
-                  Vis flere
-                </Button>
-              </Box>
-            ) : null}
-          </Box>
-        )}
-      </Box>
+                </Box>
+              ) : null}
+            </Box>
+          )}
+        </Box>
+      ) : (
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 2, md: 3 }, py: 1.5 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, md: 2.5 },
+              borderRadius: 2.5,
+              border: "1px solid #E6C7D8",
+              bgcolor: "#FFF9FD",
+              boxShadow: "0 10px 24px rgba(94,21,71,0.08)",
+            }}
+          >
+            <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#4A1F42" }}>Faglig inhhold</Typography>
+            <Typography sx={{ mt: 0.75, fontSize: 14.5, color: "#7D5A73" }}>
+              Denne fanen er klar for innhold. Send meg hva du vil vise her, så bygger jeg det inn i
+              samme designstil.
+            </Typography>
+          </Paper>
+        </Box>
+      )}
+
       <Snackbar
         open={Boolean(copiedMessage)}
         autoHideDuration={1500}
