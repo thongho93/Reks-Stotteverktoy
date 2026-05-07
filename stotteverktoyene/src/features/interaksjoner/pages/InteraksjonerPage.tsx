@@ -419,7 +419,6 @@ export default function InteraksjonerPage() {
       : selected.length === 1
         ? "1 av 2 valgt"
         : "Interaksjonssøk aktiv";
-  const searchProgressColor = selected.length >= 2 ? "success" : "warning";
 
   const handleSearch = React.useCallback(() => {
     if (!index) return;
