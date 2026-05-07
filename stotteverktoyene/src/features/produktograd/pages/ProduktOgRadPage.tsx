@@ -971,7 +971,7 @@ export default function ProduktOgRadPage() {
 
               {/* Chip cloud */}
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2.5, justifyContent: "center" }}>
-                {topAtcCodes.map(({ code, count }, index) => {
+                {topAtcCodes.map(({ code }, index) => {
                   const floatDuration = 3.2 + (index % 5) * 0.45;
                   const glowDuration  = 2.6 + (index % 4) * 0.55;
                   const entranceDelay = index * 0.07;
