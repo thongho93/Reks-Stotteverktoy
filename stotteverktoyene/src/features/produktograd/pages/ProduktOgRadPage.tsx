@@ -138,8 +138,9 @@ const matchesQuery = (product: AdviceProduct, terms: string[]): boolean => {
   return terms.every((term) => {
     if (product.searchBlob.includes(term)) return true;
 
+    // Only do digit-only fallback when the term is purely numeric (not ATC codes like R05CB01)
     const termDigits = toDigits(term);
-    if (!termDigits) return false;
+    if (!termDigits || termDigits !== term) return false;
 
     return product.farmaloggDigits.includes(termDigits) || product.skuDigits.includes(termDigits);
   });
@@ -202,6 +203,9 @@ export default function ProduktOgRadPage() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameDialogValue, setRenameDialogValue] = useState("");
   const [renameDialogTargetId, setRenameDialogTargetId] = useState<string | null>(null);
+  const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
+  const [embedDialogUrl, setEmbedDialogUrl] = useState("");
+  const [embedDialogTitle, setEmbedDialogTitle] = useState("");
 
   useEffect(() => {
     if (!user?.uid) {
@@ -416,11 +420,11 @@ export default function ProduktOgRadPage() {
     }
   };
 
-  const handleCopyNumber = async (rawValue: string, label: "Vnr" | "SKU") => {
-    const digits = toDigits(rawValue);
-    if (!digits) return;
-    const ok = await copyPlainText(digits);
-    if (ok) setCopiedMessage(`${label} kopiert: ${digits}`);
+  const handleCopyNumber = async (rawValue: string, label: "Vnr" | "SKU" | "ATC") => {
+    const value = label === "ATC" ? rawValue?.trim() : toDigits(rawValue);
+    if (!value) return;
+    const ok = await copyPlainText(value);
+    if (ok) setCopiedMessage(`${label} kopiert: ${value}`);
   };
 
   const toggleExpandedAdvice = (productId: string) => {
@@ -640,26 +644,33 @@ export default function ProduktOgRadPage() {
     }, 350);
   };
 
-  const addEmbeddedDocument = async () => {
+  const addEmbeddedDocument = () => {
     if (!user?.uid) {
       setCopiedMessage("Du må være innlogget for å legge til dokument.");
       return;
     }
+    setEmbedDialogUrl("");
+    setEmbedDialogTitle("");
+    setEmbedDialogOpen(true);
+  };
 
-    const raw = window.prompt(
-      "Lim inn SharePoint embed-kode (<iframe ...>) eller direkte URL til dokument"
-    );
-    if (raw == null) return;
+  const handleEmbedDialogUrlChange = (value: string) => {
+    setEmbedDialogUrl(value);
+    const parsed = parseEmbedInput(value);
+    if (parsed && !embedDialogTitle) {
+      setEmbedDialogTitle(parsed.suggestedTitle);
+    }
+  };
 
-    const parsed = parseEmbedInput(raw);
+  const handleEmbedConfirm = async () => {
+    if (!user?.uid) return;
+    const parsed = parseEmbedInput(embedDialogUrl);
     if (!parsed) {
       setCopiedMessage("Ugyldig iframe/URL. Lim inn gyldig HTTP(S)-lenke.");
       return;
     }
-
-    const customTitle = window.prompt("Tittel på dokumentet", parsed.suggestedTitle);
-    const title = customTitle == null ? parsed.suggestedTitle : customTitle.trim() || parsed.suggestedTitle;
-
+    const title = embedDialogTitle.trim() || parsed.suggestedTitle;
+    setEmbedDialogOpen(false);
     try {
       const now = Date.now();
       const created = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
@@ -724,7 +735,7 @@ export default function ProduktOgRadPage() {
               maxWidth: 700,
               minHeight: { xs: 38, md: 44 },
               p: 0.25,
-              borderRadius: 999,
+              borderRadius: 3,
               bgcolor: "rgba(120, 50, 102, 0.22)",
               border: "1px solid rgba(116, 44, 100, 0.26)",
               boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
@@ -739,7 +750,7 @@ export default function ProduktOgRadPage() {
               sx={{
                 minHeight: { xs: 36, md: 42 },
                 textTransform: "none",
-                borderRadius: 999,
+                borderRadius: 2.5,
                 fontSize: { xs: 14, md: 17 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
@@ -765,7 +776,7 @@ export default function ProduktOgRadPage() {
               sx={{
                 minHeight: { xs: 36, md: 42 },
                 textTransform: "none",
-                borderRadius: 999,
+                borderRadius: 2.5,
                 fontSize: { xs: 14, md: 17 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
@@ -817,6 +828,7 @@ export default function ProduktOgRadPage() {
                   color: "#412039",
                   "& input": { textAlign: "center" },
                   "& input::placeholder": { color: "#9C6F89", opacity: 1, textAlign: "center" },
+                  "& input:focus::placeholder": { opacity: 0 },
                 }}
               />
               {query ? (
@@ -892,7 +904,7 @@ export default function ProduktOgRadPage() {
                     elevation={0}
                     sx={{
                       p: { xs: 1.4, md: 1.7 },
-                      borderRadius: 2.5,
+                      borderRadius: 1.5,
                       border: "1px solid #ECD3E1",
                       bgcolor: "#FFFFFF",
                       boxShadow: "0 8px 20px rgba(94,21,71,0.08)",
@@ -923,6 +935,7 @@ export default function ProduktOgRadPage() {
                           <Chip
                             label={product.atcCode}
                             size="small"
+                            onClick={() => { void handleCopyNumber(product.atcCode, "ATC"); }}
                             sx={{
                               bgcolor: "#FFE7F4",
                               color: "#9D1D66",
@@ -931,6 +944,12 @@ export default function ProduktOgRadPage() {
                               borderRadius: 999,
                               border: "1px solid #F2B9DA",
                               height: 26,
+                              cursor: "pointer",
+                              transition: "transform 120ms ease, background-color 120ms ease",
+                              "&:hover": {
+                                bgcolor: "#FFDAF0",
+                                transform: "translateY(-1px)",
+                              },
                             }}
                           />
                         ) : null}
@@ -1070,7 +1089,7 @@ export default function ProduktOgRadPage() {
           <Paper
             elevation={0}
             sx={{
-              borderRadius: 3,
+              borderRadius: 1.5,
               border: "1px solid rgba(102,39,90,0.5)",
               bgcolor: "#0F1625",
               overflow: "hidden",
@@ -1299,8 +1318,8 @@ export default function ProduktOgRadPage() {
                       elevation={0}
                       sx={{
                         height: "100%",
-                        borderRadius: 2.5,
-                        border: "1px solid rgba(180,127,163,0.4)",
+                        borderRadius: 0,
+                        border: "none",
                         bgcolor: "#09101C",
                         overflow: "hidden",
                         display: "grid",
@@ -1553,6 +1572,97 @@ export default function ProduktOgRadPage() {
           </Popover>
         </Box>
       )}
+
+      <Dialog
+        open={embedDialogOpen}
+        onClose={() => setEmbedDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "#131B2E",
+            border: "1px solid rgba(169,119,154,0.4)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+            minWidth: 420,
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: "#EED5E8", fontWeight: 700, fontSize: 17, pb: 1 }}>
+          Bygg inn dokument
+        </DialogTitle>
+        <DialogContent sx={{ pt: "8px !important", display: "flex", flexDirection: "column", gap: 2 }}>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            label="SharePoint embed-kode eller URL"
+            value={embedDialogUrl}
+            onChange={(e) => handleEmbedDialogUrlChange(e.target.value)}
+            placeholder="Lim inn <iframe ...> eller direkte https://..."
+            variant="outlined"
+            size="small"
+            InputLabelProps={{ sx: { color: "#C9A4BA" } }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                color: "#F2E7EF",
+                fontSize: 13,
+                borderRadius: 2,
+                bgcolor: "rgba(5,9,20,0.8)",
+                "& fieldset": { borderColor: "rgba(183,121,166,0.45)" },
+                "&:hover fieldset": { borderColor: "rgba(242,162,208,0.6)" },
+                "&.Mui-focused fieldset": { borderColor: "#F2A2D0" },
+              },
+              "& .MuiInputLabel-root.Mui-focused": { color: "#F2A2D0" },
+            }}
+          />
+          <TextField
+            fullWidth
+            label="Tittel"
+            value={embedDialogTitle}
+            onChange={(e) => setEmbedDialogTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleEmbedConfirm(); }}
+            variant="outlined"
+            size="small"
+            InputLabelProps={{ sx: { color: "#C9A4BA" } }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                color: "#F2E7EF",
+                fontSize: 14,
+                borderRadius: 2,
+                bgcolor: "rgba(5,9,20,0.8)",
+                "& fieldset": { borderColor: "rgba(183,121,166,0.45)" },
+                "&:hover fieldset": { borderColor: "rgba(242,162,208,0.6)" },
+                "&.Mui-focused fieldset": { borderColor: "#F2A2D0" },
+              },
+              "& .MuiInputLabel-root.Mui-focused": { color: "#F2A2D0" },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button
+            onClick={() => setEmbedDialogOpen(false)}
+            sx={{ color: "#C9A4BA", textTransform: "none", fontWeight: 600 }}
+          >
+            Avbryt
+          </Button>
+          <Button
+            onClick={() => void handleEmbedConfirm()}
+            disabled={!embedDialogUrl.trim()}
+            variant="contained"
+            sx={{
+              borderRadius: 2,
+              textTransform: "none",
+              fontWeight: 700,
+              bgcolor: "#F2A2D0",
+              color: "#2A122A",
+              "&:hover": { bgcolor: "#F7B7DC" },
+              "&.Mui-disabled": { bgcolor: "rgba(242,162,208,0.3)", color: "rgba(42,18,42,0.5)" },
+            }}
+          >
+            Legg til
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={renameDialogOpen}
