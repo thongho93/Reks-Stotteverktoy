@@ -20,6 +20,7 @@ import {
   Snackbar,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import IndeterminateCheckBoxOutlinedIcon from "@mui/icons-material/IndeterminateCheckBoxOutlined";
@@ -104,7 +105,13 @@ function renderHighlightedText(label: string, matchedTerms: string[]): React.Rea
           <Box
             key={idx}
             component="span"
-            sx={{ bgcolor: "warning.light", borderRadius: 0.75, px: 0.4 }}
+            sx={{
+              bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.14)" : "rgba(160,58,56,0.12)",
+              color: (t) => t.palette.mode === "dark" ? "#FFFFFF" : "#6B2020",
+              borderRadius: 0.75,
+              px: 0.4,
+              fontWeight: 800,
+            }}
           >
             {part}
           </Box>
@@ -543,11 +550,23 @@ export default function InteraksjonerPage() {
   return (
     <Box
       sx={{
+        mx: -2,
+        mt: -2,
+        minHeight: "100vh",
+        bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FBF5F5",
+        backgroundImage: (t) => t.palette.mode === "dark"
+          ? "radial-gradient(circle at 6% -10%, rgba(200,60,60,0.11) 0%, rgba(200,60,60,0) 38%), radial-gradient(circle at 92% -6%, rgba(150,40,40,0.09) 0%, rgba(150,40,40,0) 32%)"
+          : "radial-gradient(circle at 6% -10%, rgba(255,94,91,0.16) 0%, rgba(255,94,91,0) 38%), radial-gradient(circle at 92% -6%, rgba(200,60,60,0.12) 0%, rgba(200,60,60,0) 32%)",
+      }}
+    >
+    <Box
+      sx={{
         maxWidth: 1760,
         width: "100%",
         mx: "auto",
         mt: { xs: 2, md: 1.5 },
         px: { xs: 1.5, md: 2.5 },
+        pt: { xs: 2, md: 2 },
         height: { xs: "auto", md: "calc(100vh - 20px)" },
         overflow: { xs: "visible", md: "hidden" },
         display: "flex",
@@ -571,6 +590,8 @@ export default function InteraksjonerPage() {
             flex: { xs: "initial", md: `0 0 calc((100% - ${DIVIDER_WIDTH_PX}px) * ${splitRatio})` },
             height: { xs: "auto", md: "100%" },
             overflow: { xs: "visible", md: "auto" },
+            bgcolor: (t) => t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF",
+            border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
           }}
         >
           {error ? (
@@ -676,9 +697,14 @@ export default function InteraksjonerPage() {
               <Chip
                 size="small"
                 label={searchProgressLabel}
-                color={searchProgressColor}
                 variant="outlined"
-                sx={{ alignSelf: "flex-start", fontWeight: 700 }}
+                sx={{
+                  alignSelf: "flex-start",
+                  fontWeight: 700,
+                  borderColor: (t) => t.palette.mode === "dark" ? "rgba(220,90,90,0.45)" : "rgba(176,68,66,0.4)",
+                  color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
+                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.14)" : "rgba(255,94,91,0.07)",
+                }}
               />
             ) : null}
             {showHistory ? (
@@ -694,8 +720,13 @@ export default function InteraksjonerPage() {
                   }}
                 >
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography sx={{ fontWeight: 800 }}>Historikk</Typography>
-                    <Chip size="small" label={`${history.length}`} sx={{ fontWeight: 700 }} />
+                    <Typography sx={{ fontWeight: 800, color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38" }}>Historikk</Typography>
+                    <Chip size="small" label={`${history.length}`} sx={{
+                      fontWeight: 700,
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.22)" : "rgba(200,70,70,0.1)",
+                      color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
+                      border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.3)" : "rgba(200,80,80,0.2)"}`,
+                    }} />
                   </Stack>
                 </Box>
 
@@ -704,7 +735,8 @@ export default function InteraksjonerPage() {
                   sx={{
                     borderRadius: 2,
                     overflow: "hidden",
-                    borderColor: "divider",
+                    borderColor: (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.2)" : "rgba(200,80,80,0.14)",
+                    bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FFF8F8",
                     boxShadow: "none",
                     mt: 1,
                   }}
@@ -781,12 +813,14 @@ export default function InteraksjonerPage() {
                       }
                       size="medium"
                       sx={{
-                        bgcolor: "action.selected",
+                        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+                        color: "text.primary",
+                        border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.14)"}`,
                         borderRadius: 999,
                         px: 0.5,
                         "& .MuiChip-label": { px: 1 },
-                        "& .MuiChip-deleteIcon": { opacity: 0.7 },
-                        "& .MuiChip-deleteIcon:hover": { opacity: 1 },
+                        "& .MuiChip-deleteIcon": { opacity: 0.5 },
+                        "& .MuiChip-deleteIcon:hover": { opacity: 0.9 },
                       }}
                     />
                   );
@@ -805,7 +839,14 @@ export default function InteraksjonerPage() {
                 variant="text"
                 onClick={handleReset}
                 disabled={selected.length === 0}
-                sx={{ color: "text.primary", fontWeight: 700 }}
+                sx={{
+                  fontWeight: 700,
+                  color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
+                  "&:hover": {
+                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.12)" : "rgba(200,70,70,0.07)",
+                  },
+                  "&.Mui-disabled": { color: "text.disabled" },
+                }}
               >
                 NULLSTILL
               </Button>
@@ -825,11 +866,17 @@ export default function InteraksjonerPage() {
                   }}
                 >
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography sx={{ fontWeight: 800 }}>Treff</Typography>
+                    <Typography sx={{ fontWeight: 800, color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38" }}>Treff</Typography>
                     <Chip
                       size="small"
                       label={`${results.length} treff`}
-                      sx={{ fontWeight: 700, ml: 1 }}
+                      sx={{
+                        fontWeight: 700,
+                        ml: 1,
+                        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.22)" : "rgba(200,70,70,0.1)",
+                        color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
+                        border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.3)" : "rgba(200,80,80,0.2)"}`,
+                      }}
                     />
                   </Stack>
                 </Box>
@@ -839,7 +886,8 @@ export default function InteraksjonerPage() {
                   sx={{
                     borderRadius: 2,
                     overflow: "hidden",
-                    borderColor: "divider",
+                    borderColor: (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.2)" : "rgba(200,80,80,0.14)",
+                    bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FFF8F8",
                     boxShadow: "none",
                     mt: 2,
                   }}
@@ -881,6 +929,15 @@ export default function InteraksjonerPage() {
                               alignItems: "flex-start",
                               gap: 1,
                               minHeight: { xs: 112, md: 128 },
+                              "&.Mui-selected": {
+                                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.2)" : "rgba(255,94,91,0.08)",
+                              },
+                              "&.Mui-selected:hover": {
+                                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.28)" : "rgba(255,94,91,0.14)",
+                              },
+                              "&:hover": {
+                                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.1)" : "rgba(255,94,91,0.05)",
+                              },
                             }}
                           >
                             <Typography
@@ -1030,6 +1087,8 @@ export default function InteraksjonerPage() {
             minHeight: { xs: 420, md: 560 },
             height: { xs: "auto", md: "100%" },
             overflow: { xs: "visible", md: "auto" },
+            bgcolor: (t) => t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF",
+            border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
           }}
         >
           {selected.length === 0 ? (
@@ -1038,21 +1097,43 @@ export default function InteraksjonerPage() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                justifyContent: "flex-start",
+                justifyContent: "center",
                 minHeight: { xs: 420, md: 620 },
                 px: 2,
-                pt: { xs: 1, md: 2 },
+                py: { xs: 4, md: 6 },
               }}
             >
-              <Box sx={{ width: "100%", maxWidth: 560 }}>
-                <Typography
-                  color="text.secondary"
-                  variant="h2"
-                  sx={{ fontWeight: 800, textAlign: "center", mt: 1 }}
-                >
-                  Interaksjonssøk
-                </Typography>
+              {/* Icon badge */}
+              <Box
+                sx={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "16px",
+                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.18)" : "rgba(255,94,91,0.1)",
+                  border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(220,90,90,0.28)" : "rgba(200,80,80,0.18)"}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  mb: 2.5,
+                }}
+              >
+                <CompareArrowsIcon sx={{ fontSize: 28, color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#B04442" }} />
               </Box>
+
+              {/* Title */}
+              <Typography
+                variant="h2"
+                sx={{
+                  fontWeight: 800,
+                  textAlign: "center",
+                  mb: 0.5,
+                  color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
+                }}
+              >
+                Interaksjonssøk
+              </Typography>
+
+              {/* Cat image */}
               <Box
                 component="img"
                 alt="Venter"
@@ -1060,21 +1141,30 @@ export default function InteraksjonerPage() {
                 loading="lazy"
                 decoding="async"
                 sx={{
-                  width: 340,
-                  maxWidth: "85%",
-                  mb: 2,
-                  opacity: 0.95,
-                  mt: 5,
+                  width: 300,
+                  maxWidth: "82%",
+                  borderRadius: "14px",
+                  border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.18)" : "rgba(200,80,80,0.1)"}`,
+                  boxShadow: (t) => t.palette.mode === "dark"
+                    ? "0 10px 36px rgba(180,50,50,0.13), 0 2px 10px rgba(0,0,0,0.45)"
+                    : "0 8px 28px rgba(200,80,80,0.09), 0 2px 8px rgba(0,0,0,0.05)",
+                  mt: 3.5,
+                  mb: 3,
+                  display: "block",
                 }}
               />
-              <Box sx={{ width: "100%", maxWidth: 560 }}>
-                <Typography
-                  color="text.secondary"
-                  sx={{ textAlign: "center", fontSize: 23 }}
-                >
-                  Kom igjen. Jeg har ikke hele dagen.{" "}
-                </Typography>
-              </Box>
+
+              {/* Subtitle */}
+              <Typography
+                sx={{
+                  textAlign: "center",
+                  fontSize: 17,
+                  fontWeight: 500,
+                  color: (t) => t.palette.mode === "dark" ? "#A86A68" : "#B87A78",
+                }}
+              >
+                Kom igjen. Jeg har ikke hele dagen.
+              </Typography>
             </Box>
           ) : null}
 
@@ -1199,7 +1289,11 @@ export default function InteraksjonerPage() {
 
                 return (
                   <Box sx={{ width: "100%" }}>
-                    <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: "divider" }}>
+                    <Card variant="outlined" sx={{
+                      borderRadius: 2,
+                      borderColor: (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)",
+                      bgcolor: (t) => t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF",
+                    }}>
                       <CardContent>
                         <Box
                           sx={{
@@ -1250,7 +1344,15 @@ export default function InteraksjonerPage() {
                                     if (!activeCtx.interactionId) return;
                                     setCreateOpen(true);
                                   }}
-                                  sx={{ fontWeight: 800 }}
+                                  sx={{
+                                    fontWeight: 800,
+                                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.7)" : "#B04442",
+                                    color: "#fff",
+                                    "&:hover": {
+                                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.9)" : "#8A3230",
+                                    },
+                                    boxShadow: "none",
+                                  }}
                                 >
                                   Ny standardtekst
                                 </Button>
@@ -1267,10 +1369,14 @@ export default function InteraksjonerPage() {
                                   )
                                 }
                                 sx={{
-                                  color: "text.primary",
-                                  borderColor: "divider",
                                   px: 1.25,
                                   fontWeight: 700,
+                                  color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
+                                  borderColor: (t) => t.palette.mode === "dark" ? "rgba(220,90,90,0.35)" : "rgba(176,68,66,0.3)",
+                                  "&:hover": {
+                                    borderColor: (t) => t.palette.mode === "dark" ? "rgba(220,90,90,0.6)" : "rgba(176,68,66,0.55)",
+                                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.1)" : "rgba(255,94,91,0.06)",
+                                  },
                                 }}
                               >
                                 Vis detaljer
@@ -1287,10 +1393,10 @@ export default function InteraksjonerPage() {
                                   gap: 1,
                                   px: 1,
                                   py: 0.5,
-                                  borderRadius: 1,
-                                  bgcolor: "action.hover",
+                                  borderRadius: 1.5,
+                                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.14)" : "rgba(255,94,91,0.07)",
                                   border: "1px solid",
-                                  borderColor: "divider",
+                                  borderColor: (t) => t.palette.mode === "dark" ? "rgba(220,90,90,0.28)" : "rgba(200,80,80,0.16)",
                                 }}
                               >
                                 <RelevanceIcon kind={kind} />
@@ -1355,8 +1461,8 @@ export default function InteraksjonerPage() {
                             p: 2,
                             borderRadius: 2,
                             border: "1px solid",
-                            borderColor: "divider",
-                            bgcolor: "action.hover",
+                            borderColor: (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)",
+                            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.06)" : "rgba(255,94,91,0.03)",
                           }}
                         >
                           <Box sx={{ mb: 1 }}>
@@ -1425,10 +1531,13 @@ export default function InteraksjonerPage() {
                                         sx={{
                                           borderRadius: 999,
                                           border: "1px solid",
-                                          borderColor: isOpenStd ? "text.primary" : "divider",
+                                          borderColor: isOpenStd
+                                            ? (t) => t.palette.mode === "dark" ? "rgba(220,90,90,0.7)" : "rgba(176,68,66,0.55)"
+                                            : (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.25)" : "rgba(200,80,80,0.16)",
                                           bgcolor: isOpenStd
-                                            ? "action.selected"
+                                            ? (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.22)" : "rgba(255,94,91,0.1)"
                                             : "background.paper",
+                                          color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#8A3230",
                                           height: 38,
                                           px: 0.5,
                                           maxWidth: "100%",
@@ -1436,7 +1545,7 @@ export default function InteraksjonerPage() {
                                           transition:
                                             "background-color 120ms ease, border-color 120ms ease, transform 120ms ease",
                                           "&:hover": {
-                                            bgcolor: "action.hover",
+                                            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.15)" : "rgba(255,94,91,0.07)",
                                             transform: "translateY(-1px)",
                                           },
                                           "& .MuiChip-label": {
@@ -1446,12 +1555,8 @@ export default function InteraksjonerPage() {
                                             textOverflow: "ellipsis",
                                             whiteSpace: "nowrap",
                                           },
-                                          "& .MuiChip-icon": {
-                                            opacity: 0.9,
-                                          },
-                                          "& .MuiChip-deleteIcon": {
-                                            opacity: 0.9,
-                                          },
+                                          "& .MuiChip-icon": { opacity: 0.85 },
+                                          "& .MuiChip-deleteIcon": { opacity: 0.85 },
                                         }}
                                       />
                                     </Tooltip>
@@ -1482,13 +1587,13 @@ export default function InteraksjonerPage() {
                                           p: 2,
                                           borderRadius: 2,
                                           border: "1px solid",
-                                          borderColor: "divider",
-                                          bgcolor: "background.paper",
+                                          borderColor: (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.2)" : "rgba(200,80,80,0.12)",
+                                          bgcolor: (t) => t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF",
                                           width: "100%",
                                           cursor: "copy",
                                           userSelect: "text",
                                           "&:hover": {
-                                            bgcolor: "action.hover",
+                                            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.08)" : "rgba(255,94,91,0.03)",
                                           },
                                         }}
                                         onClick={() => handleCopyStandardtekst(copyText)}
@@ -1635,6 +1740,7 @@ export default function InteraksjonerPage() {
           showCopySnack("Standardtekst oppdatert");
         }}
       />
+    </Box>
     </Box>
   );
 }
