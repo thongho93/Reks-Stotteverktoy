@@ -39,3 +39,5 @@ rxkatalog/~$*.xlsx
 src/features/fest/components/pimProducts.json
 src/features/produktograd/data/pharmacistAdviceData.json
 public/data/*.json
+!public/data/pimProducts.json
+!public/data/pharmacistAdviceData.json

@@ -215,6 +215,11 @@ function main() {
   const adviceRows = loadRows(ADVICE_INPUT_FILE, "farmasøytiske råd");
   const skuRows = loadRows(SKU_INPUT_FILE, "VNR/SKU-kobling");
 
+  if ((adviceRows.length === 0 || skuRows.length === 0) && fs.existsSync(OUTPUT_FILE)) {
+    console.warn("[raad:sync] En eller flere kildefiler mangler. Beholder eksisterende datafil.");
+    return;
+  }
+
   const adviceByFarmalogg = buildAdviceMap(adviceRows);
   const output = buildMergedRows(skuRows, adviceByFarmalogg);
 

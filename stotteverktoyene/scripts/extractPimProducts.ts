@@ -54,7 +54,12 @@ function main() {
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
 
   if (!fs.existsSync(INPUT_FILE)) {
-    console.warn(`[pim:sync] Kilde mangler: ${INPUT_FILE}. Skriver tom datafil.`);
+    if (fs.existsSync(OUTPUT_FILE)) {
+      console.warn(`[pim:sync] Kilde mangler: ${INPUT_FILE}. Beholder eksisterende datafil.`);
+      return;
+    }
+
+    console.warn(`[pim:sync] Kilde mangler: ${INPUT_FILE}. Oppretter tom datafil.`);
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify([], null, 2), "utf8");
     return;
   }
