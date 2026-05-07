@@ -100,6 +100,45 @@ const MAX_RENDERED_RESULTS = 120;
 const PAGE_MAX_WIDTH = 1500;
 const FAGLIG_DOC_QUERY_KEY = "fagdoc";
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
+const ATC_INGREDIENT: Record<string, string> = {
+  A02BC01: "Omeprazol",
+  A02BC02: "Pantoprazol",
+  A02BC03: "Lansoprazol",
+  A02BC04: "Rabeprazol",
+  A02BC05: "Esomeprazol",
+  A07EC02: "Mesalazin",
+  A11CC05: "Kolekalsiferol",
+  B01AB05: "Enoksaparin",
+  B01AC24: "Tikagrelol",
+  B01AF01: "Rivaroksaban",
+  B01AF02: "Apixaban",
+  C09CA06: "Kandesartan",
+  C09DA03: "Valsartan+HCTZ",
+  G03AA12: "Drospirenon+EE",
+  G04BE03: "Sildenafil",
+  G04BE08: "Tadalafil",
+  H02AB02: "Deksametason",
+  H03AA01: "Levotyroksin",
+  J01CA04: "Amoksicillin",
+  J01CA08: "Pivmecillinam",
+  J02AC01: "Flukonazol",
+  M01AB05: "Diklofenak",
+  M01AE01: "Ibuprofen",
+  M01AH05: "Etorikoksib",
+  N02AJ06: "Kodein+paracet",
+  N02BE01: "Paracetamol",
+  N02CC01: "Sumatriptan",
+  N05AH04: "Quetiapin",
+  N06AB06: "Sertralin",
+  N06AB10: "Escitalopram",
+  N06AX11: "Mirtazapin",
+  R03AK06: "Salmeterol+flut",
+  R03AK07: "Budesonid+form",
+  R03BA02: "Budesonid",
+  R05CB01: "Acetylcystein",
+  S01ED51: "Timolol komb.",
+};
+
 const IFRAME_SRC_RE = /src\s*=\s*["']([^"']+)["']/i;
 const IFRAME_TITLE_RE = /title\s*=\s*["']([^"']+)["']/i;
 
@@ -303,6 +342,17 @@ export default function ProduktOgRadPage() {
 
   const visibleProducts = useMemo(() => filtered.slice(0, renderLimit), [filtered, renderLimit]);
   const showFullCards = filtered.length <= 2;
+
+  const topAtcCodes = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      if (p.atcCode) counts.set(p.atcCode, (counts.get(p.atcCode) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([code, count]) => ({ code, count }));
+  }, [products]);
   const filteredFagligDocs = useMemo(() => {
     const normalized = normalizeSearch(fagligSearch);
     if (!normalized) return fagligDocs;
@@ -701,9 +751,10 @@ export default function ProduktOgRadPage() {
         mx: -2,
         mt: -2,
         minHeight: "100vh",
-        bgcolor: "#FBF5F8",
-        backgroundImage:
-          "radial-gradient(circle at 8% -12%, rgba(214,89,156,0.18) 0%, rgba(214,89,156,0) 40%), radial-gradient(circle at 94% -4%, rgba(133,45,110,0.14) 0%, rgba(133,45,110,0) 34%)",
+        bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FBF5F8",
+        backgroundImage: (theme) => theme.palette.mode === "dark"
+          ? "radial-gradient(circle at 8% -12%, rgba(160,40,120,0.12) 0%, rgba(160,40,120,0) 40%), radial-gradient(circle at 94% -4%, rgba(100,30,90,0.10) 0%, rgba(100,30,90,0) 34%)"
+          : "radial-gradient(circle at 8% -12%, rgba(214,89,156,0.18) 0%, rgba(214,89,156,0) 40%), radial-gradient(circle at 94% -4%, rgba(133,45,110,0.14) 0%, rgba(133,45,110,0) 34%)",
       }}
     >
       <Box
@@ -736,8 +787,8 @@ export default function ProduktOgRadPage() {
               minHeight: { xs: 38, md: 44 },
               p: 0.25,
               borderRadius: 3,
-              bgcolor: "rgba(120, 50, 102, 0.22)",
-              border: "1px solid rgba(116, 44, 100, 0.26)",
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(120,50,102,0.40)" : "rgba(120,50,102,0.22)",
+              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,130,0.45)" : "rgba(116,44,100,0.26)"}`,
               boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
               "& .MuiTabs-indicator": {
                 display: "none",
@@ -754,18 +805,18 @@ export default function ProduktOgRadPage() {
                 fontSize: { xs: 14, md: 17 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
-                color: "#4F2648",
+                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
                 bgcolor: "transparent",
                 border: "none",
                 transition: "all 160ms ease",
                 "&:hover": {
-                  color: "#3B1A35",
+                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
                   bgcolor: "rgba(255,255,255,0.08)",
                 },
                 "&.Mui-selected": {
-                  color: "#2B1129",
+                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
                   fontWeight: 800,
-                  bgcolor: "#E9A4D0",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
                   boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
                 },
               }}
@@ -780,18 +831,18 @@ export default function ProduktOgRadPage() {
                 fontSize: { xs: 14, md: 17 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
-                color: "#4F2648",
+                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
                 bgcolor: "transparent",
                 border: "none",
                 transition: "all 160ms ease",
                 "&:hover": {
-                  color: "#3B1A35",
+                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
                   bgcolor: "rgba(255,255,255,0.08)",
                 },
                 "&.Mui-selected": {
-                  color: "#2B1129",
+                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
                   fontWeight: 800,
-                  bgcolor: "#E9A4D0",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
                   boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
                 },
               }}
@@ -802,21 +853,21 @@ export default function ProduktOgRadPage() {
             <Paper
               elevation={0}
               sx={{
-                mt: 1.35,
+                mt: 3,
                 mx: "auto",
                 width: "100%",
                 maxWidth: 560,
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
-                px: 1.2,
-                py: 0.5,
+                px: 1.6,
+                py: 1,
                 borderRadius: 2.5,
-                border: "1px solid rgba(233,155,198,0.5)",
-                bgcolor: "#FFF8FC",
+                border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.4)" : "rgba(233,155,198,0.5)"}`,
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC",
               }}
             >
-              <SearchRoundedIcon sx={{ fontSize: 19, color: "#9E4F7D" }} />
+              <SearchRoundedIcon sx={{ fontSize: 19, color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#9E4F7D" }} />
               <InputBase
                 inputRef={searchInputRef}
                 value={query}
@@ -825,9 +876,9 @@ export default function ProduktOgRadPage() {
                 sx={{
                   flex: 1,
                   fontSize: { xs: 13, md: 14 },
-                  color: "#412039",
+                  color: (theme) => theme.palette.mode === "dark" ? "#E2D0DC" : "#412039",
                   "& input": { textAlign: "center" },
-                  "& input::placeholder": { color: "#9C6F89", opacity: 1, textAlign: "center" },
+                  "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#8A6880" : "#9C6F89", opacity: 1, textAlign: "center" },
                   "& input:focus::placeholder": { opacity: 0 },
                 }}
               />
@@ -836,7 +887,7 @@ export default function ProduktOgRadPage() {
                   aria-label="Tøm søk"
                   size="small"
                   onClick={() => setQuery("")}
-                  sx={{ color: "#A05C82" }}
+                  sx={{ color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#A05C82" }}
                 >
                   <CloseRoundedIcon sx={{ fontSize: 18 }} />
                 </IconButton>
@@ -848,22 +899,17 @@ export default function ProduktOgRadPage() {
 
       {activeTab === 0 ? (
         <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 2, md: 3 }, py: 1.5 }}>
-          <Typography sx={{ fontSize: 14, color: "#7E5B74", fontWeight: 600, textAlign: "center" }}>
-            Treff:{" "}
-            <Box component="span" sx={{ color: "#C93586", fontWeight: 800 }}>
-              {filtered.length}
-            </Box>
-          </Typography>
-
-          <Divider
-            sx={{
-              mt: 1.25,
-              mb: 2.25,
-              borderColor: alpha("#D79BBB", 0.45),
-              maxWidth: 980,
-              mx: "auto",
-            }}
-          />
+          {query ? (
+            <>
+              <Typography sx={{ fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#A880A0" : "#7E5B74", fontWeight: 600, textAlign: "center" }}>
+                Treff:{" "}
+                <Box component="span" sx={{ color: (theme) => theme.palette.mode === "dark" ? "#E8609A" : "#C93586", fontWeight: 800 }}>
+                  {filtered.length}
+                </Box>
+              </Typography>
+              <Divider sx={{ mt: 1.25, mb: 2.25, borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(140,70,110,0.3)" : alpha("#D79BBB", 0.45), maxWidth: 980, mx: "auto" }} />
+            </>
+          ) : null}
 
           {isLoading ? (
             <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
@@ -871,15 +917,134 @@ export default function ProduktOgRadPage() {
               <Typography color="text.secondary">Laster produktdata...</Typography>
             </Box>
           ) : error ? (
-            <Paper sx={{ p: 2, borderRadius: 2.5, border: "1px solid #EFCFE1", bgcolor: "#FFF8FC" }}>
-              <Typography sx={{ fontWeight: 700, color: "#8E2E67" }}>{error}</Typography>
+            <Paper sx={{ p: 2, borderRadius: 2.5, border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`, bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC" }}>
+              <Typography sx={{ fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#E08AB0" : "#8E2E67" }}>{error}</Typography>
             </Paper>
+          ) : !query ? (
+            <Box
+              sx={{
+                maxWidth: 860,
+                mx: "auto",
+                textAlign: "center",
+                py: 2,
+                mt: 4,
+                "@keyframes atcIn": {
+                  from: { opacity: 0, transform: "scale(0.5) translateY(24px)" },
+                  to:   { opacity: 1, transform: "scale(1)   translateY(0px)" },
+                },
+                "@keyframes atcFloat": {
+                  "0%,100%": { transform: "translateY(0px) rotate(-0.4deg)" },
+                  "30%":     { transform: "translateY(-7px) rotate(0.6deg)" },
+                  "65%":     { transform: "translateY(-3px) rotate(-0.2deg)" },
+                },
+                "@keyframes atcGlow": {
+                  "0%,100%": { boxShadow: "0 0 0px rgba(200,80,160,0)" },
+                  "50%":     { boxShadow: "0 0 18px rgba(200,80,160,0.45), 0 0 38px rgba(200,80,160,0.18)" },
+                },
+                "@keyframes atcTitleShimmer": {
+                  "0%":   { backgroundPosition: "0% 50%" },
+                  "50%":  { backgroundPosition: "100% 50%" },
+                  "100%": { backgroundPosition: "0% 50%" },
+                },
+                "@keyframes orbitSpin": {
+                  from: { transform: "rotate(0deg)"   },
+                  to:   { transform: "rotate(360deg)" },
+                },
+              }}
+            >
+              <Typography sx={{
+                mb: 2.5,
+                fontSize: { xs: 13, md: 14 },
+                fontWeight: 800,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                background: (theme) => theme.palette.mode === "dark"
+                  ? "linear-gradient(90deg, #D46FAE, #F0A0D0, #B84490, #F0A0D0, #D46FAE)"
+                  : "linear-gradient(90deg, #9D2070, #D44898, #7B1A5A, #D44898, #9D2070)",
+                backgroundSize: "300% 300%",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                animation: "atcTitleShimmer 4s ease infinite",
+              }}>
+                Vanlige ATC-koder
+              </Typography>
+
+              {/* Chip cloud */}
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2.5, justifyContent: "center" }}>
+                {topAtcCodes.map(({ code, count }, index) => {
+                  const floatDuration = 3.2 + (index % 5) * 0.45;
+                  const glowDuration  = 2.6 + (index % 4) * 0.55;
+                  const entranceDelay = index * 0.07;
+                  const floatDelay    = index * 0.31;
+                  return (
+                    <Chip
+                      key={code}
+                      label={
+                        <Box component="span" sx={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.2, py: 0.6 }}>
+                          <Box component="span" sx={{ fontWeight: 800, fontSize: 15 }}>{code}</Box>
+                          {ATC_INGREDIENT[code] ? (
+                            <Box component="span" sx={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#8A3A6A",
+                              opacity: 0.85,
+                            }}>{ATC_INGREDIENT[code]}</Box>
+                          ) : null}
+                        </Box>
+                      }
+                      onClick={() => setQuery(code)}
+                      sx={{
+                        height: "auto",
+                        minWidth: 150,
+                        borderRadius: 2.5,
+                        px: 0.5,
+                        cursor: "pointer",
+                        opacity: 0,
+                        "& .MuiChip-label": { px: 1.8 },
+                        bgcolor: (theme) => theme.palette.mode === "dark"
+                          ? index === 0 ? "rgba(160,40,110,0.45)" : "rgba(110,30,80,0.32)"
+                          : index === 0 ? "#FFE0F4"                : "#FFF0FA",
+                        color: (theme) => theme.palette.mode === "dark" ? "#F5B8DC" : "#8D1F60",
+                        border: (theme) => `1px solid ${theme.palette.mode === "dark"
+                          ? index === 0 ? "rgba(220,90,160,0.7)" : "rgba(180,70,130,0.45)"
+                          : index === 0 ? "#E898CC"              : "#F2C0DC"}`,
+                        animation: [
+                          `atcIn ${0.42}s cubic-bezier(0.34,1.56,0.64,1) ${entranceDelay}s both`,
+                          `atcFloat ${floatDuration}s ease-in-out ${floatDelay}s infinite`,
+                          `atcGlow  ${glowDuration}s ease-in-out  ${floatDelay}s infinite`,
+                        ].join(", "),
+                        transition: "background-color 160ms, border-color 160ms, transform 160ms",
+                        "&:hover": {
+                          animationPlayState: "paused",
+                          transform: "translateY(-5px) scale(1.1)",
+                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(190,60,130,0.55)" : "#FFD4EE",
+                          border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(240,110,180,0.8)" : "#DC70B8"}`,
+                          boxShadow: (theme) => theme.palette.mode === "dark"
+                            ? "0 8px 28px rgba(200,60,140,0.5), 0 0 0 1px rgba(220,100,170,0.4)"
+                            : "0 8px 24px rgba(180,50,120,0.28), 0 0 0 1px rgba(200,80,150,0.3)",
+                          zIndex: 1,
+                        },
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+
+              <Typography sx={{
+                mt: 3,
+                fontSize: 12.5,
+                color: (theme) => theme.palette.mode === "dark" ? "#6A5060" : "#BBA0B0",
+                fontStyle: "italic",
+              }}>
+                Klikk på en ATC-kode for å filtrere produkter
+              </Typography>
+            </Box>
           ) : filtered.length === 0 ? (
-            <Paper sx={{ p: 2.5, borderRadius: 2.5, border: "1px solid #EFCFE1", bgcolor: "#FFF8FC" }}>
-              <Typography sx={{ fontSize: 18, fontWeight: 700, color: "#854265" }}>
+            <Paper sx={{ p: 2.5, borderRadius: 2.5, border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`, bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC" }}>
+              <Typography sx={{ fontSize: 18, fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#D4A0C0" : "#854265" }}>
                 Ingen treff på søket ditt.
               </Typography>
-              <Typography sx={{ mt: 0.5, fontSize: 14, color: "#8E6A82" }}>
+              <Typography sx={{ mt: 0.5, fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#9A7890" : "#8E6A82" }}>
                 Prøv å søke på ATC-kode, varenummer, SKU eller deler av varenavn.
               </Typography>
             </Paper>
@@ -905,9 +1070,9 @@ export default function ProduktOgRadPage() {
                     sx={{
                       p: { xs: 1.4, md: 1.7 },
                       borderRadius: 1.5,
-                      border: "1px solid #ECD3E1",
-                      bgcolor: "#FFFFFF",
-                      boxShadow: "0 8px 20px rgba(94,21,71,0.08)",
+                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.25)" : "#ECD3E1"}`,
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFFFFF",
+                      boxShadow: (theme) => theme.palette.mode === "dark" ? "0 4px 14px rgba(0,0,0,0.35)" : "0 8px 20px rgba(94,21,71,0.08)",
                       display: "grid",
                       gap: 0.95,
                       minHeight: showFullCards ? 0 : { xs: 250, lg: 270 },
@@ -920,7 +1085,7 @@ export default function ProduktOgRadPage() {
                         sx={{
                           fontSize: { xs: 17, md: 18 },
                           fontWeight: 700,
-                          color: "#31192C",
+                          color: (theme) => theme.palette.mode === "dark" ? "#F2EDF0" : "#31192C",
                           lineHeight: 1.3,
                           display: "-webkit-box",
                           WebkitLineClamp: 2,
@@ -937,17 +1102,17 @@ export default function ProduktOgRadPage() {
                             size="small"
                             onClick={() => { void handleCopyNumber(product.atcCode, "ATC"); }}
                             sx={{
-                              bgcolor: "#FFE7F4",
-                              color: "#9D1D66",
+                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.22)" : "#FFE7F4",
+                              color: (theme) => theme.palette.mode === "dark" ? "#F09AC0" : "#9D1D66",
                               fontWeight: 800,
                               fontSize: 11,
                               borderRadius: 999,
-                              border: "1px solid #F2B9DA",
+                              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(200,80,140,0.4)" : "#F2B9DA"}`,
                               height: 26,
                               cursor: "pointer",
                               transition: "transform 120ms ease, background-color 120ms ease",
                               "&:hover": {
-                                bgcolor: "#FFDAF0",
+                                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.35)" : "#FFDAF0",
                                 transform: "translateY(-1px)",
                               },
                             }}
@@ -960,17 +1125,17 @@ export default function ProduktOgRadPage() {
                             void handleCopyNumber(product.farmaloggNumber, "Vnr");
                           }}
                           sx={{
-                            bgcolor: "#FAF1F7",
-                            color: "#6F4D64",
+                            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.18)" : "#FAF1F7",
+                            color: (theme) => theme.palette.mode === "dark" ? "#C4A0B8" : "#6F4D64",
                             fontWeight: 600,
                             fontSize: 11,
                             borderRadius: 999,
-                            border: "1px solid #EBD6E3",
+                            border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.3)" : "#EBD6E3"}`,
                             height: 26,
                             cursor: toDigits(product.farmaloggNumber) ? "pointer" : "default",
                             transition: "transform 120ms ease, background-color 120ms ease",
                             "&:hover": {
-                              bgcolor: "#F7E7F1",
+                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.30)" : "#F7E7F1",
                               transform: "translateY(-1px)",
                             },
                           }}
@@ -982,17 +1147,17 @@ export default function ProduktOgRadPage() {
                             void handleCopyNumber(product.sku, "SKU");
                           }}
                           sx={{
-                            bgcolor: "#FAF1F7",
-                            color: "#6F4D64",
+                            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.18)" : "#FAF1F7",
+                            color: (theme) => theme.palette.mode === "dark" ? "#C4A0B8" : "#6F4D64",
                             fontWeight: 600,
                             fontSize: 11,
                             borderRadius: 999,
-                            border: "1px solid #EBD6E3",
+                            border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.3)" : "#EBD6E3"}`,
                             height: 26,
                             cursor: toDigits(product.sku) ? "pointer" : "default",
                             transition: "transform 120ms ease, background-color 120ms ease",
                             "&:hover": {
-                              bgcolor: "#F7E7F1",
+                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.30)" : "#F7E7F1",
                               transform: "translateY(-1px)",
                             },
                           }}
@@ -1013,7 +1178,7 @@ export default function ProduktOgRadPage() {
                           alignContent: "start",
                           justifyContent: "start",
                           "& li": {
-                            color: "#3D2A36",
+                            color: (theme) => theme.palette.mode === "dark" ? "#E8DDE4" : "#3D2A36",
                             fontSize: { xs: 13.5, md: 14 },
                             lineHeight: 1.34,
                           },
@@ -1028,7 +1193,7 @@ export default function ProduktOgRadPage() {
                         ))}
                       </Box>
                     ) : (
-                      <Typography sx={{ mt: 0.25, color: "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
+                      <Typography sx={{ mt: 0.25, color: (theme) => theme.palette.mode === "dark" ? "#A89098" : "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
                         Ingen farmasøytisk råd registrert for dette produktet.
                       </Typography>
                     )}
@@ -1042,7 +1207,7 @@ export default function ProduktOgRadPage() {
                           minWidth: 0,
                           mt: 0.1,
                           px: 0,
-                          color: "#9D1D66",
+                          color: (theme) => theme.palette.mode === "dark" ? "#D070A0" : "#9D1D66",
                           fontSize: 12,
                           fontWeight: 700,
                           textTransform: "none",
@@ -1056,7 +1221,7 @@ export default function ProduktOgRadPage() {
               })}
               {filtered.length > visibleProducts.length ? (
                 <Box sx={{ pt: 0.25 }}>
-                  <Typography sx={{ fontSize: 13, color: "#8A6380", mb: 0.75 }}>
+                  <Typography sx={{ fontSize: 13, color: (theme) => theme.palette.mode === "dark" ? "#907080" : "#8A6380", mb: 0.75 }}>
                     Flere treff tilgjengelig
                   </Typography>
                   <Button
@@ -1068,12 +1233,12 @@ export default function ProduktOgRadPage() {
                       px: 1.4,
                       py: 0.4,
                       fontSize: 13,
-                      border: "1px solid #E1B8CF",
-                      color: "#8D2F67",
-                      bgcolor: "#FFF7FB",
+                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,130,0.45)" : "#E1B8CF"}`,
+                      color: (theme) => theme.palette.mode === "dark" ? "#D080B0" : "#8D2F67",
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,50,100,0.12)" : "#FFF7FB",
                       "&:hover": {
-                        border: "1px solid #DDA8C5",
-                        bgcolor: "#FDEDF7",
+                        border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(180,90,140,0.6)" : "#DDA8C5"}`,
+                        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,50,100,0.22)" : "#FDEDF7",
                       },
                     }}
                   >
@@ -1090,10 +1255,10 @@ export default function ProduktOgRadPage() {
             elevation={0}
             sx={{
               borderRadius: 1.5,
-              border: "1px solid rgba(102,39,90,0.5)",
-              bgcolor: "#0F1625",
+              border: "1px solid rgba(140,80,120,0.35)",
+              bgcolor: "#0D1117",
               overflow: "hidden",
-              boxShadow: "0 16px 34px rgba(10,12,22,0.32)",
+              boxShadow: "0 16px 34px rgba(0,0,0,0.32)",
               display: "flex",
               flexDirection: "column",
               height: "calc(100vh - 115px)",
@@ -1102,8 +1267,8 @@ export default function ProduktOgRadPage() {
             <Box
               sx={{
                 p: 1,
-                borderBottom: "1px solid rgba(171,115,156,0.34)",
-                bgcolor: "rgba(17,25,44,0.9)",
+                borderBottom: "1px solid rgba(140,80,120,0.3)",
+                bgcolor: "rgba(22,27,34,0.97)",
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
@@ -1159,8 +1324,8 @@ export default function ProduktOgRadPage() {
                   alignItems: "center",
                   gap: 0.75,
                   borderRadius: 2,
-                  bgcolor: "rgba(5,9,20,0.9)",
-                  border: "1px solid rgba(183,121,166,0.45)",
+                  bgcolor: "rgba(13,17,23,0.95)",
+                  border: "1px solid rgba(140,80,120,0.35)",
                 }}
               >
                 <SearchRoundedIcon sx={{ color: "#D28DB7", fontSize: 18 }} />
@@ -1189,9 +1354,9 @@ export default function ProduktOgRadPage() {
             >
               <Box
                 sx={{
-                  borderRight: { xs: "none", md: "1px solid rgba(169,119,154,0.3)" },
-                  borderBottom: { xs: "1px solid rgba(169,119,154,0.3)", md: "none" },
-                  bgcolor: "rgba(18,25,42,0.88)",
+                  borderRight: { xs: "none", md: "1px solid rgba(140,80,120,0.25)" },
+                  borderBottom: { xs: "1px solid rgba(140,80,120,0.25)", md: "none" },
+                  bgcolor: "rgba(13,17,23,0.9)",
                   p: 1,
                   overflowY: "auto",
                 }}
@@ -1243,7 +1408,7 @@ export default function ProduktOgRadPage() {
                             bgcolor:
                               selectedFagligDoc?.id === doc.id
                                 ? "rgba(242,162,208,0.18)"
-                                : "rgba(10,14,29,0.78)",
+                                : "rgba(22,27,34,0.85)",
                             "&:hover": {
                               bgcolor: "rgba(242,162,208,0.12)",
                             },
@@ -1300,7 +1465,7 @@ export default function ProduktOgRadPage() {
                       mt: 1,
                       p: 1.2,
                       borderRadius: 2,
-                      bgcolor: "rgba(10,14,29,0.88)",
+                      bgcolor: "rgba(13,17,23,0.92)",
                       border: "1px dashed rgba(242,162,208,0.35)",
                     }}
                   >
@@ -1311,7 +1476,7 @@ export default function ProduktOgRadPage() {
                 ) : null}
               </Box>
 
-              <Box sx={{ bgcolor: "#0A1324", p: 1, overflowY: "auto" }}>
+              <Box sx={{ bgcolor: "#0D1117", p: 1, overflowY: "auto" }}>
                 {selectedFagligDoc ? (
                   selectedFagligDoc.kind === "pdf" ? (
                     <Paper
@@ -1320,7 +1485,7 @@ export default function ProduktOgRadPage() {
                         height: "100%",
                         borderRadius: 0,
                         border: "none",
-                        bgcolor: "#09101C",
+                        bgcolor: "#0D1117",
                         overflow: "hidden",
                         display: "grid",
                         gridTemplateRows: "auto 1fr",
@@ -1330,12 +1495,12 @@ export default function ProduktOgRadPage() {
                         sx={{
                           px: 1.25,
                           py: 0.9,
-                          borderBottom: "1px solid rgba(170,121,156,0.35)",
+                          borderBottom: "1px solid rgba(140,80,120,0.25)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
                           gap: 1,
-                          bgcolor: "rgba(13,20,34,0.94)",
+                          bgcolor: "rgba(22,27,34,0.97)",
                         }}
                       >
                         <Stack direction="row" alignItems="center" spacing={0.9} sx={{ minWidth: 0 }}>
@@ -1355,7 +1520,7 @@ export default function ProduktOgRadPage() {
                           }}
                         />
                       </Box>
-                      <Box sx={{ height: "100%", bgcolor: "#1A1F28" }}>
+                      <Box sx={{ height: "100%", bgcolor: "#161B22" }}>
                         <iframe
                           title={selectedFagligDoc.title}
                           src={selectedFagligDoc.url ?? undefined}
@@ -1369,8 +1534,8 @@ export default function ProduktOgRadPage() {
                       sx={{
                         height: "100%",
                         borderRadius: 2.5,
-                        border: "1px solid rgba(145,164,197,0.4)",
-                        bgcolor: "#0B1422",
+                        border: "1px solid rgba(140,80,120,0.25)",
+                        bgcolor: "#161B22",
                         overflow: "hidden",
                         display: "grid",
                         gridTemplateRows: "auto 1fr auto",
@@ -1380,16 +1545,16 @@ export default function ProduktOgRadPage() {
                         sx={{
                           px: 1.25,
                           py: 0.9,
-                          borderBottom: "1px solid rgba(130,151,185,0.36)",
+                          borderBottom: "1px solid rgba(140,80,120,0.25)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
                           gap: 1,
-                          bgcolor: "rgba(13,22,36,0.95)",
+                          bgcolor: "rgba(22,27,34,0.97)",
                         }}
                       >
                         <Stack direction="row" alignItems="center" spacing={0.9} sx={{ minWidth: 0, flex: 1 }}>
-                          <DescriptionRoundedIcon sx={{ color: "#9ED9FF", fontSize: 20 }} />
+                          <DescriptionRoundedIcon sx={{ color: "#F0A1CF", fontSize: 20 }} />
                           <InputBase
                             inputRef={fagligTitleInputRef}
                             value={selectedFagligDoc.title}
@@ -1398,9 +1563,9 @@ export default function ProduktOgRadPage() {
                               flex: 1,
                               fontSize: 20,
                               fontWeight: 800,
-                              color: "#EEF6FF",
+                              color: "#F2E7EF",
                               "& input::placeholder": {
-                                color: "#AAC2DA",
+                                color: "#AFA0B2",
                                 opacity: 1,
                               },
                             }}
@@ -1411,10 +1576,10 @@ export default function ProduktOgRadPage() {
                           size="small"
                           label="Tekst"
                           sx={{
-                            bgcolor: "rgba(116,186,255,0.18)",
-                            color: "#CBE8FF",
+                            bgcolor: "rgba(242,162,208,0.2)",
+                            color: "#F5C3E1",
                             fontWeight: 700,
-                            border: "1px solid rgba(116,186,255,0.35)",
+                            border: "1px solid rgba(242,162,208,0.44)",
                           }}
                         />
                       </Box>
@@ -1429,13 +1594,13 @@ export default function ProduktOgRadPage() {
                             width: "100%",
                             p: 1.1,
                             borderRadius: 1.8,
-                            border: "1px solid rgba(149,170,204,0.35)",
-                            bgcolor: "rgba(8,14,24,0.84)",
-                            color: "#EAF1FB",
+                            border: "1px solid rgba(140,80,120,0.25)",
+                            bgcolor: "rgba(13,17,23,0.84)",
+                            color: "#F2E7EF",
                             fontSize: 17,
                             lineHeight: 1.6,
                             "& textarea::placeholder": {
-                              color: "#96A8BF",
+                              color: "#AFA0B2",
                               opacity: 1,
                             },
                           }}
@@ -1445,13 +1610,13 @@ export default function ProduktOgRadPage() {
                         sx={{
                           px: 1.25,
                           py: 0.75,
-                          borderTop: "1px solid rgba(130,151,185,0.3)",
-                          bgcolor: "rgba(10,17,28,0.95)",
+                          borderTop: "1px solid rgba(140,80,120,0.25)",
+                          bgcolor: "rgba(22,27,34,0.97)",
                           display: "flex",
                           justifyContent: "flex-end",
                         }}
                       >
-                        <Typography sx={{ fontSize: 12.5, color: "#9FB2CC" }}>
+                        <Typography sx={{ fontSize: 12.5, color: "#C4A0B8" }}>
                           Endringer lagres lokalt automatisk
                         </Typography>
                       </Box>
@@ -1464,7 +1629,7 @@ export default function ProduktOgRadPage() {
                       height: "100%",
                       borderRadius: 2.5,
                       border: "1px dashed rgba(242,162,208,0.36)",
-                      bgcolor: "rgba(12,18,32,0.88)",
+                      bgcolor: "rgba(13,17,23,0.92)",
                       display: "grid",
                       placeItems: "center",
                       p: 2,
@@ -1492,7 +1657,7 @@ export default function ProduktOgRadPage() {
               sx: {
                 borderRadius: 2.5,
                 border: "1px solid rgba(242,162,208,0.35)",
-                bgcolor: "#091427",
+                bgcolor: "#161B22",
                 color: "#F3E7F0",
                 minWidth: 230,
                 boxShadow: "0 18px 36px rgba(5,10,20,0.45)",
@@ -1532,7 +1697,7 @@ export default function ProduktOgRadPage() {
                 width: 260,
                 borderRadius: 2.5,
                 border: "1px solid rgba(242,162,208,0.35)",
-                bgcolor: "#091427",
+                bgcolor: "#161B22",
                 color: "#F3E7F0",
               },
             }}
