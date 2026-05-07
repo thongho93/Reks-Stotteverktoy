@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import {
   Alert,
   Box,
@@ -6,9 +6,12 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  Menu,
+  MenuItem,
   List,
   ListItemButton,
   ListItemText,
+  Popover,
   IconButton,
   InputBase,
   Paper,
@@ -19,6 +22,19 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc as docRef,
+  onSnapshot,
+  orderBy,
+  query as fsQuery,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -26,6 +42,13 @@ import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
+import { useAuthUser } from "../../../app/auth/useAuthUser";
+import { db, storage } from "../../../firebase/firebase";
 
 type AdviceProduct = {
   id: string;
@@ -55,6 +78,8 @@ type FagligDocument = {
   content: string;
   url: string | null;
   uploaded: boolean;
+  parentId?: string | null;
+  emoji?: string | null;
 };
 
 const normalizeSearch = (value: string): string =>
@@ -70,7 +95,8 @@ const toDigits = (value: string): string => value.replace(/\D+/g, "");
 const NUMERIC_QUERY_RE = /^\d+$/;
 const MAX_RENDERED_RESULTS = 120;
 const PAGE_MAX_WIDTH = 1500;
-const FAGLIG_TEXT_STORAGE_KEY = "produktOgRadFagligDocs.v1";
+const FAGLIG_DOC_QUERY_KEY = "fagdoc";
+const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
 
 const buildSearchBlob = (row: AdviceProductRow): AdviceProduct => {
   const atc = (row.atcCode ?? "").toUpperCase().trim();
@@ -114,11 +140,26 @@ const matchesQuery = (product: AdviceProduct, terms: string[]): boolean => {
   });
 };
 
+const mapFirebaseError = (error: unknown, fallback: string) => {
+  const code = typeof (error as { code?: unknown })?.code === "string" ? String((error as { code: string }).code) : "";
+  if (code.includes("permission-denied")) return "Mangler tilgang i Firebase (permission-denied).";
+  if (code.includes("unauthenticated")) return "Du må være innlogget for å lagre dokumenter.";
+  if (typeof (error as { message?: unknown })?.message === "string") return String((error as { message: string }).message);
+  return fallback;
+};
+
+const buildStoragePath = (uid: string, docId: string, fileName: string) => {
+  const safeName = fileName.replace(/[^\w.\-]+/g, "_");
+  return `users/${uid}/faglig-documents/${docId}/${safeName}`;
+};
+
 export default function ProduktOgRadPage() {
+  const { user } = useAuthUser();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligTitleInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
+  const textSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [query, setQuery] = useState("");
   const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
@@ -129,53 +170,53 @@ export default function ProduktOgRadPage() {
   const [expandedAdviceIds, setExpandedAdviceIds] = useState<Set<string>>(() => new Set());
   const [fagligSearch, setFagligSearch] = useState("");
   const [fagligDocs, setFagligDocs] = useState<FagligDocument[]>([]);
+  const [isFagligLoading, setIsFagligLoading] = useState(true);
   const [selectedFagligDocId, setSelectedFagligDocId] = useState<string | null>(null);
+  const [fagligDocMenuAnchorEl, setFagligDocMenuAnchorEl] = useState<HTMLElement | null>(null);
+  const [fagligDocMenuTargetId, setFagligDocMenuTargetId] = useState<string | null>(null);
+  const [fagligEmojiAnchorEl, setFagligEmojiAnchorEl] = useState<HTMLElement | null>(null);
+  const [fagligEmojiTargetId, setFagligEmojiTargetId] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(FAGLIG_TEXT_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Array<{
-        id: string;
-        title: string;
-        content: string;
-      }>;
-      if (!Array.isArray(parsed)) return;
+    if (!user?.uid) {
+      setFagligDocs([]);
+      setSelectedFagligDocId(null);
+      setIsFagligLoading(false);
+      return;
+    }
 
-      const restoredDocs: FagligDocument[] = parsed
-        .filter((item) => item && typeof item.id === "string")
-        .map((item) => ({
-          id: item.id,
-          title: String(item.title ?? "").trim() || "Nytt dokument",
-          kind: "text" as const,
-          content: String(item.content ?? ""),
-          url: null,
-          uploaded: false,
-        }));
-
-      if (restoredDocs.length > 0) {
-        setFagligDocs(restoredDocs);
-        setSelectedFagligDocId(restoredDocs[0].id);
+    setIsFagligLoading(true);
+    const docsRef = collection(db, "users", user.uid, "fagligDocuments");
+    const unsub = onSnapshot(
+      fsQuery(docsRef, orderBy("updatedAtMs", "desc")),
+      (snapshot) => {
+        const docs: FagligDocument[] = snapshot.docs.map((snap) => {
+          const data = snap.data() as Record<string, unknown>;
+          const kind = data.kind === "pdf" ? "pdf" : "text";
+          return {
+            id: snap.id,
+            title: String(data.title ?? "Nytt dokument").trim() || "Nytt dokument",
+            kind,
+            content: kind === "text" ? String(data.content ?? "") : "",
+            url: kind === "pdf" ? String(data.pdfUrl ?? "") || null : null,
+            uploaded: kind === "pdf",
+            parentId: typeof data.parentId === "string" ? data.parentId : null,
+            emoji: typeof data.emoji === "string" ? data.emoji : null,
+          };
+        });
+        setFagligDocs(docs);
+        setIsFagligLoading(false);
+      },
+      (snapshotError) => {
+        console.error(snapshotError);
+        setCopiedMessage(mapFirebaseError(snapshotError, "Klarte ikke å laste dokumenter."));
+        setFagligDocs([]);
+        setIsFagligLoading(false);
       }
-    } catch {
-      // ignore malformed local storage
-    }
-  }, []);
+    );
 
-  useEffect(() => {
-    try {
-      const serializable = fagligDocs
-        .filter((doc) => doc.kind === "text")
-        .map((doc) => ({
-          id: doc.id,
-          title: doc.title,
-          content: doc.content,
-        }));
-      localStorage.setItem(FAGLIG_TEXT_STORAGE_KEY, JSON.stringify(serializable));
-    } catch {
-      // ignore storage errors
-    }
-  }, [fagligDocs]);
+    return () => unsub();
+  }, [user?.uid]);
 
   useEffect(() => {
     let active = true;
@@ -252,6 +293,27 @@ export default function ProduktOgRadPage() {
     }
     return filteredFagligDocs[0] ?? null;
   }, [fagligDocs, filteredFagligDocs, selectedFagligDocId]);
+  const fagligDocById = useMemo(() => new Map(fagligDocs.map((doc) => [doc.id, doc])), [fagligDocs]);
+  const fagligDocMenuOpen = Boolean(fagligDocMenuAnchorEl);
+  const fagligEmojiPopoverOpen = Boolean(fagligEmojiAnchorEl);
+  const fagligDocMenuTarget = useMemo(
+    () => (fagligDocMenuTargetId ? fagligDocs.find((doc) => doc.id === fagligDocMenuTargetId) ?? null : null),
+    [fagligDocMenuTargetId, fagligDocs]
+  );
+  const fagligEmojiTarget = useMemo(
+    () => (fagligEmojiTargetId ? fagligDocs.find((doc) => doc.id === fagligEmojiTargetId) ?? null : null),
+    [fagligEmojiTargetId, fagligDocs]
+  );
+
+  useEffect(() => {
+    if (fagligDocs.length === 0) {
+      setSelectedFagligDocId(null);
+      return;
+    }
+    if (!selectedFagligDocId || !fagligDocs.some((doc) => doc.id === selectedFagligDocId)) {
+      setSelectedFagligDocId(fagligDocs[0].id);
+    }
+  }, [fagligDocs, selectedFagligDocId]);
 
   useEffect(() => {
     setRenderLimit(MAX_RENDERED_RESULTS);
@@ -259,11 +321,12 @@ export default function ProduktOgRadPage() {
   }, [query]);
 
   useEffect(() => {
-    return () => {
-      for (const doc of fagligDocs) {
-        if (doc.uploaded && doc.url) URL.revokeObjectURL(doc.url);
-      }
-    };
+    const url = new URL(window.location.href);
+    const deepLinkId = url.searchParams.get(FAGLIG_DOC_QUERY_KEY);
+    if (!deepLinkId) return;
+
+    const exists = fagligDocs.some((doc) => doc.id === deepLinkId);
+    if (exists) setSelectedFagligDocId(deepLinkId);
   }, [fagligDocs]);
 
   useEffect(() => {
@@ -301,6 +364,12 @@ export default function ProduktOgRadPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeTab, query]);
 
+  useEffect(() => {
+    return () => {
+      if (textSaveTimerRef.current) clearTimeout(textSaveTimerRef.current);
+    };
+  }, []);
+
   const copyPlainText = async (value: string): Promise<boolean> => {
     if (!value) return false;
 
@@ -337,64 +406,273 @@ export default function ProduktOgRadPage() {
     });
   };
 
-  const addTextDocument = () => {
-    const newDoc: FagligDocument = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: "Nytt dokument",
-      kind: "text",
-      content: "",
-      url: null,
-      uploaded: false,
-    };
-    setFagligDocs((prev) => [newDoc, ...prev]);
-    setSelectedFagligDocId(newDoc.id);
-    setCopiedMessage("Nytt dokument opprettet");
-    requestAnimationFrame(() => {
-      const input = fagligTitleInputRef.current;
-      if (!input) return;
-      input.focus();
-      input.select();
-    });
+  const addTextDocument = async () => {
+    if (!user?.uid) {
+      setCopiedMessage("Du må være innlogget for å opprette dokument.");
+      return;
+    }
+
+    try {
+      const now = Date.now();
+      const ref = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+        title: "Nytt dokument",
+        kind: "text",
+        content: "",
+        parentId: null,
+        emoji: null,
+        updatedAtMs: now,
+        createdAtMs: now,
+        createdByUid: user.uid,
+        updatedByUid: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setSelectedFagligDocId(ref.id);
+      setCopiedMessage("Nytt dokument opprettet");
+      requestAnimationFrame(() => {
+        const input = fagligTitleInputRef.current;
+        if (!input) return;
+        input.focus();
+        input.select();
+      });
+    } catch (err) {
+      setCopiedMessage(mapFirebaseError(err, "Kunne ikke opprette dokument."));
+    }
+  };
+
+  const createChildDocument = async (parent: FagligDocument) => {
+    if (!user?.uid) {
+      setCopiedMessage("Du må være innlogget for å opprette dokument.");
+      return;
+    }
+
+    try {
+      const now = Date.now();
+      const ref = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+        title: `${parent.title} - underfane`,
+        kind: "text",
+        content: "",
+        parentId: parent.id,
+        emoji: null,
+        updatedAtMs: now,
+        createdAtMs: now,
+        createdByUid: user.uid,
+        updatedByUid: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setSelectedFagligDocId(ref.id);
+      setCopiedMessage("Underfane opprettet");
+      requestAnimationFrame(() => {
+        const input = fagligTitleInputRef.current;
+        if (!input) return;
+        input.focus();
+        input.select();
+      });
+    } catch (err) {
+      setCopiedMessage(mapFirebaseError(err, "Kunne ikke opprette underfane."));
+    }
+  };
+
+  const isDescendantOf = (doc: FagligDocument, parentId: string, byId: Map<string, FagligDocument>) => {
+    let current: FagligDocument | undefined = doc;
+    while (current?.parentId) {
+      if (current.parentId === parentId) return true;
+      current = byId.get(current.parentId);
+    }
+    return false;
+  };
+
+  const closeFagligDocMenu = () => {
+    setFagligDocMenuAnchorEl(null);
+    setFagligDocMenuTargetId(null);
+  };
+
+  const openFagligDocMenu = (event: MouseEvent<HTMLElement>, docId: string) => {
+    event.stopPropagation();
+    setFagligDocMenuAnchorEl(event.currentTarget);
+    setFagligDocMenuTargetId(docId);
+  };
+
+  const handleAddFagligSubtab = async () => {
+    if (!fagligDocMenuTarget) return;
+    await createChildDocument(fagligDocMenuTarget);
+    closeFagligDocMenu();
+  };
+
+  const handleDeleteFagligDoc = async () => {
+    if (!fagligDocMenuTarget || !user?.uid) return;
+    const targetId = fagligDocMenuTarget.id;
+    const byId = new Map(fagligDocs.map((doc) => [doc.id, doc]));
+    const removeIds = new Set<string>([targetId]);
+    for (const doc of fagligDocs) {
+      if (isDescendantOf(doc, targetId, byId)) {
+        removeIds.add(doc.id);
+      }
+    }
+
+    try {
+      for (const removeId of removeIds) {
+        const target = byId.get(removeId);
+        if (target?.kind === "pdf" && target.url) {
+          try {
+            await deleteObject(storageRef(storage, target.url));
+          } catch {
+            // ignore missing storage files
+          }
+        }
+        await deleteDoc(docRef(db, "users", user.uid, "fagligDocuments", removeId));
+      }
+      if (selectedFagligDocId && removeIds.has(selectedFagligDocId)) {
+        setSelectedFagligDocId(null);
+      }
+      setCopiedMessage("Dokument slettet");
+    } catch (err) {
+      setCopiedMessage(mapFirebaseError(err, "Sletting feilet."));
+    }
+    closeFagligDocMenu();
+  };
+
+  const handleRenameFagligDoc = async () => {
+    if (!fagligDocMenuTarget || !user?.uid) return;
+    const current = fagligDocMenuTarget.title;
+    const nextTitle = window.prompt("Gi nytt navn", current);
+    if (nextTitle == null) return;
+    const trimmed = nextTitle.trim();
+    if (!trimmed) return;
+
+    try {
+      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", fagligDocMenuTarget.id), {
+        title: trimmed,
+        updatedAtMs: Date.now(),
+        updatedByUid: user.uid,
+        updatedAt: serverTimestamp(),
+      });
+      if (selectedFagligDocId === fagligDocMenuTarget.id && fagligDocMenuTarget.kind === "text") {
+        requestAnimationFrame(() => fagligTitleInputRef.current?.focus());
+      }
+    } catch (err) {
+      setCopiedMessage(mapFirebaseError(err, "Kunne ikke endre navn."));
+    }
+    closeFagligDocMenu();
+  };
+
+  const handleCopyFagligDocLink = async () => {
+    if (!fagligDocMenuTarget) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set(FAGLIG_DOC_QUERY_KEY, fagligDocMenuTarget.id);
+    const ok = await copyPlainText(url.toString());
+    if (ok) setCopiedMessage(`Lenke kopiert: ${fagligDocMenuTarget.title}`);
+    closeFagligDocMenu();
+  };
+
+  const handleOpenFagligEmojiPicker = () => {
+    if (!fagligDocMenuTarget || !fagligDocMenuAnchorEl) return;
+    setFagligEmojiTargetId(fagligDocMenuTarget.id);
+    setFagligEmojiAnchorEl(fagligDocMenuAnchorEl);
+    closeFagligDocMenu();
+  };
+
+  const closeFagligEmojiPicker = () => {
+    setFagligEmojiAnchorEl(null);
+    setFagligEmojiTargetId(null);
+  };
+
+  const applyFagligEmoji = async (emoji: string | null) => {
+    if (!fagligEmojiTarget || !user?.uid) return;
+    try {
+      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", fagligEmojiTarget.id), {
+        emoji,
+        updatedAtMs: Date.now(),
+        updatedByUid: user.uid,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      setCopiedMessage(mapFirebaseError(err, "Kunne ikke oppdatere emoji."));
+    }
+    closeFagligEmojiPicker();
   };
 
   const updateSelectedTextDoc = (patch: Partial<Pick<FagligDocument, "title" | "content">>) => {
-    if (!selectedFagligDoc || selectedFagligDoc.kind !== "text") return;
+    if (!selectedFagligDoc || selectedFagligDoc.kind !== "text" || !user?.uid) return;
+    const uid = user.uid;
+    const targetId = selectedFagligDoc.id;
+    const nextTitle = patch.title ?? selectedFagligDoc.title;
+    const nextContent = patch.content ?? selectedFagligDoc.content;
     setFagligDocs((prev) =>
-      prev.map((doc) => (doc.id === selectedFagligDoc.id ? { ...doc, ...patch } : doc))
+      prev.map((doc) => (doc.id === targetId ? { ...doc, ...patch } : doc))
     );
+
+    if (textSaveTimerRef.current) clearTimeout(textSaveTimerRef.current);
+    textSaveTimerRef.current = setTimeout(() => {
+      void updateDoc(docRef(db, "users", uid, "fagligDocuments", targetId), {
+        title: nextTitle,
+        content: nextContent,
+        updatedAtMs: Date.now(),
+        updatedByUid: uid,
+        updatedAt: serverTimestamp(),
+      }).catch((err) => {
+        setCopiedMessage(mapFirebaseError(err, "Kunne ikke lagre dokument."));
+      });
+    }, 350);
   };
 
-  const handleUploadPdf = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleUploadPdf = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!user?.uid) {
+      setCopiedMessage("Du må være innlogget for å laste opp PDF.");
+      event.target.value = "";
+      return;
+    }
+
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
 
-    const newDocs = files
-      .filter((file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))
-      .map((file) => {
-        const baseTitle = file.name.replace(/\.pdf$/i, "").trim();
-        return {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          title: baseTitle || "Uten navn",
-          kind: "pdf",
-          content: "",
-          url: URL.createObjectURL(file),
-          uploaded: true,
-        } as FagligDocument;
-      });
+    const pdfFiles = files.filter(
+      (file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    );
 
-    if (newDocs.length === 0) {
+    if (pdfFiles.length === 0) {
       setCopiedMessage("Kun PDF-filer støttes.");
       event.target.value = "";
       return;
     }
 
-    setFagligDocs((prev) => [...newDocs, ...prev]);
-    setSelectedFagligDocId(newDocs[0].id);
-    setCopiedMessage(
-      newDocs.length === 1
-        ? `PDF lastet opp: ${newDocs[0].title}`
-        : `${newDocs.length} PDF-filer lastet opp`
-    );
+    try {
+      let firstCreatedId: string | null = null;
+
+      for (const file of pdfFiles) {
+        const baseTitle = file.name.replace(/\.pdf$/i, "").trim() || "Uten navn";
+        const created = docRef(collection(db, "users", user.uid, "fagligDocuments"));
+        const storagePath = buildStoragePath(user.uid, created.id, file.name);
+        const storageUploadRef = storageRef(storage, storagePath);
+        await uploadBytes(storageUploadRef, file, { contentType: "application/pdf" });
+        const downloadUrl = await getDownloadURL(storageUploadRef);
+        const now = Date.now();
+        await setDoc(docRef(db, "users", user.uid, "fagligDocuments", created.id), {
+          title: baseTitle,
+          kind: "pdf",
+          content: "",
+          parentId: null,
+          emoji: null,
+          pdfUrl: downloadUrl,
+          storagePath,
+          updatedAtMs: now,
+          createdAtMs: now,
+          createdByUid: user.uid,
+          updatedByUid: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        } as Record<string, unknown>);
+        if (!firstCreatedId) firstCreatedId = created.id;
+      }
+
+      if (firstCreatedId) setSelectedFagligDocId(firstCreatedId);
+      setCopiedMessage(
+        pdfFiles.length === 1 ? `PDF lastet opp: ${pdfFiles[0].name}` : `${pdfFiles.length} PDF-filer lastet opp`
+      );
+    } catch (err) {
+      setCopiedMessage(mapFirebaseError(err, "PDF-opplasting feilet."));
+    }
     event.target.value = "";
   };
 
@@ -887,52 +1165,88 @@ export default function ProduktOgRadPage() {
                     }}
                   />
                 </Stack>
+                {isFagligLoading ? (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.8, py: 1.1 }}>
+                    <CircularProgress size={18} sx={{ color: "#E8B7D5" }} />
+                    <Typography sx={{ fontSize: 13, color: "#D8B4CA" }}>Laster dokumenter...</Typography>
+                  </Box>
+                ) : null}
                 <List sx={{ mt: 0.5, pt: 0 }}>
                   {filteredFagligDocs.map((doc) => (
-                    <ListItemButton
-                      key={doc.id}
-                      selected={selectedFagligDoc?.id === doc.id}
-                      onClick={() => setSelectedFagligDocId(doc.id)}
-                      sx={{
-                        mb: 0.5,
-                        borderRadius: 2,
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        bgcolor:
-                          selectedFagligDoc?.id === doc.id
-                            ? "rgba(242,162,208,0.18)"
-                            : "rgba(10,14,29,0.78)",
-                        "&:hover": {
-                          bgcolor: "rgba(242,162,208,0.12)",
-                        },
-                        "&.Mui-selected": {
-                          bgcolor: "rgba(242,162,208,0.2)",
-                          borderColor: "rgba(242,162,208,0.45)",
-                        },
-                        "&.Mui-selected:hover": {
-                          bgcolor: "rgba(242,162,208,0.26)",
-                        },
-                      }}
-                    >
-                      {doc.kind === "pdf" ? (
-                        <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#F0A1CF" }} />
-                      ) : (
-                        <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#9ED9FF" }} />
-                      )}
-                      <ListItemText
-                        primary={doc.title}
-                        secondary={doc.kind === "pdf" ? "Lokal PDF" : "Tekstdokument"}
-                        primaryTypographyProps={{
-                          noWrap: true,
-                          fontSize: 16,
-                          fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600,
-                          color: selectedFagligDoc?.id === doc.id ? "#FFD8ED" : "#E4DCE7",
-                        }}
-                        secondaryTypographyProps={{
-                          color: "#C9A4BA",
-                          fontSize: 12,
-                        }}
-                      />
-                    </ListItemButton>
+                    (() => {
+                      let depth = 0;
+                      let cursor = doc;
+                      while (cursor.parentId && depth < 8) {
+                        const parent = fagligDocById.get(cursor.parentId);
+                        if (!parent) break;
+                        depth += 1;
+                        cursor = parent;
+                      }
+
+                      return (
+                        <ListItemButton
+                          key={doc.id}
+                          selected={selectedFagligDoc?.id === doc.id}
+                          onClick={() => setSelectedFagligDocId(doc.id)}
+                          sx={{
+                            mb: 0.5,
+                            borderRadius: 2,
+                            pl: 1 + depth * 1.8,
+                            pr: 0.7,
+                            border: "1px solid rgba(255,255,255,0.06)",
+                            bgcolor:
+                              selectedFagligDoc?.id === doc.id
+                                ? "rgba(242,162,208,0.18)"
+                                : "rgba(10,14,29,0.78)",
+                            "&:hover": {
+                              bgcolor: "rgba(242,162,208,0.12)",
+                            },
+                            "&.Mui-selected": {
+                              bgcolor: "rgba(242,162,208,0.2)",
+                              borderColor: "rgba(242,162,208,0.45)",
+                            },
+                            "&.Mui-selected:hover": {
+                              bgcolor: "rgba(242,162,208,0.26)",
+                            },
+                          }}
+                        >
+                          {doc.emoji ? (
+                            <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
+                          ) : doc.kind === "pdf" ? (
+                            <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#F0A1CF" }} />
+                          ) : (
+                            <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#9ED9FF" }} />
+                          )}
+                          <ListItemText
+                            primary={doc.title}
+                            secondary={doc.kind === "pdf" ? "Lokal PDF" : "Tekstdokument"}
+                            primaryTypographyProps={{
+                              noWrap: true,
+                              fontSize: 16,
+                              fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600,
+                              color: selectedFagligDoc?.id === doc.id ? "#FFD8ED" : "#E4DCE7",
+                            }}
+                            secondaryTypographyProps={{
+                              color: "#C9A4BA",
+                              fontSize: 12,
+                            }}
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={(event) => openFagligDocMenu(event, doc.id)}
+                            sx={{
+                              ml: 0.5,
+                              color: "rgba(235,175,211,0.95)",
+                              "&:hover": {
+                                bgcolor: "rgba(242,162,208,0.18)",
+                              },
+                            }}
+                          >
+                            <MoreVertIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </ListItemButton>
+                      );
+                    })()
                   ))}
                 </List>
 
@@ -1135,6 +1449,92 @@ export default function ProduktOgRadPage() {
             hidden
             onChange={handleUploadPdf}
           />
+          <Menu
+            anchorEl={fagligDocMenuAnchorEl}
+            open={fagligDocMenuOpen}
+            onClose={closeFagligDocMenu}
+            PaperProps={{
+              sx: {
+                borderRadius: 2.5,
+                border: "1px solid rgba(242,162,208,0.35)",
+                bgcolor: "#091427",
+                color: "#F3E7F0",
+                minWidth: 230,
+                boxShadow: "0 18px 36px rgba(5,10,20,0.45)",
+              },
+            }}
+          >
+            <MenuItem onClick={handleAddFagligSubtab} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
+              <AddRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
+              <ListItemText primary="Legg til en underfane" primaryTypographyProps={{ fontSize: "0.84rem" }} />
+            </MenuItem>
+            <MenuItem onClick={handleDeleteFagligDoc} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
+              <DeleteOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
+              <ListItemText primary="Slett" primaryTypographyProps={{ fontSize: "0.84rem" }} />
+            </MenuItem>
+            <MenuItem onClick={handleRenameFagligDoc} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
+              <EditRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
+              <ListItemText primary="Gi nytt navn" primaryTypographyProps={{ fontSize: "0.84rem" }} />
+            </MenuItem>
+            <MenuItem onClick={() => void handleCopyFagligDocLink()} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
+              <LinkRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
+              <ListItemText primary="Kopier lenke" primaryTypographyProps={{ fontSize: "0.84rem" }} />
+            </MenuItem>
+            <MenuItem onClick={handleOpenFagligEmojiPicker} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
+              <SentimentSatisfiedAltRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
+              <ListItemText primary="Velg emoji" primaryTypographyProps={{ fontSize: "0.84rem" }} />
+            </MenuItem>
+          </Menu>
+          <Popover
+            open={fagligEmojiPopoverOpen}
+            anchorEl={fagligEmojiAnchorEl}
+            onClose={closeFagligEmojiPicker}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            PaperProps={{
+              sx: {
+                p: 1.1,
+                width: 260,
+                borderRadius: 2.5,
+                border: "1px solid rgba(242,162,208,0.35)",
+                bgcolor: "#091427",
+                color: "#F3E7F0",
+              },
+            }}
+          >
+            <Typography sx={{ fontSize: 12.5, color: "#DAB8CD", mb: 0.8 }}>
+              Aktiv emoji: {fagligEmojiTarget?.emoji ?? "Ingen"}
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={0.55}>
+              <IconButton
+                size="small"
+                onClick={() => applyFagligEmoji(null)}
+                sx={{
+                  borderRadius: 1.6,
+                  px: 0.8,
+                  color: "#E6D8E2",
+                  border: "1px solid rgba(243,221,234,0.26)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+                }}
+              >
+                <Typography sx={{ fontSize: 11.5 }}>Ingen</Typography>
+              </IconButton>
+              {FAGLIG_EMOJI_OPTIONS.map((emoji) => (
+                <IconButton
+                  key={emoji}
+                  size="small"
+                  onClick={() => applyFagligEmoji(emoji)}
+                  sx={{
+                    borderRadius: 1.5,
+                    border: "1px solid rgba(243,221,234,0.2)",
+                    "&:hover": { bgcolor: "rgba(242,162,208,0.18)" },
+                  }}
+                >
+                  <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{emoji}</Typography>
+                </IconButton>
+              ))}
+            </Stack>
+          </Popover>
         </Box>
       )}
 

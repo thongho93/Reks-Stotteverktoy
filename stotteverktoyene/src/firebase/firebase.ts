@@ -2,6 +2,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getAI, getGenerativeModel, getTemplateGenerativeModel, GoogleAIBackend } from "firebase/ai";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { initAppCheck } from "./appCheck";
 
 const firebaseConfig = {
@@ -9,6 +10,7 @@ const firebaseConfig = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
 };
 
 export const app =
@@ -19,6 +21,7 @@ initAppCheck(app);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // Initialize Gemini (Firebase AI Logic)
 export const ai = getAI(app, { backend: new GoogleAIBackend() });
