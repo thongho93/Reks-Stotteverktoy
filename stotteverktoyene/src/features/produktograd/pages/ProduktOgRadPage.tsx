@@ -5,6 +5,10 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Menu,
   MenuItem,
@@ -19,6 +23,8 @@ import {
   Stack,
   Tab,
   Tabs,
+  TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -193,6 +199,9 @@ export default function ProduktOgRadPage() {
   const [fagligDocMenuTargetId, setFagligDocMenuTargetId] = useState<string | null>(null);
   const [fagligEmojiAnchorEl, setFagligEmojiAnchorEl] = useState<HTMLElement | null>(null);
   const [fagligEmojiTargetId, setFagligEmojiTargetId] = useState<string | null>(null);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameDialogValue, setRenameDialogValue] = useState("");
+  const [renameDialogTargetId, setRenameDialogTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -542,28 +551,33 @@ export default function ProduktOgRadPage() {
     closeFagligDocMenu();
   };
 
-  const handleRenameFagligDoc = async () => {
-    if (!fagligDocMenuTarget || !user?.uid) return;
-    const current = fagligDocMenuTarget.title;
-    const nextTitle = window.prompt("Gi nytt navn", current);
-    if (nextTitle == null) return;
-    const trimmed = nextTitle.trim();
-    if (!trimmed) return;
+  const handleRenameFagligDoc = () => {
+    if (!fagligDocMenuTarget) return;
+    setRenameDialogTargetId(fagligDocMenuTarget.id);
+    setRenameDialogValue(fagligDocMenuTarget.title);
+    setRenameDialogOpen(true);
+    closeFagligDocMenu();
+  };
 
+  const handleRenameConfirm = async () => {
+    if (!renameDialogTargetId || !user?.uid) return;
+    const trimmed = renameDialogValue.trim();
+    if (!trimmed) return;
+    setRenameDialogOpen(false);
     try {
-      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", fagligDocMenuTarget.id), {
+      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", renameDialogTargetId), {
         title: trimmed,
         updatedAtMs: Date.now(),
         updatedByUid: user.uid,
         updatedAt: serverTimestamp(),
       });
-      if (selectedFagligDocId === fagligDocMenuTarget.id && fagligDocMenuTarget.kind === "text") {
+      const doc = fagligDocById.get(renameDialogTargetId);
+      if (selectedFagligDocId === renameDialogTargetId && doc?.kind === "text") {
         requestAnimationFrame(() => fagligTitleInputRef.current?.focus());
       }
     } catch (err) {
       setCopiedMessage(mapFirebaseError(err, "Kunne ikke endre navn."));
     }
-    closeFagligDocMenu();
   };
 
   const handleCopyFagligDocLink = async () => {
@@ -707,8 +721,8 @@ export default function ProduktOgRadPage() {
               mt: 0.15,
               mx: "auto",
               width: "100%",
-              maxWidth: 1200,
-              minHeight: { xs: 54, md: 62 },
+              maxWidth: 700,
+              minHeight: { xs: 38, md: 44 },
               p: 0.25,
               borderRadius: 999,
               bgcolor: "rgba(120, 50, 102, 0.22)",
@@ -723,10 +737,10 @@ export default function ProduktOgRadPage() {
               disableRipple
               label="Produkt og råd"
               sx={{
-                minHeight: { xs: 52, md: 60 },
+                minHeight: { xs: 36, md: 42 },
                 textTransform: "none",
                 borderRadius: 999,
-                fontSize: { xs: 20, md: 30 },
+                fontSize: { xs: 14, md: 17 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
                 color: "#4F2648",
@@ -749,10 +763,10 @@ export default function ProduktOgRadPage() {
               disableRipple
               label="Faglig innhold"
               sx={{
-                minHeight: { xs: 52, md: 60 },
+                minHeight: { xs: 36, md: 42 },
                 textTransform: "none",
                 borderRadius: 999,
-                fontSize: { xs: 20, md: 30 },
+                fontSize: { xs: 14, md: 17 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
                 color: "#4F2648",
@@ -780,18 +794,18 @@ export default function ProduktOgRadPage() {
                 mt: 1.35,
                 mx: "auto",
                 width: "100%",
-                maxWidth: 980,
+                maxWidth: 560,
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
-                px: 1.4,
-                py: 0.8,
+                px: 1.2,
+                py: 0.5,
                 borderRadius: 2.5,
                 border: "1px solid rgba(233,155,198,0.5)",
                 bgcolor: "#FFF8FC",
               }}
             >
-              <SearchRoundedIcon sx={{ fontSize: 21, color: "#9E4F7D" }} />
+              <SearchRoundedIcon sx={{ fontSize: 19, color: "#9E4F7D" }} />
               <InputBase
                 inputRef={searchInputRef}
                 value={query}
@@ -799,9 +813,10 @@ export default function ProduktOgRadPage() {
                 placeholder="Søk med varenummer, SKU, varenavn eller ATC-kode"
                 sx={{
                   flex: 1,
-                  fontSize: { xs: 15, md: 16 },
+                  fontSize: { xs: 13, md: 14 },
                   color: "#412039",
-                  "& input::placeholder": { color: "#9C6F89", opacity: 1 },
+                  "& input": { textAlign: "center" },
+                  "& input::placeholder": { color: "#9C6F89", opacity: 1, textAlign: "center" },
                 }}
               />
               {query ? (
@@ -1051,7 +1066,7 @@ export default function ProduktOgRadPage() {
           )}
         </Box>
       ) : (
-        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 2, md: 3 }, py: 1.5 }}>
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 1, md: 1.5 }, py: 0.75 }}>
           <Paper
             elevation={0}
             sx={{
@@ -1060,6 +1075,9 @@ export default function ProduktOgRadPage() {
               bgcolor: "#0F1625",
               overflow: "hidden",
               boxShadow: "0 16px 34px rgba(10,12,22,0.32)",
+              display: "flex",
+              flexDirection: "column",
+              height: "calc(100vh - 115px)",
             }}
           >
             <Box
@@ -1145,8 +1163,9 @@ export default function ProduktOgRadPage() {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "280px minmax(0, 1fr)" },
-                minHeight: { xs: 480, md: 720 },
+                gridTemplateColumns: { xs: "1fr", md: "220px minmax(0, 1fr)" },
+                flex: 1,
+                overflow: "hidden",
               }}
             >
               <Box
@@ -1155,6 +1174,7 @@ export default function ProduktOgRadPage() {
                   borderBottom: { xs: "1px solid rgba(169,119,154,0.3)", md: "none" },
                   bgcolor: "rgba(18,25,42,0.88)",
                   p: 1,
+                  overflowY: "auto",
                 }}
               >
                 <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 0.6, py: 0.5 }}>
@@ -1224,20 +1244,17 @@ export default function ProduktOgRadPage() {
                           ) : (
                             <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#9ED9FF" }} />
                           )}
-                          <ListItemText
-                            primary={doc.title}
-                            secondary={doc.kind === "pdf" ? "Innebygd dokument" : "Tekstdokument"}
-                            primaryTypographyProps={{
-                              noWrap: true,
-                              fontSize: 16,
-                              fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600,
-                              color: selectedFagligDoc?.id === doc.id ? "#FFD8ED" : "#E4DCE7",
-                            }}
-                            secondaryTypographyProps={{
-                              color: "#C9A4BA",
-                              fontSize: 12,
-                            }}
-                          />
+                          <Tooltip title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                            <ListItemText
+                              primary={doc.title}
+                              primaryTypographyProps={{
+                                noWrap: true,
+                                fontSize: 14,
+                                fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600,
+                                color: selectedFagligDoc?.id === doc.id ? "#FFD8ED" : "#E4DCE7",
+                              }}
+                            />
+                          </Tooltip>
                           <IconButton
                             size="small"
                             onClick={(event) => openFagligDocMenu(event, doc.id)}
@@ -1275,7 +1292,7 @@ export default function ProduktOgRadPage() {
                 ) : null}
               </Box>
 
-              <Box sx={{ bgcolor: "#0A1324", p: 1 }}>
+              <Box sx={{ bgcolor: "#0A1324", p: 1, overflowY: "auto" }}>
                 {selectedFagligDoc ? (
                   selectedFagligDoc.kind === "pdf" ? (
                     <Paper
@@ -1323,7 +1340,7 @@ export default function ProduktOgRadPage() {
                         <iframe
                           title={selectedFagligDoc.title}
                           src={selectedFagligDoc.url ?? undefined}
-                          style={{ border: 0, width: "100%", height: "100%", minHeight: "620px" }}
+                          style={{ border: 0, width: "100%", height: "100%" }}
                         />
                       </Box>
                     </Paper>
@@ -1536,6 +1553,70 @@ export default function ProduktOgRadPage() {
           </Popover>
         </Box>
       )}
+
+      <Dialog
+        open={renameDialogOpen}
+        onClose={() => setRenameDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "#131B2E",
+            border: "1px solid rgba(169,119,154,0.4)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+            minWidth: 360,
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: "#EED5E8", fontWeight: 700, fontSize: 17, pb: 1 }}>
+          Gi nytt navn
+        </DialogTitle>
+        <DialogContent sx={{ pt: "8px !important" }}>
+          <TextField
+            autoFocus
+            fullWidth
+            value={renameDialogValue}
+            onChange={(e) => setRenameDialogValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleRenameConfirm(); }}
+            variant="outlined"
+            size="small"
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                color: "#F2E7EF",
+                fontSize: 15,
+                borderRadius: 2,
+                bgcolor: "rgba(5,9,20,0.8)",
+                "& fieldset": { borderColor: "rgba(183,121,166,0.45)" },
+                "&:hover fieldset": { borderColor: "rgba(242,162,208,0.6)" },
+                "&.Mui-focused fieldset": { borderColor: "#F2A2D0" },
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button
+            onClick={() => setRenameDialogOpen(false)}
+            sx={{ color: "#C9A4BA", textTransform: "none", fontWeight: 600 }}
+          >
+            Avbryt
+          </Button>
+          <Button
+            onClick={() => void handleRenameConfirm()}
+            disabled={!renameDialogValue.trim()}
+            variant="contained"
+            sx={{
+              borderRadius: 2,
+              textTransform: "none",
+              fontWeight: 700,
+              bgcolor: "#F2A2D0",
+              color: "#2A122A",
+              "&:hover": { bgcolor: "#F7B7DC" },
+              "&.Mui-disabled": { bgcolor: "rgba(242,162,208,0.3)", color: "rgba(42,18,42,0.5)" },
+            }}
+          >
+            Lagre
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={Boolean(copiedMessage)}
