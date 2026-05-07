@@ -322,17 +322,27 @@ export default function ProduktOgRadPage() {
     const numericOnly = NUMERIC_QUERY_RE.test(normalizedQuery);
     if (numericOnly) {
       const digits = toDigits(normalizedQuery);
+      // Strip leading zeros so "060387" matches stored "60387"
+      const digitsNorm = digits.replace(/^0+/, "") || digits;
       const exact = products.filter(
-        (product) => product.farmaloggDigits === digits || product.skuDigits === digits
+        (product) =>
+          product.farmaloggDigits === digits ||
+          product.farmaloggDigits === digitsNorm ||
+          product.skuDigits === digits ||
+          product.skuDigits === digitsNorm
       );
       if (exact.length > 0) return exact;
 
       return products.filter(
         (product) =>
           product.farmaloggDigits.startsWith(digits) ||
+          product.farmaloggDigits.startsWith(digitsNorm) ||
           product.skuDigits.startsWith(digits) ||
+          product.skuDigits.startsWith(digitsNorm) ||
           product.farmaloggDigits.includes(digits) ||
-          product.skuDigits.includes(digits)
+          product.farmaloggDigits.includes(digitsNorm) ||
+          product.skuDigits.includes(digits) ||
+          product.skuDigits.includes(digitsNorm)
       );
     }
 
