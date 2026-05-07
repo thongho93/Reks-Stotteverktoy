@@ -10,7 +10,7 @@ const ADVICE_INPUT_FILE = path.resolve(__dirname, "../rxkatalog/Farmasøytiskra�
 const SKU_INPUT_FILE = path.resolve(__dirname, "../rxkatalog/260501 Kobling vnr sku (1).xlsx");
 const OUTPUT_FILE = path.resolve(
   __dirname,
-  "../src/features/produktograd/data/pharmacistAdviceData.json"
+  "../public/data/pharmacistAdviceData.json"
 );
 
 function asString(value) {
@@ -85,9 +85,10 @@ function collectAdvicePointsFromRow(row, keys, adviceColumn) {
   return points;
 }
 
-function loadRows(filePath) {
+function loadRows(filePath, label) {
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Fant ikke fil: ${filePath}`);
+    console.warn(`[raad:sync] Mangler ${label}: ${filePath}`);
+    return [];
   }
 
   const workbook = XLSX.readFile(filePath, { cellDates: false });
@@ -101,6 +102,10 @@ function loadRows(filePath) {
 }
 
 function buildAdviceMap(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return new Map();
+  }
+
   const first = rows[0] ?? {};
   const keys = Object.keys(first);
   const farmaloggColumn = resolveColumnKey(first, ["Farmalogg number", "Farmalogg"], "Farmalogg number");
@@ -137,6 +142,21 @@ function buildAdviceMap(rows) {
 }
 
 function buildMergedRows(skuRows, adviceByFarmalogg) {
+  if (!Array.isArray(skuRows) || skuRows.length === 0) {
+    const fallback = [];
+    for (const [farmaloggKey, advice] of adviceByFarmalogg.entries()) {
+      fallback.push({
+        id: `${farmaloggKey}-${advice.name}`,
+        name: advice.name,
+        atcCode: advice.atcCode,
+        farmaloggNumber: advice.farmaloggNumber,
+        sku: "",
+        advicePoints: advice.advicePoints,
+      });
+    }
+    return fallback;
+  }
+
   const first = skuRows[0] ?? {};
   const farmaloggColumn = resolveColumnKey(first, ["Farmalogg", "Farmalogg number"], "Farmalogg");
   const skuColumn = resolveColumnKey(first, ["SKU", "Sku"], "SKU");
@@ -192,8 +212,8 @@ function buildMergedRows(skuRows, adviceByFarmalogg) {
 }
 
 function main() {
-  const adviceRows = loadRows(ADVICE_INPUT_FILE);
-  const skuRows = loadRows(SKU_INPUT_FILE);
+  const adviceRows = loadRows(ADVICE_INPUT_FILE, "farmasøytiske råd");
+  const skuRows = loadRows(SKU_INPUT_FILE, "VNR/SKU-kobling");
 
   const adviceByFarmalogg = buildAdviceMap(adviceRows);
   const output = buildMergedRows(skuRows, adviceByFarmalogg);

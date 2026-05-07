@@ -504,16 +504,26 @@ const buildMedicationItems = (festRaw: any[], pimRaw: any[], hvRaw: any[]): Med[
   });
 };
 
+const fetchJsonArray = async <T,>(url: string): Promise<T[]> => {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Klarte ikke å hente ${url} (${response.status}).`);
+  }
+
+  const parsed: unknown = await response.json();
+  return Array.isArray(parsed) ? (parsed as T[]) : [];
+};
+
 const loadMedicationItems = () => {
   if (!medicationItemsPromise) {
     medicationItemsPromise = Promise.all([
       import("../meds.json"),
-      import("./pimProducts.json"),
+      fetchJsonArray<any>("/data/pimProducts.json"),
       import("./hvProducts.json"),
-    ]).then(([festModule, pimModule, hvModule]) =>
+    ]).then(([festModule, pimRows, hvModule]) =>
       buildMedicationItems(
         Array.isArray(festModule.default) ? festModule.default : [],
-        Array.isArray(pimModule.default) ? pimModule.default : [],
+        Array.isArray(pimRows) ? pimRows : [],
         Array.isArray(hvModule.default) ? hvModule.default : []
       )
     );

@@ -72,6 +72,16 @@ const buildSearchBlob = (row: AdviceProductRow): AdviceProduct => {
   };
 };
 
+const fetchAdviceRows = async (): Promise<AdviceProductRow[]> => {
+  const response = await fetch("/data/pharmacistAdviceData.json", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Kunne ikke laste datafilen (${response.status}).`);
+  }
+
+  const parsed: unknown = await response.json();
+  return Array.isArray(parsed) ? (parsed as AdviceProductRow[]) : [];
+};
+
 const matchesQuery = (product: AdviceProduct, terms: string[]): boolean => {
   if (terms.length === 0) return true;
 
@@ -106,8 +116,7 @@ export default function ProduktOgRadPage() {
       setError(null);
 
       try {
-        const module = await import("../data/pharmacistAdviceData.json");
-        const rows = (module.default ?? []) as AdviceProductRow[];
+        const rows = await fetchAdviceRows();
         if (!active) return;
 
         setProducts(rows.map(buildSearchBlob));

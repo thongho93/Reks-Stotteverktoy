@@ -8,10 +8,12 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run pim:sync && npm run raad:sync",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "fest:meds": "tsx scripts/extractFestMeds.ts",
+    "pim:sync": "tsx scripts/extractPimProducts.ts",
     "hv:sync": "tsx scripts/syncHvProductsFromCsv.ts",
     "raad:sync": "node scripts/extractPharmacistAdvice.mjs"
   },

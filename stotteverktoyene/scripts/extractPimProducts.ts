@@ -10,8 +10,8 @@ const __dirname = path.dirname(__filename);
 // Input / output
 const INPUT_FILE = path.resolve(__dirname, "../rxkatalog/PIM product export - 18-12-2025.xlsx");
 
-// Legg output der du allerede har data for søk (samme sted som hvProducts/meds)
-const OUTPUT_FILE = path.resolve(__dirname, "../src/features/fest/components/pimProducts.json");
+// Output til public slik at data kan lastes med fetch i appen.
+const OUTPUT_FILE = path.resolve(__dirname, "../public/data/pimProducts.json");
 
 // Tillat både gamle og nye kolonnenavn fra PIM-eksport.
 const COL_FARMALOGG_CANDIDATES = ["Farmalogg number", "Farmalogg"];
@@ -51,8 +51,12 @@ function resolveColumnKey(
 }
 
 function main() {
+  fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
+
   if (!fs.existsSync(INPUT_FILE)) {
-    throw new Error(`Fant ikke fil: ${INPUT_FILE}`);
+    console.warn(`[pim:sync] Kilde mangler: ${INPUT_FILE}. Skriver tom datafil.`);
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify([], null, 2), "utf8");
+    return;
   }
 
   const workbook = XLSX.readFile(INPUT_FILE, { cellDates: false });
@@ -91,7 +95,6 @@ function main() {
     })
     .filter(Boolean) as PimProduct[];
 
-  fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(out, null, 2), "utf8");
 }
 
