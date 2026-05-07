@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   Alert,
   Box,
@@ -31,15 +31,12 @@ import {
   orderBy,
   query as fsQuery,
   serverTimestamp,
-  setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
-import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -48,7 +45,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
-import { db, storage } from "../../../firebase/firebase";
+import { db } from "../../../firebase/firebase";
 
 type AdviceProduct = {
   id: string;
@@ -97,6 +94,8 @@ const MAX_RENDERED_RESULTS = 120;
 const PAGE_MAX_WIDTH = 1500;
 const FAGLIG_DOC_QUERY_KEY = "fagdoc";
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
+const IFRAME_SRC_RE = /src\s*=\s*["']([^"']+)["']/i;
+const IFRAME_TITLE_RE = /title\s*=\s*["']([^"']+)["']/i;
 
 const buildSearchBlob = (row: AdviceProductRow): AdviceProduct => {
   const atc = (row.atcCode ?? "").toUpperCase().trim();
@@ -148,9 +147,28 @@ const mapFirebaseError = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-const buildStoragePath = (uid: string, docId: string, fileName: string) => {
-  const safeName = fileName.replace(/[^\w.\-]+/g, "_");
-  return `users/${uid}/faglig-documents/${docId}/${safeName}`;
+const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: string } | null => {
+  const trimmed = rawInput.trim();
+  if (!trimmed) return null;
+
+  let url = trimmed;
+  let suggestedTitle = "Innebygd dokument";
+
+  if (/<iframe/i.test(trimmed)) {
+    const srcMatch = trimmed.match(IFRAME_SRC_RE);
+    if (!srcMatch?.[1]) return null;
+    url = srcMatch[1].trim();
+    const titleMatch = trimmed.match(IFRAME_TITLE_RE);
+    if (titleMatch?.[1]?.trim()) suggestedTitle = titleMatch[1].trim();
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    return { url: parsed.toString(), suggestedTitle };
+  } catch {
+    return null;
+  }
 };
 
 export default function ProduktOgRadPage() {
@@ -158,7 +176,6 @@ export default function ProduktOgRadPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligTitleInputRef = useRef<HTMLInputElement | null>(null);
-  const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const textSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [query, setQuery] = useState("");
@@ -513,14 +530,6 @@ export default function ProduktOgRadPage() {
 
     try {
       for (const removeId of removeIds) {
-        const target = byId.get(removeId);
-        if (target?.kind === "pdf" && target.url) {
-          try {
-            await deleteObject(storageRef(storage, target.url));
-          } catch {
-            // ignore missing storage files
-          }
-        }
         await deleteDoc(docRef(db, "users", user.uid, "fagligDocuments", removeId));
       }
       if (selectedFagligDocId && removeIds.has(selectedFagligDocId)) {
@@ -617,63 +626,48 @@ export default function ProduktOgRadPage() {
     }, 350);
   };
 
-  const handleUploadPdf = async (event: ChangeEvent<HTMLInputElement>) => {
+  const addEmbeddedDocument = async () => {
     if (!user?.uid) {
-      setCopiedMessage("Du må være innlogget for å laste opp PDF.");
-      event.target.value = "";
+      setCopiedMessage("Du må være innlogget for å legge til dokument.");
       return;
     }
 
-    const files = Array.from(event.target.files ?? []);
-    if (files.length === 0) return;
-
-    const pdfFiles = files.filter(
-      (file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    const raw = window.prompt(
+      "Lim inn SharePoint embed-kode (<iframe ...>) eller direkte URL til dokument"
     );
+    if (raw == null) return;
 
-    if (pdfFiles.length === 0) {
-      setCopiedMessage("Kun PDF-filer støttes.");
-      event.target.value = "";
+    const parsed = parseEmbedInput(raw);
+    if (!parsed) {
+      setCopiedMessage("Ugyldig iframe/URL. Lim inn gyldig HTTP(S)-lenke.");
       return;
     }
+
+    const customTitle = window.prompt("Tittel på dokumentet", parsed.suggestedTitle);
+    const title = customTitle == null ? parsed.suggestedTitle : customTitle.trim() || parsed.suggestedTitle;
 
     try {
-      let firstCreatedId: string | null = null;
-
-      for (const file of pdfFiles) {
-        const baseTitle = file.name.replace(/\.pdf$/i, "").trim() || "Uten navn";
-        const created = docRef(collection(db, "users", user.uid, "fagligDocuments"));
-        const storagePath = buildStoragePath(user.uid, created.id, file.name);
-        const storageUploadRef = storageRef(storage, storagePath);
-        await uploadBytes(storageUploadRef, file, { contentType: "application/pdf" });
-        const downloadUrl = await getDownloadURL(storageUploadRef);
-        const now = Date.now();
-        await setDoc(docRef(db, "users", user.uid, "fagligDocuments", created.id), {
-          title: baseTitle,
-          kind: "pdf",
-          content: "",
-          parentId: null,
-          emoji: null,
-          pdfUrl: downloadUrl,
-          storagePath,
-          updatedAtMs: now,
-          createdAtMs: now,
-          createdByUid: user.uid,
-          updatedByUid: user.uid,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        } as Record<string, unknown>);
-        if (!firstCreatedId) firstCreatedId = created.id;
-      }
-
-      if (firstCreatedId) setSelectedFagligDocId(firstCreatedId);
-      setCopiedMessage(
-        pdfFiles.length === 1 ? `PDF lastet opp: ${pdfFiles[0].name}` : `${pdfFiles.length} PDF-filer lastet opp`
-      );
+      const now = Date.now();
+      const created = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+        title,
+        kind: "pdf",
+        content: "",
+        parentId: null,
+        emoji: null,
+        pdfUrl: parsed.url,
+        storagePath: `external:${parsed.url}`,
+        updatedAtMs: now,
+        createdAtMs: now,
+        createdByUid: user.uid,
+        updatedByUid: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setSelectedFagligDocId(created.id);
+      setCopiedMessage("Dokument lagt til");
     } catch (err) {
-      setCopiedMessage(mapFirebaseError(err, "PDF-opplasting feilet."));
+      setCopiedMessage(mapFirebaseError(err, "Kunne ikke lagre innebygd dokument."));
     }
-    event.target.value = "";
   };
 
   return (
@@ -690,20 +684,19 @@ export default function ProduktOgRadPage() {
       <Box
         sx={{
           px: { xs: 2, md: 4 },
-          py: { xs: 2.25, md: 3 },
+          py: { xs: 1.2, md: 1.6 },
         }}
       >
         <Box
           sx={{
             maxWidth: PAGE_MAX_WIDTH,
             mx: "auto",
-            borderRadius: 4,
-            px: { xs: 2, md: 3 },
-            py: { xs: 1.6, md: 2 },
-            background:
-              "linear-gradient(135deg, rgba(34,11,41,0.98) 0%, rgba(93,31,84,0.96) 55%, rgba(143,49,113,0.94) 100%)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            boxShadow: "0 16px 34px rgba(88,20,70,0.28)",
+            borderRadius: 0,
+            px: 0,
+            py: 0,
+            background: "transparent",
+            border: "none",
+            boxShadow: "none",
           }}
         >
           <Tabs
@@ -715,14 +708,14 @@ export default function ProduktOgRadPage() {
               mx: "auto",
               width: "100%",
               maxWidth: 1200,
-              minHeight: { xs: 56, md: 68 },
-              p: 0.45,
-              borderRadius: 3.5,
-              bgcolor: "rgba(25,8,35,0.54)",
-              border: "1px solid rgba(242,186,219,0.42)",
-              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05)",
+              minHeight: { xs: 54, md: 62 },
+              p: 0.25,
+              borderRadius: 999,
+              bgcolor: "rgba(120, 50, 102, 0.22)",
+              border: "1px solid rgba(116, 44, 100, 0.26)",
+              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
               "& .MuiTabs-indicator": {
-                height: 0,
+                display: "none",
               },
             }}
           >
@@ -730,18 +723,25 @@ export default function ProduktOgRadPage() {
               disableRipple
               label="Produkt og råd"
               sx={{
-                minHeight: { xs: 50, md: 60 },
+                minHeight: { xs: 52, md: 60 },
                 textTransform: "none",
-                borderRadius: 3,
-                fontSize: { xs: 22, md: 30 },
+                borderRadius: 999,
+                fontSize: { xs: 20, md: 30 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
-                color: "#F1E6EE",
+                color: "#4F2648",
+                bgcolor: "transparent",
+                border: "none",
                 transition: "all 160ms ease",
+                "&:hover": {
+                  color: "#3B1A35",
+                  bgcolor: "rgba(255,255,255,0.08)",
+                },
                 "&.Mui-selected": {
-                  color: "#2B102A",
-                  bgcolor: "#F4A6D4",
-                  boxShadow: "0 6px 18px rgba(245,166,214,0.32)",
+                  color: "#2B1129",
+                  fontWeight: 800,
+                  bgcolor: "#E9A4D0",
+                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
                 },
               }}
             />
@@ -749,18 +749,25 @@ export default function ProduktOgRadPage() {
               disableRipple
               label="Faglig innhold"
               sx={{
-                minHeight: { xs: 50, md: 60 },
+                minHeight: { xs: 52, md: 60 },
                 textTransform: "none",
-                borderRadius: 3,
-                fontSize: { xs: 22, md: 30 },
+                borderRadius: 999,
+                fontSize: { xs: 20, md: 30 },
                 fontWeight: 800,
                 letterSpacing: "0.01em",
-                color: "#F1E6EE",
+                color: "#4F2648",
+                bgcolor: "transparent",
+                border: "none",
                 transition: "all 160ms ease",
+                "&:hover": {
+                  color: "#3B1A35",
+                  bgcolor: "rgba(255,255,255,0.08)",
+                },
                 "&.Mui-selected": {
-                  color: "#2B102A",
-                  bgcolor: "#F4A6D4",
-                  boxShadow: "0 6px 18px rgba(245,166,214,0.32)",
+                  color: "#2B1129",
+                  fontWeight: 800,
+                  bgcolor: "#E9A4D0",
+                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
                 },
               }}
             />
@@ -1070,9 +1077,9 @@ export default function ProduktOgRadPage() {
               <Stack direction="row" spacing={1}>
                 <Button
                   size="small"
-                  startIcon={<UploadFileRoundedIcon />}
+                  startIcon={<PictureAsPdfRoundedIcon />}
                   variant="contained"
-                  onClick={() => pdfInputRef.current?.click()}
+                  onClick={addEmbeddedDocument}
                   sx={{
                     borderRadius: 2,
                     textTransform: "none",
@@ -1082,7 +1089,7 @@ export default function ProduktOgRadPage() {
                     "&:hover": { bgcolor: "#F7B7DC" },
                   }}
                 >
-                  Last opp PDF
+                  Bygg inn dokument
                 </Button>
                 <Button
                   size="small"
@@ -1219,7 +1226,7 @@ export default function ProduktOgRadPage() {
                           )}
                           <ListItemText
                             primary={doc.title}
-                            secondary={doc.kind === "pdf" ? "Lokal PDF" : "Tekstdokument"}
+                            secondary={doc.kind === "pdf" ? "Innebygd dokument" : "Tekstdokument"}
                             primaryTypographyProps={{
                               noWrap: true,
                               fontSize: 16,
@@ -1262,7 +1269,7 @@ export default function ProduktOgRadPage() {
                     }}
                   >
                     <Typography sx={{ fontSize: 13, color: "#CCB5C4" }}>
-                      Ingen dokumenter funnet. Last opp PDF for å starte.
+                      Ingen dokumenter funnet. Legg til innebygd dokument eller opprett tekstdokument.
                     </Typography>
                   </Paper>
                 ) : null}
@@ -1430,10 +1437,10 @@ export default function ProduktOgRadPage() {
                     <Stack spacing={0.9} alignItems="center">
                       <DescriptionRoundedIcon sx={{ fontSize: 48, color: "#DFA0C7" }} />
                       <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#F1DAE9", textAlign: "center" }}>
-                        Last opp PDF eller opprett nytt tekstdokument
+                        Legg til innebygd dokument eller opprett nytt tekstdokument
                       </Typography>
                       <Typography sx={{ fontSize: 13.5, color: "#BCA6B8", textAlign: "center", maxWidth: 480 }}>
-                        Tekstdokumenter kan redigeres direkte i appen, på samme måte som rutineinnhold.
+                        Lim inn SharePoint iframe/URL for visning i appen, eller skriv tekstdokumenter direkte.
                       </Typography>
                     </Stack>
                   </Paper>
@@ -1441,14 +1448,6 @@ export default function ProduktOgRadPage() {
               </Box>
             </Box>
           </Paper>
-          <input
-            ref={pdfInputRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            multiple
-            hidden
-            onChange={handleUploadPdf}
-          />
           <Menu
             anchorEl={fagligDocMenuAnchorEl}
             open={fagligDocMenuOpen}
