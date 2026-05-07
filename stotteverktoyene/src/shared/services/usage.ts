@@ -6,6 +6,7 @@ export type UsagePage =
   | "omeq"
   | "standardtekster"
   | "interaksjoner"
+  | "produktograd"
   | "profil"
   | "statistikk"
   | "produktskjema"

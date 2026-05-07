@@ -9,7 +9,10 @@ import {
   Typography,
 } from "@mui/material";
 
-const officeFormEmbedUrl = "https://forms.office.com/e/CC67JNYpcr?embed=true";
+type TabKey = "produktskjema" | "anbruddForm" | "anbruddOversikt";
+
+const produktskjemaEmbedUrl = import.meta.env.VITE_OFFICE_FORM_URL as string | undefined;
+const anbruddFormEmbedUrl = "https://forms.office.com/e/CC67JNYpcr?embed=true";
 const sharepointEmbedUrl = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
   import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
 
@@ -33,36 +36,51 @@ const formatRefreshTime = (value: string | null) => {
 };
 
 export default function AndbruddPage() {
-  const [tab, setTab] = useState<"form" | "sharepoint">("sharepoint");
+  const [tab, setTab] = useState<TabKey>("produktskjema");
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [refreshKeys, setRefreshKeys] = useState({ form: 0, sharepoint: 0 });
+  const [refreshKeys, setRefreshKeys] = useState<Record<TabKey, number>>({
+    produktskjema: 0,
+    anbruddForm: 0,
+    anbruddOversikt: 0,
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastLoadedAt, setLastLoadedAt] = useState<{ form: string | null; sharepoint: string | null }>({
-    form: null,
-    sharepoint: null,
+  const [lastLoadedAt, setLastLoadedAt] = useState<Record<TabKey, string | null>>({
+    produktskjema: null,
+    anbruddForm: null,
+    anbruddOversikt: null,
   });
   const hasLoadedRef = useRef(false);
 
   const current = useMemo(() => {
-    if (tab === "form") {
+    if (tab === "produktskjema") {
+      return {
+        title: "Produktskjema",
+        src: withRefreshParam(produktskjemaEmbedUrl, refreshKeys.produktskjema),
+        missing: "Office Form URL mangler (VITE_OFFICE_FORM_URL)",
+        iframeTitle: "Produktskjema",
+        height: 860,
+      };
+    }
+
+    if (tab === "anbruddForm") {
       return {
         title: "Anbruddskjema",
-        src: withRefreshParam(officeFormEmbedUrl, refreshKeys.form),
-        missing: "Office Form embed URL mangler",
-        iframeTitle: "Office Form",
-        height: 780,
+        src: withRefreshParam(anbruddFormEmbedUrl, refreshKeys.anbruddForm),
+        missing: "Office Form URL for anbruddskjema mangler",
+        iframeTitle: "Anbruddskjema",
+        height: 860,
       };
     }
 
     return {
       title: "Oversikt (SharePoint)",
-      src: withRefreshParam(sharepointEmbedUrl, refreshKeys.sharepoint),
+      src: withRefreshParam(sharepointEmbedUrl, refreshKeys.anbruddOversikt),
       missing:
         "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
       iframeTitle: "SharePoint Excel",
       height: 860,
     };
-  }, [refreshKeys.form, refreshKeys.sharepoint, tab]);
+  }, [refreshKeys.anbruddForm, refreshKeys.anbruddOversikt, refreshKeys.produktskjema, tab]);
 
   useEffect(() => {
     if (!current.src) {
@@ -131,9 +149,10 @@ export default function AndbruddPage() {
         )}
       </Box>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} aria-label="Anbrudd tabs">
-        <Tab value="sharepoint" label="Oversikt" />
-        <Tab value="form" label="Skjema" />
+      <Tabs value={tab} onChange={(_, v: TabKey) => setTab(v)} sx={{ mb: 2 }} aria-label="Skjema tabs">
+        <Tab value="produktskjema" label="Produktskjema" />
+        <Tab value="anbruddForm" label="Anbruddskjema" />
+        <Tab value="anbruddOversikt" label="Oversikt" />
       </Tabs>
 
       {current.src ? (
@@ -159,12 +178,16 @@ export default function AndbruddPage() {
                 <Box>
                   <CircularProgress size={28} />
                   <Typography sx={{ mt: 1.5, fontWeight: 600 }}>
-                    {tab === "form" ? "Laster anbruddskjema ..." : "Laster anbruddsoversikt ..."}
+                    {tab === "produktskjema"
+                      ? "Laster produktskjema ..."
+                      : tab === "anbruddForm"
+                        ? "Laster anbruddskjema ..."
+                        : "Laster anbruddsoversikt ..."}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {tab === "form"
-                      ? "Selve skjemaet hentes fra Microsoft Forms."
-                      : "Oversikten hentes fra SharePoint."}
+                    {tab === "anbruddOversikt"
+                      ? "Oversikten hentes fra SharePoint."
+                      : "Selve skjemaet hentes fra Microsoft Forms."}
                   </Typography>
                 </Box>
               </Box>

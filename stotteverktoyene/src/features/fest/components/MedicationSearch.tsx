@@ -504,16 +504,26 @@ const buildMedicationItems = (festRaw: any[], pimRaw: any[], hvRaw: any[]): Med[
   });
 };
 
+const fetchJsonArray = async <T,>(url: string): Promise<T[]> => {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Klarte ikke å hente ${url} (${response.status}).`);
+  }
+
+  const parsed: unknown = await response.json();
+  return Array.isArray(parsed) ? (parsed as T[]) : [];
+};
+
 const loadMedicationItems = () => {
   if (!medicationItemsPromise) {
     medicationItemsPromise = Promise.all([
       import("../meds.json"),
-      import("./pimProducts.json"),
+      fetchJsonArray<any>("/data/pimProducts.json"),
       import("./hvProducts.json"),
-    ]).then(([festModule, pimModule, hvModule]) =>
+    ]).then(([festModule, pimRows, hvModule]) =>
       buildMedicationItems(
         Array.isArray(festModule.default) ? festModule.default : [],
-        Array.isArray(pimModule.default) ? pimModule.default : [],
+        Array.isArray(pimRows) ? pimRows : [],
         Array.isArray(hvModule.default) ? hvModule.default : []
       )
     );
@@ -553,10 +563,12 @@ export default function MedicationSearch({
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const anchorRef = useRef<HTMLDivElement | null>(null);
+  const manualNameInputRef = useRef<HTMLInputElement | null>(null);
   const lastObservedClipboardDigitsRef = useRef("");
   const lastAutoFilledQueryRef = useRef("");
   const clipboardReadBlockedRef = useRef(false);
   const clipboardReadInFlightRef = useRef(false);
+  const pendingManualFocusDigitsRef = useRef("");
 
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const effectiveInputRef = inputRef ?? internalInputRef;
@@ -623,6 +635,7 @@ export default function MedicationSearch({
 
         lastObservedClipboardDigitsRef.current = digits;
         lastAutoFilledQueryRef.current = digits;
+        pendingManualFocusDigitsRef.current = digits;
         setQuery(digits);
         setOpen(!isLoadingData && !loadError);
       } catch {
@@ -994,6 +1007,24 @@ export default function MedicationSearch({
     setManualName("");
   }, [deferredQuery]);
 
+  useEffect(() => {
+    if (!noHitsForLikelyIdSearch) return;
+    if (!open) return;
+
+    const queryDigits = getNumericClipboardValue(deferredQuery);
+    if (!queryDigits) return;
+    if (pendingManualFocusDigitsRef.current !== queryDigits) return;
+
+    const raf = window.requestAnimationFrame(() => {
+      manualNameInputRef.current?.focus();
+    });
+
+    pendingManualFocusDigitsRef.current = "";
+    return () => {
+      window.cancelAnimationFrame(raf);
+    };
+  }, [noHitsForLikelyIdSearch, open, deferredQuery]);
+
 
   useEffect(() => {
     if (!open || results.length === 0) {
@@ -1084,6 +1115,10 @@ export default function MedicationSearch({
           setQuery(next);
           setOpen(Boolean(next.trim()) && !isLoadingData && !loadError);
         }}
+        onPaste={(e) => {
+          const digits = getNumericClipboardValue(e.clipboardData?.getData("text") ?? "");
+          pendingManualFocusDigitsRef.current = digits;
+        }}
         onFocus={() => {
           setIsInputFocused(true);
           // Clear the field on focus to make it ready for a new search
@@ -1172,6 +1207,7 @@ export default function MedicationSearch({
               <TextField
                 size="small"
                 fullWidth
+                inputRef={manualNameInputRef}
                 label="Manuelt preparatnavn"
                 placeholder="Skriv preparatnavn for å overstyre PREPARAT1"
                 value={manualName}
