@@ -385,6 +385,8 @@ function ProductCard({
   }
 
   // ── Card view ──
+  const catColor = getCategoryColor(product.category);
+
   return (
     <div
       style={{
@@ -399,8 +401,7 @@ function ProductCard({
         transition: "box-shadow 0.15s ease, transform 0.15s ease",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow =
-          "0 4px 16px rgba(0,0,0,0.10)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)";
         (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
@@ -408,15 +409,43 @@ function ProductCard({
         (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
       }}
     >
+      {/* Product image or placeholder */}
+      <div
+        style={{
+          width: "100%",
+          height: 90,
+          borderRadius: 7,
+          overflow: "hidden",
+          background: product.image ? "#f9fafb" : `${catColor}14`,
+          border: `1px solid ${catColor}30`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        {product.image ? (
+          <img
+            src={`/nutrition/${product.image}`}
+            alt={product.name}
+            style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }}
+          />
+        ) : (
+          <span style={{ fontSize: 32, opacity: 0.25, userSelect: "none", fontWeight: 800, color: catColor }}>
+            {product.name.charAt(0).toUpperCase()}
+          </span>
+        )}
+      </div>
+
       {/* Category label */}
       <span
         style={{
           fontSize: 9,
           fontWeight: 700,
-          color: getCategoryColor(product.category),
+          color: catColor,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
-          borderBottom: `2px solid ${getCategoryColor(product.category)}`,
+          borderBottom: `2px solid ${catColor}`,
           paddingBottom: 1,
           alignSelf: "flex-start",
         }}

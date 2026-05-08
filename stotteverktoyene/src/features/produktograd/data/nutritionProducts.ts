@@ -2,6 +2,8 @@ export type NutritionProduct = {
   id: string;
   name: string;
   category: string;
+  /** Filename (with extension) inside /public/nutrition/ — e.g. "calogen.jpg" */
+  image?: string;
   properties: {
     completeNutrition?: boolean;
     fiber?: boolean;
