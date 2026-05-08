@@ -16,21 +16,6 @@ type VariantInfo = {
   flavors: string[];    // e.g. ["Sjokolade", "Jordbær"]
 };
 
-/** Extract flavor suffix: "Calogen Sjokolade" minus "Calogen" → "Sjokolade" */
-function extractFlavor(catalogName: string, nutritionName: string): string {
-  const cpNorm = normName(catalogName);
-  const npNorm = normName(nutritionName);
-  // Remove the nutrition name prefix, then remove pack descriptors from what's left
-  const suffix = cpNorm.startsWith(npNorm)
-    ? catalogName.slice(
-        // find where in the original string the prefix ends (approximate)
-        catalogName.toLowerCase().indexOf(nutritionName.toLowerCase().split(" ")[0]) +
-          npNorm.length
-      ).replace(/\d+\s*x\s*\d+\s*(?:ml|g|cl|l)?\b/gi, "").trim()
-    : catalogName;
-  return suffix || "";
-}
-
 /** Build nutrition product id → VariantInfo from catalog */
 function buildVariantMap(
   catalog: CatalogProduct[],
@@ -162,7 +147,7 @@ function normName(s: string): string {
 
 // ─── Auto image ───────────────────────────────────────────────────────────────
 const EXTS = ["jpg", "jpeg", "png", "webp"];
-function ProductImage({ id, name, catBg }: { id: string; name: string; catBg: string }) {
+function ProductImage({ id, name }: { id: string; name: string; catBg?: string }) {
   const [idx, setIdx]       = useState(0);
   const [failed, setFailed] = useState(false);
   if (failed) return (
