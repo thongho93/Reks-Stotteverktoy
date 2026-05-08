@@ -255,7 +255,7 @@ export default function ProduktOgRadPage() {
     }
 
     setIsFagligLoading(true);
-    const docsRef = collection(db, "users", user.uid, "fagligDocuments");
+    const docsRef = collection(db, "fagligDocuments");
     const unsub = onSnapshot(
       fsQuery(docsRef, orderBy("updatedAtMs", "desc")),
       (snapshot) => {
@@ -504,7 +504,7 @@ export default function ProduktOgRadPage() {
 
     try {
       const now = Date.now();
-      const ref = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+      const ref = await addDoc(collection(db, "fagligDocuments"), {
         title: "Nytt dokument",
         kind: "text",
         content: "",
@@ -538,7 +538,7 @@ export default function ProduktOgRadPage() {
 
     try {
       const now = Date.now();
-      const ref = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+      const ref = await addDoc(collection(db, "fagligDocuments"), {
         title: `${parent.title} - underfane`,
         kind: "text",
         content: "",
@@ -603,7 +603,7 @@ export default function ProduktOgRadPage() {
 
     try {
       for (const removeId of removeIds) {
-        await deleteDoc(docRef(db, "users", user.uid, "fagligDocuments", removeId));
+        await deleteDoc(docRef(db, "fagligDocuments", removeId));
       }
       if (selectedFagligDocId && removeIds.has(selectedFagligDocId)) {
         setSelectedFagligDocId(null);
@@ -629,7 +629,7 @@ export default function ProduktOgRadPage() {
     if (!trimmed) return;
     setRenameDialogOpen(false);
     try {
-      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", renameDialogTargetId), {
+      await updateDoc(docRef(db, "fagligDocuments", renameDialogTargetId), {
         title: trimmed,
         updatedAtMs: Date.now(),
         updatedByUid: user.uid,
@@ -668,7 +668,7 @@ export default function ProduktOgRadPage() {
   const applyFagligEmoji = async (emoji: string | null) => {
     if (!fagligEmojiTarget || !user?.uid) return;
     try {
-      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", fagligEmojiTarget.id), {
+      await updateDoc(docRef(db, "fagligDocuments", fagligEmojiTarget.id), {
         emoji,
         updatedAtMs: Date.now(),
         updatedByUid: user.uid,
@@ -692,7 +692,7 @@ export default function ProduktOgRadPage() {
 
     if (textSaveTimerRef.current) clearTimeout(textSaveTimerRef.current);
     textSaveTimerRef.current = setTimeout(() => {
-      void updateDoc(docRef(db, "users", uid, "fagligDocuments", targetId), {
+      void updateDoc(docRef(db, "fagligDocuments", targetId), {
         title: nextTitle,
         content: nextContent,
         updatedAtMs: Date.now(),
@@ -733,7 +733,7 @@ export default function ProduktOgRadPage() {
     setEmbedDialogOpen(false);
     try {
       const now = Date.now();
-      const created = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+      const created = await addDoc(collection(db, "fagligDocuments"), {
         title,
         kind: "pdf",
         content: "",
