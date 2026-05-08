@@ -111,6 +111,47 @@ const AGE_LABELS: Record<string, string> = {
   elderly: "Eldre",
 };
 
+// ─── Auto-resolving product image ────────────────────────────────────────────
+// Tries /nutrition/{id}.jpg → .jpeg → .png → .webp in order.
+// Falls back to a styled placeholder if none exist.
+const EXTS = ["jpg", "jpeg", "png", "webp"];
+
+function ProductImage({ id, name, catColor }: { id: string; name: string; catColor: string }) {
+  const [extIndex, setExtIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div
+        style={{
+          width: "100%", height: "100%",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <span style={{ fontSize: 32, opacity: 0.22, fontWeight: 800, color: catColor, userSelect: "none" }}>
+          {name.charAt(0).toUpperCase()}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      key={extIndex}
+      src={`/nutrition/${id}.${EXTS[extIndex]}`}
+      alt={name}
+      onError={() => {
+        if (extIndex + 1 < EXTS.length) {
+          setExtIndex((i) => i + 1);
+        } else {
+          setFailed(true);
+        }
+      }}
+      style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }}
+    />
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getColor(key: string): string {
   return (COLORS as Record<string, string>)[key] ?? "#6b7280";
@@ -409,32 +450,22 @@ function ProductCard({
         (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
       }}
     >
-      {/* Product image or placeholder */}
+      {/* Product image (auto-resolves jpg/png/webp, falls back to placeholder) */}
       <div
         style={{
           width: "100%",
           height: 90,
           borderRadius: 7,
           overflow: "hidden",
-          background: product.image ? "#f9fafb" : `${catColor}14`,
-          border: `1px solid ${catColor}30`,
+          background: `${catColor}10`,
+          border: `1px solid ${catColor}28`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
         }}
       >
-        {product.image ? (
-          <img
-            src={`/nutrition/${product.image}`}
-            alt={product.name}
-            style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }}
-          />
-        ) : (
-          <span style={{ fontSize: 32, opacity: 0.25, userSelect: "none", fontWeight: 800, color: catColor }}>
-            {product.name.charAt(0).toUpperCase()}
-          </span>
-        )}
+        <ProductImage id={product.id} name={product.name} catColor={catColor} />
       </div>
 
       {/* Category label */}
