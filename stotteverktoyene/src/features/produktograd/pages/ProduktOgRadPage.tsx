@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import NutritionProductFinder from "../components/NutritionProductFinder";
+import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import {
   Alert,
   Box,
@@ -402,8 +403,8 @@ export default function ProduktOgRadPage() {
   );
 
   useEffect(() => {
-    // "__nutrition__" is a built-in virtual tab — never auto-replace it
-    if (selectedFagligDocId === "__nutrition__") return;
+    // Built-in virtual tabs — never auto-replace them
+    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__") return;
     if (fagligDocs.length === 0) {
       setSelectedFagligDocId(null);
       return;
@@ -1428,8 +1429,68 @@ export default function ProduktOgRadPage() {
                   </Tooltip>
                 </Stack>
 
+                {/* Collapsed icon strip */}
+                {fagligSidebarCollapsed && (
+                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, py: 0.5 }}>
+                    {[
+                      { id: "__nutrition__", emoji: "🥗", label: "Ernæringsprodukter", activeColor: "rgba(34,197,94,0.35)", activeBorder: "rgba(34,197,94,0.6)" },
+                      { id: "__knuse__",     emoji: "💊", label: "Knuse-/delelisten",  activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
+                    ].map(({ id, emoji, label, activeColor, activeBorder }) => {
+                      const active = selectedFagligDocId === id;
+                      return (
+                        <Tooltip key={id} title={label} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                          <Box
+                            onClick={() => setSelectedFagligDocId(id)}
+                            sx={{
+                              width: 34, height: 34,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              borderRadius: 2,
+                              fontSize: 18,
+                              cursor: "pointer",
+                              bgcolor: active ? activeColor : "transparent",
+                              border: active ? `1.5px solid ${activeBorder}` : "1.5px solid transparent",
+                              transition: "background 120ms ease, border-color 120ms ease",
+                              "&:hover": { bgcolor: activeColor, borderColor: activeBorder },
+                            }}
+                          >
+                            {emoji}
+                          </Box>
+                        </Tooltip>
+                      );
+                    })}
+                    {filteredFagligDocs.map((doc) => {
+                      const active = selectedFagligDoc?.id === doc.id;
+                      return (
+                        <Tooltip key={doc.id} title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                          <Box
+                            onClick={() => setSelectedFagligDocId(doc.id)}
+                            sx={{
+                              width: 34, height: 34,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              borderRadius: 2,
+                              cursor: "pointer",
+                              bgcolor: active ? "rgba(242,162,208,0.22)" : "transparent",
+                              border: active ? "1.5px solid rgba(242,162,208,0.55)" : "1.5px solid transparent",
+                              transition: "background 120ms ease, border-color 120ms ease",
+                              "&:hover": { bgcolor: "rgba(242,162,208,0.15)", borderColor: "rgba(242,162,208,0.4)" },
+                            }}
+                          >
+                            {doc.emoji ? (
+                              <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
+                            ) : doc.kind === "pdf" ? (
+                              <PictureAsPdfRoundedIcon sx={{ fontSize: 18, color: active ? "#F9C8E4" : "#F0A1CF" }} />
+                            ) : (
+                              <DescriptionRoundedIcon sx={{ fontSize: 18, color: active ? "#BDE7FF" : "#9ED9FF" }} />
+                            )}
+                          </Box>
+                        </Tooltip>
+                      );
+                    })}
+                  </Box>
+                )}
+
                 {/* Sidebar content — hidden when collapsed */}
-                <Box sx={{ flex: 1, overflowY: "auto", opacity: fagligSidebarCollapsed ? 0 : 1, transition: "opacity 150ms ease", p: fagligSidebarCollapsed ? 0 : 1, pointerEvents: fagligSidebarCollapsed ? "none" : "auto" }}>
+                <Box sx={{ flex: 1, overflowY: "auto", display: fagligSidebarCollapsed ? "none" : "block", p: 1 }}>
                 {isFagligLoading ? (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.8, py: 1.1 }}>
                     <CircularProgress size={18} sx={{ color: "#E8B7D5" }} />
@@ -1461,6 +1522,35 @@ export default function ProduktOgRadPage() {
                         fontSize: 14,
                         fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600,
                         color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7",
+                      }}
+                    />
+                  </ListItemButton>
+                  </Tooltip>
+
+                  {/* Built-in: Knuse-/delelisten */}
+                  <Tooltip title="Knuse-/delelisten" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                  <ListItemButton
+                    selected={selectedFagligDocId === "__knuse__"}
+                    onClick={() => setSelectedFagligDocId("__knuse__")}
+                    sx={{
+                      mb: 0.5,
+                      borderRadius: 2,
+                      pl: 1, pr: 0.7,
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      bgcolor: selectedFagligDocId === "__knuse__" ? "rgba(139,92,246,0.18)" : "rgba(22,27,34,0.85)",
+                      "&:hover": { bgcolor: "rgba(139,92,246,0.12)" },
+                      "&.Mui-selected": { bgcolor: "rgba(139,92,246,0.2)", borderColor: "rgba(139,92,246,0.45)" },
+                      "&.Mui-selected:hover": { bgcolor: "rgba(139,92,246,0.26)" },
+                    }}
+                  >
+                    <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>💊</Typography>
+                    <ListItemText
+                      primary="Knuse-/delelisten"
+                      primaryTypographyProps={{
+                        noWrap: true,
+                        fontSize: 14,
+                        fontWeight: selectedFagligDocId === "__knuse__" ? 800 : 600,
+                        color: selectedFagligDocId === "__knuse__" ? "#DDD6FE" : "#E4DCE7",
                       }}
                     />
                   </ListItemButton>
@@ -1559,9 +1649,11 @@ export default function ProduktOgRadPage() {
                 </Box>{/* end inner content Box */}
               </Box>{/* end collapsible sidebar Box */}
 
-              <Box sx={{ bgcolor: "#0D1117", p: selectedFagligDocId === "__nutrition__" ? 0 : 1, overflowY: "auto", flex: 1, minWidth: 0 }}>
+              <Box sx={{ bgcolor: "#0D1117", p: (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__") ? 0 : 1, overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto", display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
                 {selectedFagligDocId === "__nutrition__" ? (
                   <NutritionProductFinder catalogProducts={products} />
+                ) : selectedFagligDocId === "__knuse__" ? (
+                  <KnuseDelisteTab />
                 ) : selectedFagligDoc ? (
                   selectedFagligDoc.kind === "pdf" ? (
                     <Paper
