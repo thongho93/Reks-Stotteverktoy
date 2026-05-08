@@ -730,7 +730,13 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
               <input type="text" value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Søk etter produkt..."
-                style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "#0f172a" }} />
+                style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "#0f172a" }}
+                onFocus={async () => {
+                  try {
+                    const text = (await navigator.clipboard.readText()).trim();
+                    if (/^\d+$/.test(text)) { setSearch(text); setPage(1); }
+                  } catch { /* clipboard access denied — silently ignore */ }
+                }} />
               {search && (
                 <button onClick={() => { setSearch(""); setPage(1); }}
                   style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 14, padding: 0, lineHeight: 1 }}>
