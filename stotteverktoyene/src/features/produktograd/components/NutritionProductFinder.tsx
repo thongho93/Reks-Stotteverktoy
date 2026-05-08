@@ -58,7 +58,7 @@ const PROPERTY_ICONS: Record<string, string> = {
 };
 
 const CLINICAL_ICONS: Record<string, string> = {
-  diabetes: "💧",
+  diabetes: "💉",
   pressureUlcers: "🩹",
   preoperative: "🔬",
   postoperative: "🏥",
@@ -707,7 +707,7 @@ export default function NutritionProductFinder() {
     { key: "completeNutrition", label: "Komplett ernæring", icon: "⭐", type: "prop", color: COLORS.completeNutrition },
     { key: "fiber",             label: "Kostfiber",          icon: "🌾", type: "prop",     color: COLORS.fiber },
     { key: "proteinRich",       label: "Proteinrik",         icon: "💪", type: "prop",     color: COLORS.proteinRich },
-    { key: "diabetes",          label: "Diabetes",           icon: "💧", type: "clinical", color: COLORS.diabetes },
+    { key: "diabetes",          label: "Diabetes",           icon: "💉", type: "clinical", color: COLORS.diabetes },
     { key: "kidneyFailure",     label: "Nyresvikt",          icon: "🫘", type: "clinical", color: COLORS.kidneyFailure },
     { key: "cancer",            label: "Kreft",              icon: "🎗️", type: "clinical", color: COLORS.cancer },
     { key: "preoperative",      label: "Pre/Post-op",        icon: "🔬", type: "clinical", color: COLORS.preoperative },
