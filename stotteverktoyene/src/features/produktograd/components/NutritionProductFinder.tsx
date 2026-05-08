@@ -545,6 +545,13 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
         if (!input) return;
         input.focus();
         input.select();
+        return;
+      }
+      if (e.key === "Escape" && searchRef.current === document.activeElement) {
+        e.preventDefault();
+        setSearch("");
+        setPage(1);
+        searchRef.current?.blur();
       }
     };
     window.addEventListener("keydown", onKeyDown);
