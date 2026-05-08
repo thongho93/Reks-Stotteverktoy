@@ -51,6 +51,8 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 
@@ -242,6 +244,9 @@ export default function ProduktOgRadPage() {
   const [fagligEmojiTargetId, setFagligEmojiTargetId] = useState<string | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameDialogValue, setRenameDialogValue] = useState("");
+  const [fagligSidebarCollapsed, setFagligSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem("faglig-sidebar-collapsed") === "true";
+  });
   const [renameDialogTargetId, setRenameDialogTargetId] = useState<string | null>(null);
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [embedDialogUrl, setEmbedDialogUrl] = useState("");
@@ -407,6 +412,10 @@ export default function ProduktOgRadPage() {
       setSelectedFagligDocId(fagligDocs[0].id);
     }
   }, [fagligDocs, selectedFagligDocId]);
+
+  useEffect(() => {
+    localStorage.setItem("faglig-sidebar-collapsed", String(fagligSidebarCollapsed));
+  }, [fagligSidebarCollapsed]);
 
   useEffect(() => {
     setRenderLimit(MAX_RENDERED_RESULTS);
@@ -1359,36 +1368,68 @@ export default function ProduktOgRadPage() {
 
             <Box
               sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "220px minmax(0, 1fr)" },
+                display: "flex",
                 flex: 1,
                 overflow: "hidden",
               }}
             >
+              {/* ── Collapsible Dokumentfaner sidebar ── */}
               <Box
                 sx={{
-                  borderRight: { xs: "none", md: "1px solid rgba(140,80,120,0.25)" },
-                  borderBottom: { xs: "1px solid rgba(140,80,120,0.25)", md: "none" },
+                  width: fagligSidebarCollapsed ? 44 : 220,
+                  minWidth: fagligSidebarCollapsed ? 44 : 220,
+                  transition: "width 200ms ease, min-width 200ms ease",
+                  borderRight: "1px solid rgba(140,80,120,0.25)",
                   bgcolor: "rgba(13,17,23,0.9)",
-                  p: 1,
-                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  flexShrink: 0,
                 }}
               >
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 0.6, py: 0.5 }}>
-                  <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#EED5E8" }}>
-                    Dokumentfaner
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label={filteredFagligDocs.length}
-                    sx={{
-                      bgcolor: "rgba(242,162,208,0.22)",
-                      color: "#F6BFDF",
-                      fontWeight: 700,
-                      border: "1px solid rgba(242,162,208,0.44)",
-                    }}
-                  />
+                {/* Header row */}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent={fagligSidebarCollapsed ? "center" : "space-between"}
+                  sx={{ px: fagligSidebarCollapsed ? 0.5 : 1.2, py: 0.7, flexShrink: 0 }}
+                >
+                  {!fagligSidebarCollapsed && (
+                    <>
+                      <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#EED5E8", whiteSpace: "nowrap" }}>
+                        Dokumentfaner
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={filteredFagligDocs.length}
+                        sx={{
+                          bgcolor: "rgba(242,162,208,0.22)",
+                          color: "#F6BFDF",
+                          fontWeight: 700,
+                          border: "1px solid rgba(242,162,208,0.44)",
+                        }}
+                      />
+                    </>
+                  )}
+                  <Tooltip title={fagligSidebarCollapsed ? "Vis Dokumentfaner" : "Skjul Dokumentfaner"} placement="right">
+                    <IconButton
+                      size="small"
+                      onClick={() => setFagligSidebarCollapsed((v) => !v)}
+                      sx={{
+                        color: "rgba(235,175,211,0.8)",
+                        ml: fagligSidebarCollapsed ? 0 : 0.5,
+                        "&:hover": { bgcolor: "rgba(242,162,208,0.15)", color: "#F2A2D0" },
+                      }}
+                    >
+                      {fagligSidebarCollapsed
+                        ? <ChevronRightRoundedIcon sx={{ fontSize: 20 }} />
+                        : <ChevronLeftRoundedIcon sx={{ fontSize: 20 }} />}
+                    </IconButton>
+                  </Tooltip>
                 </Stack>
+
+                {/* Sidebar content — hidden when collapsed */}
+                <Box sx={{ flex: 1, overflowY: "auto", opacity: fagligSidebarCollapsed ? 0 : 1, transition: "opacity 150ms ease", p: fagligSidebarCollapsed ? 0 : 1, pointerEvents: fagligSidebarCollapsed ? "none" : "auto" }}>
                 {isFagligLoading ? (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.8, py: 1.1 }}>
                     <CircularProgress size={18} sx={{ color: "#E8B7D5" }} />
@@ -1513,9 +1554,10 @@ export default function ProduktOgRadPage() {
                     </Typography>
                   </Paper>
                 ) : null}
-              </Box>
+                </Box>{/* end inner content Box */}
+              </Box>{/* end collapsible sidebar Box */}
 
-              <Box sx={{ bgcolor: "#0D1117", p: selectedFagligDocId === "__nutrition__" ? 0 : 1, overflowY: "auto" }}>
+              <Box sx={{ bgcolor: "#0D1117", p: selectedFagligDocId === "__nutrition__" ? 0 : 1, overflowY: "auto", flex: 1, minWidth: 0 }}>
                 {selectedFagligDocId === "__nutrition__" ? (
                   <NutritionProductFinder />
                 ) : selectedFagligDoc ? (
