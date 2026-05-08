@@ -397,6 +397,8 @@ export default function ProduktOgRadPage() {
   );
 
   useEffect(() => {
+    // "__nutrition__" is a built-in virtual tab — never auto-replace it
+    if (selectedFagligDocId === "__nutrition__") return;
     if (fagligDocs.length === 0) {
       setSelectedFagligDocId(null);
       return;
