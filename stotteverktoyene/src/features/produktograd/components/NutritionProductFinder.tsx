@@ -529,11 +529,27 @@ const PAGE_SIZE = 20;
 const VNR_RE   = /^\d+$/;
 
 export default function NutritionProductFinder({ catalogProducts = [] }: { catalogProducts?: CatalogProduct[] }) {
+  const searchRef = useRef<HTMLInputElement>(null);
   const [search,          setSearch]          = useState("");
   const [page,            setPage]            = useState(1);
   const [filterAge,       setFilterAge]       = useState<Record<string, boolean>>({});
   const [filterClinical,  setFilterClinical]  = useState<Record<string, boolean>>({});
   const [filterProps,     setFilterProps]     = useState<Record<string, boolean>>({});
+
+  // Ctrl+S / Cmd+S → focus search field
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        const input = searchRef.current;
+        if (!input) return;
+        input.focus();
+        input.select();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Build nutrition product id → VariantInfo from catalog
   const variantMap = useMemo(
@@ -727,7 +743,7 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
               boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}>
               <span style={{ color: "#94a3b8", fontSize: 14 }}>🔍</span>
-              <input type="text" value={search}
+              <input ref={searchRef} type="text" value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Søk etter produkt..."
                 style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "#0f172a" }}
