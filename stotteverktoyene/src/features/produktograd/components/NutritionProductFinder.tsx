@@ -16,13 +16,13 @@ const COLORS = {
   vegan: "#15803d",
   vegetarian: "#15803d",
   liteProtein: "#7c3aed",
-  diabetes: "#1e40af",
+  diabetes: "#1d4ed8",
   kidneyFailure: "#b45309",
   cancer: "#db2777",
   copd: "#0f766e",
   pressureUlcers: "#dc2626",
   preoperative: "#7c3aed",
-  postoperative: "#7c3aed",
+  postoperative: "#6d28d9",
   malabsorption: "#ea580c",
   constipationDiarrhea: "#65a30d",
   elderlyUndernutrition: "#0369a1",
@@ -43,7 +43,41 @@ const CATEGORY_COLORS: Record<string, string> = {
   Kreftspesifikk: "#831843",
 };
 
-// ─── Label maps ──────────────────────────────────────────────────────────────
+// ─── Icon maps ────────────────────────────────────────────────────────────────
+const PROPERTY_ICONS: Record<string, string> = {
+  completeNutrition: "⭐",
+  fiber: "🌾",
+  glutenFree: "🚫",
+  lactoseFree: "🥛",
+  lowLactose: "🥛",
+  fatFree: "💧",
+  vegan: "🌱",
+  vegetarian: "🥦",
+  proteinRich: "💪",
+  liteProtein: "🫀",
+};
+
+const CLINICAL_ICONS: Record<string, string> = {
+  diabetes: "💧",
+  pressureUlcers: "🩹",
+  preoperative: "🔬",
+  postoperative: "🏥",
+  copd: "💨",
+  kidneyFailure: "🫘",
+  cancer: "🎗️",
+  constipationDiarrhea: "🌿",
+  malabsorption: "🧪",
+  elderlyUndernutrition: "🧓",
+};
+
+const AGE_ICONS: Record<string, string> = {
+  from1Year: "👶",
+  from3Years: "🧒",
+  over6Years: "🧑",
+  elderly: "🧓",
+};
+
+// ─── Label maps ───────────────────────────────────────────────────────────────
 const PROPERTY_LABELS: Record<string, string> = {
   completeNutrition: "Komplett ernæring",
   fiber: "Kostfiber",
@@ -90,39 +124,71 @@ function slugify(str: string): string {
   return str.toLowerCase().replace(/\s+/g, "-");
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function Badge({
-  label,
+// ─── IconCircle ───────────────────────────────────────────────────────────────
+// Compact colored circle with emoji + tooltip — used in product cards
+function IconCircle({
+  icon,
   color,
-  bg,
-  small,
+  label,
+  caution,
 }: {
+  icon: string;
+  color: string;
   label: string;
-  color?: string;
-  bg?: string;
-  small?: boolean;
+  caution?: boolean;
 }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <span
+      title={label}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
+        position: "relative",
         display: "inline-flex",
         alignItems: "center",
-        gap: 3,
-        padding: small ? "1px 6px" : "2px 8px",
-        borderRadius: 999,
-        fontSize: small ? 10 : 11,
-        fontWeight: 600,
-        lineHeight: 1.6,
-        color: color ?? "#fff",
-        background: bg ?? "#6b7280",
-        whiteSpace: "nowrap",
+        justifyContent: "center",
+        width: 28,
+        height: 28,
+        borderRadius: "50%",
+        background: caution ? COLORS.cautionBg : `${color}22`,
+        border: `2px solid ${caution ? COLORS.caution : color}`,
+        fontSize: 13,
+        cursor: "default",
+        flexShrink: 0,
+        transition: "transform 0.12s ease, box-shadow 0.12s ease",
+        transform: hovered ? "scale(1.18)" : "scale(1)",
+        boxShadow: hovered ? `0 2px 8px ${color}55` : "none",
       }}
     >
-      {label}
+      {icon}
+      {hovered && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 5px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#1f2937",
+            color: "#f9fafb",
+            fontSize: 10,
+            fontWeight: 600,
+            padding: "3px 8px",
+            borderRadius: 6,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            zIndex: 99,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}
+        >
+          {caution ? "⚠ " : ""}{label}
+        </span>
+      )}
     </span>
   );
 }
 
+// ─── CautionBadge ─────────────────────────────────────────────────────────────
 function CautionBadge({ label }: { label: string }) {
   return (
     <span
@@ -146,13 +212,16 @@ function CautionBadge({ label }: { label: string }) {
   );
 }
 
+// ─── FilterChip ───────────────────────────────────────────────────────────────
 function FilterChip({
   label,
+  icon,
   active,
   color,
   onClick,
 }: {
   label: string;
+  icon?: string;
   active: boolean;
   color?: string;
   onClick: () => void;
@@ -163,8 +232,8 @@ function FilterChip({
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 4,
-        padding: "4px 12px",
+        gap: 5,
+        padding: "5px 13px",
         borderRadius: 999,
         fontSize: 12,
         fontWeight: 600,
@@ -176,8 +245,41 @@ function FilterChip({
         whiteSpace: "nowrap",
       }}
     >
+      {icon && <span style={{ fontSize: 14, lineHeight: 1 }}>{icon}</span>}
       {label}
     </button>
+  );
+}
+
+// ─── PropIconRow ──────────────────────────────────────────────────────────────
+// Row of small icon pills for product properties
+function PropIconRow({ entries }: { entries: [string, boolean][] }) {
+  if (entries.length === 0) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      {entries.map(([key]) => (
+        <span
+          key={key}
+          title={PROPERTY_LABELS[key] ?? key}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "2px 8px 2px 5px",
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 600,
+            color: getColor(key),
+            background: `${getColor(key)}18`,
+            border: `1.5px solid ${getColor(key)}55`,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ fontSize: 12 }}>{PROPERTY_ICONS[key] ?? "•"}</span>
+          {PROPERTY_LABELS[key] ?? key}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -234,59 +336,55 @@ function ProductCard({
             {product.name}
           </div>
           {product.notes && product.notes.length > 0 && (
-            <div
-              style={{
-                fontSize: 10,
-                color: "#6b7280",
-                marginTop: 2,
-                fontStyle: "italic",
-              }}
-            >
+            <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2, fontStyle: "italic" }}>
               {product.notes.join(" • ")}
             </div>
           )}
         </div>
         {/* Properties */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {propEntries.map(([key]) => (
-            <Badge
-              key={key}
-              label={PROPERTY_LABELS[key] ?? key}
-              bg={getColor(key)}
-              small
-            />
-          ))}
-        </div>
+        <PropIconRow entries={propEntries} />
         {/* Clinical */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
           {clinicalEntries.map(([key, val]) =>
             val === "caution" ? (
               <CautionBadge key={key} label={CLINICAL_LABELS[key] ?? key} />
             ) : (
-              <Badge
+              <IconCircle
                 key={key}
+                icon={CLINICAL_ICONS[key] ?? "•"}
+                color={getColor(key)}
                 label={CLINICAL_LABELS[key] ?? key}
-                bg={getColor(key)}
-                small
               />
             )
           )}
         </div>
         {/* Age */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
           {ageEntries.map(([key]) => (
-            <Badge
+            <span
               key={key}
-              label={AGE_LABELS[key] ?? key}
-              bg="#374151"
-              small
-            />
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#374151",
+                background: "#f3f4f6",
+                padding: "2px 6px",
+                borderRadius: 4,
+              }}
+            >
+              <span style={{ fontSize: 11 }}>{AGE_ICONS[key] ?? "👤"}</span>
+              {AGE_LABELS[key] ?? key}
+            </span>
           ))}
         </div>
       </div>
     );
   }
 
+  // ── Card view ──
   return (
     <div
       style={{
@@ -298,71 +396,73 @@ function ProductCard({
         flexDirection: "column",
         gap: 8,
         minHeight: 180,
+        transition: "box-shadow 0.15s ease, transform 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow =
+          "0 4px 16px rgba(0,0,0,0.10)";
+        (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
+        (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
       }}
     >
-      {/* Category badge */}
-      <div>
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            color: getCategoryColor(product.category),
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            borderBottom: `2px solid ${getCategoryColor(product.category)}`,
-            paddingBottom: 1,
-          }}
-        >
-          {product.category}
-        </span>
-      </div>
+      {/* Category label */}
+      <span
+        style={{
+          fontSize: 9,
+          fontWeight: 700,
+          color: getCategoryColor(product.category),
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          borderBottom: `2px solid ${getCategoryColor(product.category)}`,
+          paddingBottom: 1,
+          alignSelf: "flex-start",
+        }}
+      >
+        {product.category}
+      </span>
 
       {/* Product name */}
       <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", lineHeight: 1.3 }}>
         {product.name}
       </div>
 
-      {/* Property badges */}
-      {propEntries.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {propEntries.map(([key]) => (
-            <Badge
-              key={key}
-              label={PROPERTY_LABELS[key] ?? key}
-              bg={getColor(key)}
-              small
-            />
-          ))}
-        </div>
-      )}
+      {/* Property icon pills */}
+      <PropIconRow entries={propEntries} />
 
-      {/* Divider */}
+      {/* Clinical use icon circles */}
       {clinicalEntries.length > 0 && (
         <>
-          <div
-            style={{ borderTop: "1px solid #f3f4f6", margin: "2px 0" }}
-          />
+          <div style={{ borderTop: "1px solid #f3f4f6", margin: "2px 0" }} />
           <div
             style={{
               fontSize: 10,
               fontWeight: 700,
-              color: "#6b7280",
+              color: "#9ca3af",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
             }}
           >
-            Klinisk egnet ved:
+            Klinisk egnet ved
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
             {clinicalEntries.map(([key, val]) =>
               val === "caution" ? (
-                <CautionBadge key={key} label={CLINICAL_LABELS[key] ?? key} />
-              ) : (
-                <Badge
+                <IconCircle
                   key={key}
+                  icon={CLINICAL_ICONS[key] ?? "⚠️"}
+                  color={COLORS.caution}
                   label={CLINICAL_LABELS[key] ?? key}
-                  bg={getColor(key)}
-                  small
+                  caution
+                />
+              ) : (
+                <IconCircle
+                  key={key}
+                  icon={CLINICAL_ICONS[key] ?? "•"}
+                  color={getColor(key)}
+                  label={CLINICAL_LABELS[key] ?? key}
                 />
               )
             )}
@@ -370,20 +470,15 @@ function ProductCard({
         </>
       )}
 
-      {/* Footer: age + notes */}
-      <div
-        style={{
-          marginTop: "auto",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 4,
-          alignItems: "center",
-        }}
-      >
+      {/* Footer: age badges + notes */}
+      <div style={{ marginTop: "auto", display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
         {ageEntries.map(([key]) => (
           <span
             key={key}
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
               fontSize: 10,
               fontWeight: 600,
               color: "#374151",
@@ -392,19 +487,13 @@ function ProductCard({
               borderRadius: 4,
             }}
           >
+            <span style={{ fontSize: 11 }}>{AGE_ICONS[key] ?? "👤"}</span>
             {AGE_LABELS[key] ?? key}
           </span>
         ))}
         {product.notes &&
           product.notes.map((note, i) => (
-            <span
-              key={i}
-              style={{
-                fontSize: 10,
-                color: "#9ca3af",
-                fontStyle: "italic",
-              }}
-            >
+            <span key={i} style={{ fontSize: 10, color: "#9ca3af", fontStyle: "italic" }}>
               {note}
             </span>
           ))}
@@ -413,16 +502,10 @@ function ProductCard({
   );
 }
 
-// ─── Sidebar filter section ───────────────────────────────────────────────────
-function FilterSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+// ─── FilterSection ────────────────────────────────────────────────────────────
+function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 18 }}>
       <div
         style={{
           fontSize: 11,
@@ -435,20 +518,20 @@ function FilterSection({
       >
         {title}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {children}
-      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>{children}</div>
     </div>
   );
 }
 
 function SidebarCheckbox({
   label,
+  icon,
   color,
   checked,
   onChange,
 }: {
   label: string;
+  icon?: string;
   color?: string;
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -460,9 +543,12 @@ function SidebarCheckbox({
         alignItems: "center",
         gap: 7,
         fontSize: 12,
-        color: "#374151",
+        color: checked ? "#111827" : "#374151",
         cursor: "pointer",
-        fontWeight: checked ? 600 : 400,
+        fontWeight: checked ? 700 : 400,
+        padding: "2px 4px",
+        borderRadius: 5,
+        background: checked && color ? `${color}14` : "transparent",
       }}
     >
       <input
@@ -471,7 +557,24 @@ function SidebarCheckbox({
         onChange={(e) => onChange(e.target.checked)}
         style={{ accentColor: color ?? "#6b7280", width: 13, height: 13 }}
       />
-      {color && (
+      {icon ? (
+        <span
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: color ? `${color}22` : "#f3f4f6",
+            border: `1.5px solid ${color ?? "#d1d5db"}`,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 11,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </span>
+      ) : color ? (
         <span
           style={{
             width: 8,
@@ -481,7 +584,7 @@ function SidebarCheckbox({
             flexShrink: 0,
           }}
         />
-      )}
+      ) : null}
       {label}
     </label>
   );
@@ -500,9 +603,7 @@ export default function NutritionProductFinder() {
 
   // Sidebar filters
   const [filterAge, setFilterAge] = useState<Record<string, boolean>>({});
-  const [filterClinical, setFilterClinical] = useState<Record<string, boolean>>(
-    {}
-  );
+  const [filterClinical, setFilterClinical] = useState<Record<string, boolean>>({});
   const [filterProps, setFilterProps] = useState<Record<string, boolean>>({});
 
   const toggleFilter = useCallback(
@@ -531,9 +632,7 @@ export default function NutritionProductFinder() {
   }, []);
 
   const activeAgeKeys = Object.keys(filterAge).filter((k) => filterAge[k]);
-  const activeClinicalKeys = Object.keys(filterClinical).filter(
-    (k) => filterClinical[k]
-  );
+  const activeClinicalKeys = Object.keys(filterClinical).filter((k) => filterClinical[k]);
   const activePropKeys = Object.keys(filterProps).filter((k) => filterProps[k]);
 
   const filtered = useMemo(() => {
@@ -545,53 +644,50 @@ export default function NutritionProductFinder() {
       list = list.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q)
+          p.category.toLowerCase().includes(q) ||
+          (p.notes ?? []).some((n) => n.toLowerCase().includes(q))
       );
     }
 
-    // Age filters
+    // Age filter (OR within group)
     if (activeAgeKeys.length > 0) {
       list = list.filter((p) =>
-        activeAgeKeys.some(
-          (k) => (p.age as Record<string, boolean | undefined>)[k] === true
-        )
+        activeAgeKeys.some((k) => (p.age as Record<string, boolean>)[k] === true)
       );
     }
 
-    // Clinical filters
+    // Clinical filter (OR within group)
     if (activeClinicalKeys.length > 0) {
       list = list.filter((p) =>
-        activeClinicalKeys.some((k) => {
-          const val = (p.clinicalUse as Record<string, boolean | "caution" | undefined>)[k];
-          return val === true || val === "caution";
-        })
+        activeClinicalKeys.some(
+          (k) =>
+            (p.clinicalUse as Record<string, boolean | "caution">)[k] === true ||
+            (p.clinicalUse as Record<string, boolean | "caution">)[k] === "caution"
+        )
       );
     }
 
-    // Property filters
+    // Prop / category filter (OR within group)
     if (activePropKeys.length > 0) {
-      list = list.filter((p) =>
-        activePropKeys.some(
-          (k) =>
-            (p.properties as Record<string, boolean | undefined>)[k] === true
-        )
-      );
+      list = list.filter((p) => {
+        return activePropKeys.some((k) => {
+          if (k.startsWith("cat:")) {
+            return slugify(p.category) === k.slice(4);
+          }
+          return (p.properties as Record<string, boolean>)[k] === true;
+        });
+      });
     }
 
     // Sort
-    list.sort((a, b) => {
-      const cmp = a.name.localeCompare(b.name, "nb");
-      return sortOrder === "az" ? cmp : -cmp;
-    });
+    list.sort((a, b) =>
+      sortOrder === "az"
+        ? a.name.localeCompare(b.name, "nb")
+        : b.name.localeCompare(a.name, "nb")
+    );
 
     return list;
-  }, [
-    search,
-    sortOrder,
-    activeAgeKeys,
-    activeClinicalKeys,
-    activePropKeys,
-  ]);
+  }, [search, activeAgeKeys, activeClinicalKeys, activePropKeys, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -608,89 +704,89 @@ export default function NutritionProductFinder() {
 
   // Quick-filter chips
   const quickFilters = [
-    { key: "completeNutrition", label: "Komplett ernæring", type: "prop", color: COLORS.completeNutrition },
-    { key: "fiber", label: "Kostfiber", type: "prop", color: COLORS.fiber },
-    { key: "glutenFree", label: "Glutenfri", type: "prop", color: COLORS.glutenFree },
-    { key: "lactoseFree", label: "Laktosefri", type: "prop", color: COLORS.lactoseFree },
-    { key: "vegan", label: "Vegansk", type: "prop", color: COLORS.vegan },
-    { key: "diabetes", label: "Diabetes", type: "clinical", color: COLORS.diabetes },
-    { key: "cancer", label: "Kreft", type: "clinical", color: COLORS.cancer },
-    { key: "kidneyFailure", label: "Nyresvikt", type: "clinical", color: COLORS.kidneyFailure },
-    { key: "from1Year", label: "Fra 1 år", type: "age", color: "#374151" },
+    { key: "completeNutrition", label: "Komplett ernæring", icon: "⭐", type: "prop", color: COLORS.completeNutrition },
+    { key: "fiber",             label: "Kostfiber",          icon: "🌾", type: "prop",     color: COLORS.fiber },
+    { key: "proteinRich",       label: "Proteinrik",         icon: "💪", type: "prop",     color: COLORS.proteinRich },
+    { key: "diabetes",          label: "Diabetes",           icon: "💧", type: "clinical", color: COLORS.diabetes },
+    { key: "kidneyFailure",     label: "Nyresvikt",          icon: "🫘", type: "clinical", color: COLORS.kidneyFailure },
+    { key: "cancer",            label: "Kreft",              icon: "🎗️", type: "clinical", color: COLORS.cancer },
+    { key: "preoperative",      label: "Pre/Post-op",        icon: "🔬", type: "clinical", color: COLORS.preoperative },
+    { key: "copd",              label: "KOLS",               icon: "💨", type: "clinical", color: COLORS.copd },
+    { key: "from1Year",         label: "Barn",               icon: "👶", type: "age",      color: "#374151" },
+    { key: "elderly",           label: "Eldre",              icon: "🧓", type: "age",      color: "#0369a1" },
   ];
 
   return (
     <div
       style={{
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         background: "#f9fafb",
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
+      {/* ── HEADER ────────────────────────────────────────────────────────────── */}
       <div
         style={{
           background: "#fff",
           borderBottom: "1px solid #e5e7eb",
-          padding: "12px 20px",
+          padding: "12px 20px 10px",
           position: "sticky",
           top: 0,
           zIndex: 10,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
+        {/* Title row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
           <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#111827",
-              }}
-            >
-              Ernæringsprodukt-søk
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#111827" }}>
+              🥗 Ernæringsprodukt-søk
             </h2>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 11,
-                color: "#6b7280",
-              }}
-            >
-              {nutritionProducts.length} produkter
+            <p style={{ margin: 0, fontSize: 11, color: "#6b7280" }}>
+              {nutritionProducts.length} produkter • Finn riktig produkt til riktig pasient
             </p>
           </div>
 
           {/* Search */}
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Søk produktnavn..."
+          <div
             style={{
               flex: 1,
-              minWidth: 160,
-              maxWidth: 280,
-              padding: "6px 12px",
-              borderRadius: 8,
+              minWidth: 180,
+              maxWidth: 320,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
               border: "1.5px solid #d1d5db",
-              fontSize: 13,
-              outline: "none",
+              borderRadius: 8,
+              padding: "5px 10px",
+              background: "#fff",
             }}
-          />
+          >
+            <span style={{ fontSize: 14, color: "#9ca3af" }}>🔍</span>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Søk etter produkt..."
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontSize: 13,
+                background: "transparent",
+                color: "#111827",
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => { setSearch(""); setPage(1); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: 0 }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
           {/* Sort */}
           <select
@@ -703,48 +799,40 @@ export default function NutritionProductFinder() {
               fontSize: 12,
               background: "#fff",
               cursor: "pointer",
+              color: "#374151",
             }}
           >
-            <option value="az">A–Å</option>
-            <option value="za">Å–A</option>
+            <option value="az">A–Å (alfabetisk)</option>
+            <option value="za">Å–A (omvendt)</option>
           </select>
 
           {/* View toggle */}
-          <div
-            style={{
-              display: "flex",
-              border: "1.5px solid #d1d5db",
-              borderRadius: 8,
-              overflow: "hidden",
-            }}
-          >
+          <div style={{ display: "flex", border: "1.5px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
             <button
               onClick={() => setListView(false)}
               title="Kortvisning"
               style={{
-                padding: "5px 10px",
+                padding: "5px 12px",
                 background: !listView ? "#1e40af" : "#fff",
                 color: !listView ? "#fff" : "#6b7280",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 14,
+                border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 4,
               }}
             >
-              ⊞
+              ⊞ <span style={{ fontSize: 11 }}>Kort</span>
             </button>
             <button
               onClick={() => setListView(true)}
               title="Listevisning"
               style={{
-                padding: "5px 10px",
+                padding: "5px 12px",
                 background: listView ? "#1e40af" : "#fff",
                 color: listView ? "#fff" : "#6b7280",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 14,
+                border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 4,
               }}
             >
-              ≡
+              ≡ <span style={{ fontSize: 11 }}>Liste</span>
             </button>
           </div>
 
@@ -760,9 +848,12 @@ export default function NutritionProductFinder() {
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
               }}
             >
-              ✕ Nullstill filtre
+              🔄 Nullstill filter
             </button>
           )}
         </div>
@@ -773,50 +864,57 @@ export default function NutritionProductFinder() {
             display: "flex",
             gap: 6,
             flexWrap: "wrap",
-            marginTop: 10,
+            paddingBottom: 2,
           }}
         >
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", alignSelf: "center", marginRight: 2 }}>
+            Hurtigfilter
+          </span>
           {quickFilters.map((qf) => {
             const filterMap =
-              qf.type === "prop"
-                ? filterProps
-                : qf.type === "clinical"
-                ? filterClinical
-                : filterAge;
+              qf.type === "prop" ? filterProps : qf.type === "clinical" ? filterClinical : filterAge;
             const setter =
-              qf.type === "prop"
-                ? setFilterProps
-                : qf.type === "clinical"
-                ? setFilterClinical
-                : setFilterAge;
+              qf.type === "prop" ? setFilterProps : qf.type === "clinical" ? setFilterClinical : setFilterAge;
             const active = !!filterMap[qf.key];
             return (
               <FilterChip
                 key={`${qf.type}-${qf.key}`}
                 label={qf.label}
+                icon={qf.icon}
                 active={active}
                 color={qf.color}
                 onClick={() => toggleFilter(setter, qf.key, !active)}
               />
             );
           })}
+          <button
+            style={{
+              padding: "5px 11px",
+              borderRadius: 999,
+              border: "1.5px dashed #d1d5db",
+              background: "transparent",
+              color: "#6b7280",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+            title="Bruk sidefilteret for flere filtre"
+          >
+            🔧 Flere filtre
+          </button>
         </div>
       </div>
 
-      {/* ── BODY ────────────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          display: "flex",
-          flex: 1,
-          gap: 0,
-          minHeight: 0,
-        }}
-      >
-        {/* ── SIDEBAR ──────────────────────────────────────────────────────── */}
+      {/* ── BODY ──────────────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flex: 1, gap: 0, minHeight: 0 }}>
+        {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
         <aside
           style={{
-            width: 200,
-            minWidth: 180,
+            width: 210,
+            minWidth: 190,
             background: "#fff",
             borderRight: "1px solid #e5e7eb",
             padding: "16px 14px",
@@ -829,17 +927,19 @@ export default function NutritionProductFinder() {
               <SidebarCheckbox
                 key={key}
                 label={label}
+                icon={AGE_ICONS[key]}
                 checked={!!filterAge[key]}
                 onChange={(v) => toggleFilter(setFilterAge, key, v)}
               />
             ))}
           </FilterSection>
 
-          <FilterSection title="Klinisk bruk">
+          <FilterSection title="Tilstand / Indikasjon">
             {Object.entries(CLINICAL_LABELS).map(([key, label]) => (
               <SidebarCheckbox
                 key={key}
                 label={label}
+                icon={CLINICAL_ICONS[key]}
                 color={getColor(key)}
                 checked={!!filterClinical[key]}
                 onChange={(v) => toggleFilter(setFilterClinical, key, v)}
@@ -847,11 +947,12 @@ export default function NutritionProductFinder() {
             ))}
           </FilterSection>
 
-          <FilterSection title="Kostholdseigenskaper">
+          <FilterSection title="Andre filter">
             {Object.entries(PROPERTY_LABELS).map(([key, label]) => (
               <SidebarCheckbox
                 key={key}
                 label={label}
+                icon={PROPERTY_ICONS[key]}
                 color={getColor(key)}
                 checked={!!filterProps[key]}
                 onChange={(v) => toggleFilter(setFilterProps, key, v)}
@@ -868,62 +969,61 @@ export default function NutritionProductFinder() {
                   key={cat}
                   label={cat}
                   color={getCategoryColor(cat)}
-                  checked={
-                    // Use a category quick-filter by repurposing prop filter with prefixed key
-                    !!filterProps[`cat:${slugify(cat)}`]
-                  }
-                  onChange={(v) =>
-                    toggleFilter(setFilterProps, `cat:${slugify(cat)}`, v)
-                  }
+                  checked={!!filterProps[`cat:${slugify(cat)}`]}
+                  onChange={(v) => toggleFilter(setFilterProps, `cat:${slugify(cat)}`, v)}
                 />
               ))}
           </FilterSection>
-        </aside>
 
-        {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
-        <main
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px 20px",
-            minWidth: 0,
-          }}
-        >
-          {/* Result count */}
+          {/* Caution legend */}
           <div
             style={{
-              fontSize: 12,
-              color: "#6b7280",
-              marginBottom: 12,
+              marginTop: 12,
+              padding: "8px 10px",
+              background: COLORS.cautionBg,
+              borderRadius: 7,
+              border: `1px solid ${COLORS.caution}33`,
+              fontSize: 10,
+              color: COLORS.caution,
               fontWeight: 500,
+              lineHeight: 1.5,
             }}
           >
-            Viser {pageItems.length} av {filtered.length} produkter
-            {totalPages > 1 && ` • Side ${currentPage} av ${totalPages}`}
+            ℹ X = Ved forsiktighet/avtale med lege eller KEF
+          </div>
+        </aside>
+
+        {/* ── MAIN CONTENT ──────────────────────────────────────────────────── */}
+        <main style={{ flex: 1, overflowY: "auto", padding: "16px 20px", minWidth: 0 }}>
+          {/* Result count + pagination info */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 500 }}>
+              Viser {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} av {filtered.length} produkter
+              {totalPages > 1 && (
+                <span style={{ color: "#9ca3af" }}> • Side {currentPage} av {totalPages}</span>
+              )}
+            </div>
+            {/* Per-page (static label for reference matching) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9ca3af" }}>
+              Vis per side:
+              <span style={{
+                padding: "2px 8px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 5,
+                background: "#fff",
+                fontWeight: 600,
+                color: "#374151",
+              }}>
+                {PAGE_SIZE}
+              </span>
+            </div>
           </div>
 
           {/* List header (list view only) */}
           {listView && filtered.length > 0 && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "200px 1fr 1fr 160px",
-                gap: 12,
-                padding: "4px 14px",
-                marginBottom: 4,
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 1fr 160px", gap: 12, padding: "4px 14px", marginBottom: 4 }}>
               {["Produkt", "Egenskaper", "Klinisk bruk", "Alder"].map((h) => (
-                <div
-                  key={h}
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "#9ca3af",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                  }}
-                >
+                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   {h}
                 </div>
               ))}
@@ -932,27 +1032,13 @@ export default function NutritionProductFinder() {
 
           {/* Product grid / list */}
           {pageItems.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "48px 0",
-                color: "#9ca3af",
-                fontSize: 14,
-              }}
-            >
+            <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 14 }}>
               Ingen produkter matcher søkekriteriene.
               {hasActiveFilters && (
                 <div style={{ marginTop: 8 }}>
                   <button
                     onClick={resetFilters}
-                    style={{
-                      color: "#2563eb",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      textDecoration: "underline",
-                    }}
+                    style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 13, textDecoration: "underline" }}
                   >
                     Nullstill filtre
                   </button>
@@ -960,86 +1046,56 @@ export default function NutritionProductFinder() {
               )}
             </div>
           ) : listView ? (
-            <div>{pageItems.map((p) => (
-              <ProductCard key={p.id} product={p} listView={true} />
-            ))}</div>
+            <div>{pageItems.map((p) => <ProductCard key={p.id} product={p} listView={true} />)}</div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                gap: 12,
-              }}
-            >
-              {pageItems.map((p) => (
-                <ProductCard key={p.id} product={p} listView={false} />
-              ))}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12 }}>
+              {pageItems.map((p) => <ProductCard key={p.id} product={p} listView={false} />)}
             </div>
           )}
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 24,
-                flexWrap: "wrap",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 5, marginTop: 24, flexWrap: "wrap" }}>
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
                 style={{
-                  padding: "5px 12px",
-                  borderRadius: 6,
-                  border: "1.5px solid #d1d5db",
+                  padding: "5px 12px", borderRadius: 6, border: "1.5px solid #d1d5db",
                   background: currentPage === 1 ? "#f9fafb" : "#fff",
                   color: currentPage === 1 ? "#d1d5db" : "#374151",
-                  cursor: currentPage === 1 ? "default" : "pointer",
-                  fontSize: 12,
-                  fontWeight: 600,
+                  cursor: currentPage === 1 ? "default" : "pointer", fontSize: 12, fontWeight: 600,
                 }}
               >
                 ← Forrige
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+              {Array.from({ length: Math.min(totalPages, 8) }, (_, i) => i + 1).map((n) => (
                 <button
                   key={n}
                   onClick={() => setPage(n)}
                   style={{
-                    padding: "5px 10px",
-                    borderRadius: 6,
-                    border: `1.5px solid ${n === currentPage ? "#2563eb" : "#d1d5db"}`,
-                    background: n === currentPage ? "#2563eb" : "#fff",
+                    padding: "5px 10px", borderRadius: 6,
+                    border: `1.5px solid ${n === currentPage ? "#1d4ed8" : "#d1d5db"}`,
+                    background: n === currentPage ? "#1d4ed8" : "#fff",
                     color: n === currentPage ? "#fff" : "#374151",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    minWidth: 34,
+                    cursor: "pointer", fontSize: 12, fontWeight: 600, minWidth: 34,
                   }}
                 >
                   {n}
                 </button>
               ))}
+              {totalPages > 8 && (
+                <span style={{ color: "#9ca3af", fontSize: 12 }}>…</span>
+              )}
 
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
                 style={{
-                  padding: "5px 12px",
-                  borderRadius: 6,
-                  border: "1.5px solid #d1d5db",
+                  padding: "5px 12px", borderRadius: 6, border: "1.5px solid #d1d5db",
                   background: currentPage === totalPages ? "#f9fafb" : "#fff",
-                  color:
-                    currentPage === totalPages ? "#d1d5db" : "#374151",
-                  cursor:
-                    currentPage === totalPages ? "default" : "pointer",
-                  fontSize: 12,
-                  fontWeight: 600,
+                  color: currentPage === totalPages ? "#d1d5db" : "#374151",
+                  cursor: currentPage === totalPages ? "default" : "pointer", fontSize: 12, fontWeight: 600,
                 }}
               >
                 Neste →
