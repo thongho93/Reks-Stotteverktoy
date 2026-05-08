@@ -593,12 +593,8 @@ function SidebarCheckbox({
 // ─── Main Component ───────────────────────────────────────────────────────────
 const PAGE_SIZE = 20;
 
-type SortOrder = "az" | "za";
-
 export default function NutritionProductFinder() {
   const [search, setSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("az");
-  const [listView, setListView] = useState(false);
   const [page, setPage] = useState(1);
 
   // Sidebar filters
@@ -679,15 +675,11 @@ export default function NutritionProductFinder() {
       });
     }
 
-    // Sort
-    list.sort((a, b) =>
-      sortOrder === "az"
-        ? a.name.localeCompare(b.name, "nb")
-        : b.name.localeCompare(a.name, "nb")
-    );
+    // Always sort A–Å
+    list.sort((a, b) => a.name.localeCompare(b.name, "nb"));
 
     return list;
-  }, [search, activeAgeKeys, activeClinicalKeys, activePropKeys, sortOrder]);
+  }, [search, activeAgeKeys, activeClinicalKeys, activePropKeys]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -786,54 +778,6 @@ export default function NutritionProductFinder() {
                 ✕
               </button>
             )}
-          </div>
-
-          {/* Sort */}
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: "1.5px solid #d1d5db",
-              fontSize: 12,
-              background: "#fff",
-              cursor: "pointer",
-              color: "#374151",
-            }}
-          >
-            <option value="az">A–Å (alfabetisk)</option>
-            <option value="za">Å–A (omvendt)</option>
-          </select>
-
-          {/* View toggle */}
-          <div style={{ display: "flex", border: "1.5px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
-            <button
-              onClick={() => setListView(false)}
-              title="Kortvisning"
-              style={{
-                padding: "5px 12px",
-                background: !listView ? "#1e40af" : "#fff",
-                color: !listView ? "#fff" : "#6b7280",
-                border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                display: "flex", alignItems: "center", gap: 4,
-              }}
-            >
-              ⊞ <span style={{ fontSize: 11 }}>Kort</span>
-            </button>
-            <button
-              onClick={() => setListView(true)}
-              title="Listevisning"
-              style={{
-                padding: "5px 12px",
-                background: listView ? "#1e40af" : "#fff",
-                color: listView ? "#fff" : "#6b7280",
-                border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                display: "flex", alignItems: "center", gap: 4,
-              }}
-            >
-              ≡ <span style={{ fontSize: 11 }}>Liste</span>
-            </button>
           </div>
 
           {hasActiveFilters && (
@@ -995,42 +939,15 @@ export default function NutritionProductFinder() {
 
         {/* ── MAIN CONTENT ──────────────────────────────────────────────────── */}
         <main style={{ flex: 1, overflowY: "auto", padding: "16px 20px", minWidth: 0 }}>
-          {/* Result count + pagination info */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 500 }}>
-              Viser {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} av {filtered.length} produkter
-              {totalPages > 1 && (
-                <span style={{ color: "#9ca3af" }}> • Side {currentPage} av {totalPages}</span>
-              )}
-            </div>
-            {/* Per-page (static label for reference matching) */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9ca3af" }}>
-              Vis per side:
-              <span style={{
-                padding: "2px 8px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 5,
-                background: "#fff",
-                fontWeight: 600,
-                color: "#374151",
-              }}>
-                {PAGE_SIZE}
-              </span>
-            </div>
+          {/* Result count */}
+          <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 500, marginBottom: 14 }}>
+            Viser {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} av {filtered.length} produkter
+            {totalPages > 1 && (
+              <span style={{ color: "#9ca3af" }}> • Side {currentPage} av {totalPages}</span>
+            )}
           </div>
 
-          {/* List header (list view only) */}
-          {listView && filtered.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 1fr 160px", gap: 12, padding: "4px 14px", marginBottom: 4 }}>
-              {["Produkt", "Egenskaper", "Klinisk bruk", "Alder"].map((h) => (
-                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {h}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Product grid / list */}
+          {/* Product grid */}
           {pageItems.length === 0 ? (
             <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 14 }}>
               Ingen produkter matcher søkekriteriene.
@@ -1045,8 +962,6 @@ export default function NutritionProductFinder() {
                 </div>
               )}
             </div>
-          ) : listView ? (
-            <div>{pageItems.map((p) => <ProductCard key={p.id} product={p} listView={true} />)}</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12 }}>
               {pageItems.map((p) => <ProductCard key={p.id} product={p} listView={false} />)}
