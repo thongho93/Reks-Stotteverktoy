@@ -731,15 +731,6 @@ export default function NutritionProductFinder() {
       >
         {/* Title row */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#111827" }}>
-              🥗 Ernæringsprodukt-søk
-            </h2>
-            <p style={{ margin: 0, fontSize: 11, color: "#6b7280" }}>
-              {nutritionProducts.length} produkter • Finn riktig produkt til riktig pasient
-            </p>
-          </div>
-
           {/* Search */}
           <div
             style={{
