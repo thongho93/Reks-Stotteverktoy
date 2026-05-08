@@ -729,70 +729,6 @@ export default function NutritionProductFinder() {
           zIndex: 10,
         }}
       >
-        {/* Title row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
-          {/* Search */}
-          <div
-            style={{
-              flex: 1,
-              minWidth: 180,
-              maxWidth: 320,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              border: "1.5px solid #d1d5db",
-              borderRadius: 8,
-              padding: "5px 10px",
-              background: "#fff",
-            }}
-          >
-            <span style={{ fontSize: 14, color: "#9ca3af" }}>🔍</span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Søk etter produkt..."
-              style={{
-                flex: 1,
-                border: "none",
-                outline: "none",
-                fontSize: 13,
-                background: "transparent",
-                color: "#111827",
-              }}
-            />
-            {search && (
-              <button
-                onClick={() => { setSearch(""); setPage(1); }}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: 0 }}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {hasActiveFilters && (
-            <button
-              onClick={resetFilters}
-              style={{
-                padding: "5px 12px",
-                borderRadius: 8,
-                border: "1.5px solid #fca5a5",
-                background: "#fff",
-                color: "#dc2626",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              🔄 Nullstill filter
-            </button>
-          )}
-        </div>
-
         {/* Quick filter chips */}
         <div
           style={{
@@ -930,11 +866,69 @@ export default function NutritionProductFinder() {
 
         {/* ── MAIN CONTENT ──────────────────────────────────────────────────── */}
         <main style={{ flex: 1, overflowY: "auto", padding: "16px 20px", minWidth: 0 }}>
-          {/* Result count */}
-          <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 500, marginBottom: 14 }}>
-            Viser {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} av {filtered.length} produkter
-            {totalPages > 1 && (
-              <span style={{ color: "#9ca3af" }}> • Side {currentPage} av {totalPages}</span>
+          {/* Search + result count row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+            {/* Search field */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                border: "1.5px solid #d1d5db",
+                borderRadius: 8,
+                padding: "5px 10px",
+                background: "#fff",
+                minWidth: 180,
+                maxWidth: 280,
+                flex: "0 0 auto",
+              }}
+            >
+              <span style={{ fontSize: 14, color: "#9ca3af" }}>🔍</span>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Søk etter produkt..."
+                style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "#111827" }}
+              />
+              {search && (
+                <button
+                  onClick={() => { setSearch(""); setPage(1); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: 0 }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Result count */}
+            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 500 }}>
+              Viser {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} av {filtered.length} produkter
+              {totalPages > 1 && (
+                <span style={{ color: "#9ca3af" }}> • Side {currentPage} av {totalPages}</span>
+              )}
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                style={{
+                  marginLeft: "auto",
+                  padding: "4px 12px",
+                  borderRadius: 8,
+                  border: "1.5px solid #fca5a5",
+                  background: "#fff",
+                  color: "#dc2626",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                🔄 Nullstill filter
+              </button>
             )}
           </div>
 
