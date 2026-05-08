@@ -146,8 +146,16 @@ function normName(s: string): string {
   return s
     .toLowerCase()
     .replace(/(\d),(\d)/g, "$1.$2")                     // "4,0" → "4.0"
+    .replace(/\+/g, " ")                                 // "2,0+fibre" → "2,0 fibre"
     .replace(/\d+\s*x\s*\d+\s*(?:ml|g|cl|l)?\b/g, "") // "4x125ml" etc.
     .replace(/(\d+)\s+([a-zA-Z])/g, "$1$2")             // "2 kcal" → "2kcal"
+    .replace(/\bfibre\b/g, "fiber")                      // "fibre" → "fiber"
+    .replace(/\bfibr\b/g, "fiber")                       // "fibr" → "fiber"
+    .replace(/\bfib\b/g, "fiber")                        // "fib" → "fiber"
+    .replace(/\bcomp\b/g, "compact")                     // "comp" → "compact"
+    .replace(/\bactiv\b/g, "active")                     // "activ" → "active"
+    .replace(/\bfr\b/g, "fruit")                         // "dessert fr" → "dessert fruit"
+    .replace(/\bjucy\b/g, "juicy")                       // catalog typo: "jucy" → "juicy"
     .replace(/\s{2,}/g, " ")
     .trim();
 }

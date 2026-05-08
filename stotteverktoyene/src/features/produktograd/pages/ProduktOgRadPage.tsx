@@ -1438,6 +1438,7 @@ export default function ProduktOgRadPage() {
                 ) : null}
                 <List sx={{ mt: 0.5, pt: 0 }}>
                   {/* Built-in: Ernæringsprodukter */}
+                  <Tooltip title="Ernæringsprodukter" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
                   <ListItemButton
                     selected={selectedFagligDocId === "__nutrition__"}
                     onClick={() => setSelectedFagligDocId("__nutrition__")}
@@ -1463,6 +1464,7 @@ export default function ProduktOgRadPage() {
                       }}
                     />
                   </ListItemButton>
+                  </Tooltip>
                   {filteredFagligDocs.map((doc) => (
                     (() => {
                       let depth = 0;
