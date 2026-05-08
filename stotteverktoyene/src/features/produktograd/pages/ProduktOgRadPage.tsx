@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import NutritionProductFinder from "../components/NutritionProductFinder";
 import {
   Alert,
   Box,
@@ -1393,6 +1394,32 @@ export default function ProduktOgRadPage() {
                   </Box>
                 ) : null}
                 <List sx={{ mt: 0.5, pt: 0 }}>
+                  {/* Built-in: Ernæringsprodukter */}
+                  <ListItemButton
+                    selected={selectedFagligDocId === "__nutrition__"}
+                    onClick={() => setSelectedFagligDocId("__nutrition__")}
+                    sx={{
+                      mb: 0.5,
+                      borderRadius: 2,
+                      pl: 1, pr: 0.7,
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : "rgba(22,27,34,0.85)",
+                      "&:hover": { bgcolor: "rgba(34,197,94,0.12)" },
+                      "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)" },
+                      "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)" },
+                    }}
+                  >
+                    <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
+                    <ListItemText
+                      primary="Ernæringsprodukter"
+                      primaryTypographyProps={{
+                        noWrap: true,
+                        fontSize: 14,
+                        fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600,
+                        color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7",
+                      }}
+                    />
+                  </ListItemButton>
                   {filteredFagligDocs.map((doc) => (
                     (() => {
                       let depth = 0;
@@ -1486,8 +1513,10 @@ export default function ProduktOgRadPage() {
                 ) : null}
               </Box>
 
-              <Box sx={{ bgcolor: "#0D1117", p: 1, overflowY: "auto" }}>
-                {selectedFagligDoc ? (
+              <Box sx={{ bgcolor: "#0D1117", p: selectedFagligDocId === "__nutrition__" ? 0 : 1, overflowY: "auto" }}>
+                {selectedFagligDocId === "__nutrition__" ? (
+                  <NutritionProductFinder />
+                ) : selectedFagligDoc ? (
                   selectedFagligDoc.kind === "pdf" ? (
                     <Paper
                       elevation={0}
