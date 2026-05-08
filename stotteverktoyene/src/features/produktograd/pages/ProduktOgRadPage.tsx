@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import NutritionProductFinder from "../components/NutritionProductFinder";
 import {
   Alert,
   Box,
@@ -50,6 +51,8 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 
@@ -241,6 +244,9 @@ export default function ProduktOgRadPage() {
   const [fagligEmojiTargetId, setFagligEmojiTargetId] = useState<string | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameDialogValue, setRenameDialogValue] = useState("");
+  const [fagligSidebarCollapsed, setFagligSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem("faglig-sidebar-collapsed") === "true";
+  });
   const [renameDialogTargetId, setRenameDialogTargetId] = useState<string | null>(null);
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [embedDialogUrl, setEmbedDialogUrl] = useState("");
@@ -255,7 +261,7 @@ export default function ProduktOgRadPage() {
     }
 
     setIsFagligLoading(true);
-    const docsRef = collection(db, "users", user.uid, "fagligDocuments");
+    const docsRef = collection(db, "fagligDocuments");
     const unsub = onSnapshot(
       fsQuery(docsRef, orderBy("updatedAtMs", "desc")),
       (snapshot) => {
@@ -396,6 +402,8 @@ export default function ProduktOgRadPage() {
   );
 
   useEffect(() => {
+    // "__nutrition__" is a built-in virtual tab — never auto-replace it
+    if (selectedFagligDocId === "__nutrition__") return;
     if (fagligDocs.length === 0) {
       setSelectedFagligDocId(null);
       return;
@@ -404,6 +412,10 @@ export default function ProduktOgRadPage() {
       setSelectedFagligDocId(fagligDocs[0].id);
     }
   }, [fagligDocs, selectedFagligDocId]);
+
+  useEffect(() => {
+    localStorage.setItem("faglig-sidebar-collapsed", String(fagligSidebarCollapsed));
+  }, [fagligSidebarCollapsed]);
 
   useEffect(() => {
     setRenderLimit(MAX_RENDERED_RESULTS);
@@ -504,7 +516,7 @@ export default function ProduktOgRadPage() {
 
     try {
       const now = Date.now();
-      const ref = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+      const ref = await addDoc(collection(db, "fagligDocuments"), {
         title: "Nytt dokument",
         kind: "text",
         content: "",
@@ -538,7 +550,7 @@ export default function ProduktOgRadPage() {
 
     try {
       const now = Date.now();
-      const ref = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+      const ref = await addDoc(collection(db, "fagligDocuments"), {
         title: `${parent.title} - underfane`,
         kind: "text",
         content: "",
@@ -603,7 +615,7 @@ export default function ProduktOgRadPage() {
 
     try {
       for (const removeId of removeIds) {
-        await deleteDoc(docRef(db, "users", user.uid, "fagligDocuments", removeId));
+        await deleteDoc(docRef(db, "fagligDocuments", removeId));
       }
       if (selectedFagligDocId && removeIds.has(selectedFagligDocId)) {
         setSelectedFagligDocId(null);
@@ -629,7 +641,7 @@ export default function ProduktOgRadPage() {
     if (!trimmed) return;
     setRenameDialogOpen(false);
     try {
-      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", renameDialogTargetId), {
+      await updateDoc(docRef(db, "fagligDocuments", renameDialogTargetId), {
         title: trimmed,
         updatedAtMs: Date.now(),
         updatedByUid: user.uid,
@@ -668,7 +680,7 @@ export default function ProduktOgRadPage() {
   const applyFagligEmoji = async (emoji: string | null) => {
     if (!fagligEmojiTarget || !user?.uid) return;
     try {
-      await updateDoc(docRef(db, "users", user.uid, "fagligDocuments", fagligEmojiTarget.id), {
+      await updateDoc(docRef(db, "fagligDocuments", fagligEmojiTarget.id), {
         emoji,
         updatedAtMs: Date.now(),
         updatedByUid: user.uid,
@@ -692,7 +704,7 @@ export default function ProduktOgRadPage() {
 
     if (textSaveTimerRef.current) clearTimeout(textSaveTimerRef.current);
     textSaveTimerRef.current = setTimeout(() => {
-      void updateDoc(docRef(db, "users", uid, "fagligDocuments", targetId), {
+      void updateDoc(docRef(db, "fagligDocuments", targetId), {
         title: nextTitle,
         content: nextContent,
         updatedAtMs: Date.now(),
@@ -733,7 +745,7 @@ export default function ProduktOgRadPage() {
     setEmbedDialogOpen(false);
     try {
       const now = Date.now();
-      const created = await addDoc(collection(db, "users", user.uid, "fagligDocuments"), {
+      const created = await addDoc(collection(db, "fagligDocuments"), {
         title,
         kind: "pdf",
         content: "",
@@ -1356,36 +1368,68 @@ export default function ProduktOgRadPage() {
 
             <Box
               sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "220px minmax(0, 1fr)" },
+                display: "flex",
                 flex: 1,
                 overflow: "hidden",
               }}
             >
+              {/* ── Collapsible Dokumentfaner sidebar ── */}
               <Box
                 sx={{
-                  borderRight: { xs: "none", md: "1px solid rgba(140,80,120,0.25)" },
-                  borderBottom: { xs: "1px solid rgba(140,80,120,0.25)", md: "none" },
+                  width: fagligSidebarCollapsed ? 44 : 220,
+                  minWidth: fagligSidebarCollapsed ? 44 : 220,
+                  transition: "width 200ms ease, min-width 200ms ease",
+                  borderRight: "1px solid rgba(140,80,120,0.25)",
                   bgcolor: "rgba(13,17,23,0.9)",
-                  p: 1,
-                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  flexShrink: 0,
                 }}
               >
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 0.6, py: 0.5 }}>
-                  <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#EED5E8" }}>
-                    Dokumentfaner
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label={filteredFagligDocs.length}
-                    sx={{
-                      bgcolor: "rgba(242,162,208,0.22)",
-                      color: "#F6BFDF",
-                      fontWeight: 700,
-                      border: "1px solid rgba(242,162,208,0.44)",
-                    }}
-                  />
+                {/* Header row */}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent={fagligSidebarCollapsed ? "center" : "space-between"}
+                  sx={{ px: fagligSidebarCollapsed ? 0.5 : 1.2, py: 0.7, flexShrink: 0 }}
+                >
+                  {!fagligSidebarCollapsed && (
+                    <>
+                      <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#EED5E8", whiteSpace: "nowrap" }}>
+                        Dokumentfaner
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={filteredFagligDocs.length}
+                        sx={{
+                          bgcolor: "rgba(242,162,208,0.22)",
+                          color: "#F6BFDF",
+                          fontWeight: 700,
+                          border: "1px solid rgba(242,162,208,0.44)",
+                        }}
+                      />
+                    </>
+                  )}
+                  <Tooltip title={fagligSidebarCollapsed ? "Vis Dokumentfaner" : "Skjul Dokumentfaner"} placement="right">
+                    <IconButton
+                      size="small"
+                      onClick={() => setFagligSidebarCollapsed((v) => !v)}
+                      sx={{
+                        color: "rgba(235,175,211,0.8)",
+                        ml: fagligSidebarCollapsed ? 0 : 0.5,
+                        "&:hover": { bgcolor: "rgba(242,162,208,0.15)", color: "#F2A2D0" },
+                      }}
+                    >
+                      {fagligSidebarCollapsed
+                        ? <ChevronRightRoundedIcon sx={{ fontSize: 20 }} />
+                        : <ChevronLeftRoundedIcon sx={{ fontSize: 20 }} />}
+                    </IconButton>
+                  </Tooltip>
                 </Stack>
+
+                {/* Sidebar content — hidden when collapsed */}
+                <Box sx={{ flex: 1, overflowY: "auto", opacity: fagligSidebarCollapsed ? 0 : 1, transition: "opacity 150ms ease", p: fagligSidebarCollapsed ? 0 : 1, pointerEvents: fagligSidebarCollapsed ? "none" : "auto" }}>
                 {isFagligLoading ? (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.8, py: 1.1 }}>
                     <CircularProgress size={18} sx={{ color: "#E8B7D5" }} />
@@ -1393,6 +1437,34 @@ export default function ProduktOgRadPage() {
                   </Box>
                 ) : null}
                 <List sx={{ mt: 0.5, pt: 0 }}>
+                  {/* Built-in: Ernæringsprodukter */}
+                  <Tooltip title="Ernæringsprodukter" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                  <ListItemButton
+                    selected={selectedFagligDocId === "__nutrition__"}
+                    onClick={() => setSelectedFagligDocId("__nutrition__")}
+                    sx={{
+                      mb: 0.5,
+                      borderRadius: 2,
+                      pl: 1, pr: 0.7,
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : "rgba(22,27,34,0.85)",
+                      "&:hover": { bgcolor: "rgba(34,197,94,0.12)" },
+                      "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)" },
+                      "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)" },
+                    }}
+                  >
+                    <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
+                    <ListItemText
+                      primary="Ernæringsprodukter"
+                      primaryTypographyProps={{
+                        noWrap: true,
+                        fontSize: 14,
+                        fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600,
+                        color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7",
+                      }}
+                    />
+                  </ListItemButton>
+                  </Tooltip>
                   {filteredFagligDocs.map((doc) => (
                     (() => {
                       let depth = 0;
@@ -1484,10 +1556,13 @@ export default function ProduktOgRadPage() {
                     </Typography>
                   </Paper>
                 ) : null}
-              </Box>
+                </Box>{/* end inner content Box */}
+              </Box>{/* end collapsible sidebar Box */}
 
-              <Box sx={{ bgcolor: "#0D1117", p: 1, overflowY: "auto" }}>
-                {selectedFagligDoc ? (
+              <Box sx={{ bgcolor: "#0D1117", p: selectedFagligDocId === "__nutrition__" ? 0 : 1, overflowY: "auto", flex: 1, minWidth: 0 }}>
+                {selectedFagligDocId === "__nutrition__" ? (
+                  <NutritionProductFinder catalogProducts={products} />
+                ) : selectedFagligDoc ? (
                   selectedFagligDoc.kind === "pdf" ? (
                     <Paper
                       elevation={0}
