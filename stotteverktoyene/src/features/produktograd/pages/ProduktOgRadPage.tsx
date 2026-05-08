@@ -1559,7 +1559,7 @@ export default function ProduktOgRadPage() {
 
               <Box sx={{ bgcolor: "#0D1117", p: selectedFagligDocId === "__nutrition__" ? 0 : 1, overflowY: "auto", flex: 1, minWidth: 0 }}>
                 {selectedFagligDocId === "__nutrition__" ? (
-                  <NutritionProductFinder />
+                  <NutritionProductFinder catalogProducts={products} />
                 ) : selectedFagligDoc ? (
                   selectedFagligDoc.kind === "pdf" ? (
                     <Paper

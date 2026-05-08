@@ -1,6 +1,62 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { nutritionProducts, type NutritionProduct } from "../data/nutritionProducts";
 
+// ─── Catalog product (subset of AdviceProduct from ProduktOgRadPage) ──────────
+type CatalogProduct = {
+  id: string;
+  name: string;
+  farmaloggNumber: string;
+  farmaloggDigits: string;
+  skuDigits: string;
+};
+
+// ─── Variant info built from catalog ─────────────────────────────────────────
+type VariantInfo = {
+  vnrs: string[];       // raw farmalogg numbers for display
+  flavors: string[];    // e.g. ["Sjokolade", "Jordbær"]
+};
+
+/** For a catalog product name like "Calogen Sjokolade", extract the flavor suffix */
+function extractFlavor(catalogName: string, nutritionName: string): string {
+  const suffix = catalogName.slice(nutritionName.length).trim();
+  return suffix || catalogName;
+}
+
+/** Build nutrition product id → VariantInfo from catalog */
+function buildVariantMap(
+  catalog: CatalogProduct[],
+  npList: NutritionProduct[]
+): Map<string, VariantInfo> {
+  const map = new Map<string, VariantInfo>();
+
+  for (const cp of catalog) {
+    const cpLower = cp.name.toLowerCase().trim();
+    const vnr     = cp.farmaloggNumber.trim();
+    if (!vnr) continue;
+
+    // Find best (longest-name) nutrition product that is a prefix of this catalog name
+    let bestNp: NutritionProduct | null = null;
+    let bestLen = 0;
+    for (const np of npList) {
+      const npLower = np.name.toLowerCase().trim();
+      if (cpLower.startsWith(npLower) && npLower.length > bestLen) {
+        bestNp  = np;
+        bestLen = npLower.length;
+      }
+    }
+    if (!bestNp) continue;
+
+    if (!map.has(bestNp.id)) map.set(bestNp.id, { vnrs: [], flavors: [] });
+    const entry = map.get(bestNp.id)!;
+
+    if (!entry.vnrs.includes(vnr)) entry.vnrs.push(vnr);
+    const flavor = extractFlavor(cp.name, bestNp.name);
+    if (flavor && !entry.flavors.includes(flavor)) entry.flavors.push(flavor);
+  }
+
+  return map;
+}
+
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
   completeNutrition: "#16a34a", fiber: "#9333ea", proteinRich: "#2563eb",
@@ -188,11 +244,12 @@ function FilterSection({ title, children }: { title: string; children: React.Rea
 }
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
-function ProductCard({ product }: { product: NutritionProduct }) {
+function ProductCard({ product, variant }: { product: NutritionProduct; variant?: VariantInfo }) {
   const propEntries     = Object.entries(product.properties).filter(([, v]) => v === true) as [string, boolean][];
   const clinicalEntries = Object.entries(product.clinicalUse).filter(([, v]) => v !== undefined && v !== false) as [string, boolean | "caution"][];
   const ageEntries      = Object.entries(product.age).filter(([, v]) => v === true) as [string, boolean][];
   const cat             = getCat(product.category);
+  const [showFlavors, setShowFlavors] = useState(false);
 
   return (
     <div style={{
@@ -233,6 +290,52 @@ function ProductCard({ product }: { product: NutritionProduct }) {
         <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}>
           {product.name}
         </div>
+
+        {/* VNR variants */}
+        {variant && variant.vnrs.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowFlavors(v => !v)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                padding: "3px 9px", borderRadius: 999,
+                background: "#f1f5f9", border: "1px solid #e2e8f0",
+                fontSize: 10, fontWeight: 600, color: "#475569",
+                cursor: "pointer",
+              }}
+            >
+              🏷 {variant.vnrs.length} VNR-variant{variant.vnrs.length !== 1 ? "er" : ""}
+              <span style={{ fontSize: 9, opacity: 0.6 }}>{showFlavors ? "▲" : "▼"}</span>
+            </button>
+            {showFlavors && (
+              <div style={{
+                marginTop: 6, padding: "8px 10px", borderRadius: 8,
+                background: "#f8fafc", border: "1px solid #e2e8f0",
+                display: "flex", flexDirection: "column", gap: 4,
+              }}>
+                {variant.flavors.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {variant.flavors.map(f => (
+                      <span key={f} style={{
+                        fontSize: 10, padding: "1px 7px", borderRadius: 999,
+                        background: "#fff", border: "1px solid #e2e8f0",
+                        color: "#374151", fontWeight: 500,
+                      }}>{f}</span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {variant.vnrs.map(v => (
+                    <span key={v} style={{
+                      fontSize: 9, fontFamily: "monospace", padding: "1px 6px",
+                      borderRadius: 5, background: "#e2e8f0", color: "#64748b",
+                    }}>{v}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Property pills */}
         {propEntries.length > 0 && (
@@ -290,13 +393,32 @@ function ProductCard({ product }: { product: NutritionProduct }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 20;
+const VNR_RE   = /^\d+$/;
 
-export default function NutritionProductFinder() {
+export default function NutritionProductFinder({ catalogProducts = [] }: { catalogProducts?: CatalogProduct[] }) {
   const [search,          setSearch]          = useState("");
   const [page,            setPage]            = useState(1);
   const [filterAge,       setFilterAge]       = useState<Record<string, boolean>>({});
   const [filterClinical,  setFilterClinical]  = useState<Record<string, boolean>>({});
   const [filterProps,     setFilterProps]     = useState<Record<string, boolean>>({});
+
+  // Build nutrition product id → VariantInfo from catalog
+  const variantMap = useMemo(
+    () => buildVariantMap(catalogProducts, nutritionProducts),
+    [catalogProducts]
+  );
+
+  // Build vnr digits → nutrition product id for VNR search
+  const vnrIndex = useMemo(() => {
+    const idx = new Map<string, string>(); // digits → np.id
+    for (const [npId, info] of variantMap) {
+      for (const vnr of info.vnrs) {
+        const digits = vnr.replace(/\D/g, "").replace(/^0+/, "") || vnr.replace(/\D/g, "");
+        if (digits) idx.set(digits, npId);
+      }
+    }
+    return idx;
+  }, [variantMap]);
 
   const toggle = useCallback((
     setter: React.Dispatch<React.SetStateAction<Record<string, boolean>>>,
@@ -317,14 +439,34 @@ export default function NutritionProductFinder() {
 
   const filtered = useMemo(() => {
     let list = [...nutritionProducts];
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        (p.notes ?? []).some(n => n.toLowerCase().includes(q))
-      );
+    const q = search.trim();
+
+    if (q) {
+      // VNR search: purely numeric → match via vnrIndex
+      if (VNR_RE.test(q)) {
+        const digits = q.replace(/^0+/, "") || q;
+        const matchedIds = new Set<string>();
+        for (const [vnrDigits, npId] of vnrIndex) {
+          if (vnrDigits === digits || vnrDigits.startsWith(digits) || digits.startsWith(vnrDigits)) {
+            matchedIds.add(npId);
+          }
+        }
+        if (matchedIds.size > 0) {
+          list = list.filter(p => matchedIds.has(p.id));
+        } else {
+          // Fall back to name search if no VNR match
+          list = list.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+        }
+      } else {
+        const ql = q.toLowerCase();
+        list = list.filter(p =>
+          p.name.toLowerCase().includes(ql) ||
+          p.category.toLowerCase().includes(ql) ||
+          (p.notes ?? []).some(n => n.toLowerCase().includes(ql))
+        );
+      }
     }
+
     if (activeAge.length)
       list = list.filter(p => activeAge.some(k => (p.age as Record<string, boolean>)[k]));
     if (activeClinical.length)
@@ -339,7 +481,7 @@ export default function NutritionProductFinder() {
       }));
     list.sort((a, b) => a.name.localeCompare(b.name, "nb"));
     return list;
-  }, [search, activeAge, activeClinical, activeProps]);
+  }, [search, activeAge, activeClinical, activeProps, vnrIndex]);
 
   const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -496,7 +638,7 @@ export default function NutritionProductFinder() {
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 14 }}>
-              {pageItems.map(p => <ProductCard key={p.id} product={p} />)}
+              {pageItems.map(p => <ProductCard key={p.id} product={p} variant={variantMap.get(p.id)} />)}
             </div>
           )}
 
