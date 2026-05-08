@@ -16,10 +16,19 @@ type VariantInfo = {
   flavors: string[];    // e.g. ["Sjokolade", "Jordbær"]
 };
 
-/** For a catalog product name like "Calogen Sjokolade", extract the flavor suffix */
+/** Extract flavor suffix: "Calogen Sjokolade" minus "Calogen" → "Sjokolade" */
 function extractFlavor(catalogName: string, nutritionName: string): string {
-  const suffix = catalogName.slice(nutritionName.length).trim();
-  return suffix || catalogName;
+  const cpNorm = normName(catalogName);
+  const npNorm = normName(nutritionName);
+  // Remove the nutrition name prefix, then remove pack descriptors from what's left
+  const suffix = cpNorm.startsWith(npNorm)
+    ? catalogName.slice(
+        // find where in the original string the prefix ends (approximate)
+        catalogName.toLowerCase().indexOf(nutritionName.toLowerCase().split(" ")[0]) +
+          npNorm.length
+      ).replace(/\d+\s*x\s*\d+\s*(?:ml|g|cl|l)?\b/gi, "").trim()
+    : catalogName;
+  return suffix || "";
 }
 
 /** Build nutrition product id → VariantInfo from catalog */
@@ -29,19 +38,21 @@ function buildVariantMap(
 ): Map<string, VariantInfo> {
   const map = new Map<string, VariantInfo>();
 
+  // Pre-normalise nutrition product names once
+  const npNorms = npList.map(np => ({ np, norm: normName(np.name) }));
+
   for (const cp of catalog) {
-    const cpLower = cp.name.toLowerCase().trim();
-    const vnr     = cp.farmaloggNumber.trim();
+    const cpNorm = normName(cp.name);
+    const vnr    = cp.farmaloggNumber.trim();
     if (!vnr) continue;
 
-    // Find best (longest-name) nutrition product that is a prefix of this catalog name
+    // Find best (longest normalised prefix) nutrition product
     let bestNp: NutritionProduct | null = null;
     let bestLen = 0;
-    for (const np of npList) {
-      const npLower = np.name.toLowerCase().trim();
-      if (cpLower.startsWith(npLower) && npLower.length > bestLen) {
+    for (const { np, norm: npNorm } of npNorms) {
+      if (cpNorm.startsWith(npNorm) && npNorm.length > bestLen) {
         bestNp  = np;
-        bestLen = npLower.length;
+        bestLen = npNorm.length;
       }
     }
     if (!bestNp) continue;
@@ -50,8 +61,14 @@ function buildVariantMap(
     const entry = map.get(bestNp.id)!;
 
     if (!entry.vnrs.includes(vnr)) entry.vnrs.push(vnr);
-    const flavor = extractFlavor(cp.name, bestNp.name);
-    if (flavor && !entry.flavors.includes(flavor)) entry.flavors.push(flavor);
+
+    // Extract flavor: what comes after the matched prefix in the original name
+    const flavor = cpNorm.slice(bestLen).replace(/\d+\s*x\s*\d+.*/g, "").trim();
+    // Capitalize first letter for display
+    const flavorDisplay = flavor.charAt(0).toUpperCase() + flavor.slice(1);
+    if (flavorDisplay && !entry.flavors.includes(flavorDisplay)) {
+      entry.flavors.push(flavorDisplay);
+    }
   }
 
   return map;
@@ -117,6 +134,23 @@ const AGE_LABELS: Record<string, string> = {
 };
 
 function slugify(s: string) { return s.toLowerCase().replace(/\s+/g, "-"); }
+
+/**
+ * Normalize a product name for fuzzy prefix matching.
+ * - Lowercase
+ * - Remove pack descriptors: "4x125", "4x125ml", "4 x 200 ml"
+ * - Collapse space between digit and letter: "2 kcal" → "2kcal"
+ * - Collapse multiple spaces
+ */
+function normName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/(\d),(\d)/g, "$1.$2")                     // "4,0" → "4.0"
+    .replace(/\d+\s*x\s*\d+\s*(?:ml|g|cl|l)?\b/g, "") // "4x125ml" etc.
+    .replace(/(\d+)\s+([a-zA-Z])/g, "$1$2")             // "2 kcal" → "2kcal"
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 // ─── Auto image ───────────────────────────────────────────────────────────────
 const EXTS = ["jpg", "jpeg", "png", "webp"];
