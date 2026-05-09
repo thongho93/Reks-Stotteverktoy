@@ -266,6 +266,7 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
   const [activeTab, setActiveTab] = useState<TabKey>("rad");
   const [faqOpen, setFaqOpen] = useState(false);
   const [faq2Open, setFaq2Open] = useState(false);
+  const [faq3Open, setFaq3Open] = useState(false);
 
   const textMain  = dk ? "#f0e8f4" : "#0f172a";
   const textSub   = dk ? "#8e7d98" : "#64748b";
@@ -542,6 +543,75 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
                     Hvis du har behov for å bruke syrenøytraliserende hyppig eller over lengre perioder, bør du kontakte lege.
                   </Typography>
                 </Box>
+              </Box>
+            )}
+          </Box>
+
+          {/* FAQ 3 – Natron NAF */}
+          <Box
+            onClick={() => setFaq3Open(o => !o)}
+            sx={{
+              mb: 1.5, borderRadius: 3, overflow: "hidden", cursor: "pointer",
+              border: `1.5px solid ${faq3Open ? "#ef444455" : (dk ? "#334155" : "#e2e8f0")}`,
+              background: dk ? "#161b27" : "#fff",
+              boxShadow: faq3Open ? "0 0 0 3px #ef444414" : "0 1px 3px rgba(0,0,0,0.05)",
+              transition: "box-shadow 150ms, border-color 150ms",
+            }}
+          >
+            {/* Header row */}
+            <Box sx={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              px: 2, py: 1.5, gap: 1.5,
+            }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+                <Box sx={{
+                  width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                  background: "#ef444418", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: "#ef4444" }}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/>
+                    <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: textMain, lineHeight: 1.35 }}>
+                  Kan gravide bruke Natron NAF (syrenøytraliserende)?
+                </Typography>
+              </Box>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: faq3Open ? "rotate(180deg)" : "rotate(0deg)" }}>
+                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </Box>
+
+            {/* Expandable body */}
+            {faq3Open && (
+              <Box sx={{
+                px: 2, pb: 2,
+                borderTop: `1px solid ${dk ? "#1e293b" : "#f1f5f9"}`,
+                display: "flex", flexDirection: "column", gap: 1.5,
+              }}>
+                <Box sx={{
+                  background: dk ? "#2d1a1a" : "#fff5f5",
+                  border: `1px solid ${dk ? "#7f1d1d" : "#fca5a5"}`,
+                  borderRadius: 2, p: "10px 14px",
+                  display: "flex", gap: 1, alignItems: "flex-start",
+                  mt: 1.5,
+                }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    style={{ color: "#ef4444", flexShrink: 0, marginTop: 2 }}>
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <Typography sx={{ fontSize: 12.5, color: dk ? "#fca5a5" : "#991b1b", lineHeight: 1.7 }}>
+                    <strong>Frarådes under graviditet:</strong> Natron NAF bør som hovedregel ikke brukes av gravide.
+                  </Typography>
+                </Box>
+                <Typography sx={{ fontSize: 13, color: textSub, lineHeight: 1.75 }}>
+                  Det er ikke sett fosterskadelige effekter, men bruk over tid kan potensielt ha negative innvirkning på mors
+                  syre-basebalanse og væskenivå. Ettersom det tross alt finnes andre og bedre alternativer for behandling av
+                  halsbrann og sure oppstøt hos gravide, fraråder vi bruk av Natron NAF under graviditet.
+                </Typography>
               </Box>
             )}
           </Box>
