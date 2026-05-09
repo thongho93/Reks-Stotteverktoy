@@ -242,7 +242,7 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
         background: dk
           ? "linear-gradient(135deg, #0f2027 0%, #0c1a2e 60%, #0f172a 100%)"
           : "linear-gradient(135deg, #e0f7fa 0%, #e8eaf6 60%, #f3e5f5 100%)",
-        px: { xs: 3, md: 5 }, pt: 4, pb: 5,
+        pt: 4, pb: 5,
         position: "relative", overflow: "hidden",
       }}>
         {/* Decorative blobs */}
@@ -251,50 +251,55 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
         <Box sx={{ position: "absolute", bottom: -60, left: "30%", width: 300, height: 300, borderRadius: "50%",
           background: `radial-gradient(circle, #a78bfa22 0%, transparent 70%)`, pointerEvents: "none" }} />
 
-        {/* Breadcrumb */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 2.5, fontSize: 12, fontWeight: 600, position: "relative" }}>
-          <span style={{ cursor: "pointer", color: ACCENT }} onClick={onBack}>Gravide</span>
-          <span style={{ color: textSub, fontSize: 14 }}>›</span>
-          <span style={{ color: textSub }}>Halsbrann</span>
-        </Box>
+        {/* Inner wrapper — same max-width + padding as content section */}
+        <Box sx={{ px: { xs: 2, md: 4 }, maxWidth: 1100, mx: "auto", position: "relative" }}>
 
-        {/* Title row */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1.5, position: "relative" }}>
-          <Typography sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 900, color: textMain, lineHeight: 1.15, letterSpacing: "-0.02em" }}>
-            Halsbrann hos gravide
-          </Typography>
-          <Box sx={{
-            width: 48, height: 48, borderRadius: 3, flexShrink: 0,
-            background: `${ACCENT}18`, display: "flex", alignItems: "center", justifyContent: "center",
-            border: `1.5px solid ${ACCENT}30`,
-          }}>
-            <svg width="26" height="26" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: ACCENT }}>
-              <path fillRule="evenodd" clipRule="evenodd" d="M39 8H9C8.44771 8 8 8.44772 8 9V39C8 39.5523 8.44772 40 9 40H39C39.5523 40 40 39.5523 40 39V9C40 8.44771 39.5523 8 39 8ZM9 6C7.34315 6 6 7.34315 6 9V39C6 40.6569 7.34315 42 9 42H39C40.6569 42 42 40.6569 42 39V9C42 7.34315 40.6569 6 39 6H9Z" fill="currentColor"/>
-              <path fillRule="evenodd" clipRule="evenodd" d="M20.0889 10C20.0889 15.1089 17.7658 18.9036 15.3041 23.3195C12.2373 28.8208 15.0904 33.5826 18.5926 38C18.5926 32.9306 19.3994 30.0689 23.1926 26.2587C25.5254 30.4353 25.7372 33.5009 25 38C34.6627 33.334 34.1463 25.6833 31.33 17C30.787 19 29.7752 20.8182 29.1179 22.0909C27.809 17.0219 24.076 13.3085 20.0889 10Z" fill="currentColor"/>
-            </svg>
+          {/* Breadcrumb */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 2.5, fontSize: 12, fontWeight: 600 }}>
+            <span style={{ cursor: "pointer", color: ACCENT }} onClick={onBack}>Gravide</span>
+            <span style={{ color: textSub, fontSize: 14 }}>›</span>
+            <span style={{ color: textSub }}>Halsbrann</span>
           </Box>
-        </Box>
 
-        <Typography sx={{ fontSize: 14.5, color: textSub, lineHeight: 1.75, mb: 2.5, maxWidth: 560, position: "relative" }}>
-          Halsbrann er svært vanlig i graviditet. Det skyldes hormonelle endringer og økt trykk fra livmoren.
-          Flere reseptfrie alternativer kan brukes trygt.
-        </Typography>
-
-        {/* Tags */}
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, position: "relative" }}>
-          {[
-            { label: "Gravid",                   bg: "#ede9fe", color: "#7c3aed", border: "#c4b5fd" },
-            { label: "Vanlig plage",              bg: "#fef3c7", color: "#b45309", border: "#fde68a" },
-            { label: "Oppdatert: Mai 2024",       bg: dk ? "#1e293b" : "#f1f5f9", color: "#64748b", border: "#e2e8f0" },
-          ].map(tag => (
-            <span key={tag.label} style={{
-              fontSize: 11.5, fontWeight: 700, padding: "4px 12px",
-              borderRadius: 999, background: tag.bg, color: tag.color,
-              border: `1px solid ${tag.border}`,
+          {/* Title row */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1.5 }}>
+            <Typography sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 900, color: textMain, lineHeight: 1.15, letterSpacing: "-0.02em" }}>
+              Halsbrann hos gravide
+            </Typography>
+            <Box sx={{
+              width: 48, height: 48, borderRadius: 3, flexShrink: 0,
+              background: `${ACCENT}18`, display: "flex", alignItems: "center", justifyContent: "center",
+              border: `1.5px solid ${ACCENT}30`,
             }}>
-              {tag.label}
-            </span>
-          ))}
+              <svg width="26" height="26" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: ACCENT }}>
+                <path fillRule="evenodd" clipRule="evenodd" d="M39 8H9C8.44771 8 8 8.44772 8 9V39C8 39.5523 8.44772 40 9 40H39C39.5523 40 40 39.5523 40 39V9C40 8.44771 39.5523 8 39 8ZM9 6C7.34315 6 6 7.34315 6 9V39C6 40.6569 7.34315 42 9 42H39C40.6569 42 42 40.6569 42 39V9C42 7.34315 40.6569 6 39 6H9Z" fill="currentColor"/>
+                <path fillRule="evenodd" clipRule="evenodd" d="M20.0889 10C20.0889 15.1089 17.7658 18.9036 15.3041 23.3195C12.2373 28.8208 15.0904 33.5826 18.5926 38C18.5926 32.9306 19.3994 30.0689 23.1926 26.2587C25.5254 30.4353 25.7372 33.5009 25 38C34.6627 33.334 34.1463 25.6833 31.33 17C30.787 19 29.7752 20.8182 29.1179 22.0909C27.809 17.0219 24.076 13.3085 20.0889 10Z" fill="currentColor"/>
+              </svg>
+            </Box>
+          </Box>
+
+          <Typography sx={{ fontSize: 14.5, color: textSub, lineHeight: 1.75, mb: 2.5, maxWidth: 560 }}>
+            Halsbrann er svært vanlig i graviditet. Det skyldes hormonelle endringer og økt trykk fra livmoren.
+            Flere reseptfrie alternativer kan brukes trygt.
+          </Typography>
+
+          {/* Tags */}
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {[
+              { label: "Gravid",                   bg: "#ede9fe", color: "#7c3aed", border: "#c4b5fd" },
+              { label: "Vanlig plage",              bg: "#fef3c7", color: "#b45309", border: "#fde68a" },
+              { label: "Oppdatert: Mai 2024",       bg: dk ? "#1e293b" : "#f1f5f9", color: "#64748b", border: "#e2e8f0" },
+            ].map(tag => (
+              <span key={tag.label} style={{
+                fontSize: 11.5, fontWeight: 700, padding: "4px 12px",
+                borderRadius: 999, background: tag.bg, color: tag.color,
+                border: `1px solid ${tag.border}`,
+              }}>
+                {tag.label}
+              </span>
+            ))}
+          </Box>
+
         </Box>
       </Box>
 
