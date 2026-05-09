@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -160,8 +160,15 @@ function priorityBg(p: Medicine["priority"]): string {
   return "#fee2e2";
 }
 
-function priorityIcon(p: Medicine["priority"]): string {
-  if (p === "first" || p === "second") return "✅";
+function priorityIcon(p: Medicine["priority"]): React.ReactNode {
+  if (p === "first") return (
+    <svg width="13" height="13" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+      <g transform="matrix(0.91 0 0 0.91 12 12)">
+        <path style={{ fill: "currentColor" }} transform="translate(-15, -15)" d="M 24 4 L 6 4 C 4.895 4 4 4.895 4 6 L 4 24 C 4 25.105 4.895 26 6 26 L 24 26 C 25.105 26 26 25.105 26 24 L 26 6 C 26 4.895 25.105 4 24 4 z M 16.506 19.932 L 14.442 19.932 L 14.442 12.078 L 14.319 12.078 L 11.899000000000001 13.745999999999999 L 11.899000000000001 11.825 L 14.449000000000002 10.068 L 16.507 10.068 L 16.506 19.932 L 16.506 19.932 z" />
+      </g>
+    </svg>
+  );
+  if (p === "second") return "✅";
   if (p === "need") return "⚠️";
   return "🩺";
 }
