@@ -427,9 +427,9 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
                 <Box sx={{
                   width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                  background: `${ACCENT}18`, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "#16a34a18", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: ACCENT }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: "#16a34a" }}>
                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/>
                     <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
@@ -497,9 +497,9 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
                 <Box sx={{
                   width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                  background: `${ACCENT}18`, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "#16a34a18", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: ACCENT }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: "#16a34a" }}>
                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/>
                     <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
