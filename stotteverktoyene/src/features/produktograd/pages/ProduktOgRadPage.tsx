@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useLocation } from "react-router-dom";
 import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
+import TryggmammaTab from "../components/TryggmammaTab";
 import {
   Alert,
   Box,
@@ -415,7 +416,7 @@ export default function ProduktOgRadPage() {
 
   useEffect(() => {
     // Built-in virtual tabs — never auto-replace them
-    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__") return;
+    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return;
     if (fagligDocs.length === 0) {
       setSelectedFagligDocId(null);
       return;
@@ -1444,8 +1445,9 @@ export default function ProduktOgRadPage() {
                 {fagligSidebarCollapsed && (
                   <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, py: 0.5 }}>
                     {[
-                      { id: "__nutrition__", emoji: "🥗", label: "Ernæringsprodukter", activeColor: "rgba(34,197,94,0.35)", activeBorder: "rgba(34,197,94,0.6)" },
-                      { id: "__knuse__",     emoji: "💊", label: "Knuse-/delelisten",  activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
+                      { id: "__nutrition__",   emoji: "🥗", label: "Ernæringsprodukter", activeColor: "rgba(34,197,94,0.35)",  activeBorder: "rgba(34,197,94,0.6)"  },
+                      { id: "__knuse__",       emoji: "💊", label: "Knuse-/delelisten",  activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
+                      { id: "__tryggmamma__",  emoji: "🤰", label: "Tryggmamma",         activeColor: "rgba(236,72,153,0.35)", activeBorder: "rgba(236,72,153,0.6)" },
                     ].map(({ id, emoji, label, activeColor, activeBorder }) => {
                       const active = selectedFagligDocId === id;
                       return (
@@ -1566,6 +1568,35 @@ export default function ProduktOgRadPage() {
                     />
                   </ListItemButton>
                   </Tooltip>
+
+                  {/* Built-in: Tryggmamma */}
+                  <Tooltip title="Tryggmamma" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                  <ListItemButton
+                    selected={selectedFagligDocId === "__tryggmamma__"}
+                    onClick={() => setSelectedFagligDocId("__tryggmamma__")}
+                    sx={{
+                      mb: 0.5,
+                      borderRadius: 2,
+                      pl: 1, pr: 0.7,
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      bgcolor: selectedFagligDocId === "__tryggmamma__" ? "rgba(236,72,153,0.18)" : "rgba(22,27,34,0.85)",
+                      "&:hover": { bgcolor: "rgba(236,72,153,0.12)" },
+                      "&.Mui-selected": { bgcolor: "rgba(236,72,153,0.2)", borderColor: "rgba(236,72,153,0.45)" },
+                      "&.Mui-selected:hover": { bgcolor: "rgba(236,72,153,0.26)" },
+                    }}
+                  >
+                    <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🤰</Typography>
+                    <ListItemText
+                      primary="Tryggmamma"
+                      primaryTypographyProps={{
+                        noWrap: true,
+                        fontSize: 14,
+                        fontWeight: selectedFagligDocId === "__tryggmamma__" ? 800 : 600,
+                        color: selectedFagligDocId === "__tryggmamma__" ? "#FBCFE8" : "#E4DCE7",
+                      }}
+                    />
+                  </ListItemButton>
+                  </Tooltip>
                   {filteredFagligDocs.map((doc) => (
                     (() => {
                       let depth = 0;
@@ -1660,11 +1691,13 @@ export default function ProduktOgRadPage() {
                 </Box>{/* end inner content Box */}
               </Box>{/* end collapsible sidebar Box */}
 
-              <Box sx={{ bgcolor: "#0D1117", p: (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__") ? 0 : 1, overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto", display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+              <Box sx={{ bgcolor: "#0D1117", p: (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") ? 0 : 1, overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto", display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
                 {selectedFagligDocId === "__nutrition__" ? (
                   <NutritionProductFinder catalogProducts={products} />
                 ) : selectedFagligDocId === "__knuse__" ? (
                   <KnuseDelisteTab />
+                ) : selectedFagligDocId === "__tryggmamma__" ? (
+                  <TryggmammaTab />
                 ) : selectedFagligDoc ? (
                   selectedFagligDoc.kind === "pdf" ? (
                     <Paper
