@@ -283,6 +283,14 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             Flere reseptfrie alternativer kan brukes trygt.
           </Typography>
 
+          <span style={{
+            fontSize: 11.5, fontWeight: 700, padding: "4px 12px",
+            borderRadius: 999, background: dk ? "#1e293b" : "#f1f5f9",
+            color: "#64748b", border: "1px solid #e2e8f0",
+          }}>
+            Sist oppdatert: Mai 2024
+          </span>
+
         </Box>
       </Box>
 
