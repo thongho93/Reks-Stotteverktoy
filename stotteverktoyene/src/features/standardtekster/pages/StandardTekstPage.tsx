@@ -63,6 +63,7 @@ const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 type PalettePrefill = {
   templateId: string;
   preparatText?: string;
+  preparatKey?: string;
   tallValues?: Record<number, string>;
   formuleringValues?: Record<number, string>;
   clockTime?: string;
@@ -78,6 +79,8 @@ function parsePalettePrefill(value: unknown): PalettePrefill | null {
   const result: PalettePrefill = { templateId: candidate.templateId.trim() };
   if (typeof candidate.preparatText === "string" && candidate.preparatText.trim())
     result.preparatText = candidate.preparatText.trim();
+  if (typeof candidate.preparatKey === "string" && candidate.preparatKey.trim())
+    result.preparatKey = candidate.preparatKey.trim();
   if (candidate.tallValues && typeof candidate.tallValues === "object")
     result.tallValues = candidate.tallValues as Record<number, string>;
   if (candidate.formuleringValues && typeof candidate.formuleringValues === "object")
@@ -1027,7 +1030,10 @@ export default function StandardTekstPage() {
       setFormuleringByPreparatKey({});
 
       if (pendingPalette.preparatText) {
-        addPickedPreparat(pendingPalette.preparatText, pendingPalette.preparatText);
+        addPickedPreparat(
+          pendingPalette.preparatText,
+          pendingPalette.preparatKey ?? pendingPalette.preparatText,
+        );
       }
 
       const normalizedContent = normalizeTemplateContent(selected.content);

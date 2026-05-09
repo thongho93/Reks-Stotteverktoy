@@ -36,7 +36,9 @@ import {
   templateHasKlokkeslettDagToken,
   templateHasDatoToken,
   templateHasDatoMndToken,
+  formatPreparatForTemplate,
 } from "../standardtekster/utils/preparat";
+import { loadMedicationItems, type Med } from "../fest/components/MedicationSearch";
 
 // ─── Page definitions ───────────────────────────────────────────────────────
 
@@ -233,6 +235,7 @@ export function GlobalSearch({ open, onClose }: Props) {
 
   // ── Standardtekster multi-step state ────────────────────────────────────────
   const [stdTemplates, setStdTemplates] = useState<StandardTekst[]>([]);
+  const [stdMedItems, setStdMedItems] = useState<Med[]>([]);
   const [stdLoading, setStdLoading] = useState(false);
   const [stdStep, setStdStep] = useState<0 | 1>(0); // 0 = search template, 1 = fill fields
   const [stdSelectedTemplate, setStdSelectedTemplate] = useState<StandardTekst | null>(null);
@@ -308,6 +311,21 @@ export function GlobalSearch({ open, onClose }: Props) {
     stdHasDato ||
     stdHasDatoMnd;
 
+  // VNR lookup: when commandQuery looks like a varenummer (4–6 digits), find the product
+  const stdVnrMatch = useMemo<Med | null>(() => {
+    if (!stdMedItems.length || !commandQuery.trim()) return null;
+    const q = commandQuery.trim();
+    if (!/^\d{4,6}$/.test(q)) return null;
+    const needle = q.replace(/^0+/, "") || "0";
+    return (
+      stdMedItems.find((m) => {
+        if (!m.farmaloggNumber) return false;
+        const id = String(m.farmaloggNumber).trim().replace(/^0+/, "") || "0";
+        return id === needle;
+      }) ?? null
+    );
+  }, [stdMedItems, commandQuery]);
+
   // Reset on open
   useEffect(() => {
     if (open) {
@@ -352,8 +370,12 @@ export function GlobalSearch({ open, onClose }: Props) {
   const loadStdTemplates = useCallback(async () => {
     setStdLoading(true);
     try {
-      const all = await readCachedOrFetchStandardTekster();
+      const [all, meds] = await Promise.all([
+        readCachedOrFetchStandardTekster(),
+        loadMedicationItems(),
+      ]);
       setStdTemplates(all.filter((t) => t.isActive !== false));
+      setStdMedItems(meds);
     } catch {
       setStdTemplates([]);
     } finally {
@@ -440,7 +462,13 @@ export function GlobalSearch({ open, onClose }: Props) {
       stdSelectedTemplate.content
     );
     if (hasPreparat && commandQuery.trim()) {
-      palettePrefill.preparatText = commandQuery.trim();
+      if (stdVnrMatch) {
+        // Resolved VNR → pass the drug name + VNR as key so the page shows the product name
+        palettePrefill.preparatText = formatPreparatForTemplate(stdVnrMatch) || commandQuery.trim();
+        palettePrefill.preparatKey = String(stdVnrMatch.farmaloggNumber ?? commandQuery.trim());
+      } else {
+        palettePrefill.preparatText = commandQuery.trim();
+      }
     }
 
     const tallInds = getTallTokenIndices(stdSelectedTemplate.content);
@@ -468,6 +496,7 @@ export function GlobalSearch({ open, onClose }: Props) {
     scopedPage,
     stdSelectedTemplate,
     commandQuery,
+    stdVnrMatch,
     stdTalls,
     stdFormulerings,
     stdClockTime,
@@ -820,11 +849,41 @@ export function GlobalSearch({ open, onClose }: Props) {
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                   {stdHasPreparat && (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <LightbulbOutlinedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                        Skriv preparat / varenummer i søkefeltet over
-                      </Typography>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <LightbulbOutlinedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          Skriv preparat / varenummer i søkefeltet over
+                        </Typography>
+                      </Box>
+                      {/* VNR resolved preview */}
+                      {stdVnrMatch && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.75,
+                            px: 1.5,
+                            py: 0.75,
+                            borderRadius: 1.5,
+                            backgroundColor: (theme) =>
+                              alpha("#4BC76A", theme.palette.mode === "dark" ? 0.12 : 0.07),
+                            border: (theme) =>
+                              `1px solid ${alpha("#4BC76A", theme.palette.mode === "dark" ? 0.3 : 0.2)}`,
+                          }}
+                        >
+                          <CheckCircleOutlineRoundedIcon sx={{ fontSize: 15, color: "#4BC76A", flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: "#4BC76A", fontWeight: 600 }}>
+                            {formatPreparatForTemplate(stdVnrMatch) || stdVnrMatch.varenavn || commandQuery}
+                          </Typography>
+                        </Box>
+                      )}
+                      {/* VNR typed but no match found */}
+                      {!stdVnrMatch && /^\d{4,6}$/.test(commandQuery.trim()) && commandQuery.trim() && (
+                        <Typography variant="caption" sx={{ color: "text.disabled", pl: 3 }}>
+                          Fant ikke produkt for varenr {commandQuery.trim()}
+                        </Typography>
+                      )}
                     </Box>
                   )}
 
