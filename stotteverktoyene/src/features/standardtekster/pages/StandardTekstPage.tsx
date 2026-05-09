@@ -233,6 +233,12 @@ export default function StandardTekstPage() {
     selected,
   } = useStandardTekster();
 
+  // Pre-fill preparat search when navigated from the global command palette
+  useEffect(() => {
+    const searchQuery = (location.state as { searchQuery?: string } | null)?.searchQuery;
+    if (searchQuery) setSearch(searchQuery);
+  }, [location.state, setSearch]);
+
   const omeqPrefill = useMemo<OMEQStandardtekstPrefill | null>(() => {
     const fromLocation = parseOmeqStandardtekstPrefill(
       (location.state as { omeqPrefill?: unknown } | null)?.omeqPrefill,

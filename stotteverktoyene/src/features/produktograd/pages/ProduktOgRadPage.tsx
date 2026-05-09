@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useLocation } from "react-router-dom";
 import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import {
@@ -223,6 +224,7 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
 
 export default function ProduktOgRadPage() {
   const { user } = useAuthUser();
+  const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligTitleInputRef = useRef<HTMLInputElement | null>(null);
@@ -230,6 +232,15 @@ export default function ProduktOgRadPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [query, setQuery] = useState("");
   const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
+
+  // Pre-fill search when navigated from the global command palette
+  useEffect(() => {
+    const searchQuery = (location.state as { searchQuery?: string } | null)?.searchQuery;
+    if (searchQuery) {
+      setQuery(searchQuery);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [location.state]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);

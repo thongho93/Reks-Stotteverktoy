@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -126,6 +126,7 @@ const makeRow = (): Row => ({
 
 export default function OMEQPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [rows, setRows] = useState<Row[]>([makeRow()]);
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
@@ -173,6 +174,17 @@ export default function OMEQPage() {
     const t = setTimeout(() => setFocusRowId(null), 0);
     return () => clearTimeout(t);
   }, [focusRowId]);
+
+  // Pre-fill first row when navigated from the global command palette
+  useEffect(() => {
+    const prefill = (location.state as { prefill?: { medicationText?: string; doseText?: string } } | null)?.prefill;
+    if (!prefill?.medicationText) return;
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === 0 ? { ...r, medicationText: prefill.medicationText!, doseText: prefill.doseText ?? "" } : r
+      )
+    );
+  }, [location.state]);
 
   const resetAll = useCallback(() => {
     // Reset to initial state without reloading the whole app
