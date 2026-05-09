@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { nutritionProducts, type NutritionProduct } from "../data/nutritionProducts";
 
 // ─── Catalog product (subset of AdviceProduct from ProduktOgRadPage) ──────────
@@ -11,9 +12,13 @@ type CatalogProduct = {
 };
 
 // ─── Variant info built from catalog ─────────────────────────────────────────
+type VariantRow = {
+  vnr: string;     // raw farmalogg number
+  flavor: string;  // e.g. "Sjokolade", "Jordbær" (empty string = no flavor suffix)
+};
+
 type VariantInfo = {
-  vnrs: string[];       // raw farmalogg numbers for display
-  flavors: string[];    // e.g. ["Sjokolade", "Jordbær"]
+  rows: VariantRow[];
 };
 
 /** Build nutrition product id → VariantInfo from catalog */
@@ -42,17 +47,16 @@ function buildVariantMap(
     }
     if (!bestNp) continue;
 
-    if (!map.has(bestNp.id)) map.set(bestNp.id, { vnrs: [], flavors: [] });
+    if (!map.has(bestNp.id)) map.set(bestNp.id, { rows: [] });
     const entry = map.get(bestNp.id)!;
 
-    if (!entry.vnrs.includes(vnr)) entry.vnrs.push(vnr);
-
-    // Extract flavor: what comes after the matched prefix in the original name
+    // Extract flavor: what comes after the matched prefix in the normalized name
     const flavor = cpNorm.slice(bestLen).replace(/\d+\s*x\s*\d+.*/g, "").trim();
-    // Capitalize first letter for display
     const flavorDisplay = flavor.charAt(0).toUpperCase() + flavor.slice(1);
-    if (flavorDisplay && !entry.flavors.includes(flavorDisplay)) {
-      entry.flavors.push(flavorDisplay);
+
+    // Only add if this VNR isn't already recorded
+    if (!entry.rows.some(r => r.vnr === vnr)) {
+      entry.rows.push({ vnr, flavor: flavorDisplay });
     }
   }
 
@@ -270,13 +274,136 @@ function FilterSection({ title, children }: { title: string; children: React.Rea
   );
 }
 
+// ─── VNR Modal ────────────────────────────────────────────────────────────────
+function VnrModal({ productName, rows, onClose }: {
+  productName: string;
+  rows: VariantRow[];
+  onClose: () => void;
+}) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Lock body scroll
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  return createPortal(
+    <div
+      ref={overlayRef}
+      onClick={e => { if (e.target === overlayRef.current) onClose(); }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(15,23,42,0.55)",
+        backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div style={{
+        background: "#fff", borderRadius: 18,
+        boxShadow: "0 24px 64px rgba(0,0,0,0.22)",
+        width: "100%", maxWidth: 480,
+        maxHeight: "80vh", display: "flex", flexDirection: "column",
+        overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: "18px 20px 14px",
+          borderBottom: "1px solid #f1f5f9",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+        }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
+              VNR-varianter
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#0f172a" }}>{productName}</div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Lukk"
+            style={{
+              flexShrink: 0, width: 32, height: 32, borderRadius: 999,
+              border: "1px solid #e2e8f0", background: "#f8fafc",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", fontSize: 16, color: "#64748b",
+            }}
+          >✕</button>
+        </div>
+
+        {/* Table */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "8px 0" }}>
+          {/* Column headers */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr",
+            padding: "6px 20px 4px",
+            borderBottom: "1px solid #f1f5f9",
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>Smak / variant</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>VNR</span>
+          </div>
+
+          {rows.map((row, i) => (
+            <div
+              key={row.vnr}
+              style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr",
+                padding: "10px 20px",
+                background: i % 2 === 0 ? "#fff" : "#f8fafc",
+                alignItems: "center",
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+                {row.flavor || <span style={{ color: "#94a3b8", fontStyle: "italic" }}>Nøytral</span>}
+              </span>
+              <span style={{
+                fontSize: 13, fontFamily: "monospace", fontWeight: 600,
+                color: "#475569", letterSpacing: "0.04em",
+              }}>
+                {row.vnr}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: "12px 20px",
+          borderTop: "1px solid #f1f5f9",
+          display: "flex", justifyContent: "flex-end",
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "7px 20px", borderRadius: 10,
+              background: "#0f172a", border: "none",
+              fontSize: 13, fontWeight: 700, color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Lukk
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ─── Product Card ─────────────────────────────────────────────────────────────
 function ProductCard({ product, variant }: { product: NutritionProduct; variant?: VariantInfo }) {
   const propEntries     = Object.entries(product.properties).filter(([, v]) => v === true) as [string, boolean][];
   const clinicalEntries = Object.entries(product.clinicalUse).filter(([, v]) => v !== undefined && v !== false) as [string, boolean | "caution"][];
   const ageEntries      = Object.entries(product.age).filter(([, v]) => v === true) as [string, boolean][];
   const cat             = getCat(product.category);
-  const [showFlavors, setShowFlavors] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <div style={{
@@ -319,10 +446,10 @@ function ProductCard({ product, variant }: { product: NutritionProduct; variant?
         </div>
 
         {/* VNR variants */}
-        {variant && variant.vnrs.length > 0 && (
-          <div>
+        {variant && variant.rows.length > 0 && (
+          <>
             <button
-              onClick={() => setShowFlavors(v => !v)}
+              onClick={() => setModalOpen(true)}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 5,
                 padding: "3px 9px", borderRadius: 999,
@@ -331,37 +458,16 @@ function ProductCard({ product, variant }: { product: NutritionProduct; variant?
                 cursor: "pointer",
               }}
             >
-              🏷 {variant.vnrs.length} VNR-variant{variant.vnrs.length !== 1 ? "er" : ""}
-              <span style={{ fontSize: 9, opacity: 0.6 }}>{showFlavors ? "▲" : "▼"}</span>
+              🏷 {variant.rows.length} VNR-variant{variant.rows.length !== 1 ? "er" : ""}
             </button>
-            {showFlavors && (
-              <div style={{
-                marginTop: 6, padding: "8px 10px", borderRadius: 8,
-                background: "#f8fafc", border: "1px solid #e2e8f0",
-                display: "flex", flexDirection: "column", gap: 4,
-              }}>
-                {variant.flavors.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {variant.flavors.map(f => (
-                      <span key={f} style={{
-                        fontSize: 10, padding: "1px 7px", borderRadius: 999,
-                        background: "#fff", border: "1px solid #e2e8f0",
-                        color: "#374151", fontWeight: 500,
-                      }}>{f}</span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                  {variant.vnrs.map(v => (
-                    <span key={v} style={{
-                      fontSize: 9, fontFamily: "monospace", padding: "1px 6px",
-                      borderRadius: 5, background: "#e2e8f0", color: "#64748b",
-                    }}>{v}</span>
-                  ))}
-                </div>
-              </div>
+            {modalOpen && (
+              <VnrModal
+                productName={product.name}
+                rows={variant.rows}
+                onClose={() => setModalOpen(false)}
+              />
             )}
-          </div>
+          </>
         )}
 
         {/* Property pills */}
@@ -423,11 +529,34 @@ const PAGE_SIZE = 20;
 const VNR_RE   = /^\d+$/;
 
 export default function NutritionProductFinder({ catalogProducts = [] }: { catalogProducts?: CatalogProduct[] }) {
+  const searchRef = useRef<HTMLInputElement>(null);
   const [search,          setSearch]          = useState("");
   const [page,            setPage]            = useState(1);
   const [filterAge,       setFilterAge]       = useState<Record<string, boolean>>({});
   const [filterClinical,  setFilterClinical]  = useState<Record<string, boolean>>({});
   const [filterProps,     setFilterProps]     = useState<Record<string, boolean>>({});
+
+  // Ctrl+S / Cmd+S → focus search field
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        const input = searchRef.current;
+        if (!input) return;
+        input.focus();
+        input.select();
+        return;
+      }
+      if (e.key === "Escape" && searchRef.current === document.activeElement) {
+        e.preventDefault();
+        setSearch("");
+        setPage(1);
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Build nutrition product id → VariantInfo from catalog
   const variantMap = useMemo(
@@ -439,7 +568,7 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
   const vnrIndex = useMemo(() => {
     const idx = new Map<string, string>(); // digits → np.id
     for (const [npId, info] of variantMap) {
-      for (const vnr of info.vnrs) {
+      for (const { vnr } of info.rows) {
         const digits = vnr.replace(/\D/g, "").replace(/^0+/, "") || vnr.replace(/\D/g, "");
         if (digits) idx.set(digits, npId);
       }
@@ -621,10 +750,16 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
               boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}>
               <span style={{ color: "#94a3b8", fontSize: 14 }}>🔍</span>
-              <input type="text" value={search}
+              <input ref={searchRef} type="text" value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Søk etter produkt..."
-                style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "#0f172a" }} />
+                style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "#0f172a" }}
+                onFocus={async () => {
+                  try {
+                    const text = (await navigator.clipboard.readText()).trim();
+                    if (/^\d+$/.test(text)) { setSearch(text); setPage(1); }
+                  } catch { /* clipboard access denied — silently ignore */ }
+                }} />
               {search && (
                 <button onClick={() => { setSearch(""); setPage(1); }}
                   style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 14, padding: 0, lineHeight: 1 }}>

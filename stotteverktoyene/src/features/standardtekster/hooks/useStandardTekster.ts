@@ -80,6 +80,37 @@ const writeCachedItems = (items: StandardTekst[]) => {
   }
 };
 
+export async function readCachedOrFetchStandardTekster(): Promise<StandardTekst[]> {
+  const now = Date.now();
+
+  if (memoryCache && now - memoryCache.ts < STANDARDTEKSTER_CACHE_TTL_MS) {
+    return normalizeCachedItems(memoryCache.items);
+  }
+
+  try {
+    const raw = sessionStorage.getItem(STANDARDTEKSTER_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { ts?: number; items?: StandardTekst[] };
+      if (
+        parsed &&
+        Array.isArray(parsed.items) &&
+        typeof parsed.ts === "number" &&
+        now - parsed.ts < STANDARDTEKSTER_CACHE_TTL_MS
+      ) {
+        const normalized = normalizeCachedItems(parsed.items);
+        memoryCache = { items: normalized, ts: parsed.ts };
+        return normalized;
+      }
+    }
+  } catch {
+    // ignore cache read errors
+  }
+
+  const items = await standardTeksterApi.fetchAll();
+  writeCachedItems(items);
+  return items;
+}
+
 export function useStandardTekster(): UseStandardTeksterResult {
   const [items, setItems] = useState<StandardTekst[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);

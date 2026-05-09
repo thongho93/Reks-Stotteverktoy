@@ -26,6 +26,8 @@ import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
+import { GlobalSearch } from "../features/commandpalette/GlobalSearch";
+import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearchHotkey";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import RequireRekspert from "./auth/RequireRekspert";
 import { ProfileMenu } from "./auth/ProfileMenu";
@@ -398,8 +400,11 @@ function Layout() {
     logUsage("page_view", { page, pagePath: location.pathname });
   }, [location.pathname]);
 
+  const { open: searchOpen, closeSearch } = useGlobalSearchHotkey();
+
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
+      <GlobalSearch open={searchOpen} onClose={closeSearch} />
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <Box component="main" sx={{ flex: 1, p: 2 }}>
         <Suspense fallback={<RouteLoader />}>

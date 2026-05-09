@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useLocation } from "react-router-dom";
 import {
   Alert,
   Autocomplete,
@@ -132,6 +133,7 @@ type HistoryItem = {
 
 export default function InteraksjonerPage() {
   const { index, loading, error, reload } = useInteractions();
+  const location = useLocation();
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
   const splitContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [isResizingSplit, setIsResizingSplit] = React.useState(false);
@@ -196,6 +198,26 @@ export default function InteraksjonerPage() {
 
   const [selected, setSelected] = React.useState<InteractionEntity[]>([]);
   const [inputValue, setInputValue] = React.useState("");
+
+  // Pre-fill search when navigated from the global command palette
+  React.useEffect(() => {
+    const state = location.state as {
+      searchQuery?: string;
+      selectedEntities?: InteractionEntity[];
+    } | null;
+    if (!state) return;
+
+    if (Array.isArray(state.selectedEntities) && state.selectedEntities.length > 0) {
+      setSelected(state.selectedEntities);
+      setInputValue("");
+      return;
+    }
+
+    if (state.searchQuery) {
+      setInputValue(state.searchQuery);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [location.state]);
   const [results, setResults] = React.useState<MatchResult[]>([]);
   const [activeResult, setActiveResult] = React.useState<number>(0);
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({});

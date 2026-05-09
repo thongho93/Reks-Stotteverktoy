@@ -514,7 +514,7 @@ const fetchJsonArray = async <T,>(url: string): Promise<T[]> => {
   return Array.isArray(parsed) ? (parsed as T[]) : [];
 };
 
-const loadMedicationItems = () => {
+export const loadMedicationItems = () => {
   if (!medicationItemsPromise) {
     medicationItemsPromise = Promise.all([
       import("../meds.json"),
@@ -531,6 +531,8 @@ const loadMedicationItems = () => {
 
   return medicationItemsPromise;
 };
+
+export type { Med };
 
 const tokenMatches = (hayTokens: string[], needleRaw: string) => {
   const needle = needleRaw.replace(",", ".");
