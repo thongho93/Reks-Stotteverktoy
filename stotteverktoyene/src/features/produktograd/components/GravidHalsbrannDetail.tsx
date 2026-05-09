@@ -184,7 +184,7 @@ function priorityColor(p: Medicine["priority"]): string {
   if (p === "first")   return "#16a34a";
   if (p === "second")  return "#2563eb";
   if (p === "need")    return "#d97706";
-  if (p === "warning") return "#b45309";
+  if (p === "warning") return "#f59e0b";
   return "#dc2626";
 }
 
