@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTheme } from "@mui/material/styles";
 import {
   Box,
   Chip,
@@ -22,7 +23,10 @@ import { KNUSE_DELE_DRUGS, type DrugEntry, type SpecialCode } from "../data/knus
 
 // ─── Code colours ─────────────────────────────────────────────────────────────
 
-const CODE_COLORS: Record<number, { bg: string; text: string; ring: string }> = {
+type CodeColor = { bg: string; text: string; ring: string };
+type SpecialStyle = { bg: string; text: string; border: string };
+
+const CODE_COLORS_DARK: Record<number, CodeColor> = {
   1:  { bg: "#1E3A8A", text: "#93C5FD", ring: "#3B82F6" },
   2:  { bg: "#4C1D95", text: "#C4B5FD", ring: "#8B5CF6" },
   3:  { bg: "#78350F", text: "#FCD34D", ring: "#D97706" },
@@ -37,13 +41,72 @@ const CODE_COLORS: Record<number, { bg: string; text: string; ring: string }> = 
   12: { bg: "#431407", text: "#FED7AA", ring: "#F97316" },
 };
 
-const SPECIAL_STYLES: Record<SpecialCode, { bg: string; text: string; border: string }> = {
-  A:   { bg: "rgba(234,179,8,0.14)",  text: "#FDE68A", border: "rgba(234,179,8,0.45)" },
-  G:   { bg: "rgba(34,197,94,0.14)",  text: "#86EFAC", border: "rgba(34,197,94,0.45)" },
-  K:   { bg: "rgba(239,68,68,0.14)",  text: "#FCA5A5", border: "rgba(239,68,68,0.45)" },
-  OBS: { bg: "rgba(249,115,22,0.14)", text: "#FDBA74", border: "rgba(249,115,22,0.45)" },
+const CODE_COLORS_LIGHT: Record<number, CodeColor> = {
+  1:  { bg: "#DBEAFE", text: "#1D4ED8", ring: "#3B82F6" },
+  2:  { bg: "#EDE9FE", text: "#6D28D9", ring: "#8B5CF6" },
+  3:  { bg: "#FEF3C7", text: "#92400E", ring: "#D97706" },
+  4:  { bg: "#CCFBF1", text: "#0F766E", ring: "#14B8A6" },
+  5:  { bg: "#ECFCCB", text: "#3F6212", ring: "#84CC16" },
+  6:  { bg: "#FCE7F3", text: "#9D174D", ring: "#EC4899" },
+  7:  { bg: "#FFE4E6", text: "#9F1239", ring: "#F43F5E" },
+  8:  { bg: "#F3E8FF", text: "#6B21A8", ring: "#9333EA" },
+  9:  { bg: "#FEE2E2", text: "#991B1B", ring: "#EF4444" },
+  10: { bg: "#DCFCE7", text: "#166534", ring: "#22C55E" },
+  11: { bg: "#E0E7FF", text: "#3730A3", ring: "#6366F1" },
+  12: { bg: "#FFEDD5", text: "#9A3412", ring: "#F97316" },
+};
+
+const SPECIAL_STYLES_DARK: Record<SpecialCode, SpecialStyle> = {
+  A:   { bg: "rgba(234,179,8,0.14)",   text: "#FDE68A", border: "rgba(234,179,8,0.45)" },
+  G:   { bg: "rgba(34,197,94,0.14)",   text: "#86EFAC", border: "rgba(34,197,94,0.45)" },
+  K:   { bg: "rgba(239,68,68,0.14)",   text: "#FCA5A5", border: "rgba(239,68,68,0.45)" },
+  OBS: { bg: "rgba(249,115,22,0.14)",  text: "#FDBA74", border: "rgba(249,115,22,0.45)" },
   X:   { bg: "rgba(107,114,128,0.14)", text: "#D1D5DB", border: "rgba(107,114,128,0.45)" },
 };
+
+const SPECIAL_STYLES_LIGHT: Record<SpecialCode, SpecialStyle> = {
+  A:   { bg: "rgba(234,179,8,0.12)",   text: "#92400E", border: "rgba(234,179,8,0.5)" },
+  G:   { bg: "rgba(34,197,94,0.12)",   text: "#166534", border: "rgba(34,197,94,0.5)" },
+  K:   { bg: "rgba(239,68,68,0.12)",   text: "#991B1B", border: "rgba(239,68,68,0.5)" },
+  OBS: { bg: "rgba(249,115,22,0.12)",  text: "#9A3412", border: "rgba(249,115,22,0.5)" },
+  X:   { bg: "rgba(107,114,128,0.1)",  text: "#374151", border: "rgba(107,114,128,0.4)" },
+};
+
+// ─── Theme colour tokens ───────────────────────────────────────────────────────
+
+function getColors(mode: "dark" | "light") {
+  const d = mode === "dark";
+  return {
+    mainBg:                  d ? "#0A0812"                    : "#F7F5FC",
+    headerBg:                d ? "rgba(15,10,24,0.97)"        : "rgba(255,255,255,0.97)",
+    legendBg:                d ? "rgba(13,10,20,0.9)"         : "rgba(248,246,252,0.98)",
+    panelBg:                 d ? "rgba(13,10,20,0.95)"        : "rgba(252,250,255,0.97)",
+    borderSoft:              d ? "rgba(255,255,255,0.07)"     : "rgba(0,0,0,0.08)",
+    borderMed:               d ? "rgba(255,255,255,0.08)"     : "rgba(0,0,0,0.09)",
+    rowBorder:               d ? "rgba(255,255,255,0.04)"     : "rgba(0,0,0,0.05)",
+    tableHdrBg:              d ? "rgba(255,255,255,0.03)"     : "rgba(0,0,0,0.03)",
+    rowHoverBg:              d ? "rgba(255,255,255,0.03)"     : "rgba(0,0,0,0.03)",
+    searchInputBg:           d ? "rgba(255,255,255,0.05)"     : "rgba(0,0,0,0.04)",
+    searchBorder:            d ? "rgba(255,255,255,0.1)"      : "rgba(0,0,0,0.12)",
+    dividerColor:            d ? "rgba(255,255,255,0.08)"     : "rgba(0,0,0,0.09)",
+    scrollThumb:             d ? "rgba(255,255,255,0.1)"      : "rgba(0,0,0,0.15)",
+    scrollThumbSm:           d ? "rgba(255,255,255,0.12)"     : "rgba(0,0,0,0.12)",
+    textStrong:              d ? "#E2D9F3"                    : "#1A1033",
+    textMuted:               d ? "#7D6E94"                    : "#6B5F80",
+    textMedium:              d ? "#9B8EB0"                    : "#5A4E70",
+    textLegend:              d ? "#A897BE"                    : "#4A3E60",
+    textLegendTitle:         d ? "#C9B8E8"                    : "#2D1F4A",
+    textDim:                 d ? "#6B5F80"                    : "#9B8EB0",
+    iconMuted:               d ? "#9B8EB0"                    : "#7A6E94",
+    expandIcon:              d ? "rgba(255,255,255,0.3)"      : "rgba(0,0,0,0.3)",
+    disabledIcon:            d ? "rgba(255,255,255,0.15)"     : "rgba(0,0,0,0.2)",
+    legendHoverBg:           d ? "rgba(255,255,255,0.06)"     : "rgba(0,0,0,0.05)",
+    footerBorder:            d ? "rgba(255,255,255,0.06)"     : "rgba(0,0,0,0.07)",
+    expandedRowBg:           d ? "rgba(139,92,246,0.06)"      : "rgba(139,92,246,0.05)",
+    expandedRowBorderBottom: d ? "rgba(255,255,255,0.06)"     : "rgba(0,0,0,0.06)",
+    fallbackText:            d ? "#fff"                       : "#000",
+  } as const;
+}
 
 // ─── Legend data ──────────────────────────────────────────────────────────────
 
@@ -73,7 +136,9 @@ const SPECIAL_DESCRIPTIONS: { code: SpecialCode; label: string; description: str
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function CodeBadge({ code }: { code: number }) {
-  const c = CODE_COLORS[code];
+  const theme = useTheme();
+  const codeColors = theme.palette.mode === "dark" ? CODE_COLORS_DARK : CODE_COLORS_LIGHT;
+  const c = codeColors[code];
   if (!c) return null;
   return (
     <Tooltip title={CODE_DESCRIPTIONS.find((d) => d.code === code)?.description ?? ""} arrow placement="top">
@@ -106,7 +171,9 @@ function CodeBadge({ code }: { code: number }) {
 }
 
 function SpecialBadge({ code }: { code: SpecialCode }) {
-  const s = SPECIAL_STYLES[code];
+  const theme = useTheme();
+  const specialStyles = theme.palette.mode === "dark" ? SPECIAL_STYLES_DARK : SPECIAL_STYLES_LIGHT;
+  const s = specialStyles[code];
   return (
     <Tooltip title={SPECIAL_DESCRIPTIONS.find((d) => d.code === code)?.description ?? ""} arrow placement="top">
       <Box
@@ -135,6 +202,10 @@ function SpecialBadge({ code }: { code: SpecialCode }) {
 
 function DrugRow({ drug }: { drug: DrugEntry }) {
   const [expanded, setExpanded] = useState(false);
+  const theme = useTheme();
+  const col = getColors(theme.palette.mode);
+  const codeColors = theme.palette.mode === "dark" ? CODE_COLORS_DARK : CODE_COLORS_LIGHT;
+
   return (
     <>
       <Box
@@ -145,19 +216,19 @@ function DrugRow({ drug }: { drug: DrugEntry }) {
           gap: 1,
           px: 2,
           py: 1.1,
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
+          borderBottom: `1px solid ${col.rowBorder}`,
           transition: "background 120ms ease",
           cursor: "default",
-          "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
+          "&:hover": { bgcolor: col.rowHoverBg },
         }}
       >
         {/* Legemiddel */}
         <Box sx={{ minWidth: 0 }}>
           <Stack direction="row" alignItems="center" gap={0.8} flexWrap="wrap">
-            <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#E2D9F3" }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: col.textStrong }}>
               {drug.name}
             </Typography>
-            <Typography sx={{ fontSize: 12, color: "#7D6E94" }}>
+            <Typography sx={{ fontSize: 12, color: col.textMuted }}>
               ({drug.manufacturer})
             </Typography>
             {drug.specialCodes.map((sc) => (
@@ -167,7 +238,7 @@ function DrugRow({ drug }: { drug: DrugEntry }) {
         </Box>
 
         {/* Legemiddelform */}
-        <Typography sx={{ fontSize: 12.5, color: "#9B8EB0", whiteSpace: "nowrap" }}>
+        <Typography sx={{ fontSize: 12.5, color: col.textMedium, whiteSpace: "nowrap" }}>
           {drug.form}
         </Typography>
 
@@ -178,13 +249,12 @@ function DrugRow({ drug }: { drug: DrugEntry }) {
           ))}
         </Stack>
 
-
         {/* Expand */}
         <IconButton
           size="small"
           onClick={() => setExpanded((v) => !v)}
           sx={{
-            color: expanded ? "#C084FC" : "rgba(255,255,255,0.3)",
+            color: expanded ? "#C084FC" : col.expandIcon,
             "&:hover": { color: "#C084FC", bgcolor: "rgba(192,132,252,0.1)" },
           }}
         >
@@ -198,8 +268,8 @@ function DrugRow({ drug }: { drug: DrugEntry }) {
           sx={{
             px: 2,
             py: 1.2,
-            bgcolor: "rgba(139,92,246,0.06)",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            bgcolor: col.expandedRowBg,
+            borderBottom: `1px solid ${col.expandedRowBorderBottom}`,
             borderLeft: "3px solid rgba(139,92,246,0.55)",
           }}
         >
@@ -212,9 +282,9 @@ function DrugRow({ drug }: { drug: DrugEntry }) {
                   size="small"
                   label={`${c}: ${desc.description}`}
                   sx={{
-                    bgcolor: CODE_COLORS[c]?.bg ?? "transparent",
-                    color: CODE_COLORS[c]?.text ?? "#fff",
-                    border: `1px solid ${CODE_COLORS[c]?.ring ?? "#fff"}50`,
+                    bgcolor: codeColors[c]?.bg ?? "transparent",
+                    color: codeColors[c]?.text ?? col.fallbackText,
+                    border: `1px solid ${codeColors[c]?.ring ?? "#999"}50`,
                     fontSize: 11.5,
                     fontWeight: 600,
                     height: 22,
@@ -232,14 +302,17 @@ function DrugRow({ drug }: { drug: DrugEntry }) {
 // ─── Legend panel ─────────────────────────────────────────────────────────────
 
 function LegendPanel({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const theme = useTheme();
+  const col = getColors(theme.palette.mode);
+
   return (
     <Box
       sx={{
         width: collapsed ? 36 : 240,
         minWidth: collapsed ? 36 : 240,
         transition: "width 200ms ease, min-width 200ms ease",
-        borderRight: "1px solid rgba(255,255,255,0.07)",
-        bgcolor: "rgba(13,10,20,0.9)",
+        borderRight: `1px solid ${col.borderSoft}`,
+        bgcolor: col.legendBg,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -254,14 +327,14 @@ function LegendPanel({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
           justifyContent: collapsed ? "center" : "space-between",
           px: collapsed ? 0 : 1.5,
           py: 1,
-          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          borderBottom: `1px solid ${col.borderSoft}`,
           flexShrink: 0,
         }}
       >
         {!collapsed && (
           <Stack direction="row" alignItems="center" spacing={0.7}>
-            <InfoOutlinedIcon sx={{ fontSize: 15, color: "#9B8EB0" }} />
-            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: "#C9B8E8", whiteSpace: "nowrap" }}>
+            <InfoOutlinedIcon sx={{ fontSize: 15, color: col.iconMuted }} />
+            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: col.textLegendTitle, whiteSpace: "nowrap" }}>
               Slik tolkes tallkodene
             </Typography>
           </Stack>
@@ -270,7 +343,7 @@ function LegendPanel({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
           <IconButton
             size="small"
             onClick={onToggle}
-            sx={{ color: "#9B8EB0", "&:hover": { color: "#C9B8E8", bgcolor: "rgba(255,255,255,0.06)" } }}
+            sx={{ color: col.iconMuted, "&:hover": { color: col.textLegendTitle, bgcolor: col.legendHoverBg } }}
           >
             {collapsed
               ? <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
@@ -291,7 +364,7 @@ function LegendPanel({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
           py: 1,
           "&::-webkit-scrollbar": { width: 4 },
           "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-          "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.12)", borderRadius: 2 },
+          "&::-webkit-scrollbar-thumb": { bgcolor: col.scrollThumbSm, borderRadius: 2 },
         }}
       >
         {/* Numbered codes */}
@@ -301,30 +374,30 @@ function LegendPanel({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
               <Box sx={{ flexShrink: 0, mt: 0.1 }}>
                 <CodeBadge code={code} />
               </Box>
-              <Typography sx={{ fontSize: 11.5, color: "#A897BE", lineHeight: 1.45, pt: 0.4 }}>
+              <Typography sx={{ fontSize: 11.5, color: col.textLegend, lineHeight: 1.45, pt: 0.4 }}>
                 {description}
               </Typography>
             </Stack>
           ))}
         </Stack>
 
-        <Divider sx={{ my: 1.2, borderColor: "rgba(255,255,255,0.08)" }} />
+        <Divider sx={{ my: 1.2, borderColor: col.dividerColor }} />
 
         {/* Special codes */}
         <Stack spacing={0.7}>
           {SPECIAL_DESCRIPTIONS.map(({ code, description }) => (
             <Stack key={code} direction="row" alignItems="center" spacing={1}>
               <SpecialBadge code={code} />
-              <Typography sx={{ fontSize: 11.5, color: "#A897BE", lineHeight: 1.4 }}>
+              <Typography sx={{ fontSize: 11.5, color: col.textLegend, lineHeight: 1.4 }}>
                 {description}
               </Typography>
             </Stack>
           ))}
         </Stack>
 
-        <Divider sx={{ my: 1.2, borderColor: "rgba(255,255,255,0.08)" }} />
+        <Divider sx={{ my: 1.2, borderColor: col.dividerColor }} />
 
-        <Typography sx={{ fontSize: 11, color: "#7D6E94", lineHeight: 1.4, fontStyle: "italic" }}>
+        <Typography sx={{ fontSize: 11, color: col.textMuted, lineHeight: 1.4, fontStyle: "italic" }}>
           X = Ved forsiktighet/avtale med lege eller KEF
         </Typography>
 
@@ -358,6 +431,8 @@ export default function KnuseDelisteTab() {
   const [search, setSearch]             = useState("");
   const [page, setPage]                 = useState(0);
   const [legendCollapsed, setLegendCollapsed] = useState(false);
+  const theme = useTheme();
+  const col = getColors(theme.palette.mode);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -379,7 +454,7 @@ export default function KnuseDelisteTab() {
   }
 
   return (
-    <Box sx={{ display: "flex", height: "100%", overflow: "hidden", bgcolor: "#0A0812" }}>
+    <Box sx={{ display: "flex", height: "100%", overflow: "hidden", bgcolor: col.mainBg }}>
       {/* Legend */}
       <LegendPanel collapsed={legendCollapsed} onToggle={() => setLegendCollapsed((v) => !v)} />
 
@@ -391,14 +466,14 @@ export default function KnuseDelisteTab() {
           sx={{
             px: 2.5,
             py: 1.4,
-            borderBottom: "1px solid rgba(255,255,255,0.07)",
-            bgcolor: "rgba(15,10,24,0.97)",
+            borderBottom: `1px solid ${col.borderSoft}`,
+            bgcolor: col.headerBg,
             flexShrink: 0,
           }}
         >
           <Stack direction="row" alignItems="center" spacing={1.2} mb={0.4}>
             <Typography
-              sx={{ fontSize: 18, fontWeight: 800, color: "#E2D9F3", letterSpacing: "-0.01em" }}
+              sx={{ fontSize: 18, fontWeight: 800, color: col.textStrong, letterSpacing: "-0.01em" }}
             >
               Knuse-/delelisten
             </Typography>
@@ -407,10 +482,10 @@ export default function KnuseDelisteTab() {
               placement="right"
               arrow
             >
-              <InfoOutlinedIcon sx={{ fontSize: 16, color: "#7D6E94", cursor: "default" }} />
+              <InfoOutlinedIcon sx={{ fontSize: 16, color: col.textMuted, cursor: "default" }} />
             </Tooltip>
           </Stack>
-          <Typography sx={{ fontSize: 12, color: "#7D6E94" }}>
+          <Typography sx={{ fontSize: 12, color: col.textMuted }}>
             Retningslinjer for knusing, deling, åpning og oppløsning av tabletter og kapsler
           </Typography>
         </Box>
@@ -420,8 +495,8 @@ export default function KnuseDelisteTab() {
           sx={{
             px: 2,
             py: 1.2,
-            borderBottom: "1px solid rgba(255,255,255,0.07)",
-            bgcolor: "rgba(13,10,20,0.95)",
+            borderBottom: `1px solid ${col.borderSoft}`,
+            bgcolor: col.panelBg,
             flexShrink: 0,
           }}
         >
@@ -434,8 +509,8 @@ export default function KnuseDelisteTab() {
               px: 1.4,
               py: 0.65,
               borderRadius: 2,
-              bgcolor: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              bgcolor: col.searchInputBg,
+              border: `1px solid ${col.searchBorder}`,
               maxWidth: 520,
               "&:focus-within": {
                 borderColor: "rgba(139,92,246,0.55)",
@@ -443,7 +518,7 @@ export default function KnuseDelisteTab() {
               },
             }}
           >
-            <SearchRoundedIcon sx={{ fontSize: 17, color: "#7D6E94", flexShrink: 0 }} />
+            <SearchRoundedIcon sx={{ fontSize: 17, color: col.textMuted, flexShrink: 0 }} />
             <InputBase
               fullWidth
               value={search}
@@ -451,21 +526,20 @@ export default function KnuseDelisteTab() {
               placeholder="Søk etter legemiddel..."
               sx={{
                 fontSize: 13.5,
-                color: "#E2D9F3",
-                "& input::placeholder": { color: "#7D6E94", opacity: 1 },
+                color: col.textStrong,
+                "& input::placeholder": { color: col.textMuted, opacity: 1 },
               }}
             />
             {search && (
               <IconButton
                 size="small"
                 onClick={() => handleSearch("")}
-                sx={{ color: "#7D6E94", p: 0.3, "&:hover": { color: "#C084FC" } }}
+                sx={{ color: col.textMuted, p: 0.3, "&:hover": { color: "#C084FC" } }}
               >
                 <ClearRoundedIcon sx={{ fontSize: 15 }} />
               </IconButton>
             )}
           </Box>
-
         </Box>
 
         {/* Table header */}
@@ -476,23 +550,23 @@ export default function KnuseDelisteTab() {
             gap: 1,
             px: 2,
             py: 0.8,
-            bgcolor: "rgba(255,255,255,0.03)",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            bgcolor: col.tableHdrBg,
+            borderBottom: `1px solid ${col.borderMed}`,
             flexShrink: 0,
           }}
         >
           {["Legemiddel", "Legemiddelform", "Håndtering (tallkode)", ""].map((h) => (
-            <Typography key={h} sx={{ fontSize: 11.5, fontWeight: 700, color: "#6B5F80", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <Typography key={h} sx={{ fontSize: 11.5, fontWeight: 700, color: col.textDim, textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {h}
             </Typography>
           ))}
         </Box>
 
         {/* Drug rows */}
-        <Box sx={{ flex: 1, overflowY: "auto", "&::-webkit-scrollbar": { width: 5 }, "&::-webkit-scrollbar-track": { bgcolor: "transparent" }, "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.1)", borderRadius: 3 } }}>
+        <Box sx={{ flex: 1, overflowY: "auto", "&::-webkit-scrollbar": { width: 5 }, "&::-webkit-scrollbar-track": { bgcolor: "transparent" }, "&::-webkit-scrollbar-thumb": { bgcolor: col.scrollThumb, borderRadius: 3 } }}>
           {paginated.length === 0 ? (
             <Box sx={{ py: 6, textAlign: "center" }}>
-              <Typography sx={{ fontSize: 14, color: "#6B5F80" }}>Ingen legemidler funnet</Typography>
+              <Typography sx={{ fontSize: 14, color: col.textDim }}>Ingen legemidler funnet</Typography>
             </Box>
           ) : (
             paginated.map((drug) => <DrugRow key={drug.id} drug={drug} />)
@@ -504,8 +578,8 @@ export default function KnuseDelisteTab() {
           sx={{
             px: 2,
             py: 0.8,
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            bgcolor: "rgba(13,10,20,0.95)",
+            borderTop: `1px solid ${col.footerBorder}`,
+            bgcolor: col.panelBg,
             flexShrink: 0,
             display: "flex",
             alignItems: "center",
@@ -513,7 +587,7 @@ export default function KnuseDelisteTab() {
             gap: 1,
           }}
         >
-          <Typography sx={{ fontSize: 11.5, color: "#6B5F80" }}>
+          <Typography sx={{ fontSize: 11.5, color: col.textDim }}>
             {`${safePage * PAGE_SIZE + 1}–${Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} av ${filtered.length} legemidler`}
             {search && ` · "${search}"`}
           </Typography>
@@ -524,7 +598,7 @@ export default function KnuseDelisteTab() {
                 size="small"
                 disabled={safePage === 0}
                 onClick={() => setPage(0)}
-                sx={{ color: safePage === 0 ? "rgba(255,255,255,0.15)" : "#9B8EB0", p: 0.4, "&:hover": { color: "#C084FC" } }}
+                sx={{ color: safePage === 0 ? col.disabledIcon : col.textMedium, p: 0.4, "&:hover": { color: "#C084FC" } }}
               >
                 <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
               </IconButton>
@@ -532,7 +606,7 @@ export default function KnuseDelisteTab() {
                 size="small"
                 disabled={safePage === 0}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
-                sx={{ color: safePage === 0 ? "rgba(255,255,255,0.15)" : "#9B8EB0", p: 0.4, "&:hover": { color: "#C084FC" } }}
+                sx={{ color: safePage === 0 ? col.disabledIcon : col.textMedium, p: 0.4, "&:hover": { color: "#C084FC" } }}
               >
                 <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
               </IconButton>
@@ -547,7 +621,7 @@ export default function KnuseDelisteTab() {
                 }, [])
                 .map((item, idx) =>
                   item === "…" ? (
-                    <Typography key={`ellipsis-${idx}`} sx={{ fontSize: 12, color: "#6B5F80", px: 0.3 }}>…</Typography>
+                    <Typography key={`ellipsis-${idx}`} sx={{ fontSize: 12, color: col.textDim, px: 0.3 }}>…</Typography>
                   ) : (
                     <Box
                       key={item}
@@ -559,7 +633,7 @@ export default function KnuseDelisteTab() {
                         cursor: "pointer",
                         fontSize: 12, fontWeight: 700,
                         bgcolor: item === safePage ? "rgba(139,92,246,0.3)" : "transparent",
-                        color: item === safePage ? "#C084FC" : "#9B8EB0",
+                        color: item === safePage ? "#C084FC" : col.textMedium,
                         border: item === safePage ? "1px solid rgba(139,92,246,0.55)" : "1px solid transparent",
                         "&:hover": { bgcolor: "rgba(139,92,246,0.15)", color: "#C084FC" },
                       }}
@@ -573,7 +647,7 @@ export default function KnuseDelisteTab() {
                 size="small"
                 disabled={safePage === totalPages - 1}
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                sx={{ color: safePage === totalPages - 1 ? "rgba(255,255,255,0.15)" : "#9B8EB0", p: 0.4, "&:hover": { color: "#C084FC" } }}
+                sx={{ color: safePage === totalPages - 1 ? col.disabledIcon : col.textMedium, p: 0.4, "&:hover": { color: "#C084FC" } }}
               >
                 <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
               </IconButton>
@@ -581,7 +655,7 @@ export default function KnuseDelisteTab() {
                 size="small"
                 disabled={safePage === totalPages - 1}
                 onClick={() => setPage(totalPages - 1)}
-                sx={{ color: safePage === totalPages - 1 ? "rgba(255,255,255,0.15)" : "#9B8EB0", p: 0.4, "&:hover": { color: "#C084FC" } }}
+                sx={{ color: safePage === totalPages - 1 ? col.disabledIcon : col.textMedium, p: 0.4, "&:hover": { color: "#C084FC" } }}
               >
                 <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
               </IconButton>
