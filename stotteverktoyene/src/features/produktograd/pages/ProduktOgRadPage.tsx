@@ -396,6 +396,7 @@ export default function ProduktOgRadPage() {
   }, [fagligDocs, fagligSearch]);
 
   const selectedFagligDoc = useMemo(() => {
+    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return null;
     if (selectedFagligDocId) {
       const exact = fagligDocs.find((doc) => doc.id === selectedFagligDocId);
       if (exact) return exact;
@@ -1608,11 +1609,11 @@ export default function ProduktOgRadPage() {
                             borderRadius: 2,
                             pl: 1 + depth * 1.8,
                             pr: 0.7,
-                            border: "1px solid rgba(255,255,255,0.06)",
+                            border: selectedFagligDoc?.id === doc.id ? "1px solid rgba(242,162,208,0.45)" : "1px solid transparent",
                             bgcolor:
                               selectedFagligDoc?.id === doc.id
                                 ? "rgba(242,162,208,0.18)"
-                                : "rgba(22,27,34,0.85)",
+                                : "transparent",
                             "&:hover": {
                               bgcolor: "rgba(242,162,208,0.12)",
                             },
