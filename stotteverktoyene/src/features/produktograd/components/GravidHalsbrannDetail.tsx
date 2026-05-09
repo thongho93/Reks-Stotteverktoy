@@ -216,8 +216,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
   const dk = theme.palette.mode === "dark";
   const [activeTab, setActiveTab] = useState<TabKey>("rad");
 
-  const bg        = dk ? "#0D1117" : "#F5F3F8";
-  const cardBg    = dk ? "#161B22" : "#ffffff";
   const textMain  = dk ? "#f0e8f4" : "#0f172a";
   const textSub   = dk ? "#8e7d98" : "#64748b";
   const border    = dk ? "rgba(255,255,255,0.08)" : "#e2e8f0";
@@ -237,111 +235,109 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
   ];
 
   return (
-    <Box sx={{ bgcolor: bg }}>
+    <Box sx={{ bgcolor: dk ? "#0a0e1a" : "#f0f4f8", minHeight: "100%" }}>
 
-      <Box sx={{ px: { xs: 2, md: 3 }, pt: 3, pb: 2.5, maxWidth: 1100, mx: "auto" }}>
+      {/* ══ HERO BANNER ══════════════════════════════════════════════════════ */}
+      <Box sx={{
+        background: dk
+          ? "linear-gradient(135deg, #0f2027 0%, #0c1a2e 60%, #0f172a 100%)"
+          : "linear-gradient(135deg, #e0f7fa 0%, #e8eaf6 60%, #f3e5f5 100%)",
+        px: { xs: 3, md: 5 }, pt: 4, pb: 5,
+        position: "relative", overflow: "hidden",
+      }}>
+        {/* Decorative blobs */}
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 220, height: 220, borderRadius: "50%",
+          background: `radial-gradient(circle, ${ACCENT}22 0%, transparent 70%)`, pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: "30%", width: 300, height: 300, borderRadius: "50%",
+          background: `radial-gradient(circle, #a78bfa22 0%, transparent 70%)`, pointerEvents: "none" }} />
 
-        {/* ─── Breadcrumb ────────────────────────────────────────────────── */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 2, fontSize: 12.5, color: ACCENT, fontWeight: 600 }}>
-          <span style={{ cursor: "pointer" }} onClick={onBack}>Gravide</span>
-          <span style={{ color: textSub }}>›</span>
+        {/* Breadcrumb */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 2.5, fontSize: 12, fontWeight: 600, position: "relative" }}>
+          <span style={{ cursor: "pointer", color: ACCENT }} onClick={onBack}>Gravide</span>
+          <span style={{ color: textSub, fontSize: 14 }}>›</span>
           <span style={{ color: textSub }}>Halsbrann</span>
         </Box>
 
-        {/* ─── Hero ───────────────────────────────────────────────────────── */}
-        <Box sx={{ mb: 3 }}>
-          <Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.25 }}>
-              <Typography sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 900, color: textMain, lineHeight: 1.2 }}>
-                Halsbrann hos gravide
-              </Typography>
-              <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: ACCENT, flexShrink: 0 }}>
-                <path fillRule="evenodd" clipRule="evenodd" d="M39 8H9C8.44771 8 8 8.44772 8 9V39C8 39.5523 8.44772 40 9 40H39C39.5523 40 40 39.5523 40 39V9C40 8.44771 39.5523 8 39 8ZM9 6C7.34315 6 6 7.34315 6 9V39C6 40.6569 7.34315 42 9 42H39C40.6569 42 42 40.6569 42 39V9C42 7.34315 40.6569 6 39 6H9Z" fill="currentColor"/>
-                <path fillRule="evenodd" clipRule="evenodd" d="M20.0889 10C20.0889 15.1089 17.7658 18.9036 15.3041 23.3195C12.2373 28.8208 15.0904 33.5826 18.5926 38C18.5926 32.9306 19.3994 30.0689 23.1926 26.2587C25.5254 30.4353 25.7372 33.5009 25 38C34.6627 33.334 34.1463 25.6833 31.33 17C30.787 19 29.7752 20.8182 29.1179 22.0909C27.809 17.0219 24.076 13.3085 20.0889 10Z" fill="currentColor"/>
-              </svg>
-            </Box>
-
-            <Typography sx={{ fontSize: 14, color: textSub, lineHeight: 1.7, mb: 2, maxWidth: 520 }}>
-              Halsbrann er svært vanlig i graviditet. Det skyldes hormonelle endringer og økt trykk fra
-              livmoren. Flere reseptfrie alternativer kan brukes trygt.
-            </Typography>
-
-            {/* Tags */}
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {[
-                { label: "Gravid",              bg: "#ede9fe", color: "#7c3aed" },
-                { label: "Vanlig plage",         bg: "#fef3c7", color: "#b45309" },
-                { label: "Sist oppdatert: Mai 2024", bg: "#f1f5f9", color: "#475569" },
-              ].map(tag => (
-                <span key={tag.label} style={{
-                  fontSize: 11.5, fontWeight: 700, padding: "3px 10px",
-                  borderRadius: 999, background: tag.bg, color: tag.color,
-                }}>
-                  {tag.label}
-                </span>
-              ))}
-            </Box>
-          </Box>
-
-        </Box>
-
-        {/* ─── Symptoms ───────────────────────────────────────────────────── */}
-        <Box sx={{
-          background: cardBg,
-          border: `1px solid ${border}`,
-          borderRadius: 3, p: 2.5, mb: 3,
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr auto" },
-          gap: 2, alignItems: "center",
-        }}>
-          <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: 15, color: textMain, mb: 1.5 }}>
-              Kjenner du deg igjen i disse symptomene?
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {SYMPTOMS.map(({ label, icon }) => (
-                <span key={label} style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  fontSize: 12.5, fontWeight: 600,
-                  background: "#e0f2fe", borderRadius: 999, padding: "5px 14px",
-                  border: "1.5px solid #bae6fd", color: ACCENT,
-                }}>
-                  {icon}
-                  <span style={{ color: "#0c4a6e" }}>{label}</span>
-                </span>
-              ))}
-            </Box>
-          </Box>
-
-          {/* Decorative pregnant illustration placeholder */}
+        {/* Title row */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1.5, position: "relative" }}>
+          <Typography sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 900, color: textMain, lineHeight: 1.15, letterSpacing: "-0.02em" }}>
+            Halsbrann hos gravide
+          </Typography>
           <Box sx={{
-            width: 90, height: 90, borderRadius: "50%",
-            background: "linear-gradient(135deg, #e0f2fe, #ede9fe)",
-            display: { xs: "none", md: "flex" }, alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
+            width: 48, height: 48, borderRadius: 3, flexShrink: 0,
+            background: `${ACCENT}18`, display: "flex", alignItems: "center", justifyContent: "center",
+            border: `1.5px solid ${ACCENT}30`,
           }}>
-            <span style={{ fontSize: 42 }}>🤰</span>
+            <svg width="26" height="26" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: ACCENT }}>
+              <path fillRule="evenodd" clipRule="evenodd" d="M39 8H9C8.44771 8 8 8.44772 8 9V39C8 39.5523 8.44772 40 9 40H39C39.5523 40 40 39.5523 40 39V9C40 8.44771 39.5523 8 39 8ZM9 6C7.34315 6 6 7.34315 6 9V39C6 40.6569 7.34315 42 9 42H39C40.6569 42 42 40.6569 42 39V9C42 7.34315 40.6569 6 39 6H9Z" fill="currentColor"/>
+              <path fillRule="evenodd" clipRule="evenodd" d="M20.0889 10C20.0889 15.1089 17.7658 18.9036 15.3041 23.3195C12.2373 28.8208 15.0904 33.5826 18.5926 38C18.5926 32.9306 19.3994 30.0689 23.1926 26.2587C25.5254 30.4353 25.7372 33.5009 25 38C34.6627 33.334 34.1463 25.6833 31.33 17C30.787 19 29.7752 20.8182 29.1179 22.0909C27.809 17.0219 24.076 13.3085 20.0889 10Z" fill="currentColor"/>
+            </svg>
           </Box>
         </Box>
 
-        {/* ─── Treatment alternatives ─────────────────────────────────────── */}
-        <Box sx={{
-          background: cardBg,
-          border: `1px solid ${border}`,
-          borderRadius: 3, p: 2.5, mb: 3,
-        }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: 15, color: textMain }}>
+        <Typography sx={{ fontSize: 14.5, color: textSub, lineHeight: 1.75, mb: 2.5, maxWidth: 560, position: "relative" }}>
+          Halsbrann er svært vanlig i graviditet. Det skyldes hormonelle endringer og økt trykk fra livmoren.
+          Flere reseptfrie alternativer kan brukes trygt.
+        </Typography>
+
+        {/* Tags */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, position: "relative" }}>
+          {[
+            { label: "Gravid",                   bg: "#ede9fe", color: "#7c3aed", border: "#c4b5fd" },
+            { label: "Vanlig plage",              bg: "#fef3c7", color: "#b45309", border: "#fde68a" },
+            { label: "Oppdatert: Mai 2024",       bg: dk ? "#1e293b" : "#f1f5f9", color: "#64748b", border: "#e2e8f0" },
+          ].map(tag => (
+            <span key={tag.label} style={{
+              fontSize: 11.5, fontWeight: 700, padding: "4px 12px",
+              borderRadius: 999, background: tag.bg, color: tag.color,
+              border: `1px solid ${tag.border}`,
+            }}>
+              {tag.label}
+            </span>
+          ))}
+        </Box>
+      </Box>
+
+      {/* ══ CONTENT ══════════════════════════════════════════════════════════ */}
+      <Box sx={{ px: { xs: 2, md: 4 }, pt: 3, pb: 4, maxWidth: 1100, mx: "auto" }}>
+
+        {/* ─── Symptoms ─────────────────────────────────────────────────────── */}
+        <Box sx={{ mb: 3 }}>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: textSub, textTransform: "uppercase", letterSpacing: "0.1em", mb: 1.5 }}>
+            Kjenner du deg igjen?
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {SYMPTOMS.map(({ label, icon }) => (
+              <span key={label} style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                fontSize: 13, fontWeight: 600,
+                background: dk ? "#1e293b" : "#fff",
+                borderRadius: 12, padding: "8px 16px",
+                border: `1.5px solid ${dk ? "#334155" : "#e2e8f0"}`,
+                color: dk ? "#94a3b8" : "#334155",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}>
+                <span style={{ color: ACCENT, display: "inline-flex" }}>{icon}</span>
+                {label}
+              </span>
+            ))}
+          </Box>
+        </Box>
+
+        {/* ─── Treatment alternatives ───────────────────────────────────────── */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: textSub, textTransform: "uppercase", letterSpacing: "0.1em" }}>
               Behandlingsalternativer
             </Typography>
-            <svg aria-label="Rangert etter anbefaling" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "help", flexShrink: 0, color: textMain }}>
+            <svg aria-label="Rangert etter anbefaling" width="15" height="15" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "help", flexShrink: 0, color: textSub, opacity: 0.7 }}>
               <g transform="matrix(0.43 0 0 0.43 12 12)">
                 <path style={{ fill: "currentColor" }} transform="translate(-25, -25)" d="M 24.5 2 C 21.472656 2 19 4.472656 19 7.5 C 19 10.527344 21.472656 13 24.5 13 C 27.527344 13 30 10.527344 30 7.5 C 30 4.472656 27.527344 2 24.5 2 Z M 24.5 4 C 26.445313 4 28 5.554688 28 7.5 C 28 9.445313 26.445313 11 24.5 11 C 22.554688 11 21 9.445313 21 7.5 C 21 5.554688 22.554688 4 24.5 4 Z M 15 16 C 14.449219 16 14 16.449219 14 17 L 14 23 C 14 23.550781 14.449219 24 15 24 L 20 24 L 20 40 L 15 40 C 14.449219 40 14 40.449219 14 41 L 14 47 C 14 47.550781 14.449219 48 15 48 L 35 48 C 35.550781 48 36 47.550781 36 47 L 36 41 C 36 40.449219 35.550781 40 35 40 L 30 40 L 30 17 C 30 16.449219 29.550781 16 29 16 Z M 16 18 L 28 18 L 28 41 C 28 41.550781 28.449219 42 29 42 L 34 42 L 34 46 L 16 46 L 16 42 L 21 42 C 21.550781 42 22 41.550781 22 41 L 22 23 C 22 22.449219 21.550781 22 21 22 L 16 22 Z" />
               </g>
             </svg>
           </Box>
 
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5, mb: 2 }}>
             {MEDICINES.filter(m => m.priority).map(med => (
               <TreatmentCard key={med.name} med={med} />
             ))}
@@ -349,80 +345,84 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
 
           {/* Footnotes */}
           <Box sx={{
-            mt: 2, pt: 1.75,
-            borderTop: `1px solid ${border}`,
-            display: "flex", flexDirection: "column", gap: 0.75,
+            background: dk ? "#161b27" : "#f8fafc",
+            border: `1px solid ${border}`,
+            borderRadius: 2, p: "10px 14px",
+            display: "flex", flexDirection: "column", gap: 0.5,
           }}>
-            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
+            <Typography sx={{ fontSize: 11, color: textSub, lineHeight: 1.7 }}>
               <strong style={{ color: textMain }}>*</strong> Medisiner som inneholder kalsiumkarbonat (Gaviscon mikstur, Galieve, Titralac) bør ikke brukes oftere enn høyst fire ganger om dagen.
             </Typography>
-            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
+            <Typography sx={{ fontSize: 11, color: textSub, lineHeight: 1.7 }}>
               <strong style={{ color: textMain }}>**</strong> Kontakt lege hvis du har behov for å bruke famotidin (Pepcid, Pepcidduo) i mer enn to uker sammenhengende.
             </Typography>
           </Box>
         </Box>
 
-        {/* ─── Main content + Sidebar ─────────────────────────────────────── */}
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 280px" }, gap: 2.5 }}>
+        {/* ─── Tabs ─────────────────────────────────────────────────────────── */}
+        <Box sx={{ mb: 3 }}>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: textSub, textTransform: "uppercase", letterSpacing: "0.1em", mb: 2 }}>
+            Mer informasjon
+          </Typography>
 
-          {/* Left — Tabbed content */}
-          <Box>
-            {/* Tab bar */}
-            <Box sx={{
-              display: "flex", gap: 0,
-              background: cardBg,
-              border: `1px solid ${border}`,
-              borderBottom: "none",
-              borderRadius: "12px 12px 0 0",
-              overflow: "hidden",
-            }}>
-              {TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    flex: 1, border: "none", cursor: "pointer",
-                    padding: "11px 8px",
-                    background: activeTab === tab.key ? (dk ? "#0D1117" : "#f8fafc") : "transparent",
-                    borderBottom: activeTab === tab.key ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
-                    fontSize: 12, fontWeight: activeTab === tab.key ? 800 : 600,
-                    color: activeTab === tab.key ? ACCENT : (dk ? "#8e7d98" : "#64748b"),
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    transition: "all 140ms ease",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {tab.icon} {tab.label}
-                </button>
-              ))}
-            </Box>
+          {/* Tab pills */}
+          <Box sx={{
+            display: "inline-flex", gap: 0.5, mb: 0,
+            background: dk ? "#1e293b" : "#f1f5f9",
+            borderRadius: "14px 14px 0 0", p: "6px 6px 0",
+          }}>
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  border: "none", cursor: "pointer",
+                  padding: "8px 18px",
+                  borderRadius: "10px 10px 0 0",
+                  background: activeTab === tab.key ? (dk ? "#0f172a" : "#fff") : "transparent",
+                  fontSize: 12.5, fontWeight: activeTab === tab.key ? 700 : 500,
+                  color: activeTab === tab.key ? textMain : textSub,
+                  boxShadow: activeTab === tab.key ? "0 -1px 0 0 rgba(0,0,0,0.06)" : "none",
+                  transition: "all 150ms ease",
+                  whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5,
+                  borderBottom: activeTab === tab.key ? `2px solid ${ACCENT}` : "2px solid transparent",
+                }}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </Box>
 
-            {/* Tab content */}
-            <Box sx={{
-              background: cardBg,
-              border: `1px solid ${border}`,
-              borderRadius: "0 0 12px 12px",
-              overflow: "hidden",
-            }}>
+          {/* Tab panel */}
+          <Box sx={{
+            background: dk ? "#0f172a" : "#fff",
+            border: `1px solid ${border}`,
+            borderRadius: "0 14px 14px 14px",
+            overflow: "hidden",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+          }}>
 
-              {/* ── Ikke-medikamentelle råd tab ── */}
-              {activeTab === "rad" && (
-                <Box sx={{ p: 2.5 }}>
-                  <Typography sx={{ fontWeight: 800, fontSize: 14.5, color: textMain, mb: 0.5 }}>
-                    Andre gode råd
-                  </Typography>
-                  <Typography sx={{ fontSize: 13, color: textSub, mb: 2, lineHeight: 1.6 }}>
-                    Selv om du bruker medisiner bør du forsøtte å følge disse generelle rådene mot halsbrann og sure oppstøt.
-                  </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-                    {RAD_TIPS.map((tip, i) => (
-                      <Box key={i} sx={{
-                        display: "flex", gap: 1.25, alignItems: "flex-start",
-                        background: dk ? "#161B22" : "#f8fafc",
+            {/* ── Ikke-medikamentelle råd ── */}
+            {activeTab === "rad" && (
+              <Box sx={{ p: 3 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: 13, color: textSub, mb: 2, lineHeight: 1.6 }}>
+                  Selv om du bruker medisiner, bør du forsøke å følge disse generelle rådene mot halsbrann og sure oppstøt.
+                </Typography>
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
+                  {RAD_TIPS.map((tip, i) => (
+                    <Box key={i} sx={{
+                      display: "flex", gap: 1.5, alignItems: "flex-start",
+                      background: dk ? "#1e293b" : "#f8fafc",
+                      border: `1px solid ${border}`,
+                      borderRadius: 3, p: 2,
+                    }}>
+                      <Box sx={{
+                        width: 36, height: 36, borderRadius: 2, flexShrink: 0,
+                        background: dk ? "#0f172a" : "#fff",
                         border: `1px solid ${border}`,
-                        borderRadius: 2.5, p: 1.5,
+                        display: "flex", alignItems: "center", justifyContent: "center",
                       }}>
-                        <span style={{ fontSize: 18, flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                        <span style={{ fontSize: 20, display: "inline-flex", alignItems: "center" }}>
                           {i === 0 ? (
                             <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                               <g transform="matrix(0.2 0 0 0.2 12 12)">
@@ -439,162 +439,96 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
                             </svg>
                           ) : ["🍽️", "🥗", "⏰"][i - 1]}
                         </span>
-                        <Typography sx={{ fontSize: 13, color: textMain, lineHeight: 1.65 }}>
-                          {tip}
-                        </Typography>
                       </Box>
-                    ))}
-                  </Box>
-                </Box>
-              )}
-
-              {/* ── Når kontakte lege tab ── */}
-              {activeTab === "lege" && (
-                <Box sx={{ p: 2.5 }}>
-                  <Box sx={{ display: "flex", gap: 1.25, alignItems: "flex-start", mb: 2 }}>
-                    <span style={{ fontSize: 24, flexShrink: 0 }}>🩺</span>
-                    <Box>
-                      <Typography sx={{ fontWeight: 800, fontSize: 14.5, color: textMain, mb: 0.5 }}>
-                        Når bør du kontakte lege?
-                      </Typography>
-                      <Typography sx={{ fontSize: 13, color: textSub, lineHeight: 1.65 }}>
-                        Verken alginat (Gaviscon, Galieve), syrenøytraliserende medisiner (Novaluzid, Titralac)
-                        eller famotidin gir tilstrekkelig effekt, bør du kontakte lege for å diskutere om andre
-                        alternativer kan være riktige for deg.
-                      </Typography>
+                      <Typography sx={{ fontSize: 13, color: textMain, lineHeight: 1.7 }}>{tip}</Typography>
                     </Box>
-                  </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
 
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    {[
-                      "Sterke smerter i magen eller brystet",
-                      "Vedvarende plager som ikke bedres med reseptfrie midler",
-                      "Symptomer som forverrer seg over tid",
-                      "Behov for bruk av famotidin i mer enn én sammenheng",
-                    ].map((item, i) => (
-                      <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                        <span style={{ fontSize: 14, color: "#dc2626", flexShrink: 0 }}>•</span>
-                        <Typography sx={{ fontSize: 13, color: textMain, lineHeight: 1.6 }}>{item}</Typography>
-                      </Box>
-                    ))}
+            {/* ── Når kontakte lege ── */}
+            {activeTab === "lege" && (
+              <Box sx={{ p: 3 }}>
+                <Box sx={{
+                  background: dk ? "#1a0a0a" : "#fff5f5",
+                  border: "1.5px solid #fca5a5",
+                  borderRadius: 3, p: 2, mb: 2.5,
+                  display: "flex", gap: 1.5, alignItems: "flex-start",
+                }}>
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>🩺</span>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "#dc2626", mb: 0.5 }}>
+                      Når bør du kontakte lege?
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, color: dk ? "#f87171" : "#7f1d1d", lineHeight: 1.65 }}>
+                      Verken alginat, syrenøytraliserende midler eller famotidin gir tilstrekkelig effekt? Kontakt lege
+                      for å diskutere om andre alternativer kan være riktige for deg.
+                    </Typography>
                   </Box>
                 </Box>
-              )}
-
-              {/* ── Kilder tab ── */}
-              {activeTab === "kilder" && (
-                <Box sx={{ p: 2.5 }}>
-                  <Typography sx={{ fontWeight: 800, fontSize: 14.5, color: textMain, mb: 2 }}>
-                    Informasjonskilder
-                  </Typography>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   {[
-                    {
-                      name: "Trygg Mammamedisin",
-                      desc: "Nasjonal tjeneste for legemiddelinformasjon ved graviditet og amming, drevet av RELIS.",
-                      url: "https://www.tryggmammamedisin.no",
-                    },
-                    {
-                      name: "RELIS",
-                      desc: "Avdeling for legemiddelinformasjon og farmakologi. Ansvarlig for tjenesten Trygg Mammamedisin.",
-                      url: "https://www.relis.no",
-                    },
+                    "Sterke smerter i magen eller brystet",
+                    "Vedvarende plager som ikke bedres med reseptfrie midler",
+                    "Symptomer som forverrer seg over tid",
+                    "Behov for bruk av famotidin i mer enn to uker sammenhengende",
+                  ].map((item, i) => (
+                    <Box key={i} sx={{
+                      display: "flex", gap: 1.25, alignItems: "center",
+                      background: dk ? "#1e293b" : "#f8fafc",
+                      border: `1px solid ${border}`, borderRadius: 2, p: "10px 14px",
+                    }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#dc2626", flexShrink: 0, display: "inline-block" }} />
+                      <Typography sx={{ fontSize: 13, color: textMain, lineHeight: 1.5 }}>{item}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* ── Kilder ── */}
+            {activeTab === "kilder" && (
+              <Box sx={{ p: 3 }}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 2 }}>
+                  {[
+                    { name: "Trygg Mammamedisin", desc: "Nasjonal tjeneste for legemiddelinformasjon ved graviditet og amming, drevet av RELIS.", url: "https://www.tryggmammamedisin.no" },
+                    { name: "RELIS", desc: "Avdeling for legemiddelinformasjon og farmakologi. Ansvarlig for tjenesten Trygg Mammamedisin.", url: "https://www.relis.no" },
                   ].map(src => (
                     <Box key={src.name} sx={{
-                      mb: 1.5, p: 1.75,
-                      background: dk ? "#161B22" : "#f8fafc",
-                      border: `1px solid ${border}`,
-                      borderRadius: 2.5,
+                      p: 2, background: dk ? "#1e293b" : "#f8fafc",
+                      border: `1px solid ${border}`, borderRadius: 3,
+                      display: "flex", flexDirection: "column", gap: 0.5,
                     }}>
-                      <Typography sx={{ fontWeight: 700, fontSize: 13.5, color: ACCENT, mb: 0.25 }}>
-                        {src.name}
-                      </Typography>
-                      <Typography sx={{ fontSize: 12.5, color: textSub, mb: 0.75, lineHeight: 1.6 }}>
-                        {src.desc}
-                      </Typography>
+                      <Typography sx={{ fontWeight: 700, fontSize: 13.5, color: ACCENT }}>{src.name}</Typography>
+                      <Typography sx={{ fontSize: 12.5, color: textSub, lineHeight: 1.6 }}>{src.desc}</Typography>
                       <a href={src.url} target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize: 12, color: ACCENT, fontWeight: 600, textDecoration: "none" }}>
+                        style={{ fontSize: 12, color: ACCENT, fontWeight: 600, textDecoration: "none", marginTop: 4 }}>
                         {src.url} ↗
                       </a>
                     </Box>
                   ))}
-                  <Typography sx={{ fontSize: 11.5, color: textSub, mt: 2, lineHeight: 1.7, fontStyle: "italic" }}>
-                    Sist oppdatert: Mai 2024. Informasjonen er skrevet av/godkjent av legespesialister og oppdateres
-                    jevnlig basert på ny forskning og erfaring fra graviditetsomsorgen.
-                  </Typography>
                 </Box>
-              )}
-
-            </Box>
-          </Box>
-
-          {/* ── Right sidebar ─────────────────────────────────────────────── */}
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-
-            {/* Husk også */}
-            <Box sx={{
-              background: cardBg, border: `1px solid ${border}`,
-              borderRadius: 3, p: 2.25,
-            }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
-                <span style={{ fontSize: 18 }}>💡</span>
-                <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: "#d97706" }}>Husk også</Typography>
+                <Typography sx={{ fontSize: 11, color: textSub, lineHeight: 1.7, fontStyle: "italic" }}>
+                  Sist oppdatert: Mai 2024. Informasjonen er skrevet av/godkjent av legespesialister og oppdateres
+                  jevnlig basert på ny forskning og erfaring fra graviditetsomsorgen.
+                </Typography>
               </Box>
-              <Typography sx={{ fontSize: 12.5, color: textSub, lineHeight: 1.7, mb: 1.25 }}>
-                Ikke-medikamentelle tiltak kan ha stor effekt på halsbrann.
-              </Typography>
-              <button
-                onClick={() => setActiveTab("rad")}
-                style={{
-                  background: "none", border: "1px solid #fcd34d", borderRadius: 8,
-                  padding: "5px 12px", fontSize: 12, fontWeight: 700,
-                  color: "#d97706", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
-                }}
-              >
-                Se råd →
-              </button>
-            </Box>
-
-            {/* Viktig å vite */}
-            <Box sx={{
-              background: cardBg, border: `1px solid ${border}`,
-              borderRadius: 3, p: 2.25,
-            }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
-                <span style={{ fontSize: 18 }}>🛡️</span>
-                <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: "#16a34a" }}>Viktig å vite</Typography>
-              </Box>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-                {[
-                  "Bruk laveste effektive dose.",
-                  "De fleste plaster og medisiner kan brukes ved behov.",
-                  "Informasjonen er basert på oppdaterte kilder.",
-                ].map((item, i) => (
-                  <Box key={i} sx={{ display: "flex", gap: 0.75, alignItems: "flex-start" }}>
-                    <span style={{ fontSize: 12, color: "#16a34a", flexShrink: 0, marginTop: 2 }}>✓</span>
-                    <Typography sx={{ fontSize: 12.5, color: textSub, lineHeight: 1.55 }}>{item}</Typography>
-                  </Box>
-                ))}
-              </Box>
-              <button
-                onClick={() => setActiveTab("kilder")}
-                style={{
-                  marginTop: 12, background: "none", border: "1px solid #bbf7d0",
-                  borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
-                  color: "#16a34a", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
-                }}
-              >
-                Les mer om vurdering →
-              </button>
-            </Box>
-
-
+            )}
           </Box>
         </Box>
 
-        {/* ─── Footer disclaimer ───────────────────────────────────────────── */}
-        <Typography sx={{ textAlign: "center", fontSize: 11.5, color: textSub, mt: 3, pb: 2, lineHeight: 1.7 }}>
-          ℹ️ Informasjonen erstatter ikke individuell vurdering fra helsepersonell. Ved bekymring eller vedvarende plager, kontakt lege.
-        </Typography>
+        {/* ─── Footer disclaimer ─────────────────────────────────────────────── */}
+        <Box sx={{
+          display: "flex", alignItems: "flex-start", gap: 1,
+          background: dk ? "#161b27" : "#f8fafc",
+          border: `1px solid ${border}`, borderRadius: 2, p: "10px 14px",
+        }}>
+          <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>ℹ️</span>
+          <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.7 }}>
+            Informasjonen erstatter ikke individuell vurdering fra helsepersonell. Ved bekymring eller vedvarende plager, kontakt lege.
+          </Typography>
+        </Box>
 
       </Box>
     </Box>
