@@ -684,8 +684,8 @@ export default function StandardTekstSidebar({
                         ? "rgba(24, 33, 46, 0.9)"
                         : "rgba(255,255,255,0.9)",
                     "&:hover": {
-                      bgcolor: "rgba(185, 130, 154, 0.14)",
-                      borderColor: "rgba(185,130,154,0.42)",
+                      bgcolor: "rgba(92, 170, 126, 0.16)",
+                      borderColor: "rgba(92, 170, 126, 0.42)",
                     },
                   }}
                 >
@@ -714,8 +714,8 @@ export default function StandardTekstSidebar({
                         ? "rgba(24, 33, 46, 0.9)"
                         : "rgba(255,255,255,0.9)",
                     "&:hover": {
-                      bgcolor: "rgba(185, 130, 154, 0.14)",
-                      borderColor: "rgba(185,130,154,0.42)",
+                      bgcolor: "rgba(92, 170, 126, 0.16)",
+                      borderColor: "rgba(92, 170, 126, 0.42)",
                     },
                   }}
                 >
@@ -927,68 +927,73 @@ export default function StandardTekstSidebar({
                               setFavoriteDropTarget(null);
                             }}
                             className={styles.sidebarItem}
-                            sx={(theme) => ({
-                              pl: 2.15,
-                              pr: 0.75,
-                              py: 0.55,
-                              position: "relative",
-                              border: `1px solid ${alpha(
-                                itemCategoryColor,
-                                theme.palette.mode === "dark" ? 0.58 : 0.34,
-                              )} !important`,
-                              backgroundColor: `${alpha(
-                                itemCategoryColor,
-                                theme.palette.mode === "dark" ? 0.18 : 0.1,
-                              )} !important`,
-                              transition:
-                                "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
-                              "&::before": {
-                                content: '""',
-                                position: "absolute",
-                                left: 0,
-                                top: 6,
-                                bottom: 6,
-                                width: 5,
-                                borderRadius: "0 999px 999px 0",
-                                backgroundColor: itemCategoryColor,
-                                boxShadow: `0 0 0 1px ${alpha(theme.palette.common.black, 0.08)}`,
-                              },
+                            sx={(theme) => {
+                              const greenAccent =
+                                theme.palette.mode === "dark" ? "#8fdab5" : "#5aa97f";
 
-                              "&.Mui-selected": {
+                              return {
+                                pl: 2.15,
+                                pr: 0.75,
+                                py: 0.55,
+                                position: "relative",
+                                border: `1px solid ${alpha(
+                                  itemCategoryColor,
+                                  theme.palette.mode === "dark" ? 0.58 : 0.34,
+                                )} !important`,
                                 backgroundColor: `${alpha(
                                   itemCategoryColor,
-                                  theme.palette.mode === "dark" ? 0.32 : 0.2,
+                                  theme.palette.mode === "dark" ? 0.18 : 0.1,
                                 )} !important`,
-                                borderColor: `${alpha(itemCategoryColor, 0.72)} !important`,
-                                boxShadow: `0 2px 8px ${alpha(itemCategoryColor, 0.3)}`,
-                              },
+                                transition:
+                                  "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
+                                "&::before": {
+                                  content: '""',
+                                  position: "absolute",
+                                  left: 0,
+                                  top: 6,
+                                  bottom: 6,
+                                  width: 5,
+                                  borderRadius: "0 999px 999px 0",
+                                  backgroundColor: itemCategoryColor,
+                                  boxShadow: `0 0 0 1px ${alpha(theme.palette.common.black, 0.08)}`,
+                                },
 
-                              "&.Mui-selected:hover": {
-                                backgroundColor: `${alpha(
-                                  itemCategoryColor,
-                                  theme.palette.mode === "dark" ? 0.38 : 0.26,
-                                )} !important`,
-                              },
+                                "&.Mui-selected": {
+                                  backgroundColor: `${alpha(
+                                    greenAccent,
+                                    theme.palette.mode === "dark" ? 0.28 : 0.18,
+                                  )} !important`,
+                                  borderColor: `${alpha(greenAccent, 0.72)} !important`,
+                                  boxShadow: `0 2px 8px ${alpha(greenAccent, 0.28)}`,
+                                },
 
-                              "&:hover": {
-                                backgroundColor: `${alpha(
-                                  itemCategoryColor,
-                                  theme.palette.mode === "dark" ? 0.25 : 0.15,
-                                )} !important`,
-                                borderColor: `${alpha(itemCategoryColor, 0.66)} !important`,
-                                transform: "translateX(1px)",
-                              },
-                              ...(dropBefore
-                                ? {
-                                    boxShadow: `inset 0 2px 0 ${alpha(itemCategoryColor, 0.9)}`,
-                                  }
-                                : {}),
-                              ...(dropAfter
-                                ? {
-                                    boxShadow: `inset 0 -2px 0 ${alpha(itemCategoryColor, 0.9)}`,
-                                  }
-                                : {}),
-                            })}
+                                "&.Mui-selected:hover": {
+                                  backgroundColor: `${alpha(
+                                    greenAccent,
+                                    theme.palette.mode === "dark" ? 0.34 : 0.24,
+                                  )} !important`,
+                                },
+
+                                "&:hover": {
+                                  backgroundColor: `${alpha(
+                                    greenAccent,
+                                    theme.palette.mode === "dark" ? 0.22 : 0.14,
+                                  )} !important`,
+                                  borderColor: `${alpha(greenAccent, 0.66)} !important`,
+                                  transform: "translateX(1px)",
+                                },
+                                ...(dropBefore
+                                  ? {
+                                      boxShadow: `inset 0 2px 0 ${alpha(itemCategoryColor, 0.9)}`,
+                                    }
+                                  : {}),
+                                ...(dropAfter
+                                  ? {
+                                      boxShadow: `inset 0 -2px 0 ${alpha(itemCategoryColor, 0.9)}`,
+                                    }
+                                  : {}),
+                              };
+                            }}
                           >
                             <ListItemText
                               primary={<TruncatedTitle title={it.title} />}

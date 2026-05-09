@@ -2,22 +2,22 @@
   text-transform: none !important;
   padding: 4px 10px !important;
   min-width: auto !important;
-  color: #b9829a !important;
+  color: #4f8f6c !important;
   font-weight: 600;
   border-radius: 999px !important;
   align-self: center;
-  border: 1px solid rgba(185, 130, 154, 0.55);
-  background: rgba(185, 130, 154, 0.06);
+  border: 1px solid rgba(92, 170, 126, 0.52);
+  background: rgba(92, 170, 126, 0.08);
 }
 
 .headerLinkButton:hover {
-  background: rgba(185, 130, 154, 0.12) !important;
-  border-color: rgba(185, 130, 154, 0.75);
+  background: rgba(92, 170, 126, 0.16) !important;
+  border-color: rgba(92, 170, 126, 0.72);
   text-decoration: none;
 }
 
 .headerLinkButton:global(.Mui-focusVisible) {
-  outline: 2px solid rgba(185, 130, 154, 0.55);
+  outline: 2px solid rgba(92, 170, 126, 0.5);
   outline-offset: 2px;
 }
 .page {
@@ -26,7 +26,20 @@
   display: flex;
   flex-direction: column;
   overflow: visible;
+  position: relative;
+  isolation: isolate;
   --desktop-ui-scale: 1;
+  --std-page-bg: #edf8f1;
+  background: var(--std-page-bg);
+}
+
+.page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--std-page-bg);
 }
 
 /* Desktop compact mode: scale down this page slightly at 100% browser zoom.
@@ -93,7 +106,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden; /* hele panelet scroller ikke */
-  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid rgba(92, 170, 126, 0.34) !important;
   border-radius: 18px !important;
   background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
   box-shadow:
@@ -196,7 +209,7 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
-  background: linear-gradient(180deg, rgba(185, 130, 154, 0.08) 0%, rgba(185, 130, 154, 0.02) 100%);
+  background: linear-gradient(180deg, rgba(92, 170, 126, 0.11) 0%, rgba(92, 170, 126, 0.03) 100%);
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
 
@@ -237,20 +250,20 @@
 }
 
 .sidebarItem:hover {
-  background: rgba(185, 130, 154, 0.1);
-  border-color: rgba(185, 130, 154, 0.35);
+  background: rgba(92, 170, 126, 0.12);
+  border-color: rgba(92, 170, 126, 0.38);
   transform: translateX(1px);
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
 .sidebarItem:global(.Mui-selected) {
-  background: rgba(185, 130, 154, 0.18);
-  border-color: rgba(185, 130, 154, 0.5);
+  background: rgba(92, 170, 126, 0.2);
+  border-color: rgba(92, 170, 126, 0.52);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
 }
 
 .sidebarItem:global(.Mui-selected):hover {
-  background: rgba(185, 130, 154, 0.24);
+  background: rgba(92, 170, 126, 0.26);
 }
 
 /* Make the "Ny standardtekst" pill feel like a primary action in the panel */
@@ -278,7 +291,7 @@
 
 .preparatPaper {
   padding: 12px 14px 10px;
-  border: 1px solid rgba(15, 23, 42, 0.1) !important;
+  border: 1px solid rgba(92, 170, 126, 0.36) !important;
   border-radius: 20px !important;
   background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
   box-shadow:
@@ -335,7 +348,7 @@
   max-width: none;
   position: relative;
   isolation: isolate;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(92, 170, 126, 0.34);
   border-radius: 20px !important;
   background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
   box-shadow:
@@ -356,9 +369,9 @@
   pointer-events: none;
   background: linear-gradient(
     90deg,
-    rgba(185, 130, 154, 0.7) 0%,
-    rgba(59, 130, 246, 0.45) 52%,
-    rgba(16, 185, 129, 0.38) 100%
+    rgba(92, 170, 126, 0.62) 0%,
+    rgba(134, 214, 168, 0.5) 55%,
+    rgba(177, 232, 200, 0.42) 100%
   );
 }
 
@@ -679,13 +692,13 @@
 
 .expandIcon {
   transition: transform 150ms ease;
-  color: #b9829a;
+  color: #4f8f6c;
 }
 
 .expandIconOpen {
   transition: transform 150ms ease;
   transform: rotate(180deg);
-  color: #b9829a;
+  color: #4f8f6c;
 }
 
 .guidePaper {
@@ -753,7 +766,20 @@
   padding-top: 4px !important;
   padding-bottom: 4px !important;
   border-radius: 14px !important;
-  background: rgba(15, 23, 42, 0.02);
+  color: #4f8f6c !important;
+  border-color: rgba(92, 170, 126, 0.58) !important;
+  background: rgba(92, 170, 126, 0.08) !important;
+}
+
+.preparatClearButton:hover {
+  border-color: rgba(92, 170, 126, 0.78) !important;
+  background: rgba(92, 170, 126, 0.16) !important;
+}
+
+.preparatClearButton:global(.Mui-disabled) {
+  color: rgba(15, 23, 42, 0.34) !important;
+  border-color: rgba(148, 163, 184, 0.34) !important;
+  background: rgba(15, 23, 42, 0.04) !important;
 }
 
 .preparatSingleSearch {
@@ -877,19 +903,19 @@
 }
 
 .inputControlCard {
-  border: 1px solid rgba(148, 163, 184, 0.46) !important;
+  border: 1px solid rgba(92, 170, 126, 0.38) !important;
   border-radius: 18px !important;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .timeDateCard {
-  border: 1px solid rgba(185, 130, 154, 0.52) !important;
+  border: 1px solid rgba(92, 170, 126, 0.48) !important;
   border-radius: 20px !important;
-  background: linear-gradient(180deg, rgba(255, 244, 250, 0.88) 0%, rgba(246, 241, 250, 0.82) 100%) !important;
+  background: linear-gradient(180deg, rgba(240, 249, 244, 0.96) 0%, rgba(232, 245, 238, 0.92) 100%) !important;
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
-    0 10px 22px rgba(185, 130, 154, 0.12);
+    0 10px 22px rgba(92, 170, 126, 0.12);
   position: relative;
   overflow: hidden;
 }
@@ -934,7 +960,7 @@
   font-weight: 700;
   letter-spacing: 0.2px;
   color: #fff;
-  background: #b9829a;
+  background: #4f8f6c;
 }
 
 .profileMenuRoot {
@@ -973,7 +999,7 @@
   font-size: 14px;
   font-weight: 700;
   color: #fff;
-  background: #b9829a;
+  background: #4f8f6c;
 }
 
 .profileMenuHeaderText {
@@ -1001,8 +1027,8 @@
   font-weight: 600;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(185, 130, 154, 0.18);
-  color: #6f3b52;
+  background: rgba(92, 170, 126, 0.18);
+  color: #2e694b;
   white-space: nowrap;
 }
 
@@ -1018,14 +1044,14 @@
 .autoFocusGlow :global(.MuiOutlinedInput-root) {
   transition: box-shadow 220ms ease;
   box-shadow:
-    0 0 0 1px rgba(185, 130, 154, 0.18),
-    0 0 12px 4px rgba(185, 130, 154, 0.25);
+    0 0 0 1px rgba(92, 170, 126, 0.2),
+    0 0 12px 4px rgba(92, 170, 126, 0.24);
 }
 
 .autoFocusGlow :global(.MuiOutlinedInput-root.Mui-focused) {
   box-shadow:
-    0 0 0 1px rgba(185, 130, 154, 0.25),
-    0 0 16px 6px rgba(185, 130, 154, 0.35);
+    0 0 0 1px rgba(92, 170, 126, 0.28),
+    0 0 16px 6px rgba(92, 170, 126, 0.32);
 }
 
 .profileThemeToggleItem {
@@ -1036,22 +1062,24 @@
   --std-surface: rgba(20, 27, 37, 0.98);
   --std-surface-raised: rgba(26, 34, 46, 0.98);
   --std-surface-soft: rgba(31, 40, 54, 0.98);
-  --std-border: rgba(165, 177, 198, 0.26);
-  --std-border-strong: rgba(165, 177, 198, 0.42);
+  --std-border: rgba(128, 179, 154, 0.28);
+  --std-border-strong: rgba(155, 207, 181, 0.44);
   --std-text: var(--app-text-strong);
   --std-text-muted: var(--app-text-muted);
-  --std-shadow: rgba(2, 6, 18, 0.36);
+  --std-shadow: rgba(2, 16, 10, 0.42);
+  --std-page-bg: #070f20;
+  background: var(--std-page-bg);
 }
 
 :global([data-app-theme="dark"]) .headerLinkButton {
-  color: #d9e2f2 !important;
+  color: #d5f0e2 !important;
   border-color: var(--std-border-strong);
   background: var(--std-surface-soft);
 }
 
 :global([data-app-theme="dark"]) .headerLinkButton:hover {
   background: rgba(39, 49, 65, 0.98) !important;
-  border-color: rgba(190, 200, 218, 0.54);
+  border-color: rgba(174, 220, 196, 0.58);
 }
 
 :global([data-app-theme="dark"]) .sidebar {
@@ -1095,7 +1123,12 @@
 }
 
 :global([data-app-theme="dark"]) .contentPaper::before {
-  background: rgba(121, 137, 163, 0.52);
+  background: linear-gradient(
+    90deg,
+    rgba(98, 176, 132, 0.72) 0%,
+    rgba(132, 206, 164, 0.56) 55%,
+    rgba(165, 226, 192, 0.44) 100%
+  );
 }
 
 :global([data-app-theme="dark"]) .emptyStateTitle {
@@ -1125,7 +1158,7 @@
 }
 
 :global([data-app-theme="dark"]) .followUpChip:hover {
-  border-color: rgba(165, 177, 198, 0.62) !important;
+  border-color: rgba(165, 218, 190, 0.68) !important;
   background: var(--std-surface-soft) !important;
   box-shadow: 0 4px 10px rgba(2, 6, 18, 0.22);
 }
@@ -1141,7 +1174,20 @@
 /* sidebarBody scrollbar is hidden globally — no dark-mode override needed */
 
 :global([data-app-theme="dark"]) .preparatClearButton {
-  background: rgba(165, 177, 198, 0.12);
+  color: #d6ffe9 !important;
+  border-color: rgba(136, 212, 172, 0.52) !important;
+  background: rgba(106, 189, 143, 0.18) !important;
+}
+
+:global([data-app-theme="dark"]) .preparatClearButton:hover {
+  border-color: rgba(160, 228, 194, 0.74) !important;
+  background: rgba(106, 189, 143, 0.26) !important;
+}
+
+:global([data-app-theme="dark"]) .preparatClearButton:global(.Mui-disabled) {
+  color: rgba(203, 213, 225, 0.42) !important;
+  border-color: rgba(165, 177, 198, 0.3) !important;
+  background: rgba(165, 177, 198, 0.1) !important;
 }
 
 :global([data-app-theme="dark"]) .preparatChip {
@@ -1193,8 +1239,8 @@
 
 :global([data-app-theme="dark"]) .profileAvatar,
 :global([data-app-theme="dark"]) .profileMenuAvatarSmall {
-  color: #fce7f3;
-  background: linear-gradient(180deg, rgba(230, 165, 190, 0.92) 0%, rgba(208, 129, 159, 0.92) 100%);
+  color: #e8fff3;
+  background: linear-gradient(180deg, rgba(106, 189, 143, 0.94) 0%, rgba(78, 153, 112, 0.94) 100%);
 }
 
 :global([data-app-theme="dark"]) .profileMenuPaper {
@@ -1203,8 +1249,8 @@
 }
 
 :global([data-app-theme="dark"]) .profileMenuRolePill {
-  background: rgba(230, 165, 190, 0.22);
-  color: #ffd6e5;
+  background: rgba(106, 189, 143, 0.24);
+  color: #d6ffe9;
 }
 
 :global([data-app-theme="dark"]) .profileMenuEmail {
@@ -1217,12 +1263,53 @@
 
 :global([data-app-theme="dark"]) .autoFocusGlow :global(.MuiOutlinedInput-root) {
   box-shadow:
-    0 0 0 1px rgba(230, 165, 190, 0.28),
-    0 0 12px 3px rgba(230, 165, 190, 0.3);
+    0 0 0 1px rgba(106, 189, 143, 0.3),
+    0 0 12px 3px rgba(106, 189, 143, 0.28);
 }
 
 :global([data-app-theme="dark"]) .autoFocusGlow :global(.MuiOutlinedInput-root.Mui-focused) {
   box-shadow:
-    0 0 0 1px rgba(230, 165, 190, 0.36),
-    0 0 16px 6px rgba(230, 165, 190, 0.4);
+    0 0 0 1px rgba(136, 212, 172, 0.38),
+    0 0 16px 6px rgba(106, 189, 143, 0.34);
+}
+
+/* Page-scoped focus/toggle color cleanup to avoid mixed accent colors */
+.page :global(.MuiFormLabel-root.Mui-focused) {
+  color: #4f8f6c !important;
+}
+
+.page :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+  border-color: rgba(92, 170, 126, 0.88) !important;
+}
+
+.page :global(.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) {
+  border-color: rgba(92, 170, 126, 0.66) !important;
+}
+
+.page :global(.MuiSwitch-switchBase.Mui-checked) {
+  color: #5aa97f !important;
+}
+
+.page :global(.MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track) {
+  background-color: rgba(90, 169, 127, 0.64) !important;
+}
+
+:global([data-app-theme="dark"]) .page :global(.MuiFormLabel-root.Mui-focused) {
+  color: #9fe0bf !important;
+}
+
+:global([data-app-theme="dark"]) .page :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+  border-color: rgba(136, 212, 172, 0.9) !important;
+}
+
+:global([data-app-theme="dark"]) .page :global(.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) {
+  border-color: rgba(136, 212, 172, 0.72) !important;
+}
+
+:global([data-app-theme="dark"]) .page :global(.MuiSwitch-switchBase.Mui-checked) {
+  color: #8fdab5 !important;
+}
+
+:global([data-app-theme="dark"]) .page :global(.MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track) {
+  background-color: rgba(143, 218, 181, 0.66) !important;
 }
