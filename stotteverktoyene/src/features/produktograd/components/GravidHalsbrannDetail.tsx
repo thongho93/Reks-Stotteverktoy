@@ -150,8 +150,7 @@ function TreatmentCard({ med }: { med: Medicine }) {
       overflow: "hidden",
       display: "flex",
       flexDirection: "column",
-      minWidth: 190,
-      flex: "1 1 190px",
+      minWidth: 0,
       boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 6px 20px rgba(0,0,0,0.07)",
       transition: "box-shadow 160ms ease, transform 160ms ease",
     }}
@@ -371,7 +370,7 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             </svg>
           </Box>
 
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5 }}>
             {MEDICINES.filter(m => m.priority).map(med => (
               <TreatmentCard key={med.name} med={med} />
             ))}
