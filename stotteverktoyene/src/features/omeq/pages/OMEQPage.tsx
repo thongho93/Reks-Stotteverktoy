@@ -133,6 +133,7 @@ export default function OMEQPage() {
   const location = useLocation();
   const [rows, setRows] = useState<Row[]>([makeRow()]);
   const [vedtakOmeq, setVedtakOmeq] = useState<string>("");
+  const [debouncedVedtakOmeq, setDebouncedVedtakOmeq] = useState<string>("");
   const [copiedOpen, setCopiedOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
@@ -200,6 +201,7 @@ export default function OMEQPage() {
     setShowInfoTable(false);
     setFocusRowId(firstRow.id);
     setVedtakOmeq("");
+    setDebouncedVedtakOmeq("");
   }, []);
 
   useEffect(() => {
@@ -274,8 +276,13 @@ export default function OMEQPage() {
 
   const totalOmeqText = useMemo(() => String(totalOmeq).replace(".", ","), [totalOmeq]);
 
-  const vedtakNum = useMemo(() => parseFloat(vedtakOmeq.replace(",", ".")), [vedtakOmeq]);
-  const hasVedtak = useMemo(() => vedtakOmeq.trim() !== "" && Number.isFinite(vedtakNum), [vedtakOmeq, vedtakNum]);
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedVedtakOmeq(vedtakOmeq), 500);
+    return () => clearTimeout(id);
+  }, [vedtakOmeq]);
+
+  const vedtakNum = useMemo(() => parseFloat(debouncedVedtakOmeq.replace(",", ".")), [debouncedVedtakOmeq]);
+  const hasVedtak = useMemo(() => debouncedVedtakOmeq.trim() !== "" && Number.isFinite(vedtakNum), [debouncedVedtakOmeq, vedtakNum]);
   const vedtakIsOk = useMemo(() => hasVedtak && totalOmeq <= vedtakNum, [hasVedtak, totalOmeq, vedtakNum]);
 
   useEffect(() => {

@@ -1011,7 +1011,7 @@ export default function StandardTekstPage() {
 
       const nextTallValues = buildInitialTallValues(normalizeTemplateContent(selected.content));
       nextTallValues[1] = pending.totalOmeq;
-      if (pending.vedtakOmeq) nextTallValues[2] = pending.vedtakOmeq;
+      if (pending.vedtakOmeq) nextTallValues[0] = pending.vedtakOmeq;
       setTallByIndex(nextTallValues);
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
