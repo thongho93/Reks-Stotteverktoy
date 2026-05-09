@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Chip,
+  CircularProgress,
   Dialog,
   List,
   ListItemButton,
@@ -24,8 +25,18 @@ import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import KeyboardReturnRoundedIcon from "@mui/icons-material/KeyboardReturnRounded";
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import { useNavigate } from "react-router-dom";
 import { useAuthUser } from "../../app/auth/useAuthUser";
+import { readCachedOrFetchStandardTekster } from "../standardtekster/hooks/useStandardTekster";
+import type { StandardTekst } from "../standardtekster/types";
+import {
+  getTallTokenIndices,
+  getFormuleringTokenIndices,
+  templateHasKlokkeslettDagToken,
+  templateHasDatoToken,
+  templateHasDatoMndToken,
+} from "../standardtekster/utils/preparat";
 
 // ─── Page definitions ───────────────────────────────────────────────────────
 
@@ -73,15 +84,16 @@ const PAGE_COMMANDS: Record<string, PageCommand> = {
     },
   },
   "/standardtekster": {
-    placeholder: "Søk etter preparat eller standardtekst...",
-    example: "morfin",
-    parsePreview(query) {
-      return query.trim() ? `Preparatsøk: ${query.trim()}` : null;
+    placeholder: "Søk etter standardtekst...",
+    example: "hyppig   eller   morfin avhengig",
+    parsePreview(_query) {
+      return null;
     },
-    buildState(query) {
-      return { searchQuery: query.trim() };
+    buildState(_query) {
+      return {};
     },
-  },
+    multiStep: true,
+  } as PageCommand & { multiStep: true },
   "/produkt-og-rad": {
     placeholder: "Varenr, produktnavn eller ATC-kode...",
     example: "Fresubin   eller   N02BE01",
@@ -219,6 +231,18 @@ export function GlobalSearch({ open, onClose }: Props) {
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
   const hasOwnerAccess = Boolean(isOwner) || role === "owner";
 
+  // ── Standardtekster multi-step state ────────────────────────────────────────
+  const [stdTemplates, setStdTemplates] = useState<StandardTekst[]>([]);
+  const [stdLoading, setStdLoading] = useState(false);
+  const [stdStep, setStdStep] = useState<0 | 1>(0); // 0 = search template, 1 = fill fields
+  const [stdSelectedTemplate, setStdSelectedTemplate] = useState<StandardTekst | null>(null);
+  const [stdDropdownIndex, setStdDropdownIndex] = useState(0);
+  const [stdTalls, setStdTalls] = useState<Record<number, string>>({});
+  const [stdFormulerings, setStdFormulerings] = useState<Record<number, string>>({});
+  const [stdClockTime, setStdClockTime] = useState("11:00");
+  const [stdClockDay, setStdClockDay] = useState<"today" | "tomorrow">("today");
+  const [stdDatoInput, setStdDatoInput] = useState("");
+
   const entries = ALL_ENTRIES.filter(
     (e) =>
       (!e.admin || hasRekspertAccess) &&
@@ -229,6 +253,60 @@ export function GlobalSearch({ open, onClose }: Props) {
   const isScoped = scopedPage !== null;
   const command = scopedPage ? PAGE_COMMANDS[scopedPage.path] : null;
   const preview = command?.parsePreview(commandQuery) ?? null;
+  const isStdScoped = isScoped && scopedPage?.path === "/standardtekster";
+
+  const stdFilteredTemplates = useMemo(() => {
+    if (!stdTemplates.length) return [];
+    const q = normalize(commandQuery);
+    if (!q) return stdTemplates.slice(0, 10);
+    return stdTemplates
+      .filter(
+        (t) =>
+          normalize(t.title).includes(q) ||
+          normalize(t.category ?? "").includes(q)
+      )
+      .slice(0, 8);
+  }, [stdTemplates, commandQuery]);
+
+  const stdHasPreparat = useMemo(
+    () =>
+      stdSelectedTemplate
+        ? /\{\{\s*PREPARAT\d*\s*\}\}|\bPREPARAT\d*\b/i.test(stdSelectedTemplate.content)
+        : false,
+    [stdSelectedTemplate]
+  );
+  const stdTallIndices = useMemo(
+    () => (stdSelectedTemplate ? getTallTokenIndices(stdSelectedTemplate.content) : []),
+    [stdSelectedTemplate]
+  );
+  const stdFormIndices = useMemo(
+    () => (stdSelectedTemplate ? getFormuleringTokenIndices(stdSelectedTemplate.content) : []),
+    [stdSelectedTemplate]
+  );
+  const stdHasClock = useMemo(
+    () =>
+      stdSelectedTemplate
+        ? templateHasKlokkeslettDagToken(stdSelectedTemplate.content)
+        : false,
+    [stdSelectedTemplate]
+  );
+  const stdHasDato = useMemo(
+    () =>
+      stdSelectedTemplate ? templateHasDatoToken(stdSelectedTemplate.content) : false,
+    [stdSelectedTemplate]
+  );
+  const stdHasDatoMnd = useMemo(
+    () =>
+      stdSelectedTemplate ? templateHasDatoMndToken(stdSelectedTemplate.content) : false,
+    [stdSelectedTemplate]
+  );
+  const stdHasAnyField =
+    stdHasPreparat ||
+    stdTallIndices.length > 0 ||
+    stdFormIndices.length > 0 ||
+    stdHasClock ||
+    stdHasDato ||
+    stdHasDatoMnd;
 
   // Reset on open
   useEffect(() => {
@@ -258,17 +336,50 @@ export function GlobalSearch({ open, onClose }: Props) {
     }
   }, [open]);
 
-  const enterScopeMode = useCallback((entry: SearchEntry) => {
-    setScopedPage(entry);
-    setCommandQuery("");
-    setTimeout(() => inputRef.current?.focus(), 60);
+  const resetStdState = useCallback(() => {
+    setStdTemplates([]);
+    setStdLoading(false);
+    setStdStep(0);
+    setStdSelectedTemplate(null);
+    setStdDropdownIndex(0);
+    setStdTalls({});
+    setStdFormulerings({});
+    setStdClockTime("11:00");
+    setStdClockDay("today");
+    setStdDatoInput("");
   }, []);
+
+  const loadStdTemplates = useCallback(async () => {
+    setStdLoading(true);
+    try {
+      const all = await readCachedOrFetchStandardTekster();
+      setStdTemplates(all.filter((t) => t.isActive !== false));
+    } catch {
+      setStdTemplates([]);
+    } finally {
+      setStdLoading(false);
+    }
+  }, []);
+
+  const enterScopeMode = useCallback(
+    (entry: SearchEntry) => {
+      setScopedPage(entry);
+      setCommandQuery("");
+      if (entry.path === "/standardtekster") {
+        resetStdState();
+        void loadStdTemplates();
+      }
+      setTimeout(() => inputRef.current?.focus(), 60);
+    },
+    [loadStdTemplates, resetStdState]
+  );
 
   const exitScopeMode = useCallback(() => {
     setScopedPage(null);
     setCommandQuery("");
+    resetStdState();
     setTimeout(() => inputRef.current?.focus(), 30);
-  }, []);
+  }, [resetStdState]);
 
   const navigateTo = useCallback(
     (entry: SearchEntry, withCommand = false) => {
@@ -281,6 +392,90 @@ export function GlobalSearch({ open, onClose }: Props) {
     },
     [navigate, onClose, command, commandQuery]
   );
+
+  const selectStdTemplate = useCallback(
+    (template: StandardTekst) => {
+      setStdSelectedTemplate(template);
+      setStdStep(1);
+      setCommandQuery("");
+      setStdDropdownIndex(0);
+
+      const tallInds = getTallTokenIndices(template.content);
+      const nextTalls: Record<number, string> = {};
+      for (const i of tallInds) nextTalls[i] = "";
+      setStdTalls(nextTalls);
+
+      const formInds = getFormuleringTokenIndices(template.content);
+      const nextForms: Record<number, string> = {};
+      for (const i of formInds) nextForms[i] = "";
+      setStdFormulerings(nextForms);
+
+      setStdClockTime("11:00");
+      setStdClockDay("today");
+      setStdDatoInput("");
+
+      setTimeout(() => inputRef.current?.focus(), 60);
+    },
+    []
+  );
+
+  const goBackToStdStep0 = useCallback(() => {
+    setStdStep(0);
+    setStdSelectedTemplate(null);
+    setStdDropdownIndex(0);
+    setStdTalls({});
+    setStdFormulerings({});
+    setCommandQuery("");
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }, []);
+
+  const navigateWithStdPrefill = useCallback(() => {
+    if (!scopedPage || !stdSelectedTemplate) return;
+
+    const palettePrefill: Record<string, unknown> = {
+      templateId: stdSelectedTemplate.id,
+    };
+
+    const hasPreparat = /\{\{\s*PREPARAT\d*\s*\}\}|\bPREPARAT\d*\b/i.test(
+      stdSelectedTemplate.content
+    );
+    if (hasPreparat && commandQuery.trim()) {
+      palettePrefill.preparatText = commandQuery.trim();
+    }
+
+    const tallInds = getTallTokenIndices(stdSelectedTemplate.content);
+    if (tallInds.length) palettePrefill.tallValues = stdTalls;
+
+    const formInds = getFormuleringTokenIndices(stdSelectedTemplate.content);
+    if (formInds.length) palettePrefill.formuleringValues = stdFormulerings;
+
+    if (templateHasKlokkeslettDagToken(stdSelectedTemplate.content) && stdClockTime) {
+      palettePrefill.clockTime = stdClockTime;
+      palettePrefill.clockDay = stdClockDay;
+    }
+
+    if (
+      (templateHasDatoToken(stdSelectedTemplate.content) ||
+        templateHasDatoMndToken(stdSelectedTemplate.content)) &&
+      stdDatoInput
+    ) {
+      palettePrefill.datoInput = stdDatoInput;
+    }
+
+    navigate(scopedPage.path, { state: { palettePrefill } });
+    onClose();
+  }, [
+    scopedPage,
+    stdSelectedTemplate,
+    commandQuery,
+    stdTalls,
+    stdFormulerings,
+    stdClockTime,
+    stdClockDay,
+    stdDatoInput,
+    navigate,
+    onClose,
+  ]);
 
   const handleItemClick = useCallback((entry: SearchEntry) => {
     const hasCommand = Boolean(PAGE_COMMANDS[entry.path]);
@@ -317,6 +512,44 @@ export function GlobalSearch({ open, onClose }: Props) {
       const isCtrlCmd = e.ctrlKey || e.metaKey;
 
       if (isScoped) {
+        // ── Standardtekster multi-step keyboard handling ──
+        if (isStdScoped) {
+          if (stdStep === 0) {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setStdDropdownIndex((i) => Math.min(i + 1, stdFilteredTemplates.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setStdDropdownIndex((i) => Math.max(i - 1, 0));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              const t = stdFilteredTemplates[stdDropdownIndex];
+              if (t) selectStdTemplate(t);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              if (commandQuery) setCommandQuery("");
+              else exitScopeMode();
+            } else if (e.key === "Backspace" && commandQuery === "") {
+              e.preventDefault();
+              exitScopeMode();
+            }
+          } else {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              navigateWithStdPrefill();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              if (commandQuery) setCommandQuery("");
+              else goBackToStdStep0();
+            } else if (e.key === "Backspace" && commandQuery === "") {
+              e.preventDefault();
+              goBackToStdStep0();
+            }
+          }
+          return;
+        }
+
+        // ── Other pages scoped keyboard handling ──
         if (e.key === "Escape") {
           e.preventDefault();
           if (commandQuery) {
@@ -358,8 +591,10 @@ export function GlobalSearch({ open, onClose }: Props) {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
-    open, isScoped, entries, activeIndex, scopedPage, commandQuery,
+    open, isScoped, isStdScoped, entries, activeIndex, scopedPage, commandQuery,
+    stdStep, stdFilteredTemplates, stdDropdownIndex,
     navigateTo, enterScopeMode, exitScopeMode, onClose,
+    selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill,
   ]);
 
   const shortcutLabel = "Space";
@@ -420,6 +655,24 @@ export function GlobalSearch({ open, onClose }: Props) {
           />
         )}
 
+        {/* Standardtekster: selected template chip in step 1 */}
+        {isStdScoped && stdStep === 1 && stdSelectedTemplate && (
+          <Chip
+            label={stdSelectedTemplate.title}
+            size="small"
+            onDelete={goBackToStdStep0}
+            sx={{
+              flexShrink: 0,
+              maxWidth: 200,
+              fontWeight: 500,
+              fontSize: "0.75rem",
+              backgroundColor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)",
+              "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" },
+            }}
+          />
+        )}
+
         {/* The actual input */}
         <TextField
           inputRef={inputRef}
@@ -428,7 +681,17 @@ export function GlobalSearch({ open, onClose }: Props) {
             if (isScoped) setCommandQuery(e.target.value);
             else setQuery(e.target.value);
           }}
-          placeholder={isScoped ? (command?.placeholder ?? "") : "Søk etter side..."}
+          placeholder={
+            isStdScoped
+              ? stdStep === 0
+                ? (command?.placeholder ?? "Søk etter standardtekst...")
+                : stdHasPreparat
+                ? "Preparat / varenummer..."
+                : ""
+              : isScoped
+              ? (command?.placeholder ?? "")
+              : "Søk etter side..."
+          }
           fullWidth
           variant="standard"
           InputProps={{
@@ -465,63 +728,249 @@ export function GlobalSearch({ open, onClose }: Props) {
 
       {/* ── Results / command hint ── */}
       {isScoped ? (
-        // Scoped command mode: show syntax hint + live preview
-        <Box sx={{ px: 3, py: 2.5 }}>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 1.5,
-              p: 2,
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.1 : 0.06),
-              border: (theme) =>
-                `1px solid ${alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.25 : 0.18)}`,
-            }}
-          >
-            <LightbulbOutlinedIcon
-              sx={{ fontSize: 18, color: scopedPage!.color, mt: 0.25, flexShrink: 0 }}
-            />
-            <Box>
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: 500, color: "text.primary", mb: 0.25 }}
-              >
-                {command?.placeholder}
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
-                f.eks. {command?.example}
-              </Typography>
+        isStdScoped ? (
+          stdStep === 0 ? (
+            // ── Standardtekster step 0: template search dropdown ──
+            <Box sx={{ maxHeight: 360, overflowY: "auto" }}>
+              {stdLoading ? (
+                <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : stdFilteredTemplates.length === 0 ? (
+                <Box sx={{ py: 4, textAlign: "center" }}>
+                  <Typography color="text.secondary" variant="body2">
+                    {commandQuery.trim()
+                      ? `Ingen standardtekster for «${commandQuery}»`
+                      : "Ingen standardtekster funnet"}
+                  </Typography>
+                </Box>
+              ) : (
+                <List disablePadding sx={{ py: 0.5 }}>
+                  {stdFilteredTemplates.map((t, i) => {
+                    const isActive = i === stdDropdownIndex;
+                    return (
+                      <ListItemButton
+                        key={t.id}
+                        selected={isActive}
+                        onClick={() => selectStdTemplate(t)}
+                        onMouseMove={() => setStdDropdownIndex(i)}
+                        sx={{
+                          mx: 0.75,
+                          my: 0.25,
+                          borderRadius: 2,
+                          px: 1.5,
+                          py: 1,
+                          borderLeft: `3px solid ${isActive ? "#4BC76A" : "transparent"}`,
+                          transition: "background-color 80ms, border-color 80ms",
+                          "&.Mui-selected": {
+                            backgroundColor: (theme) =>
+                              alpha("#4BC76A", theme.palette.mode === "dark" ? 0.16 : 0.09),
+                          },
+                          "&.Mui-selected:hover": {
+                            backgroundColor: (theme) =>
+                              alpha("#4BC76A", theme.palette.mode === "dark" ? 0.2 : 0.12),
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 36, color: "#4BC76A" }}>
+                          <DescriptionIcon sx={{ fontSize: 20 }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={t.title}
+                          secondary={t.category ?? undefined}
+                          primaryTypographyProps={{
+                            fontWeight: isActive ? 600 : 400,
+                            fontSize: "0.92rem",
+                          }}
+                          secondaryTypographyProps={{ fontSize: "0.73rem", sx: { opacity: 0.6 } }}
+                        />
+                        {isActive && (
+                          <KeyboardReturnRoundedIcon
+                            sx={{ fontSize: 16, color: "text.disabled", ml: 1 }}
+                          />
+                        )}
+                      </ListItemButton>
+                    );
+                  })}
+                </List>
+              )}
             </Box>
-          </Box>
+          ) : (
+            // ── Standardtekster step 1: field form ──
+            <Box sx={{ px: 2.5, py: 2, maxHeight: 400, overflowY: "auto" }}>
+              {!stdHasAnyField ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: (theme) =>
+                      alpha("#4BC76A", theme.palette.mode === "dark" ? 0.1 : 0.06),
+                    border: (theme) =>
+                      `1px solid ${alpha("#4BC76A", theme.palette.mode === "dark" ? 0.25 : 0.18)}`,
+                  }}
+                >
+                  <CheckCircleOutlineRoundedIcon sx={{ fontSize: 18, color: "#4BC76A" }} />
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    Ingen felt å fylle ut — trykk Enter for å åpne malen
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  {stdHasPreparat && (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <LightbulbOutlinedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Skriv preparat / varenummer i søkefeltet over
+                      </Typography>
+                    </Box>
+                  )}
 
-          {/* Live parse preview */}
-          {preview && (
+                  {stdTallIndices.map((idx, pos) => (
+                    <TextField
+                      key={`tall-${idx}`}
+                      label={stdTallIndices.length > 1 ? `Antall ${pos + 1}` : "Antall"}
+                      value={stdTalls[idx] ?? ""}
+                      onChange={(e) =>
+                        setStdTalls((prev) => ({ ...prev, [idx]: e.target.value }))
+                      }
+                      size="small"
+                      fullWidth
+                      inputProps={{ inputMode: "decimal" }}
+                    />
+                  ))}
+
+                  {stdFormIndices.map((idx, pos) => (
+                    <TextField
+                      key={`form-${idx}`}
+                      label={stdFormIndices.length > 1 ? `Formulering ${pos + 1}` : "Formulering"}
+                      placeholder="tablett, kapsel, ml..."
+                      value={stdFormulerings[idx] ?? ""}
+                      onChange={(e) =>
+                        setStdFormulerings((prev) => ({ ...prev, [idx]: e.target.value }))
+                      }
+                      size="small"
+                      fullWidth
+                    />
+                  ))}
+
+                  {stdHasClock && (
+                    <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                      <TextField
+                        label="Klokkeslett"
+                        value={stdClockTime}
+                        onChange={(e) => setStdClockTime(e.target.value)}
+                        size="small"
+                        sx={{ width: 130 }}
+                        placeholder="11:00"
+                      />
+                      <Box sx={{ display: "flex", gap: 0.5 }}>
+                        {(["today", "tomorrow"] as const).map((day) => (
+                          <Box
+                            key={day}
+                            onClick={() => setStdClockDay(day)}
+                            sx={{
+                              px: 1.5,
+                              py: 0.5,
+                              borderRadius: 1.5,
+                              fontSize: "0.78rem",
+                              cursor: "pointer",
+                              fontWeight: stdClockDay === day ? 600 : 400,
+                              border: (theme) =>
+                                `1px solid ${
+                                  stdClockDay === day
+                                    ? "#4BC76A"
+                                    : theme.palette.divider
+                                }`,
+                              backgroundColor: (theme) =>
+                                stdClockDay === day
+                                  ? alpha("#4BC76A", theme.palette.mode === "dark" ? 0.18 : 0.1)
+                                  : "transparent",
+                              color: stdClockDay === day ? "#4BC76A" : "text.secondary",
+                              userSelect: "none",
+                            }}
+                          >
+                            {day === "today" ? "I dag" : "I morgen"}
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {(stdHasDato || stdHasDatoMnd) && (
+                    <TextField
+                      label="Dato"
+                      value={stdDatoInput}
+                      onChange={(e) => setStdDatoInput(e.target.value)}
+                      size="small"
+                      fullWidth
+                      placeholder="dd.mm.yyyy"
+                    />
+                  )}
+                </Box>
+              )}
+            </Box>
+          )
+        ) : (
+          // ── Other pages: existing hint card + live preview ──
+          <Box sx={{ px: 3, py: 2.5 }}>
             <Box
               sx={{
-                mt: 1.5,
-                px: 2,
-                py: 1,
-                borderRadius: 1.5,
-                backgroundColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
-                border: (theme) => `1px solid ${theme.palette.divider}`,
                 display: "flex",
-                alignItems: "center",
-                gap: 1,
+                alignItems: "flex-start",
+                gap: 1.5,
+                p: 2,
+                borderRadius: 2,
+                backgroundColor: (theme) =>
+                  alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.1 : 0.06),
+                border: (theme) =>
+                  `1px solid ${alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.25 : 0.18)}`,
               }}
             >
-              <scopedPage.Icon sx={{ fontSize: 16, color: scopedPage!.color, flexShrink: 0 }} />
-              <Typography
-                variant="caption"
-                sx={{ color: "text.secondary", fontFamily: "monospace" }}
-              >
-                {preview}
-              </Typography>
+              <LightbulbOutlinedIcon
+                sx={{ fontSize: 18, color: scopedPage!.color, mt: 0.25, flexShrink: 0 }}
+              />
+              <Box>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 500, color: "text.primary", mb: 0.25 }}
+                >
+                  {command?.placeholder}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+                  f.eks. {command?.example}
+                </Typography>
+              </Box>
             </Box>
-          )}
-        </Box>
+
+            {preview && (
+              <Box
+                sx={{
+                  mt: 1.5,
+                  px: 2,
+                  py: 1,
+                  borderRadius: 1.5,
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <scopedPage.Icon sx={{ fontSize: 16, color: scopedPage!.color, flexShrink: 0 }} />
+                <Typography
+                  variant="caption"
+                  sx={{ color: "text.secondary", fontFamily: "monospace" }}
+                >
+                  {preview}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )
       ) : (
         // Normal mode: result list
         <Box sx={{ maxHeight: 420, overflowY: "auto" }}>
@@ -600,10 +1049,26 @@ export function GlobalSearch({ open, onClose }: Props) {
         }}
       >
         {isScoped ? (
-          <>
-            <KbdHint keys={["↵"]} label={`Gå til ${scopedPage!.label}`} />
-            <KbdHint keys={["Esc"]} label="tilbake" />
-          </>
+          isStdScoped ? (
+            stdStep === 0 ? (
+              <>
+                <KbdHint keys={["↑", "↓"]} label="naviger" />
+                <KbdHint keys={["↵"]} label="velg mal" />
+                <KbdHint keys={["Esc"]} label="tilbake" />
+              </>
+            ) : (
+              <>
+                <KbdHint keys={["Tab"]} label="neste felt" />
+                <KbdHint keys={["↵"]} label="åpne" />
+                <KbdHint keys={["Esc"]} label="velg annen mal" />
+              </>
+            )
+          ) : (
+            <>
+              <KbdHint keys={["↵"]} label={`Gå til ${scopedPage!.label}`} />
+              <KbdHint keys={["Esc"]} label="tilbake" />
+            </>
+          )
         ) : (
           <>
             <KbdHint keys={["↑", "↓"]} label="naviger" />

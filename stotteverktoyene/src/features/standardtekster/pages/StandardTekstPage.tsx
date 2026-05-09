@@ -60,6 +60,38 @@ type OMEQStandardtekstPrefill = {
 };
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
+type PalettePrefill = {
+  templateId: string;
+  preparatText?: string;
+  tallValues?: Record<number, string>;
+  formuleringValues?: Record<number, string>;
+  clockTime?: string;
+  clockDay?: "today" | "tomorrow";
+  datoInput?: string;
+};
+
+function parsePalettePrefill(value: unknown): PalettePrefill | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<PalettePrefill>;
+  if (typeof candidate.templateId !== "string" || !candidate.templateId.trim()) return null;
+
+  const result: PalettePrefill = { templateId: candidate.templateId.trim() };
+  if (typeof candidate.preparatText === "string" && candidate.preparatText.trim())
+    result.preparatText = candidate.preparatText.trim();
+  if (candidate.tallValues && typeof candidate.tallValues === "object")
+    result.tallValues = candidate.tallValues as Record<number, string>;
+  if (candidate.formuleringValues && typeof candidate.formuleringValues === "object")
+    result.formuleringValues = candidate.formuleringValues as Record<number, string>;
+  if (typeof candidate.clockTime === "string" && candidate.clockTime.trim())
+    result.clockTime = candidate.clockTime.trim();
+  if (candidate.clockDay === "today" || candidate.clockDay === "tomorrow")
+    result.clockDay = candidate.clockDay;
+  if (typeof candidate.datoInput === "string" && candidate.datoInput.trim())
+    result.datoInput = candidate.datoInput.trim();
+
+  return result;
+}
+
 type ClockTallDay = "today" | "tomorrow";
 const CLOCK_TALL_OPTIONS = ["11:00", "14:00", "15:00"] as const;
 const DEFAULT_CLOCK_TALL_TIME = "11:00";
@@ -258,6 +290,10 @@ export default function StandardTekstPage() {
   const appliedOmeqPrefillRequestIdRef = useRef<number | null>(null);
   const [pendingOmeqPrefill, setPendingOmeqPrefill] = useState<OMEQStandardtekstPrefill | null>(null);
   const protectedOmeqSelectedIdRef = useRef<string | null>(null);
+
+  const appliedPalettePrefillIdRef = useRef<string | null>(null);
+  const [pendingPalettePrefill, setPendingPalettePrefill] = useState<PalettePrefill | null>(null);
+  const protectedPaletteSelectedIdRef = useRef<string | null>(null);
 
   // Start with no selected template after initial load (so the user actively selects one)
   useEffect(() => {
@@ -933,8 +969,12 @@ export default function StandardTekstPage() {
     const shouldApplyOmeqPrefill =
       Boolean(pending && selected) &&
       selected!.title.trim().toLowerCase() === pending!.templateTitle.trim().toLowerCase();
+    const pendingPalette = pendingPalettePrefill;
+    const shouldApplyPalettePrefill =
+      Boolean(pendingPalette && selected) && selected!.id === pendingPalette!.templateId;
     const shouldProtectCurrentSelection =
-      Boolean(protectedOmeqSelectedIdRef.current) && protectedOmeqSelectedIdRef.current === selectedId;
+      (Boolean(protectedOmeqSelectedIdRef.current) && protectedOmeqSelectedIdRef.current === selectedId) ||
+      (Boolean(protectedPaletteSelectedIdRef.current) && protectedPaletteSelectedIdRef.current === selectedId);
 
     setIsEditing(shouldAutoEditNew);
     setDraftTitle(selected?.title ?? "");
@@ -981,6 +1021,42 @@ export default function StandardTekstPage() {
       } catch {
         // ignore
       }
+    } else if (shouldApplyPalettePrefill && selected && pendingPalette) {
+      resetPreparatRows();
+      setVirkestoffByKey({});
+      setFormuleringByPreparatKey({});
+
+      if (pendingPalette.preparatText) {
+        addPickedPreparat(pendingPalette.preparatText, pendingPalette.preparatText);
+      }
+
+      const normalizedContent = normalizeTemplateContent(selected.content);
+      const nextTall = buildInitialTallValues(normalizedContent);
+      if (pendingPalette.tallValues) {
+        for (const [k, v] of Object.entries(pendingPalette.tallValues)) {
+          nextTall[Number(k)] = v;
+        }
+      }
+      setTallByIndex(nextTall);
+
+      if (pendingPalette.formuleringValues) {
+        const nextF: Record<number, string> = { 0: "" };
+        for (const [k, v] of Object.entries(pendingPalette.formuleringValues)) {
+          nextF[Number(k)] = v;
+        }
+        setFormuleringByIndex(nextF);
+      }
+
+      const clockTimeToUse = pendingPalette.clockTime ?? DEFAULT_CLOCK_TALL_TIME;
+      setClockTime(clockTimeToUse);
+      setClockDay(pendingPalette.clockDay ?? getAutomaticClockTallDay(clockTimeToUse));
+      setClockCustomMode(true);
+      setDatoInput(pendingPalette.datoInput ?? "");
+      setErrorLocal(null);
+
+      protectedPaletteSelectedIdRef.current = selected.id;
+      setPendingPalettePrefill(null);
+      appliedPalettePrefillIdRef.current = pendingPalette.templateId;
     } else if (!shouldProtectCurrentSelection && !preserveInputsOnNextSelectRef.current) {
       resetPreparatRows();
       setVirkestoffByKey({});
@@ -1015,6 +1091,7 @@ export default function StandardTekstPage() {
     activeTemplateContent,
     canManageStandardTekster,
     pendingOmeqPrefill,
+    pendingPalettePrefill,
     resetPreparatRows,
     selected,
     selectedId,
@@ -1031,6 +1108,12 @@ export default function StandardTekstPage() {
     if (!protectedOmeqSelectedIdRef.current) return;
     if (protectedOmeqSelectedIdRef.current === selectedId) return;
     protectedOmeqSelectedIdRef.current = null;
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!protectedPaletteSelectedIdRef.current) return;
+    if (protectedPaletteSelectedIdRef.current === selectedId) return;
+    protectedPaletteSelectedIdRef.current = null;
   }, [selectedId]);
 
   // Auto-focus standardtekst search on first load when no template is selected
@@ -1060,6 +1143,24 @@ export default function StandardTekstPage() {
       setSelectedId(target.id);
     }
   }, [items, omeqPrefill, selected, selectedId, setSelectedId]);
+
+  // Detect palette prefill from global search and queue it
+  useEffect(() => {
+    const raw = (location.state as { palettePrefill?: unknown } | null)?.palettePrefill;
+    if (!raw || !items.length) return;
+    const parsed = parsePalettePrefill(raw);
+    if (!parsed) return;
+    if (appliedPalettePrefillIdRef.current === parsed.templateId) return;
+
+    const target = items.find((item) => item.id === parsed.templateId);
+    if (!target) return;
+
+    setPendingPalettePrefill(parsed);
+    if (selectedId !== target.id) {
+      preserveInputsOnNextSelectRef.current = true;
+      setSelectedId(target.id);
+    }
+  }, [items, location.state, selectedId, setSelectedId]);
 
   const startEdit = () => {
     if (!canManageStandardTekster) return;
