@@ -333,44 +333,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
           </Box>
         </Box>
 
-        {/* ─── Treatment alternatives ─────────────────────────────────────── */}
-        <Box sx={{
-          background: cardBg,
-          border: `1px solid ${border}`,
-          borderRadius: 3, p: 2.5, mb: 3,
-        }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: 15, color: textMain }}>
-              Behandlingsalternativer
-            </Typography>
-            <svg aria-label="Rangert etter anbefaling" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "help", flexShrink: 0, color: textMain }}>
-              <g transform="matrix(0.43 0 0 0.43 12 12)">
-                <path style={{ fill: "currentColor" }} transform="translate(-25, -25)" d="M 24.5 2 C 21.472656 2 19 4.472656 19 7.5 C 19 10.527344 21.472656 13 24.5 13 C 27.527344 13 30 10.527344 30 7.5 C 30 4.472656 27.527344 2 24.5 2 Z M 24.5 4 C 26.445313 4 28 5.554688 28 7.5 C 28 9.445313 26.445313 11 24.5 11 C 22.554688 11 21 9.445313 21 7.5 C 21 5.554688 22.554688 4 24.5 4 Z M 15 16 C 14.449219 16 14 16.449219 14 17 L 14 23 C 14 23.550781 14.449219 24 15 24 L 20 24 L 20 40 L 15 40 C 14.449219 40 14 40.449219 14 41 L 14 47 C 14 47.550781 14.449219 48 15 48 L 35 48 C 35.550781 48 36 47.550781 36 47 L 36 41 C 36 40.449219 35.550781 40 35 40 L 30 40 L 30 17 C 30 16.449219 29.550781 16 29 16 Z M 16 18 L 28 18 L 28 41 C 28 41.550781 28.449219 42 29 42 L 34 42 L 34 46 L 16 46 L 16 42 L 21 42 C 21.550781 42 22 41.550781 22 41 L 22 23 C 22 22.449219 21.550781 22 21 22 L 16 22 Z" />
-              </g>
-            </svg>
-          </Box>
-
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
-            {MEDICINES.filter(m => m.priority).map(med => (
-              <TreatmentCard key={med.name} med={med} />
-            ))}
-          </Box>
-
-          {/* Footnotes */}
-          <Box sx={{
-            mt: 2, pt: 1.75,
-            borderTop: `1px solid ${border}`,
-            display: "flex", flexDirection: "column", gap: 0.75,
-          }}>
-            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
-              <strong style={{ color: textMain }}>*</strong> Medisiner som inneholder kalsiumkarbonat (Gaviscon mikstur, Galieve, Titralac) bør ikke brukes oftere enn høyst fire ganger om dagen.
-            </Typography>
-            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
-              <strong style={{ color: textMain }}>**</strong> Kontakt lege hvis du har behov for å bruke famotidin (Pepcid, Pepcidduo) i mer enn to uker sammenhengende.
-            </Typography>
-          </Box>
-        </Box>
-
         {/* ─── Symptoms ───────────────────────────────────────────────────── */}
         <Box sx={{
           background: cardBg,
@@ -410,6 +372,44 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             flexShrink: 0,
           }}>
             <span style={{ fontSize: 42 }}>🤰</span>
+          </Box>
+        </Box>
+
+        {/* ─── Treatment alternatives ─────────────────────────────────────── */}
+        <Box sx={{
+          background: cardBg,
+          border: `1px solid ${border}`,
+          borderRadius: 3, p: 2.5, mb: 3,
+        }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: 15, color: textMain }}>
+              Behandlingsalternativer
+            </Typography>
+            <svg aria-label="Rangert etter anbefaling" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "help", flexShrink: 0, color: textMain }}>
+              <g transform="matrix(0.43 0 0 0.43 12 12)">
+                <path style={{ fill: "currentColor" }} transform="translate(-25, -25)" d="M 24.5 2 C 21.472656 2 19 4.472656 19 7.5 C 19 10.527344 21.472656 13 24.5 13 C 27.527344 13 30 10.527344 30 7.5 C 30 4.472656 27.527344 2 24.5 2 Z M 24.5 4 C 26.445313 4 28 5.554688 28 7.5 C 28 9.445313 26.445313 11 24.5 11 C 22.554688 11 21 9.445313 21 7.5 C 21 5.554688 22.554688 4 24.5 4 Z M 15 16 C 14.449219 16 14 16.449219 14 17 L 14 23 C 14 23.550781 14.449219 24 15 24 L 20 24 L 20 40 L 15 40 C 14.449219 40 14 40.449219 14 41 L 14 47 C 14 47.550781 14.449219 48 15 48 L 35 48 C 35.550781 48 36 47.550781 36 47 L 36 41 C 36 40.449219 35.550781 40 35 40 L 30 40 L 30 17 C 30 16.449219 29.550781 16 29 16 Z M 16 18 L 28 18 L 28 41 C 28 41.550781 28.449219 42 29 42 L 34 42 L 34 46 L 16 46 L 16 42 L 21 42 C 21.550781 42 22 41.550781 22 41 L 22 23 C 22 22.449219 21.550781 22 21 22 L 16 22 Z" />
+              </g>
+            </svg>
+          </Box>
+
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+            {MEDICINES.filter(m => m.priority).map(med => (
+              <TreatmentCard key={med.name} med={med} />
+            ))}
+          </Box>
+
+          {/* Footnotes */}
+          <Box sx={{
+            mt: 2, pt: 1.75,
+            borderTop: `1px solid ${border}`,
+            display: "flex", flexDirection: "column", gap: 0.75,
+          }}>
+            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
+              <strong style={{ color: textMain }}>*</strong> Medisiner som inneholder kalsiumkarbonat (Gaviscon mikstur, Galieve, Titralac) bør ikke brukes oftere enn høyst fire ganger om dagen.
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
+              <strong style={{ color: textMain }}>**</strong> Kontakt lege hvis du har behov for å bruke famotidin (Pepcid, Pepcidduo) i mer enn to uker sammenhengende.
+            </Typography>
           </Box>
         </Box>
 
