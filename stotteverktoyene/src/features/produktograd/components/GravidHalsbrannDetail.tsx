@@ -11,6 +11,7 @@ interface Medicine {
   comment: string;
   priority?: "first" | "second" | "need" | "doctor" | "warning";
   priorityLabel?: string;
+  faqKey?: string;
 }
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ const MEDICINES: Medicine[] = [
     comment: "Danner et skumlag over mageinnholdet og hindrer det fra å stige opp. Trygt for gravide.",
     priority: "first",
     priorityLabel: "Førstevalg",
+    faqKey: "gaviscon",
   },
   {
     name: "Gaviscon mikstur* / Galieve*",
@@ -31,6 +33,7 @@ const MEDICINES: Medicine[] = [
     comment: "Inneholder alginat og syrenøytraliserende. Maks 4 ganger daglig pga. kalsiumkarbonat. Trygt for gravide.",
     priority: "first",
     priorityLabel: "Førstevalg",
+    faqKey: "gaviscon",
   },
   // ── Syrenøytraliserende — Førstevalg ──
   {
@@ -40,6 +43,7 @@ const MEDICINES: Medicine[] = [
     comment: "Syrenøytraliserende middel. Titralac inneholder kalsiumkarbonat – maks 4 ganger daglig. Godt dokumentert i graviditet.",
     priority: "first",
     priorityLabel: "Førstevalg",
+    faqKey: "novaluzid",
   },
   {
     name: "Natron NAF",
@@ -48,6 +52,7 @@ const MEDICINES: Medicine[] = [
     comment: "Natriumbikarbonat. Brukes som kortidsbehandling. Ikke anbefalt ved høyt blodtrykk eller ved stort inntak over tid.",
     priority: "warning",
     priorityLabel: "Frarådes",
+    faqKey: "natron",
   },
   // ── H2-blokker — Ved behov ──
   {
@@ -57,6 +62,7 @@ const MEDICINES: Medicine[] = [
     comment: "Famotidin reduserer syreproduksjonen. Brukes ved behov. Kontakt lege ved bruk i mer enn 2 uker sammenhengende.",
     priority: "second",
     priorityLabel: "Andrevalg",
+    faqKey: "pepcid",
   },
   {
     name: "Pepciduo**",
@@ -65,6 +71,7 @@ const MEDICINES: Medicine[] = [
     comment: "Kombinasjon av famotidin og syrenøytraliserende. Kontakt lege ved bruk i mer enn 2 uker sammenhengende.",
     priority: "second",
     priorityLabel: "Andrevalg",
+    faqKey: "pepcid",
   },
   // ── PPI — Kontakt lege først ──
   {
@@ -74,6 +81,7 @@ const MEDICINES: Medicine[] = [
     comment: "Syrehemmende middel. Mest erfaring av PPI-preparatene i graviditet. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
+    faqKey: "ppi",
   },
   {
     name: "Nexium / Esomeprazol",
@@ -82,6 +90,7 @@ const MEDICINES: Medicine[] = [
     comment: "Syrehemmende middel. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
+    faqKey: "ppi",
   },
   {
     name: "Somac / Somac Control / Pantoprazol",
@@ -90,6 +99,7 @@ const MEDICINES: Medicine[] = [
     comment: "Syrehemmende middel. Anbefales ikke som rutinebehandling. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
+    faqKey: "ppi",
   },
   {
     name: "Lanzor Melt / Lansoprazol",
@@ -98,6 +108,7 @@ const MEDICINES: Medicine[] = [
     comment: "Syrehemmende middel. Les mer i pakningsvedlegget. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
+    faqKey: "ppi",
   },
 ];
 
@@ -190,7 +201,7 @@ function priorityColor(p: Medicine["priority"]): string {
 
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
-function TreatmentCard({ med }: { med: Medicine }) {
+function TreatmentCard({ med, onLesMer }: { med: Medicine; onLesMer?: () => void }) {
   const color = priorityColor(med.priority);
 
   return (
@@ -254,6 +265,33 @@ function TreatmentCard({ med }: { med: Medicine }) {
           {med.comment}
         </div>
 
+        {/* Les mer link */}
+        {onLesMer && (
+          <button
+            onClick={e => { e.stopPropagation(); onLesMer(); }}
+            style={{
+              marginTop: 12, alignSelf: "flex-start",
+              display: "inline-flex", alignItems: "center", gap: 4,
+              background: `${color}12`, border: `1px solid ${color}30`,
+              borderRadius: 999, padding: "3px 10px",
+              cursor: "pointer", fontSize: 11, fontWeight: 700, color,
+              transition: "background 150ms, border-color 150ms",
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = `${color}22`;
+              (e.currentTarget as HTMLButtonElement).style.borderColor = `${color}60`;
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = `${color}12`;
+              (e.currentTarget as HTMLButtonElement).style.borderColor = `${color}30`;
+            }}
+          >
+            Les mer
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
 
       </div>
     </div>
@@ -265,11 +303,17 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
   const theme = useTheme();
   const dk = theme.palette.mode === "dark";
   const [activeTab, setActiveTab] = useState<TabKey>("rad");
-  const [faqOpen, setFaqOpen] = useState(false);
-  const [faq2Open, setFaq2Open] = useState(false);
-  const [faq3Open, setFaq3Open] = useState(false);
-  const [faq4Open, setFaq4Open] = useState(false);
-  const [faq5Open, setFaq5Open] = useState(false);
+  const [openFaqs, setOpenFaqs] = useState<Record<string, boolean>>({});
+
+  function toggleFaq(key: string) {
+    setOpenFaqs(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+  function handleLesMer(key: string) {
+    setOpenFaqs(prev => ({ ...prev, [key]: true }));
+    setTimeout(() => {
+      document.getElementById(`faq-${key}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 60);
+  }
 
   const textMain  = dk ? "#f0e8f4" : "#0f172a";
   const textSub   = dk ? "#8e7d98" : "#64748b";
@@ -390,7 +434,7 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5, mb: 2 }}>
             {MEDICINES.filter(m => m.priority).map(med => (
-              <TreatmentCard key={med.name} med={med} />
+              <TreatmentCard key={med.name} med={med} onLesMer={med.faqKey ? () => handleLesMer(med.faqKey!) : undefined} />
             ))}
           </Box>
 
@@ -412,12 +456,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
 
           {/* FAQ – Kan gravide bruke Gaviscon / Galieve? */}
           <Box
-            onClick={() => setFaqOpen(o => !o)}
+            id="faq-gaviscon"
+            onClick={() => toggleFaq("gaviscon")}
             sx={{
               mb: 1.5, borderRadius: 3, overflow: "hidden", cursor: "pointer",
-              border: `1.5px solid ${faqOpen ? ACCENT + "55" : (dk ? "#334155" : "#e2e8f0")}`,
+              border: `1.5px solid ${openFaqs["gaviscon"] ? "#16a34a55" : (dk ? "#334155" : "#e2e8f0")}`,
               background: dk ? "#161b27" : "#fff",
-              boxShadow: faqOpen ? `0 0 0 3px ${ACCENT}14` : "0 1px 3px rgba(0,0,0,0.05)",
+              boxShadow: openFaqs["gaviscon"] ? "0 0 0 3px #16a34a14" : "0 1px 3px rgba(0,0,0,0.05)",
               transition: "box-shadow 150ms, border-color 150ms",
             }}
           >
@@ -442,13 +487,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
               </Box>
               {/* Chevron */}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: faqOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: openFaqs["gaviscon"] ? "rotate(180deg)" : "rotate(0deg)" }}>
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Box>
 
             {/* Expandable body */}
-            {faqOpen && (
+            {openFaqs["gaviscon"] && (
               <Box sx={{
                 px: 2, pb: 2,
                 borderTop: `1px solid ${dk ? "#1e293b" : "#f1f5f9"}`,
@@ -482,12 +527,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
 
           {/* FAQ 2 – Novaluzid / Titralac */}
           <Box
-            onClick={() => setFaq2Open(o => !o)}
+            id="faq-novaluzid"
+            onClick={() => toggleFaq("novaluzid")}
             sx={{
               mb: 1.5, borderRadius: 3, overflow: "hidden", cursor: "pointer",
-              border: `1.5px solid ${faq2Open ? ACCENT + "55" : (dk ? "#334155" : "#e2e8f0")}`,
+              border: `1.5px solid ${openFaqs["novaluzid"] ? "#16a34a55" : (dk ? "#334155" : "#e2e8f0")}`,
               background: dk ? "#161b27" : "#fff",
-              boxShadow: faq2Open ? `0 0 0 3px ${ACCENT}14` : "0 1px 3px rgba(0,0,0,0.05)",
+              boxShadow: openFaqs["novaluzid"] ? "0 0 0 3px #16a34a14" : "0 1px 3px rgba(0,0,0,0.05)",
               transition: "box-shadow 150ms, border-color 150ms",
             }}
           >
@@ -511,13 +557,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
                 </Typography>
               </Box>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: faq2Open ? "rotate(180deg)" : "rotate(0deg)" }}>
+                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: openFaqs["novaluzid"] ? "rotate(180deg)" : "rotate(0deg)" }}>
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Box>
 
             {/* Expandable body */}
-            {faq2Open && (
+            {openFaqs["novaluzid"] && (
               <Box sx={{
                 px: 2, pb: 2,
                 borderTop: `1px solid ${dk ? "#1e293b" : "#f1f5f9"}`,
@@ -552,12 +598,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
 
           {/* FAQ 3 – Natron NAF */}
           <Box
-            onClick={() => setFaq3Open(o => !o)}
+            id="faq-natron"
+            onClick={() => toggleFaq("natron")}
             sx={{
               mb: 1.5, borderRadius: 3, overflow: "hidden", cursor: "pointer",
-              border: `1.5px solid ${faq3Open ? "#f59e0b55" : (dk ? "#334155" : "#e2e8f0")}`,
+              border: `1.5px solid ${openFaqs["natron"] ? "#f59e0b55" : (dk ? "#334155" : "#e2e8f0")}`,
               background: dk ? "#161b27" : "#fff",
-              boxShadow: faq3Open ? "0 0 0 3px #f59e0b14" : "0 1px 3px rgba(0,0,0,0.05)",
+              boxShadow: openFaqs["natron"] ? "0 0 0 3px #f59e0b14" : "0 1px 3px rgba(0,0,0,0.05)",
               transition: "box-shadow 150ms, border-color 150ms",
             }}
           >
@@ -581,13 +628,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
                 </Typography>
               </Box>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: faq3Open ? "rotate(180deg)" : "rotate(0deg)" }}>
+                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: openFaqs["natron"] ? "rotate(180deg)" : "rotate(0deg)" }}>
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Box>
 
             {/* Expandable body */}
-            {faq3Open && (
+            {openFaqs["natron"] && (
               <Box sx={{
                 px: 2, pb: 2,
                 borderTop: `1px solid ${dk ? "#1e293b" : "#f1f5f9"}`,
@@ -621,12 +668,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
 
           {/* FAQ 4 – Pepcid / Pepcidduo */}
           <Box
-            onClick={() => setFaq4Open(o => !o)}
+            id="faq-pepcid"
+            onClick={() => toggleFaq("pepcid")}
             sx={{
               mb: 1.5, borderRadius: 3, overflow: "hidden", cursor: "pointer",
-              border: `1.5px solid ${faq4Open ? "#2563eb55" : (dk ? "#334155" : "#e2e8f0")}`,
+              border: `1.5px solid ${openFaqs["pepcid"] ? "#2563eb55" : (dk ? "#334155" : "#e2e8f0")}`,
               background: dk ? "#161b27" : "#fff",
-              boxShadow: faq4Open ? "0 0 0 3px #2563eb14" : "0 1px 3px rgba(0,0,0,0.05)",
+              boxShadow: openFaqs["pepcid"] ? "0 0 0 3px #2563eb14" : "0 1px 3px rgba(0,0,0,0.05)",
               transition: "box-shadow 150ms, border-color 150ms",
             }}
           >
@@ -650,13 +698,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
                 </Typography>
               </Box>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: faq4Open ? "rotate(180deg)" : "rotate(0deg)" }}>
+                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: openFaqs["pepcid"] ? "rotate(180deg)" : "rotate(0deg)" }}>
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Box>
 
             {/* Expandable body */}
-            {faq4Open && (
+            {openFaqs["pepcid"] && (
               <Box sx={{
                 px: 2, pb: 2,
                 borderTop: `1px solid ${dk ? "#1e293b" : "#f1f5f9"}`,
@@ -696,12 +744,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
 
           {/* FAQ 5 – Losec / Nexium / Somac / Lanzo Melt */}
           <Box
-            onClick={() => setFaq5Open(o => !o)}
+            id="faq-ppi"
+            onClick={() => toggleFaq("ppi")}
             sx={{
               mb: 1.5, borderRadius: 3, overflow: "hidden", cursor: "pointer",
-              border: `1.5px solid ${faq5Open ? "#dc262655" : (dk ? "#334155" : "#e2e8f0")}`,
+              border: `1.5px solid ${openFaqs["ppi"] ? "#dc262655" : (dk ? "#334155" : "#e2e8f0")}`,
               background: dk ? "#161b27" : "#fff",
-              boxShadow: faq5Open ? "0 0 0 3px #dc262614" : "0 1px 3px rgba(0,0,0,0.05)",
+              boxShadow: openFaqs["ppi"] ? "0 0 0 3px #dc262614" : "0 1px 3px rgba(0,0,0,0.05)",
               transition: "box-shadow 150ms, border-color 150ms",
             }}
           >
@@ -725,13 +774,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
                 </Typography>
               </Box>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: faq5Open ? "rotate(180deg)" : "rotate(0deg)" }}>
+                style={{ color: textSub, flexShrink: 0, transition: "transform 200ms", transform: openFaqs["ppi"] ? "rotate(180deg)" : "rotate(0deg)" }}>
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Box>
 
             {/* Expandable body */}
-            {faq5Open && (
+            {openFaqs["ppi"] && (
               <Box sx={{
                 px: 2, pb: 2,
                 borderTop: `1px solid ${dk ? "#1e293b" : "#f1f5f9"}`,
