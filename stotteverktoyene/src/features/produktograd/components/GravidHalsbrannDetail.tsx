@@ -2,15 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-type UsageLevel = "yes" | "caution" | "doctor";
 type TabKey = "rad" | "lege" | "kilder";
 
 interface Medicine {
   name: string;
   form: string;
   type: string;
-  usage: UsageLevel;
-  usageLabel: string;
   comment: string;
   priority?: "first" | "second" | "need" | "doctor";
   priorityLabel?: string;
@@ -23,8 +20,6 @@ const MEDICINES: Medicine[] = [
     name: "Gaviscon tyggetabletter",
     form: "Tyggetablett",
     type: "Alginat",
-    usage: "yes",
-    usageLabel: "Ja",
     comment: "Danner et skumlag over mageinnholdet og hindrer det fra å stige opp. Trygt for gravide.",
     priority: "first",
     priorityLabel: "Førstevalg",
@@ -33,8 +28,6 @@ const MEDICINES: Medicine[] = [
     name: "Gaviscon mikstur* / Galieve*",
     form: "Mikstur",
     type: "Alginat + syrenøytraliserende",
-    usage: "yes",
-    usageLabel: "Ja",
     comment: "Inneholder alginat og syrenøytraliserende. Maks 4 ganger daglig pga. kalsiumkarbonat. Trygt for gravide.",
     priority: "first",
     priorityLabel: "Førstevalg",
@@ -44,8 +37,6 @@ const MEDICINES: Medicine[] = [
     name: "Novaluzid / Titralac*",
     form: "Tablett",
     type: "Syrenøytraliserende",
-    usage: "yes",
-    usageLabel: "Ja",
     comment: "Syrenøytraliserende middel. Titralac inneholder kalsiumkarbonat – maks 4 ganger daglig. Godt dokumentert i graviditet.",
     priority: "first",
     priorityLabel: "Førstevalg",
@@ -54,8 +45,6 @@ const MEDICINES: Medicine[] = [
     name: "Natron NAF",
     form: "Pulver/tablett",
     type: "Syrenøytraliserende",
-    usage: "yes",
-    usageLabel: "Ja",
     comment: "Natriumbikarbonat. Brukes som kortidsbehandling. Ikke anbefalt ved høyt blodtrykk eller ved stort inntak over tid.",
     priority: "first",
     priorityLabel: "Førstevalg",
@@ -65,8 +54,6 @@ const MEDICINES: Medicine[] = [
     name: "Pepcid**",
     form: "Tablett",
     type: "H2-blokker (famotidin)",
-    usage: "caution",
-    usageLabel: "Ja",
     comment: "Famotidin reduserer syreproduksjonen. Brukes ved behov. Kontakt lege ved bruk i mer enn 2 uker sammenhengende.",
     priority: "second",
     priorityLabel: "Andrevalg",
@@ -75,8 +62,6 @@ const MEDICINES: Medicine[] = [
     name: "Pepciduo**",
     form: "Tablett",
     type: "H2-blokker + syrenøytraliserende",
-    usage: "caution",
-    usageLabel: "Ja",
     comment: "Kombinasjon av famotidin og syrenøytraliserende. Kontakt lege ved bruk i mer enn 2 uker sammenhengende.",
     priority: "second",
     priorityLabel: "Andrevalg",
@@ -86,8 +71,6 @@ const MEDICINES: Medicine[] = [
     name: "Losec / Omeprazol",
     form: "Kapsel",
     type: "PPI",
-    usage: "doctor",
-    usageLabel: "Kontakt lege først",
     comment: "Syrehemmende middel. Mest erfaring av PPI-preparatene i graviditet. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
@@ -96,8 +79,6 @@ const MEDICINES: Medicine[] = [
     name: "Nexium / Esomeprazol",
     form: "Kapsel/tablett",
     type: "PPI",
-    usage: "doctor",
-    usageLabel: "Kontakt lege først",
     comment: "Syrehemmende middel. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
@@ -106,8 +87,6 @@ const MEDICINES: Medicine[] = [
     name: "Somac / Somac Control / Pantoprazol",
     form: "Tablett",
     type: "PPI",
-    usage: "doctor",
-    usageLabel: "Kontakt lege først",
     comment: "Syrehemmende middel. Anbefales ikke som rutinebehandling. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
@@ -116,8 +95,6 @@ const MEDICINES: Medicine[] = [
     name: "Lanzor Melt / Lansoprazol",
     form: "Smeltetablett",
     type: "PPI",
-    usage: "doctor",
-    usageLabel: "Kontakt lege først",
     comment: "Syrehemmende middel. Les mer i pakningsvedlegget. Brukes kun etter legevurdering.",
     priority: "doctor",
     priorityLabel: "Kontakt lege først",
@@ -154,18 +131,6 @@ const RAD_TIPS = [
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-function usageColor(u: UsageLevel): string {
-  if (u === "yes")     return "#16a34a";
-  if (u === "caution") return "#d97706";
-  return "#dc2626";
-}
-
-function usageBg(u: UsageLevel): string {
-  if (u === "yes")     return "#dcfce7";
-  if (u === "caution") return "#fef3c7";
-  return "#fee2e2";
-}
-
 function priorityColor(p: Medicine["priority"]): string {
   if (p === "first")  return "#16a34a";
   if (p === "second") return "#2563eb";
@@ -240,18 +205,6 @@ function TreatmentCard({ med }: { med: Medicine }) {
         {med.comment}
       </div>
 
-      {/* Usage badge — hidden for doctor priority (already covered by priority badge) */}
-      {med.priority !== "doctor" && (
-        <span style={{
-          display: "inline-flex", alignItems: "center", gap: 4,
-          fontSize: 10.5, fontWeight: 700,
-          color: usageColor(med.usage),
-          background: usageBg(med.usage),
-          borderRadius: 999, padding: "2px 8px", alignSelf: "flex-start",
-        }}>
-          Kan brukes: {med.usageLabel}
-        </span>
-      )}
     </div>
   );
 }
