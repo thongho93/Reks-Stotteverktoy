@@ -29,7 +29,7 @@
   position: relative;
   isolation: isolate;
   --desktop-ui-scale: 1;
-  --std-page-bg: #edf8f1;
+  --std-page-bg: #dcebe2;
   background: var(--std-page-bg);
 }
 
@@ -293,7 +293,7 @@
   padding: 12px 14px 10px;
   border: 1px solid rgba(92, 170, 126, 0.36) !important;
   border-radius: 20px !important;
-  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  background: linear-gradient(180deg, #fbfefc 0%, #f2f9f4 100%);
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 10px 24px rgba(15, 23, 42, 0.06);
@@ -350,7 +350,7 @@
   isolation: isolate;
   border: 1px solid rgba(92, 170, 126, 0.34);
   border-radius: 20px !important;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  background: linear-gradient(180deg, #fbfefc 0%, #f3faf5 100%);
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 14px 32px rgba(15, 23, 42, 0.06);
@@ -905,14 +905,14 @@
 .inputControlCard {
   border: 1px solid rgba(92, 170, 126, 0.38) !important;
   border-radius: 18px !important;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  background: linear-gradient(180deg, #fcfffd 0%, #f2f9f4 100%) !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .timeDateCard {
   border: 1px solid rgba(92, 170, 126, 0.48) !important;
   border-radius: 20px !important;
-  background: linear-gradient(180deg, rgba(240, 249, 244, 0.96) 0%, rgba(232, 245, 238, 0.92) 100%) !important;
+  background: linear-gradient(180deg, rgba(245, 252, 248, 0.98) 0%, rgba(236, 248, 241, 0.94) 100%) !important;
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 10px 22px rgba(92, 170, 126, 0.12);

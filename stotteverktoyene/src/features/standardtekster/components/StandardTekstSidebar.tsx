@@ -929,7 +929,7 @@ export default function StandardTekstSidebar({
                             className={styles.sidebarItem}
                             sx={(theme) => {
                               const greenAccent =
-                                theme.palette.mode === "dark" ? "#8fdab5" : "#5aa97f";
+                                theme.palette.mode === "dark" ? "#8fdab5" : "#8ecfad";
 
                               return {
                                 pl: 2.15,
@@ -961,7 +961,7 @@ export default function StandardTekstSidebar({
                                 "&.Mui-selected": {
                                   backgroundColor: `${alpha(
                                     greenAccent,
-                                    theme.palette.mode === "dark" ? 0.28 : 0.18,
+                                    theme.palette.mode === "dark" ? 0.28 : 0.16,
                                   )} !important`,
                                   borderColor: `${alpha(greenAccent, 0.72)} !important`,
                                   boxShadow: `0 2px 8px ${alpha(greenAccent, 0.28)}`,
@@ -970,14 +970,14 @@ export default function StandardTekstSidebar({
                                 "&.Mui-selected:hover": {
                                   backgroundColor: `${alpha(
                                     greenAccent,
-                                    theme.palette.mode === "dark" ? 0.34 : 0.24,
+                                    theme.palette.mode === "dark" ? 0.34 : 0.2,
                                   )} !important`,
                                 },
 
                                 "&:hover": {
                                   backgroundColor: `${alpha(
                                     greenAccent,
-                                    theme.palette.mode === "dark" ? 0.22 : 0.14,
+                                    theme.palette.mode === "dark" ? 0.22 : 0.12,
                                   )} !important`,
                                   borderColor: `${alpha(greenAccent, 0.66)} !important`,
                                   transform: "translateX(1px)",
