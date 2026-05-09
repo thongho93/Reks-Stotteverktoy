@@ -518,18 +518,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
           </Box>
         </Box>
 
-        {/* ─── Footer disclaimer ─────────────────────────────────────────────── */}
-        <Box sx={{
-          display: "flex", alignItems: "flex-start", gap: 1,
-          background: dk ? "#161b27" : "#f8fafc",
-          border: `1px solid ${border}`, borderRadius: 2, p: "10px 14px",
-        }}>
-          <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>ℹ️</span>
-          <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.7 }}>
-            Informasjonen erstatter ikke individuell vurdering fra helsepersonell. Ved bekymring eller vedvarende plager, kontakt lege.
-          </Typography>
-        </Box>
-
       </Box>
     </Box>
   );
