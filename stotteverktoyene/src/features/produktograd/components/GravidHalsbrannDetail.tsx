@@ -240,16 +240,18 @@ function TreatmentCard({ med }: { med: Medicine }) {
         {med.comment}
       </div>
 
-      {/* Usage badge */}
-      <span style={{
-        display: "inline-flex", alignItems: "center", gap: 4,
-        fontSize: 10.5, fontWeight: 700,
-        color: usageColor(med.usage),
-        background: usageBg(med.usage),
-        borderRadius: 999, padding: "2px 8px", alignSelf: "flex-start",
-      }}>
-        Kan brukes: {med.usageLabel}
-      </span>
+      {/* Usage badge — hidden for doctor priority (already covered by priority badge) */}
+      {med.priority !== "doctor" && (
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          fontSize: 10.5, fontWeight: 700,
+          color: usageColor(med.usage),
+          background: usageBg(med.usage),
+          borderRadius: 999, padding: "2px 8px", alignSelf: "flex-start",
+        }}>
+          Kan brukes: {med.usageLabel}
+        </span>
+      )}
     </div>
   );
 }
