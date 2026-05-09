@@ -150,8 +150,8 @@ function TreatmentCard({ med }: { med: Medicine }) {
       overflow: "hidden",
       display: "flex",
       flexDirection: "column",
-      minWidth: 175,
-      flex: "1 1 175px",
+      minWidth: 190,
+      flex: "1 1 190px",
       boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 6px 20px rgba(0,0,0,0.07)",
       transition: "box-shadow 160ms ease, transform 160ms ease",
     }}
@@ -188,10 +188,11 @@ function TreatmentCard({ med }: { med: Medicine }) {
 
         {/* Type tag */}
         <div style={{
-          display: "inline-flex", alignSelf: "flex-start",
+          display: "inline-block",
           fontSize: 10, fontWeight: 600, color: "#64748b",
           background: "#f1f5f9", borderRadius: 6, padding: "2px 8px",
           border: "1px solid #e2e8f0", marginBottom: 10,
+          wordBreak: "break-word", lineHeight: 1.5,
         }}>
           {med.type}
         </div>
