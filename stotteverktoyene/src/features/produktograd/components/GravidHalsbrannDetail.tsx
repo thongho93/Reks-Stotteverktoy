@@ -248,9 +248,8 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
           <span style={{ color: textSub }}>Halsbrann</span>
         </Box>
 
-        {/* ─── Hero + Warning panel ───────────────────────────────────────── */}
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 300px" }, gap: 2.5, mb: 3 }}>
-          {/* Left */}
+        {/* ─── Hero ───────────────────────────────────────────────────────── */}
+        <Box sx={{ mb: 3 }}>
           <Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.25 }}>
               <Typography sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 900, color: textMain, lineHeight: 1.2 }}>
@@ -284,34 +283,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             </Box>
           </Box>
 
-          {/* Right — Når kontakte lege */}
-          <Box sx={{
-            background: dk ? "#1a1200" : "#fffbeb",
-            border: "1.5px solid #fcd34d",
-            borderRadius: 3, p: 2.25,
-            display: "flex", flexDirection: "column", gap: 1.25,
-          }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <span style={{ fontSize: 20 }}>⚠️</span>
-              <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#92400e" }}>
-                Når kontakte lege?
-              </Typography>
-            </Box>
-            <Typography sx={{ fontSize: 13, color: dk ? "#c9a854" : "#78350f", lineHeight: 1.65 }}>
-              Kontakt lege dersom du har sterke smerter, vedvarende plager eller symptomer som
-              ikke bedres med behandling.
-            </Typography>
-            <button
-              onClick={() => setActiveTab("lege")}
-              style={{
-                alignSelf: "flex-start", background: "none", border: "1px solid #fcd34d",
-                borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
-                color: "#92400e", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
-              }}
-            >
-              Se mer ▾
-            </button>
-          </Box>
         </Box>
 
         {/* ─── Symptoms ───────────────────────────────────────────────────── */}
