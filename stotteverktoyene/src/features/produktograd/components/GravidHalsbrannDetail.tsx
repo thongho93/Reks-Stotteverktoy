@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -261,6 +261,13 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
   const border    = dk ? "rgba(255,255,255,0.08)" : "#e2e8f0";
   const ACCENT    = "#06B6D4"; // halsbrann cyan
 
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onBack(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onBack]);
+
   const TABS: { key: TabKey; label: string; icon: string }[] = [
     { key: "legemidler", label: "Legemidler",              icon: "💊" },
     { key: "rad",        label: "Ikke-medikamentelle råd", icon: "🌿" },
@@ -269,38 +276,9 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
   ];
 
   return (
-    <Box sx={{ height: "100%", overflowY: "auto", bgcolor: bg }}>
+    <Box sx={{ bgcolor: bg }}>
 
-      {/* ─── Top bar ──────────────────────────────────────────────────────── */}
-      <Box sx={{
-        position: "sticky", top: 0, zIndex: 10,
-        bgcolor: dk ? "#0D1117" : "#fff",
-        borderBottom: `1px solid ${border}`,
-        px: 3, py: 1.2,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <button
-          onClick={onBack}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            background: "none", border: "none", cursor: "pointer",
-            fontSize: 13, fontWeight: 600, color: ACCENT,
-            padding: "4px 0",
-          }}
-        >
-          ← Tilbake til oversikt
-        </button>
-
-        <button style={{
-          background: ACCENT, border: "none", borderRadius: 8,
-          padding: "6px 14px", fontSize: 12, fontWeight: 700,
-          color: "#fff", cursor: "pointer",
-        }}>
-          Spør oss!
-        </button>
-      </Box>
-
-      <Box sx={{ px: { xs: 2, md: 3 }, py: 2.5, maxWidth: 1100, mx: "auto" }}>
+      <Box sx={{ px: { xs: 2, md: 3 }, pt: 3, pb: 2.5, maxWidth: 1100, mx: "auto" }}>
 
         {/* ─── Breadcrumb ────────────────────────────────────────────────── */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 2, fontSize: 12.5, color: ACCENT, fontWeight: 600 }}>

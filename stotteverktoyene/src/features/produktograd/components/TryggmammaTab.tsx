@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Box, Typography, Paper, TextField, InputAdornment, Button, useTheme,
 } from "@mui/material";
@@ -203,11 +204,6 @@ export default function TryggmammaTab() {
   const [search, setSearch] = useState("");
   const [detailView, setDetailView] = useState<string | null>(null);
 
-  // Show detail view when available
-  if (detailView === "gravide-halsbrann") {
-    return <GravidHalsbrannDetail onBack={() => setDetailView(null)} />;
-  }
-
   const filtered = search.trim()
     ? CATEGORIES.filter(c =>
         c.label.toLowerCase().includes(search.toLowerCase()) ||
@@ -216,6 +212,7 @@ export default function TryggmammaTab() {
     : CATEGORIES;
 
   return (
+    <>
     <Box sx={{ height: "100%", overflowY: "auto", bgcolor: bg, p: 3 }}>
 
       {/* ---- Header ---- */}
@@ -418,5 +415,51 @@ export default function TryggmammaTab() {
       </Typography>
 
     </Box>
+
+    {/* ---- Detail modal portal ---- */}
+    {detailView === "gravide-halsbrann" && createPortal(
+      <div
+        onClick={(e) => { if (e.target === e.currentTarget) setDetailView(null); }}
+        style={{
+          position: "fixed", inset: 0, zIndex: 1400,
+          background: "rgba(15,23,42,0.55)",
+          backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 16,
+        }}
+      >
+        <div style={{
+          width: "100%", maxWidth: 1020,
+          maxHeight: "92vh",
+          borderRadius: 20,
+          overflow: "hidden",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.30)",
+          display: "flex", flexDirection: "column",
+          position: "relative",
+        }}>
+          {/* Close button */}
+          <button
+            onClick={() => setDetailView(null)}
+            aria-label="Lukk"
+            style={{
+              position: "absolute", top: 14, right: 16, zIndex: 10,
+              width: 32, height: 32, borderRadius: "50%",
+              border: "1px solid rgba(0,0,0,0.12)",
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(4px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", fontSize: 16, color: "#475569",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            }}
+          >✕</button>
+
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            <GravidHalsbrannDetail onBack={() => setDetailView(null)} />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 }
