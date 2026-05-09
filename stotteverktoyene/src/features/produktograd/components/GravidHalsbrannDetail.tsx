@@ -3,7 +3,7 @@ import { Box, Typography, useTheme } from "@mui/material";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type UsageLevel = "yes" | "caution" | "doctor";
-type TabKey = "legemidler" | "rad" | "lege" | "kilder";
+type TabKey = "rad" | "lege" | "kilder";
 
 interface Medicine {
   name: string;
@@ -216,87 +216,11 @@ function TreatmentCard({ med }: { med: Medicine }) {
   );
 }
 
-function MedicineRow({ med, odd }: { med: Medicine; odd: boolean }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <div
-        onClick={() => setOpen(v => !v)}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "2fr 1fr 1.4fr 2fr 32px",
-          gap: 8, alignItems: "center",
-          padding: "11px 16px",
-          background: odd ? "#f8fafc" : "#fff",
-          cursor: "pointer",
-          borderBottom: "1px solid #f1f5f9",
-        }}
-      >
-        {/* Name + form */}
-        <div>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1e293b" }}>{med.name}</div>
-          <div style={{ fontSize: 11, color: "#94a3b8" }}>{med.form}</div>
-        </div>
-
-        {/* Type */}
-        <div style={{ fontSize: 12.5, color: "#475569" }}>{med.type}</div>
-
-        {/* Usage */}
-        <span style={{
-          display: "inline-flex", alignItems: "center", gap: 4,
-          fontSize: 11, fontWeight: 700,
-          color: usageColor(med.usage),
-          background: usageBg(med.usage),
-          borderRadius: 999, padding: "2px 8px",
-        }}>
-          {med.usage === "yes" ? "✅" : med.usage === "caution" ? "⚠️" : "🩺"} {med.usageLabel}
-        </span>
-
-        {/* Comment */}
-        <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.4 }}>
-          {med.priority && (
-            <span style={{
-              fontSize: 10.5, fontWeight: 700, color: priorityColor(med.priority),
-              background: priorityBg(med.priority),
-              borderRadius: 999, padding: "1px 7px", marginRight: 6,
-            }}>
-              {med.priorityLabel}
-            </span>
-          )}
-          {med.comment}
-        </div>
-
-        {/* Expand arrow */}
-        <div style={{
-          fontSize: 12, color: "#94a3b8",
-          transform: open ? "rotate(180deg)" : "none",
-          transition: "transform 150ms ease",
-          textAlign: "center",
-        }}>▼</div>
-      </div>
-
-      {open && (
-        <div style={{
-          background: odd ? "#f1f5f9" : "#f8fafc",
-          padding: "10px 16px 14px 16px",
-          borderBottom: "1px solid #e2e8f0",
-          fontSize: 12.5, color: "#475569", lineHeight: 1.7,
-        }}>
-          <strong style={{ color: "#1e293b" }}>Type:</strong> {med.type} &nbsp;|&nbsp;
-          <strong style={{ color: "#1e293b" }}>Form:</strong> {med.form}
-          <br />{med.comment}
-        </div>
-      )}
-    </>
-  );
-}
-
 // ─── Main Component ─────────────────────────────────────────────────────────────
 export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }) {
   const theme = useTheme();
   const dk = theme.palette.mode === "dark";
-  const [activeTab, setActiveTab] = useState<TabKey>("legemidler");
+  const [activeTab, setActiveTab] = useState<TabKey>("rad");
 
   const bg        = dk ? "#0D1117" : "#F5F3F8";
   const cardBg    = dk ? "#161B22" : "#ffffff";
@@ -313,10 +237,9 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
   }, [onBack]);
 
   const TABS: { key: TabKey; label: string; icon: string }[] = [
-    { key: "legemidler", label: "Legemidler",              icon: "💊" },
-    { key: "rad",        label: "Ikke-medikamentelle råd", icon: "🌿" },
-    { key: "lege",       label: "Når kontakte lege",       icon: "ℹ️" },
-    { key: "kilder",     label: "Kilder",                  icon: "📄" },
+    { key: "rad",    label: "Ikke-medikamentelle råd", icon: "🌿" },
+    { key: "lege",   label: "Når kontakte lege",       icon: "ℹ️" },
+    { key: "kilder", label: "Kilder",                  icon: "📄" },
   ];
 
   return (
@@ -494,38 +417,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
               borderRadius: "0 0 12px 12px",
               overflow: "hidden",
             }}>
-
-              {/* ── Legemidler tab ── */}
-              {activeTab === "legemidler" && (
-                <Box>
-                  {/* Table header */}
-                  <Box sx={{
-                    display: "grid",
-                    gridTemplateColumns: "2fr 1fr 1.4fr 2fr 32px",
-                    gap: 1, px: 2, py: 1.25,
-                    borderBottom: `1px solid ${border}`,
-                    background: dk ? "#161B22" : "#f8fafc",
-                  }}>
-                    {["Legemiddel", "Type", "Kan brukes", "Kommentar", ""].map(h => (
-                      <Typography key={h} sx={{ fontSize: 10.5, fontWeight: 700, color: textSub, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        {h}
-                      </Typography>
-                    ))}
-                  </Box>
-
-                  {MEDICINES.map((med, i) => (
-                    <MedicineRow key={med.name} med={med} odd={i % 2 !== 0} />
-                  ))}
-
-                  {/* Footer note */}
-                  <Box sx={{ px: 2, py: 1.5, background: dk ? "#0a0f17" : "#f0f9ff", display: "flex", gap: 1, alignItems: "flex-start" }}>
-                    <span style={{ fontSize: 14, flexShrink: 0 }}>ℹ️</span>
-                    <Typography sx={{ fontSize: 11.5, color: dk ? "#7da4b8" : "#0369a1", lineHeight: 1.6 }}>
-                      Medisiner merket med «Kontakt lege først» bør kun brukes etter vurdering av helsepersonell.
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
 
               {/* ── Ikke-medikamentelle råd tab ── */}
               {activeTab === "rad" && (
