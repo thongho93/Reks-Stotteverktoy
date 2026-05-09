@@ -138,12 +138,6 @@ function priorityColor(p: Medicine["priority"]): string {
   return "#dc2626";
 }
 
-function priorityBg(p: Medicine["priority"]): string {
-  if (p === "first")  return "#dcfce7";
-  if (p === "second") return "#dbeafe";
-  if (p === "need")   return "#fef3c7";
-  return "#fee2e2";
-}
 
 function priorityIcon(p: Medicine["priority"]): React.ReactNode {
   if (p === "first") return (
@@ -171,40 +165,80 @@ function priorityIcon(p: Medicine["priority"]): React.ReactNode {
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 function TreatmentCard({ med }: { med: Medicine }) {
+  const color = priorityColor(med.priority);
+
   return (
     <div style={{
       background: "#fff",
-      borderRadius: 14,
-      border: `1.5px solid ${priorityColor(med.priority)}30`,
-      padding: "14px 16px",
+      borderRadius: 18,
+      overflow: "hidden",
       display: "flex",
       flexDirection: "column",
-      gap: 8,
-      minWidth: 160,
-      flex: "1 1 160px",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-    }}>
-      {/* Priority badge */}
-      <span style={{
-        display: "inline-flex", alignItems: "center", gap: 4,
-        fontSize: 10.5, fontWeight: 700,
-        color: priorityColor(med.priority),
-        background: priorityBg(med.priority),
-        borderRadius: 999, padding: "2px 8px", alignSelf: "flex-start",
-      }}>
-        {priorityIcon(med.priority)} {med.priorityLabel}
-      </span>
+      minWidth: 175,
+      flex: "1 1 175px",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 6px 20px rgba(0,0,0,0.07)",
+      transition: "box-shadow 160ms ease, transform 160ms ease",
+    }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.10), 0 16px 32px rgba(0,0,0,0.10)";
+        (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.06), 0 6px 20px rgba(0,0,0,0.07)";
+        (e.currentTarget as HTMLDivElement).style.transform = "none";
+      }}
+    >
+      {/* Top accent stripe */}
+      <div style={{ height: 5, background: color, flexShrink: 0 }} />
 
-      {/* Name */}
-      <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", lineHeight: 1.25 }}>
-        {med.name}
+      {/* Body */}
+      <div style={{ padding: "14px 16px 18px", display: "flex", flexDirection: "column", gap: 0, flex: 1 }}>
+
+        {/* Priority row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 10 }}>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+          <span style={{
+            fontSize: 10, fontWeight: 800, color,
+            textTransform: "uppercase", letterSpacing: "0.07em",
+          }}>
+            {med.priorityLabel}
+          </span>
+        </div>
+
+        {/* Name */}
+        <div style={{ fontSize: 14.5, fontWeight: 800, color: "#0f172a", lineHeight: 1.3, marginBottom: 8 }}>
+          {med.name}
+        </div>
+
+        {/* Type tag */}
+        <div style={{
+          display: "inline-flex", alignSelf: "flex-start",
+          fontSize: 10, fontWeight: 600, color: "#64748b",
+          background: "#f1f5f9", borderRadius: 6, padding: "2px 8px",
+          border: "1px solid #e2e8f0", marginBottom: 10,
+        }}>
+          {med.type}
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: `${color}20`, marginBottom: 10 }} />
+
+        {/* Description */}
+        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.65, flex: 1 }}>
+          {med.comment}
+        </div>
+
+        {/* Bottom priority accent */}
+        <div style={{
+          marginTop: 14, paddingTop: 10,
+          borderTop: "1px solid #f1f5f9",
+          display: "flex", alignItems: "center", gap: 5,
+        }}>
+          {priorityIcon(med.priority)}
+          <span style={{ fontSize: 10, color, fontWeight: 700 }}>{med.priorityLabel}</span>
+        </div>
+
       </div>
-
-      {/* Description */}
-      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.55, flex: 1 }}>
-        {med.comment}
-      </div>
-
     </div>
   );
 }
