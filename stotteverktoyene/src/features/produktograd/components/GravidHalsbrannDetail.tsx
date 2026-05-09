@@ -68,8 +68,8 @@ const MEDICINES: Medicine[] = [
     usage: "caution",
     usageLabel: "Ja",
     comment: "Famotidin reduserer syreproduksjonen. Brukes ved behov. Kontakt lege ved bruk i mer enn 2 uker sammenhengende.",
-    priority: "need",
-    priorityLabel: "Ved behov",
+    priority: "second",
+    priorityLabel: "Andrevalg",
   },
   {
     name: "Pepciduo**",
@@ -78,8 +78,8 @@ const MEDICINES: Medicine[] = [
     usage: "caution",
     usageLabel: "Ja",
     comment: "Kombinasjon av famotidin og syrenøytraliserende. Kontakt lege ved bruk i mer enn 2 uker sammenhengende.",
-    priority: "need",
-    priorityLabel: "Ved behov",
+    priority: "second",
+    priorityLabel: "Andrevalg",
   },
   // ── PPI — Kontakt lege først ──
   {
