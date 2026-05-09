@@ -587,26 +587,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
               </button>
             </Box>
 
-            {/* Har du spørsmål */}
-            <Box sx={{
-              background: cardBg, border: `1px solid ${border}`,
-              borderRadius: 3, p: 2.25,
-            }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
-                <span style={{ fontSize: 18 }}>💬</span>
-                <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: ACCENT }}>Har du spørsmål?</Typography>
-              </Box>
-              <Typography sx={{ fontSize: 12.5, color: textSub, lineHeight: 1.7, mb: 1.25 }}>
-                Kontakt farmasøyt eller lege hvis du er usikker på hva som er trygt for deg.
-              </Typography>
-              <button style={{
-                background: ACCENT, border: "none", borderRadius: 8,
-                padding: "7px 14px", fontSize: 12, fontWeight: 700,
-                color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
-              }}>
-                Send spørsmål →
-              </button>
-            </Box>
 
           </Box>
         </Box>
