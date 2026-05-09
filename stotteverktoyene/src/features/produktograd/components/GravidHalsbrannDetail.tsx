@@ -283,23 +283,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             Flere reseptfrie alternativer kan brukes trygt.
           </Typography>
 
-          {/* Tags */}
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {[
-              { label: "Gravid",                   bg: "#ede9fe", color: "#7c3aed", border: "#c4b5fd" },
-              { label: "Vanlig plage",              bg: "#fef3c7", color: "#b45309", border: "#fde68a" },
-              { label: "Oppdatert: Mai 2024",       bg: dk ? "#1e293b" : "#f1f5f9", color: "#64748b", border: "#e2e8f0" },
-            ].map(tag => (
-              <span key={tag.label} style={{
-                fontSize: 11.5, fontWeight: 700, padding: "4px 12px",
-                borderRadius: 999, background: tag.bg, color: tag.color,
-                border: `1px solid ${tag.border}`,
-              }}>
-                {tag.label}
-              </span>
-            ))}
-          </Box>
-
         </Box>
       </Box>
 
