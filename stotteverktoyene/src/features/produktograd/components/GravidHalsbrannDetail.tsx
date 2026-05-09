@@ -390,6 +390,22 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             ))}
           </Box>
 
+          {/* Footnotes */}
+          <Box sx={{
+            background: dk ? "#161b27" : "#f8fafc",
+            border: `1px solid ${border}`,
+            borderRadius: 2, p: "10px 14px",
+            display: "flex", flexDirection: "column", gap: 0.5,
+            mb: 1.5,
+          }}>
+            <Typography sx={{ fontSize: 11, color: textSub, lineHeight: 1.7 }}>
+              <strong style={{ color: textMain }}>*</strong> Medisiner som inneholder kalsiumkarbonat (Gaviscon mikstur, Galieve, Titralac) bør ikke brukes oftere enn høyst fire ganger om dagen.
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: textSub, lineHeight: 1.7 }}>
+              <strong style={{ color: textMain }}>**</strong> Kontakt lege hvis du har behov for å bruke famotidin (Pepcid, Pepcidduo) i mer enn to uker sammenhengende.
+            </Typography>
+          </Box>
+
           {/* FAQ – Kan gravide bruke Gaviscon / Galieve? */}
           <Box
             onClick={() => setFaqOpen(o => !o)}
@@ -530,20 +546,6 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             )}
           </Box>
 
-          {/* Footnotes */}
-          <Box sx={{
-            background: dk ? "#161b27" : "#f8fafc",
-            border: `1px solid ${border}`,
-            borderRadius: 2, p: "10px 14px",
-            display: "flex", flexDirection: "column", gap: 0.5,
-          }}>
-            <Typography sx={{ fontSize: 11, color: textSub, lineHeight: 1.7 }}>
-              <strong style={{ color: textMain }}>*</strong> Medisiner som inneholder kalsiumkarbonat (Gaviscon mikstur, Galieve, Titralac) bør ikke brukes oftere enn høyst fire ganger om dagen.
-            </Typography>
-            <Typography sx={{ fontSize: 11, color: textSub, lineHeight: 1.7 }}>
-              <strong style={{ color: textMain }}>**</strong> Kontakt lege hvis du har behov for å bruke famotidin (Pepcid, Pepcidduo) i mer enn to uker sammenhengende.
-            </Typography>
-          </Box>
         </Box>
 
         {/* ─── Tabs ─────────────────────────────────────────────────────────── */}
