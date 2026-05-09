@@ -429,7 +429,7 @@ export default function TryggmammaTab() {
         }}
       >
         <div style={{
-          width: "100%", maxWidth: 1020,
+          width: "100%", maxWidth: 1300,
           maxHeight: "92vh",
           borderRadius: 20,
           overflow: "hidden",
