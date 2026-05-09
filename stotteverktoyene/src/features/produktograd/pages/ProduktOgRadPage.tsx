@@ -1,4 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useLocation } from "react-router-dom";
 import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
@@ -56,6 +73,7 @@ import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 
@@ -223,6 +241,47 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
   }
 };
 
+const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__knuse__", "__tryggmamma__"] as const;
+
+function SortableSidebarItem({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.45 : 1,
+        display: "flex",
+        alignItems: "center",
+        mb: 0.5,
+        "&:hover .drag-handle": { opacity: 1 },
+      }}
+    >
+      <Box
+        className="drag-handle"
+        {...attributes}
+        {...listeners}
+        sx={{
+          opacity: 0,
+          cursor: "grab",
+          display: "flex",
+          alignItems: "center",
+          color: "rgba(235,175,211,0.5)",
+          flexShrink: 0,
+          px: 0.3,
+          transition: "opacity 150ms",
+          touchAction: "none",
+          "&:active": { cursor: "grabbing" },
+        }}
+      >
+        <DragIndicatorRoundedIcon sx={{ fontSize: 15 }} />
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+    </Box>
+  );
+}
+
 export default function ProduktOgRadPage() {
   const { user } = useAuthUser();
   const location = useLocation();
@@ -264,6 +323,9 @@ export default function ProduktOgRadPage() {
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [embedDialogUrl, setEmbedDialogUrl] = useState("");
   const [embedDialogTitle, setEmbedDialogTitle] = useState("");
+  const [sidebarOrder, setSidebarOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("faglig-sidebar-order") ?? "[]"); } catch { return []; }
+  });
 
   useEffect(() => {
     if (!user?.uid) {
@@ -404,6 +466,34 @@ export default function ProduktOgRadPage() {
     return filteredFagligDocs[0] ?? null;
   }, [fagligDocs, filteredFagligDocs, selectedFagligDocId]);
   const fagligDocById = useMemo(() => new Map(fagligDocs.map((doc) => [doc.id, doc])), [fagligDocs]);
+
+  const sortedSidebarIds = useMemo(() => {
+    const allIds = [...VIRTUAL_SIDEBAR_IDS, ...filteredFagligDocs.map((d) => d.id)];
+    if (sidebarOrder.length === 0) return allIds;
+    const valid = sidebarOrder.filter((id) => allIds.includes(id));
+    const newIds = allIds.filter((id) => !sidebarOrder.includes(id));
+    return [...valid, ...newIds];
+  }, [filteredFagligDocs, sidebarOrder]);
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function handleSidebarDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setSidebarOrder((prev) => {
+      const base = prev.length > 0 ? prev : sortedSidebarIds;
+      const oldIdx = base.indexOf(active.id as string);
+      const newIdx = base.indexOf(over.id as string);
+      if (oldIdx === -1 || newIdx === -1) return prev;
+      const next = arrayMove(base, oldIdx, newIdx);
+      localStorage.setItem("faglig-sidebar-order", JSON.stringify(next));
+      return next;
+    });
+  }
+
   const fagligDocMenuOpen = Boolean(fagligDocMenuAnchorEl);
   const fagligEmojiPopoverOpen = Boolean(fagligEmojiAnchorEl);
   const fagligDocMenuTarget = useMemo(
@@ -1501,167 +1591,126 @@ export default function ProduktOgRadPage() {
                     <Typography sx={{ fontSize: 13, color: "#D8B4CA" }}>Laster dokumenter...</Typography>
                   </Box>
                 ) : null}
-                <List sx={{ mt: 0.5, pt: 0 }}>
-                  {/* Built-in: Ernæringsprodukter */}
-                  <Tooltip title="Ernæringsprodukter" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                  <ListItemButton
-                    selected={selectedFagligDocId === "__nutrition__"}
-                    onClick={() => setSelectedFagligDocId("__nutrition__")}
-                    sx={{
-                      mb: 0.5,
-                      borderRadius: 2,
-                      pl: 1, pr: 0.7,
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : "rgba(22,27,34,0.85)",
-                      "&:hover": { bgcolor: "rgba(34,197,94,0.12)" },
-                      "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)" },
-                      "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)" },
-                    }}
-                  >
-                    <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
-                    <ListItemText
-                      primary="Ernæringsprodukter"
-                      primaryTypographyProps={{
-                        noWrap: true,
-                        fontSize: 14,
-                        fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600,
-                        color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7",
-                      }}
-                    />
-                  </ListItemButton>
-                  </Tooltip>
-
-                  {/* Built-in: Knuse-/delelisten */}
-                  <Tooltip title="Knuse-/delelisten" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                  <ListItemButton
-                    selected={selectedFagligDocId === "__knuse__"}
-                    onClick={() => setSelectedFagligDocId("__knuse__")}
-                    sx={{
-                      mb: 0.5,
-                      borderRadius: 2,
-                      pl: 1, pr: 0.7,
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      bgcolor: selectedFagligDocId === "__knuse__" ? "rgba(139,92,246,0.18)" : "rgba(22,27,34,0.85)",
-                      "&:hover": { bgcolor: "rgba(139,92,246,0.12)" },
-                      "&.Mui-selected": { bgcolor: "rgba(139,92,246,0.2)", borderColor: "rgba(139,92,246,0.45)" },
-                      "&.Mui-selected:hover": { bgcolor: "rgba(139,92,246,0.26)" },
-                    }}
-                  >
-                    <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>💊</Typography>
-                    <ListItemText
-                      primary="Knuse-/delelisten"
-                      primaryTypographyProps={{
-                        noWrap: true,
-                        fontSize: 14,
-                        fontWeight: selectedFagligDocId === "__knuse__" ? 800 : 600,
-                        color: selectedFagligDocId === "__knuse__" ? "#DDD6FE" : "#E4DCE7",
-                      }}
-                    />
-                  </ListItemButton>
-                  </Tooltip>
-
-                  {/* Built-in: Tryggmamma */}
-                  <Tooltip title="Tryggmamma" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                  <ListItemButton
-                    selected={selectedFagligDocId === "__tryggmamma__"}
-                    onClick={() => setSelectedFagligDocId("__tryggmamma__")}
-                    sx={{
-                      mb: 0.5,
-                      borderRadius: 2,
-                      pl: 1, pr: 0.7,
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      bgcolor: selectedFagligDocId === "__tryggmamma__" ? "rgba(236,72,153,0.18)" : "rgba(22,27,34,0.85)",
-                      "&:hover": { bgcolor: "rgba(236,72,153,0.12)" },
-                      "&.Mui-selected": { bgcolor: "rgba(236,72,153,0.2)", borderColor: "rgba(236,72,153,0.45)" },
-                      "&.Mui-selected:hover": { bgcolor: "rgba(236,72,153,0.26)" },
-                    }}
-                  >
-                    <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🤰</Typography>
-                    <ListItemText
-                      primary="Tryggmamma"
-                      primaryTypographyProps={{
-                        noWrap: true,
-                        fontSize: 14,
-                        fontWeight: selectedFagligDocId === "__tryggmamma__" ? 800 : 600,
-                        color: selectedFagligDocId === "__tryggmamma__" ? "#FBCFE8" : "#E4DCE7",
-                      }}
-                    />
-                  </ListItemButton>
-                  </Tooltip>
-                  {filteredFagligDocs.map((doc) => (
-                    (() => {
-                      let depth = 0;
-                      let cursor = doc;
-                      while (cursor.parentId && depth < 8) {
-                        const parent = fagligDocById.get(cursor.parentId);
-                        if (!parent) break;
-                        depth += 1;
-                        cursor = parent;
-                      }
-
-                      return (
-                        <ListItemButton
-                          key={doc.id}
-                          selected={selectedFagligDoc?.id === doc.id}
-                          onClick={() => setSelectedFagligDocId(doc.id)}
-                          sx={{
-                            mb: 0.5,
-                            borderRadius: 2,
-                            pl: 1 + depth * 1.8,
-                            pr: 0.7,
-                            border: selectedFagligDoc?.id === doc.id ? "1px solid rgba(242,162,208,0.45)" : "1px solid transparent",
-                            bgcolor:
-                              selectedFagligDoc?.id === doc.id
-                                ? "rgba(242,162,208,0.18)"
-                                : "transparent",
-                            "&:hover": {
-                              bgcolor: "rgba(242,162,208,0.12)",
-                            },
-                            "&.Mui-selected": {
-                              bgcolor: "rgba(242,162,208,0.2)",
-                              borderColor: "rgba(242,162,208,0.45)",
-                            },
-                            "&.Mui-selected:hover": {
-                              bgcolor: "rgba(242,162,208,0.26)",
-                            },
-                          }}
-                        >
-                          {doc.emoji ? (
-                            <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
-                          ) : doc.kind === "pdf" ? (
-                            <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#F0A1CF" }} />
-                          ) : (
-                            <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#9ED9FF" }} />
-                          )}
-                          <Tooltip title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                            <ListItemText
-                              primary={doc.title}
-                              primaryTypographyProps={{
-                                noWrap: true,
-                                fontSize: 14,
-                                fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600,
-                                color: selectedFagligDoc?.id === doc.id ? "#FFD8ED" : "#E4DCE7",
+                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleSidebarDragEnd}>
+                  <SortableContext items={sortedSidebarIds} strategy={verticalListSortingStrategy}>
+                    <List sx={{ mt: 0.5, pt: 0 }}>
+                      {sortedSidebarIds.map((id) => {
+                        if (id === "__nutrition__") return (
+                          <SortableSidebarItem key={id} id={id}>
+                            <Tooltip title="Ernæringsprodukter" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                              <ListItemButton
+                                selected={selectedFagligDocId === "__nutrition__"}
+                                onClick={() => setSelectedFagligDocId("__nutrition__")}
+                                sx={{
+                                  borderRadius: 2, pl: 1, pr: 0.7,
+                                  border: "1px solid rgba(255,255,255,0.06)",
+                                  bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : "rgba(22,27,34,0.85)",
+                                  "&:hover": { bgcolor: "rgba(34,197,94,0.12)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)" },
+                                }}
+                              >
+                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
+                                <ListItemText primary="Ernæringsprodukter" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7" }} />
+                              </ListItemButton>
+                            </Tooltip>
+                          </SortableSidebarItem>
+                        );
+                        if (id === "__knuse__") return (
+                          <SortableSidebarItem key={id} id={id}>
+                            <Tooltip title="Knuse-/delelisten" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                              <ListItemButton
+                                selected={selectedFagligDocId === "__knuse__"}
+                                onClick={() => setSelectedFagligDocId("__knuse__")}
+                                sx={{
+                                  borderRadius: 2, pl: 1, pr: 0.7,
+                                  border: "1px solid rgba(255,255,255,0.06)",
+                                  bgcolor: selectedFagligDocId === "__knuse__" ? "rgba(139,92,246,0.18)" : "rgba(22,27,34,0.85)",
+                                  "&:hover": { bgcolor: "rgba(139,92,246,0.12)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(139,92,246,0.2)", borderColor: "rgba(139,92,246,0.45)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(139,92,246,0.26)" },
+                                }}
+                              >
+                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>💊</Typography>
+                                <ListItemText primary="Knuse-/delelisten" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__knuse__" ? 800 : 600, color: selectedFagligDocId === "__knuse__" ? "#DDD6FE" : "#E4DCE7" }} />
+                              </ListItemButton>
+                            </Tooltip>
+                          </SortableSidebarItem>
+                        );
+                        if (id === "__tryggmamma__") return (
+                          <SortableSidebarItem key={id} id={id}>
+                            <Tooltip title="Tryggmamma" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                              <ListItemButton
+                                selected={selectedFagligDocId === "__tryggmamma__"}
+                                onClick={() => setSelectedFagligDocId("__tryggmamma__")}
+                                sx={{
+                                  borderRadius: 2, pl: 1, pr: 0.7,
+                                  border: "1px solid rgba(255,255,255,0.06)",
+                                  bgcolor: selectedFagligDocId === "__tryggmamma__" ? "rgba(236,72,153,0.18)" : "rgba(22,27,34,0.85)",
+                                  "&:hover": { bgcolor: "rgba(236,72,153,0.12)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(236,72,153,0.2)", borderColor: "rgba(236,72,153,0.45)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(236,72,153,0.26)" },
+                                }}
+                              >
+                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🤰</Typography>
+                                <ListItemText primary="Tryggmamma" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__tryggmamma__" ? 800 : 600, color: selectedFagligDocId === "__tryggmamma__" ? "#FBCFE8" : "#E4DCE7" }} />
+                              </ListItemButton>
+                            </Tooltip>
+                          </SortableSidebarItem>
+                        );
+                        const doc = fagligDocById.get(id);
+                        if (!doc) return null;
+                        let depth = 0;
+                        let cursor = doc;
+                        while (cursor.parentId && depth < 8) {
+                          const parent = fagligDocById.get(cursor.parentId);
+                          if (!parent) break;
+                          depth += 1;
+                          cursor = parent;
+                        }
+                        return (
+                          <SortableSidebarItem key={id} id={id}>
+                            <ListItemButton
+                              selected={selectedFagligDoc?.id === doc.id}
+                              onClick={() => setSelectedFagligDocId(doc.id)}
+                              sx={{
+                                borderRadius: 2,
+                                pl: 1 + depth * 1.8,
+                                pr: 0.7,
+                                border: selectedFagligDoc?.id === doc.id ? "1px solid rgba(242,162,208,0.45)" : "1px solid transparent",
+                                bgcolor: selectedFagligDoc?.id === doc.id ? "rgba(242,162,208,0.18)" : "transparent",
+                                "&:hover": { bgcolor: "rgba(242,162,208,0.12)" },
+                                "&.Mui-selected": { bgcolor: "rgba(242,162,208,0.2)", borderColor: "rgba(242,162,208,0.45)" },
+                                "&.Mui-selected:hover": { bgcolor: "rgba(242,162,208,0.26)" },
                               }}
-                            />
-                          </Tooltip>
-                          <IconButton
-                            size="small"
-                            onClick={(event) => openFagligDocMenu(event, doc.id)}
-                            sx={{
-                              ml: 0.5,
-                              color: "rgba(235,175,211,0.95)",
-                              "&:hover": {
-                                bgcolor: "rgba(242,162,208,0.18)",
-                              },
-                            }}
-                          >
-                            <MoreVertIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </ListItemButton>
-                      );
-                    })()
-                  ))}
-                </List>
+                            >
+                              {doc.emoji ? (
+                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
+                              ) : doc.kind === "pdf" ? (
+                                <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#F0A1CF" }} />
+                              ) : (
+                                <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#9ED9FF" }} />
+                              )}
+                              <Tooltip title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                                <ListItemText
+                                  primary={doc.title}
+                                  primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600, color: selectedFagligDoc?.id === doc.id ? "#FFD8ED" : "#E4DCE7" }}
+                                />
+                              </Tooltip>
+                              <IconButton
+                                size="small"
+                                onClick={(event) => openFagligDocMenu(event, doc.id)}
+                                sx={{ ml: 0.5, color: "rgba(235,175,211,0.95)", "&:hover": { bgcolor: "rgba(242,162,208,0.18)" } }}
+                              >
+                                <MoreVertIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </ListItemButton>
+                          </SortableSidebarItem>
+                        );
+                      })}
+                    </List>
+                  </SortableContext>
+                </DndContext>
 
                 {filteredFagligDocs.length === 0 ? (
                   <Paper
