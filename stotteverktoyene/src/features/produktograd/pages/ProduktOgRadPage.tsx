@@ -250,7 +250,7 @@ export default function ProduktOgRadPage() {
   const [fagligSearch, setFagligSearch] = useState("");
   const [fagligDocs, setFagligDocs] = useState<FagligDocument[]>([]);
   const [isFagligLoading, setIsFagligLoading] = useState(true);
-  const [selectedFagligDocId, setSelectedFagligDocId] = useState<string | null>(null);
+  const [selectedFagligDocId, setSelectedFagligDocId] = useState<string | null>("__nutrition__");
   const [fagligDocMenuAnchorEl, setFagligDocMenuAnchorEl] = useState<HTMLElement | null>(null);
   const [fagligDocMenuTargetId, setFagligDocMenuTargetId] = useState<string | null>(null);
   const [fagligEmojiAnchorEl, setFagligEmojiAnchorEl] = useState<HTMLElement | null>(null);
