@@ -9,7 +9,7 @@ interface Medicine {
   form: string;
   type: string;
   comment: string;
-  priority?: "first" | "second" | "need" | "doctor";
+  priority?: "first" | "second" | "need" | "doctor" | "warning";
   priorityLabel?: string;
 }
 
@@ -46,8 +46,8 @@ const MEDICINES: Medicine[] = [
     form: "Pulver/tablett",
     type: "Syrenøytraliserende",
     comment: "Natriumbikarbonat. Brukes som kortidsbehandling. Ikke anbefalt ved høyt blodtrykk eller ved stort inntak over tid.",
-    priority: "first",
-    priorityLabel: "Førstevalg",
+    priority: "warning",
+    priorityLabel: "Frarådes",
   },
   // ── H2-blokker — Ved behov ──
   {
@@ -181,9 +181,10 @@ const RAD_TIPS = [
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function priorityColor(p: Medicine["priority"]): string {
-  if (p === "first")  return "#16a34a";
-  if (p === "second") return "#2563eb";
-  if (p === "need")   return "#d97706";
+  if (p === "first")   return "#16a34a";
+  if (p === "second")  return "#2563eb";
+  if (p === "need")    return "#d97706";
+  if (p === "warning") return "#b45309";
   return "#dc2626";
 }
 
