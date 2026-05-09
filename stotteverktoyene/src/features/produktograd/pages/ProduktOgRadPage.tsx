@@ -1412,16 +1412,6 @@ export default function ProduktOgRadPage() {
                       <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#EED5E8", whiteSpace: "nowrap" }}>
                         Dokumentfaner
                       </Typography>
-                      <Chip
-                        size="small"
-                        label={filteredFagligDocs.length}
-                        sx={{
-                          bgcolor: "rgba(242,162,208,0.22)",
-                          color: "#F6BFDF",
-                          fontWeight: 700,
-                          border: "1px solid rgba(242,162,208,0.44)",
-                        }}
-                      />
                     </>
                   )}
                   <Tooltip title={fagligSidebarCollapsed ? "Vis Dokumentfaner" : "Skjul Dokumentfaner"} placement="right">
