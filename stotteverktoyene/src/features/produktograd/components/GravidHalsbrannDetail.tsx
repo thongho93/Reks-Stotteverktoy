@@ -30,7 +30,7 @@ const MEDICINES: Medicine[] = [
     priorityLabel: "Førstevalg",
   },
   {
-    name: "Gaviscon mikstur / Galieve",
+    name: "Gaviscon mikstur* / Galieve*",
     form: "Mikstur",
     type: "Alginat + syrenøytraliserende",
     usage: "yes",
@@ -41,7 +41,7 @@ const MEDICINES: Medicine[] = [
   },
   // ── Syrenøytraliserende — Førstevalg ──
   {
-    name: "Novaluzid / Titralac",
+    name: "Novaluzid / Titralac*",
     form: "Tablett",
     type: "Syrenøytraliserende",
     usage: "yes",
@@ -62,7 +62,7 @@ const MEDICINES: Medicine[] = [
   },
   // ── H2-blokker — Ved behov ──
   {
-    name: "Pepcid",
+    name: "Pepcid**",
     form: "Tablett",
     type: "H2-blokker (famotidin)",
     usage: "caution",
@@ -72,7 +72,7 @@ const MEDICINES: Medicine[] = [
     priorityLabel: "Ved behov",
   },
   {
-    name: "Pepciduo",
+    name: "Pepciduo**",
     form: "Tablett",
     type: "H2-blokker + syrenøytraliserende",
     usage: "caution",
@@ -334,6 +334,20 @@ export default function GravidHalsbrannDetail({ onBack }: { onBack: () => void }
             {MEDICINES.filter(m => m.priority).map(med => (
               <TreatmentCard key={med.name} med={med} />
             ))}
+          </Box>
+
+          {/* Footnotes */}
+          <Box sx={{
+            mt: 2, pt: 1.75,
+            borderTop: `1px solid ${border}`,
+            display: "flex", flexDirection: "column", gap: 0.75,
+          }}>
+            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
+              <strong style={{ color: textMain }}>*</strong> Medisiner som inneholder kalsiumkarbonat (Gaviscon mikstur, Galieve, Titralac) bør ikke brukes oftere enn høyst fire ganger om dagen.
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, color: textSub, lineHeight: 1.65 }}>
+              <strong style={{ color: textMain }}>**</strong> Kontakt lege hvis du har behov for å bruke famotidin (Pepcid, Pepcidduo) i mer enn to uker sammenhengende.
+            </Typography>
           </Box>
         </Box>
 
