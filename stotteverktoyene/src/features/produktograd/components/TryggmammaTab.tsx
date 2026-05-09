@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Box, Typography, Paper, TextField, InputAdornment, Button, useTheme,
 } from "@mui/material";
+import GravidHalsbrannDetail from "./GravidHalsbrannDetail";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
@@ -200,6 +201,12 @@ export default function TryggmammaTab() {
 
   const [section, setSection] = useState<"ammende" | "gravide">("ammende");
   const [search, setSearch] = useState("");
+  const [detailView, setDetailView] = useState<string | null>(null);
+
+  // Show detail view when available
+  if (detailView === "gravide-halsbrann") {
+    return <GravidHalsbrannDetail onBack={() => setDetailView(null)} />;
+  }
 
   const filtered = search.trim()
     ? CATEGORIES.filter(c =>
@@ -303,6 +310,9 @@ export default function TryggmammaTab() {
           <Paper
             key={id}
             elevation={0}
+            onClick={() => {
+              if (id === "halsbrann" && section === "gravide") setDetailView("gravide-halsbrann");
+            }}
             sx={{
               p: 2, borderRadius: 2.5,
               bgcolor: cardBg,
