@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Box,
   Chip,
@@ -42,6 +42,7 @@ const SPECIAL_STYLES: Record<SpecialCode, { bg: string; text: string; border: st
   G:   { bg: "rgba(34,197,94,0.14)",  text: "#86EFAC", border: "rgba(34,197,94,0.45)" },
   K:   { bg: "rgba(239,68,68,0.14)",  text: "#FCA5A5", border: "rgba(239,68,68,0.45)" },
   OBS: { bg: "rgba(249,115,22,0.14)", text: "#FDBA74", border: "rgba(249,115,22,0.45)" },
+  X:   { bg: "rgba(107,114,128,0.14)", text: "#D1D5DB", border: "rgba(107,114,128,0.45)" },
 };
 
 // ─── Legend data ──────────────────────────────────────────────────────────────

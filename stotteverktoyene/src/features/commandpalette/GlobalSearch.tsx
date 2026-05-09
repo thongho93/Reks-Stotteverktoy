@@ -3,7 +3,6 @@ import {
   Box,
   Chip,
   Dialog,
-  InputAdornment,
   List,
   ListItemButton,
   ListItemIcon,
@@ -364,8 +363,6 @@ export function GlobalSearch({ open, onClose }: Props) {
   ]);
 
   const shortcutLabel = "Space";
-  const isMac = /mac/i.test(navigator.platform);
-  const ctrlLabel = isMac ? "⌘" : "Ctrl";
 
   return (
     <Dialog
@@ -538,7 +535,6 @@ export function GlobalSearch({ open, onClose }: Props) {
             <List disablePadding sx={{ py: 0.5 }}>
               {entries.map((entry, i) => {
                 const isActive = i === activeIndex;
-                const hasCommand = Boolean(PAGE_COMMANDS[entry.path]);
                 return (
                   <ListItemButton
                     key={entry.path}
