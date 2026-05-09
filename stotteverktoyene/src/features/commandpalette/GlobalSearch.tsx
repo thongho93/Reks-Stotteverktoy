@@ -39,6 +39,8 @@ import {
   formatPreparatForTemplate,
 } from "../standardtekster/utils/preparat";
 import { loadMedicationItems, type Med } from "../fest/components/MedicationSearch";
+import { loadInteractionsIndex } from "../interaksjoner/services/useInteractions";
+import type { InteractionEntity } from "../fest/mappers/interactionsToIndex";
 
 // ─── Page definitions ───────────────────────────────────────────────────────
 
@@ -246,6 +248,12 @@ export function GlobalSearch({ open, onClose }: Props) {
   const [stdClockDay, setStdClockDay] = useState<"today" | "tomorrow">("today");
   const [stdDatoInput, setStdDatoInput] = useState("");
 
+  // ── Interaksjonssøk scoped state ─────────────────────────────────────────────
+  const [intIndex, setIntIndex] = useState<{ entities: InteractionEntity[] } | null>(null);
+  const [intLoading, setIntLoading] = useState(false);
+  const [intSelected, setIntSelected] = useState<InteractionEntity[]>([]);
+  const [intDropdownIndex, setIntDropdownIndex] = useState(0);
+
   const entries = ALL_ENTRIES.filter(
     (e) =>
       (!e.admin || hasRekspertAccess) &&
@@ -257,6 +265,19 @@ export function GlobalSearch({ open, onClose }: Props) {
   const command = scopedPage ? PAGE_COMMANDS[scopedPage.path] : null;
   const preview = command?.parsePreview(commandQuery) ?? null;
   const isStdScoped = isScoped && scopedPage?.path === "/standardtekster";
+  const isIntScoped = isScoped && scopedPage?.path === "/interaksjoner";
+
+  const intFilteredOptions = useMemo<InteractionEntity[]>(() => {
+    if (!intIndex?.entities?.length || !commandQuery.trim()) return [];
+    const q = commandQuery.trim().toLowerCase();
+    const starts = intIndex.entities.filter((o) => o.label.toLowerCase().startsWith(q));
+    const includes = intIndex.entities.filter(
+      (o) =>
+        !o.label.toLowerCase().startsWith(q) &&
+        (o.label.toLowerCase().includes(q) || (o.atc ? o.atc.toLowerCase().includes(q) : false))
+    );
+    return [...starts, ...includes].slice(0, 12);
+  }, [intIndex, commandQuery]);
 
   const stdFilteredTemplates = useMemo(() => {
     if (!stdTemplates.length) return [];
@@ -354,6 +375,25 @@ export function GlobalSearch({ open, onClose }: Props) {
     }
   }, [open]);
 
+  // Interaksjonssøk: auto-select on exact 7-char ATC input
+  useEffect(() => {
+    if (!isIntScoped || !intIndex?.entities?.length) return;
+    const q = commandQuery.trim().toUpperCase();
+    if (!q || !/^[A-Z][0-9]{2}[A-Z]{2}[0-9]{2}$/.test(q)) return;
+    const exactMatches = intIndex.entities.filter(
+      (e) => e.kind !== "product" && (e.atc ?? "").toUpperCase() === q
+    );
+    if (exactMatches.length !== 1) return;
+    const match = exactMatches[0];
+    setIntSelected((prev) => {
+      const id = match.id ?? (match.atc ? `atc:${match.atc}` : `name:${match.key}`);
+      const seen = new Set(prev.map((p) => p.id ?? (p.atc ? `atc:${p.atc}` : `name:${p.key}`)));
+      if (seen.has(id)) return prev;
+      return [...prev, match];
+    });
+    setCommandQuery("");
+  }, [commandQuery, isIntScoped, intIndex]);
+
   const resetStdState = useCallback(() => {
     setStdTemplates([]);
     setStdLoading(false);
@@ -365,6 +405,12 @@ export function GlobalSearch({ open, onClose }: Props) {
     setStdClockTime("11:00");
     setStdClockDay("today");
     setStdDatoInput("");
+  }, []);
+
+  const resetIntState = useCallback(() => {
+    setIntLoading(false);
+    setIntSelected([]);
+    setIntDropdownIndex(0);
   }, []);
 
   const loadStdTemplates = useCallback(async () => {
@@ -383,6 +429,18 @@ export function GlobalSearch({ open, onClose }: Props) {
     }
   }, []);
 
+  const loadIntIndex = useCallback(async () => {
+    setIntLoading(true);
+    try {
+      const idx = await loadInteractionsIndex();
+      setIntIndex(idx);
+    } catch {
+      // ignore
+    } finally {
+      setIntLoading(false);
+    }
+  }, []);
+
   const enterScopeMode = useCallback(
     (entry: SearchEntry) => {
       setScopedPage(entry);
@@ -390,18 +448,22 @@ export function GlobalSearch({ open, onClose }: Props) {
       if (entry.path === "/standardtekster") {
         resetStdState();
         void loadStdTemplates();
+      } else if (entry.path === "/interaksjoner") {
+        resetIntState();
+        void loadIntIndex();
       }
       setTimeout(() => inputRef.current?.focus(), 60);
     },
-    [loadStdTemplates, resetStdState]
+    [loadStdTemplates, resetStdState, resetIntState, loadIntIndex]
   );
 
   const exitScopeMode = useCallback(() => {
     setScopedPage(null);
     setCommandQuery("");
     resetStdState();
+    resetIntState();
     setTimeout(() => inputRef.current?.focus(), 30);
-  }, [resetStdState]);
+  }, [resetStdState, resetIntState]);
 
   const navigateTo = useCallback(
     (entry: SearchEntry, withCommand = false) => {
@@ -506,6 +568,32 @@ export function GlobalSearch({ open, onClose }: Props) {
     onClose,
   ]);
 
+  const intEntityId = useCallback(
+    (e: InteractionEntity) => e.id ?? (e.atc ? `atc:${e.atc}` : `name:${e.key}`),
+    []
+  );
+
+  const selectIntEntity = useCallback(
+    (entity: InteractionEntity) => {
+      setIntSelected((prev) => {
+        const id = entity.id ?? (entity.atc ? `atc:${entity.atc}` : `name:${entity.key}`);
+        const seen = new Set(prev.map((p) => p.id ?? (p.atc ? `atc:${p.atc}` : `name:${p.key}`)));
+        if (seen.has(id)) return prev;
+        return [...prev, entity];
+      });
+      setCommandQuery("");
+      setIntDropdownIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 30);
+    },
+    []
+  );
+
+  const navigateWithIntSelected = useCallback(() => {
+    if (!scopedPage) return;
+    navigate(scopedPage.path, { state: { selectedEntities: intSelected } });
+    onClose();
+  }, [scopedPage, intSelected, navigate, onClose]);
+
   const handleItemClick = useCallback((entry: SearchEntry) => {
     const hasCommand = Boolean(PAGE_COMMANDS[entry.path]);
 
@@ -578,6 +666,37 @@ export function GlobalSearch({ open, onClose }: Props) {
           return;
         }
 
+        // ── Interaksjonssøk scoped keyboard handling ──
+        if (isIntScoped) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setIntDropdownIndex((i) => Math.min(i + 1, intFilteredOptions.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setIntDropdownIndex((i) => Math.max(i - 1, 0));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (commandQuery.trim() && intFilteredOptions.length > 0) {
+              const entity = intFilteredOptions[intDropdownIndex] ?? intFilteredOptions[0];
+              if (entity) selectIntEntity(entity);
+            } else {
+              navigateWithIntSelected();
+            }
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            if (commandQuery) setCommandQuery("");
+            else exitScopeMode();
+          } else if (e.key === "Backspace" && commandQuery === "") {
+            e.preventDefault();
+            if (intSelected.length > 0) {
+              setIntSelected((prev) => prev.slice(0, -1));
+            } else {
+              exitScopeMode();
+            }
+          }
+          return;
+        }
+
         // ── Other pages scoped keyboard handling ──
         if (e.key === "Escape") {
           e.preventDefault();
@@ -620,10 +739,12 @@ export function GlobalSearch({ open, onClose }: Props) {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
-    open, isScoped, isStdScoped, entries, activeIndex, scopedPage, commandQuery,
+    open, isScoped, isStdScoped, isIntScoped, entries, activeIndex, scopedPage, commandQuery,
     stdStep, stdFilteredTemplates, stdDropdownIndex,
+    intFilteredOptions, intDropdownIndex, intSelected,
     navigateTo, enterScopeMode, exitScopeMode, onClose,
     selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill,
+    selectIntEntity, navigateWithIntSelected,
   ]);
 
   const shortcutLabel = "Space";
@@ -717,6 +838,8 @@ export function GlobalSearch({ open, onClose }: Props) {
                 : stdHasPreparat
                 ? "Preparat / varenummer..."
                 : ""
+              : isIntScoped
+              ? "Søk etter legemiddel, virkestoff eller ATC-kode..."
               : isScoped
               ? (command?.placeholder ?? "")
               : "Søk etter side..."
@@ -972,6 +1095,159 @@ export function GlobalSearch({ open, onClose }: Props) {
               )}
             </Box>
           )
+        ) : isIntScoped ? (
+          // ── Interaksjonssøk: autocomplete search ──
+          <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
+            {intLoading ? (
+              <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <>
+                {/* Dropdown of filtered options */}
+                {commandQuery.trim() && intFilteredOptions.length === 0 && (
+                  <Box sx={{ py: 3, textAlign: "center" }}>
+                    <Typography color="text.secondary" variant="body2">
+                      Ingen treff for «{commandQuery}»
+                    </Typography>
+                  </Box>
+                )}
+                {intFilteredOptions.length > 0 && (
+                  <List disablePadding sx={{ py: 0.5 }}>
+                    {intFilteredOptions.map((o, i) => {
+                      const isActive = i === intDropdownIndex;
+                      const label =
+                        o.kind === "product"
+                          ? o.label
+                          : o.atc
+                          ? `${o.label} (${o.atc})`
+                          : o.label;
+                      return (
+                        <ListItemButton
+                          key={intEntityId(o)}
+                          selected={isActive}
+                          onClick={() => selectIntEntity(o)}
+                          onMouseMove={() => setIntDropdownIndex(i)}
+                          sx={{
+                            mx: 0.75,
+                            my: 0.25,
+                            borderRadius: 2,
+                            px: 1.5,
+                            py: 0.75,
+                            borderLeft: `3px solid ${isActive ? "#FF5E5B" : "transparent"}`,
+                            transition: "background-color 80ms, border-color 80ms",
+                            "&.Mui-selected": {
+                              backgroundColor: (theme) =>
+                                alpha("#FF5E5B", theme.palette.mode === "dark" ? 0.16 : 0.09),
+                            },
+                            "&.Mui-selected:hover": {
+                              backgroundColor: (theme) =>
+                                alpha("#FF5E5B", theme.palette.mode === "dark" ? 0.2 : 0.12),
+                            },
+                          }}
+                        >
+                          <ListItemText
+                            primary={label}
+                            primaryTypographyProps={{
+                              fontWeight: isActive ? 600 : 400,
+                              fontSize: "0.92rem",
+                            }}
+                          />
+                          {isActive && (
+                            <KeyboardReturnRoundedIcon
+                              sx={{ fontSize: 16, color: "text.disabled", ml: 1 }}
+                            />
+                          )}
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                )}
+
+                {/* Selected chips */}
+                {intSelected.length > 0 && (
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1.5,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 0.75,
+                      borderTop: intFilteredOptions.length > 0 ? "1px solid" : "none",
+                      borderColor: "divider",
+                    }}
+                  >
+                    {intSelected.map((o) => {
+                      const id = intEntityId(o);
+                      const label =
+                        o.kind === "product"
+                          ? o.label
+                          : o.atc
+                          ? `${o.label} ${o.atc}`
+                          : o.label;
+                      return (
+                        <Chip
+                          key={id}
+                          label={label}
+                          size="small"
+                          onDelete={() =>
+                            setIntSelected((prev) => prev.filter((p) => intEntityId(p) !== id))
+                          }
+                          sx={{
+                            fontWeight: 500,
+                            fontSize: "0.78rem",
+                            backgroundColor: (theme) =>
+                              alpha("#FF5E5B", theme.palette.mode === "dark" ? 0.16 : 0.09),
+                            color: "#FF5E5B",
+                            border: `1px solid ${alpha("#FF5E5B", 0.3)}`,
+                            "& .MuiChip-deleteIcon": { color: alpha("#FF5E5B", 0.7) },
+                            "& .MuiChip-deleteIcon:hover": { color: "#FF5E5B" },
+                          }}
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
+
+                {/* Empty-state hint */}
+                {!commandQuery.trim() && intSelected.length === 0 && (
+                  <Box sx={{ px: 3, py: 2.5 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 1.5,
+                        p: 2,
+                        borderRadius: 2,
+                        backgroundColor: (theme) =>
+                          alpha("#FF5E5B", theme.palette.mode === "dark" ? 0.1 : 0.06),
+                        border: (theme) =>
+                          `1px solid ${alpha("#FF5E5B", theme.palette.mode === "dark" ? 0.25 : 0.18)}`,
+                      }}
+                    >
+                      <LightbulbOutlinedIcon
+                        sx={{ fontSize: 18, color: "#FF5E5B", mt: 0.25, flexShrink: 0 }}
+                      />
+                      <Box>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, color: "text.primary", mb: 0.25 }}
+                        >
+                          Søk etter legemiddel, virkestoff eller ATC-kode
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", fontFamily: "monospace" }}
+                        >
+                          f.eks. warfarin, metoprolol, N02AA01
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                )}
+              </>
+            )}
+          </Box>
         ) : (
           // ── Other pages: existing hint card + live preview ──
           <Box sx={{ px: 3, py: 2.5 }}>
@@ -1120,6 +1396,20 @@ export function GlobalSearch({ open, onClose }: Props) {
                 <KbdHint keys={["Tab"]} label="neste felt" />
                 <KbdHint keys={["↵"]} label="åpne" />
                 <KbdHint keys={["Esc"]} label="velg annen mal" />
+              </>
+            )
+          ) : isIntScoped ? (
+            intFilteredOptions.length > 0 ? (
+              <>
+                <KbdHint keys={["↑", "↓"]} label="naviger" />
+                <KbdHint keys={["↵"]} label="velg" />
+                <KbdHint keys={["Esc"]} label="tilbake" />
+              </>
+            ) : (
+              <>
+                {intSelected.length > 0 && <KbdHint keys={["⌫"]} label="fjern siste" />}
+                <KbdHint keys={["↵"]} label={intSelected.length > 0 ? "søk" : "åpne side"} />
+                <KbdHint keys={["Esc"]} label="tilbake" />
               </>
             )
           ) : (

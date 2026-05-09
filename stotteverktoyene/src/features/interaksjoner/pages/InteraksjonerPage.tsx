@@ -201,10 +201,22 @@ export default function InteraksjonerPage() {
 
   // Pre-fill search when navigated from the global command palette
   React.useEffect(() => {
-    const searchQuery = (location.state as { searchQuery?: string } | null)?.searchQuery;
-    if (!searchQuery) return;
-    setInputValue(searchQuery);
-    setTimeout(() => searchInputRef.current?.focus(), 100);
+    const state = location.state as {
+      searchQuery?: string;
+      selectedEntities?: InteractionEntity[];
+    } | null;
+    if (!state) return;
+
+    if (Array.isArray(state.selectedEntities) && state.selectedEntities.length > 0) {
+      setSelected(state.selectedEntities);
+      setInputValue("");
+      return;
+    }
+
+    if (state.searchQuery) {
+      setInputValue(state.searchQuery);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
   }, [location.state]);
   const [results, setResults] = React.useState<MatchResult[]>([]);
   const [activeResult, setActiveResult] = React.useState<number>(0);

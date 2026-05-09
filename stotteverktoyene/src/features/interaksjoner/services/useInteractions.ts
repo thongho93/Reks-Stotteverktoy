@@ -14,6 +14,26 @@ type State = {
   error: string | null;
 };
 
+let cachedIndexPromise: Promise<InteractionIndex> | null = null;
+
+export function loadInteractionsIndex(): Promise<InteractionIndex> {
+  if (!cachedIndexPromise) {
+    cachedIndexPromise = fetch("/interactions.json", {
+      headers: { Accept: "application/json" },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<InteractionJson[]>;
+      })
+      .then((data) => buildInteractionsIndex(data))
+      .catch((e) => {
+        cachedIndexPromise = null;
+        throw e;
+      });
+  }
+  return cachedIndexPromise;
+}
+
 // Fetches interactions.json (recommended to place it in /public as /interactions.json)
 // and builds a fast in-memory index for the interaction search UI.
 export function useInteractions() {
