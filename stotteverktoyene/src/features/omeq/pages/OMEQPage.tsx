@@ -12,7 +12,9 @@ import {
   ListItem,
   ListItemText,
   Paper,
+  Snackbar,
   Switch,
+  TextField,
   Tooltip,
   Typography,
   Table,
@@ -23,6 +25,8 @@ import {
   TableRow,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import CancelIcon from "@mui/icons-material/Cancel";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -128,6 +132,8 @@ export default function OMEQPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [rows, setRows] = useState<Row[]>([makeRow()]);
+  const [vedtakOmeq, setVedtakOmeq] = useState<string>("");
+  const [copiedOpen, setCopiedOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
@@ -193,6 +199,7 @@ export default function OMEQPage() {
     setShowHelp(false);
     setShowInfoTable(false);
     setFocusRowId(firstRow.id);
+    setVedtakOmeq("");
   }, []);
 
   useEffect(() => {
@@ -267,7 +274,17 @@ export default function OMEQPage() {
 
   const totalOmeqText = useMemo(() => String(totalOmeq).replace(".", ","), [totalOmeq]);
 
-  const canOpenOmeqStandardtekst = selectedPreparats.length > 0 && totalOmeq > 0;
+  const vedtakNum = useMemo(() => parseFloat(vedtakOmeq.replace(",", ".")), [vedtakOmeq]);
+  const hasVedtak = useMemo(() => vedtakOmeq.trim() !== "" && Number.isFinite(vedtakNum), [vedtakOmeq, vedtakNum]);
+  const vedtakIsOk = useMemo(() => hasVedtak && totalOmeq <= vedtakNum, [hasVedtak, totalOmeq, vedtakNum]);
+
+  useEffect(() => {
+    if (!vedtakIsOk) return;
+    const text = `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${vedtakOmeq} mg`;
+    navigator.clipboard.writeText(text).then(() => setCopiedOpen(true)).catch(() => {});
+  }, [vedtakIsOk, totalOmeqText, vedtakOmeq]);
+
+  const canOpenOmeqStandardtekst = selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
 
   const openOmeqStandardtekst = useCallback(() => {
     if (!canOpenOmeqStandardtekst) return;
@@ -277,6 +294,7 @@ export default function OMEQPage() {
       templateTitle: OMEQ_STANDARDTEKST_TITLE,
       preparats: selectedPreparats,
       totalOmeq: totalOmeqText,
+      vedtakOmeq,
     };
 
     try {
@@ -290,7 +308,7 @@ export default function OMEQPage() {
         omeqPrefill: payload,
       },
     });
-  }, [canOpenOmeqStandardtekst, navigate, selectedPreparats, totalOmeqText]);
+  }, [canOpenOmeqStandardtekst, navigate, selectedPreparats, totalOmeqText, vedtakOmeq]);
 
   const formatFactor = (n: number) => {
     // display with comma for decimals
@@ -601,13 +619,35 @@ export default function OMEQPage() {
                     </Tooltip>
                   </Box>
 
-                  <Box className={styles.totalOmeqBox}>
-                    <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
-                      Total OMEQ
-                    </Typography>
-                    <Typography variant="h5" className={styles.totalOmeqValue}>
-                      {totalOmeq}
-                    </Typography>
+                  <Box className={styles.omeqCompareRow}>
+                    <Box className={styles.totalOmeqBox}>
+                      <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
+                        Total OMEQ
+                      </Typography>
+                      <Typography variant="h5" className={styles.totalOmeqValue}>
+                        {totalOmeq}
+                      </Typography>
+                    </Box>
+
+                    {hasVedtak && (
+                      vedtakIsOk
+                        ? <CheckCircleIcon className={styles.omeqCheckOk} />
+                        : <CancelIcon className={styles.omeqCheckFail} />
+                    )}
+                    <Box className={styles.vedtakOmeqBox}>
+                      <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
+                        OMEQ vedtak
+                      </Typography>
+                      <TextField
+                        variant="standard"
+                        value={vedtakOmeq}
+                        onChange={(e) => setVedtakOmeq(e.target.value)}
+                        placeholder="0"
+                        inputProps={{ inputMode: "decimal", style: { textAlign: "center", fontWeight: 700, fontSize: "1.25rem" } }}
+                        InputProps={{ disableUnderline: true }}
+                        sx={{ width: 72 }}
+                      />
+                    </Box>
                   </Box>
 
                   <Paper
@@ -643,6 +683,13 @@ export default function OMEQPage() {
           </Box>
         ))}
       </Paper>
+      <Snackbar
+        open={copiedOpen}
+        onClose={() => setCopiedOpen(false)}
+        autoHideDuration={2500}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        message="Kopiert til utklippstavle"
+      />
     </Container>
   );
 }

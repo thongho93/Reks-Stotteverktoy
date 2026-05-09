@@ -57,6 +57,7 @@ type OMEQStandardtekstPrefill = {
   templateTitle: string;
   preparats: string[];
   totalOmeq: string;
+  vedtakOmeq?: string;
 };
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
@@ -250,6 +251,7 @@ function parseOmeqStandardtekstPrefill(value: unknown): OMEQStandardtekstPrefill
     templateTitle: candidate.templateTitle.trim(),
     preparats,
     totalOmeq: candidate.totalOmeq.trim(),
+    vedtakOmeq: typeof candidate.vedtakOmeq === "string" ? candidate.vedtakOmeq.trim() : undefined,
   };
 }
 
@@ -1009,6 +1011,7 @@ export default function StandardTekstPage() {
 
       const nextTallValues = buildInitialTallValues(normalizeTemplateContent(selected.content));
       nextTallValues[1] = pending.totalOmeq;
+      if (pending.vedtakOmeq) nextTallValues[2] = pending.vedtakOmeq;
       setTallByIndex(nextTallValues);
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
