@@ -15,7 +15,7 @@ interface Medicine {
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
-const ACCENT = "#F97316";
+const ACCENT = "#EC4899";
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 const MEDICINES_OK: Medicine[] = [
@@ -302,14 +302,14 @@ export default function AmmendeHostemedisinerDetail({ onBack }: { onBack: () => 
       {/* ══ HERO ══════════════════════════════════════════════════════════════ */}
       <Box sx={{
         background: dk
-          ? "linear-gradient(135deg, #1a1000 0%, #150e00 60%, #0f172a 100%)"
-          : "linear-gradient(135deg, #ffedd5 0%, #fff7ed 60%, #fffbf5 100%)",
+          ? "linear-gradient(135deg, #1a0011 0%, #150010 60%, #0f172a 100%)"
+          : "linear-gradient(135deg, #fce7f3 0%, #fdf2f8 60%, #fdf4f9 100%)",
         pt: 4, pb: 5, position: "relative", overflow: "hidden",
       }}>
         <Box sx={{ position: "absolute", top: -40, right: -40, width: 220, height: 220, borderRadius: "50%",
           background: `radial-gradient(circle, ${ACCENT}22 0%, transparent 70%)`, pointerEvents: "none" }} />
         <Box sx={{ position: "absolute", bottom: -60, left: "30%", width: 300, height: 300, borderRadius: "50%",
-          background: `radial-gradient(circle, #fb923c22 0%, transparent 70%)`, pointerEvents: "none" }} />
+          background: `radial-gradient(circle, #f9a8d422 0%, transparent 70%)`, pointerEvents: "none" }} />
 
         <Box sx={{ px: { xs: 2, md: 4 }, maxWidth: 1100, mx: "auto", position: "relative" }}>
           {/* Breadcrumb */}
