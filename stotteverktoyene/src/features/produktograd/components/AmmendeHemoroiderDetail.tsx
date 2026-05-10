@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ const FAQS = [
     key: "alcos",
     question: "Kan ammende bruke Alcos-Anal?",
     dotColor: "#16a34a",
-    body: (dk: boolean, textSub: string) => (
+    body: (_dk: boolean, textSub: string) => (
       <Typography sx={{ fontSize: 13, color: textSub, lineHeight: 1.75, pt: 1.5 }}>
         Ja, ammende som trenger medisin mot hemoroider kan trygt forsøke Alcos-Anal salve.
         Alcos-Anal skal ifølge produsenten virke kløestillende og sammentrekkende på blodårene
@@ -197,7 +197,7 @@ const FAQS = [
     key: "naf",
     question: "Er det midler mot hemoroider som ammende ikke bør bruke?",
     dotColor: "#64748b",
-    body: (dk: boolean, textSub: string) => (
+    body: (_dk: boolean, textSub: string) => (
       <>
         <Typography sx={{ fontSize: 13, color: textSub, lineHeight: 1.75, pt: 1.5 }}>
           Det er svært lite erfaring med bruk av andre midler mot hemoroider enn Alcos-Anal,
