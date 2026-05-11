@@ -270,6 +270,12 @@ export const ATC_PRODUCTS: Partial<Record<ATCcode, ATCProduct[]>> = {
       form: "stikkpille",
       variants: [{ strength: "100 mg", productNumbers: [214251] }],
     },
+    {
+      name: "Dolcontral",
+      manufacturer: "Mibe",
+      form: "stikkpille",
+      variants: [{ strength: "100 mg", productNumbers: [267331] }],
+    },
   ],
   N02AA03: [
     {
