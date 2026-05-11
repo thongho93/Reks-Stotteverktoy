@@ -699,7 +699,7 @@ export const nutritionProducts: NutritionProduct[] = [
       vegan: true,
       vegetarian: true,
     },
-    age: { over6Years: true },
+    age: { from3Years: true },
     clinicalUse: {
       diabetes: "caution",
       copd: "caution",
