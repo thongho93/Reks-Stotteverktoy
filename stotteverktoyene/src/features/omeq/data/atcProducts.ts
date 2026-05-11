@@ -264,6 +264,18 @@ export const ATC_PRODUCTS: Partial<Record<ATCcode, ATCProduct[]>> = {
       strengths: ["50 mg/ml"],
     },
     { name: "Petidin", manufacturer: "Takeda", form: "injeksjon", strengths: ["50 mg/ml"] },
+    {
+      name: "Petidin NAF",
+      manufacturer: "Sykehusapoteket Oslo, Ullevål",
+      form: "stikkpille",
+      variants: [{ strength: "100 mg", productNumbers: [214251] }],
+    },
+    {
+      name: "Dolcontral",
+      manufacturer: "Mibe",
+      form: "stikkpille",
+      variants: [{ strength: "100 mg", productNumbers: [267331] }],
+    },
   ],
   N02AA03: [
     {
