@@ -1526,7 +1526,7 @@ export default function ProduktOgRadPage() {
                 {fagligSidebarCollapsed && (
                   <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, py: 0.5 }}>
                     {[
-                      { id: "__nutrition__",   emoji: "🥗", label: "Ernæringsprodukter", activeColor: "rgba(34,197,94,0.35)",  activeBorder: "rgba(34,197,94,0.6)"  },
+                      { id: "__nutrition__",   emoji: "🥗", label: "Næringsmidler", activeColor: "rgba(34,197,94,0.35)",  activeBorder: "rgba(34,197,94,0.6)"  },
                       { id: "__knuse__",       emoji: "💊", label: "Knuse-/delelisten",  activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
                       { id: "__tryggmamma__",  emoji: "🤰", label: "Tryggmamma",         activeColor: "rgba(236,72,153,0.35)", activeBorder: "rgba(236,72,153,0.6)" },
                     ].map(({ id, emoji, label, activeColor, activeBorder }) => {
@@ -1597,7 +1597,7 @@ export default function ProduktOgRadPage() {
                       {sortedSidebarIds.map((id) => {
                         if (id === "__nutrition__") return (
                           <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Ernæringsprodukter" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                            <Tooltip title="Næringsmidler" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
                               <ListItemButton
                                 selected={selectedFagligDocId === "__nutrition__"}
                                 onClick={() => setSelectedFagligDocId("__nutrition__")}
@@ -1611,7 +1611,7 @@ export default function ProduktOgRadPage() {
                                 }}
                               >
                                 <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
-                                <ListItemText primary="Ernæringsprodukter" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7" }} />
+                                <ListItemText primary="Næringsmidler" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7" }} />
                               </ListItemButton>
                             </Tooltip>
                           </SortableSidebarItem>
