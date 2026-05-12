@@ -7,6 +7,7 @@ import GravidHalsbrannDetail from "./GravidHalsbrannDetail";
 import AmmendeHalsbrannDetail from "./AmmendeHalsbrannDetail";
 import AmmendeHemoroiderDetail from "./AmmendeHemoroiderDetail";
 import AmmendeHostemedisinerDetail from "./AmmendeHostemedisinerDetail";
+import AmmendePollenallergiDetail from "./AmmendePollenallergiDetail";
 import AmmendeKortisonkremerDetail from "./AmmendeKortisonkremerDetail";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
@@ -316,6 +317,7 @@ export default function TryggmammaTab() {
               if (id === "halsbrann" && section === "ammende") setDetailView("ammende-halsbrann");
               if (id === "hemoroider" && section === "ammende") setDetailView("ammende-hemoroider");
               if (id === "hostemedisiner" && section === "ammende") setDetailView("ammende-hostemedisiner");
+              if (id === "pollenallergi" && section === "ammende") setDetailView("ammende-pollenallergi");
               if (id === "kortisonkremer" && section === "ammende") setDetailView("ammende-kortisonkremer");
             }}
             sx={{
@@ -425,6 +427,47 @@ export default function TryggmammaTab() {
     </Box>
 
     {/* ---- Detail modal portal ---- */}
+    {detailView === "ammende-pollenallergi" && createPortal(
+      <div
+        onClick={(e) => { if (e.target === e.currentTarget) setDetailView(null); }}
+        style={{
+          position: "fixed", inset: 0, zIndex: 1400,
+          background: "rgba(15,23,42,0.55)",
+          backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 16,
+        }}
+      >
+        <div style={{
+          width: "100%", maxWidth: 1300,
+          maxHeight: "92vh",
+          borderRadius: 20,
+          overflow: "hidden",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.30)",
+          display: "flex", flexDirection: "column",
+          position: "relative",
+        }}>
+          <button
+            onClick={() => setDetailView(null)}
+            aria-label="Lukk"
+            style={{
+              position: "absolute", top: 14, right: 16, zIndex: 10,
+              width: 32, height: 32, borderRadius: "50%",
+              border: "1px solid rgba(0,0,0,0.12)",
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(4px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", fontSize: 16, color: "#475569",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            }}
+          >✕</button>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            <AmmendePollenallergiDetail onBack={() => setDetailView(null)} />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
     {detailView === "ammende-hostemedisiner" && createPortal(
       <div
         onClick={(e) => { if (e.target === e.currentTarget) setDetailView(null); }}
