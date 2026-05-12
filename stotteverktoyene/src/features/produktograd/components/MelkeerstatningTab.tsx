@@ -256,8 +256,8 @@ const PEPTICATE_PLUS_2: Product = {
   id: "pepticate-plus-2",
   name: "Pepticate Plus 2",
   age: "6+ måneder",
-  tagline: "Mysebasert, høygradig hydrolysert ernæringsprodukt for barn fra 6 måneder med kumelkallergi. Inneholder en unik, veldokumentert blanding av prebiotiske kostfibre (GOS/FOS).",
-  description: "Hypoallergen tilskuddsblanding i pulverform, egnet som en del av en balansert kost fra 6 måneders alder.",
+  tagline: "Mysebasert, høygradig hydrolysert ernæringsprodukt til spedbarn fra 6 måneder med kumelkallergi. Inneholder en unik, veldokumentert blanding av prebiotiske kostfibre (GOS/FOS).",
+  description: "Hypoallergen tilskuddsblanding i pulverform, som er egnet som en del av en balansert kost fra 6 måneders alder. Energitetthet på 0,68 kcal/ml. Tilsatt ingredienser som er en kilde til de langkjedede fettsyrer (ARA/DHA).",
   image: "/nutrition/pepticate-plus-2.png",
   type: "Hydrolysert",
   badges: [
@@ -277,10 +277,10 @@ const PEPTICATE_PLUS_2: Product = {
   ],
   fordeler: [
     "Bygger på 30 års forskning på morsmelk og er dokumentert velfungerende for barn med kumelkallergi.",
-    "Lukter og smaker mer som en vanlig morsmelkerstatning – barnet venner seg raskt til smaken og liker produktet.",
-    "Tilsatt en unik, veldokumentert blanding av prebiotiske kostfibre GOS/FOS (0,6 g/100 ml). Avføringen blir myk og tarmfloraen ligner den hos spedbarn som ammes.",
-    "Inneholder laktose – en viktig energikilde i morsmelk – som gir mild smak og bidrar til opptak av mineraler som kalsium.",
-    "Langkjedede fettsyrer DHA og ARA spiller en viktig rolle for hjernen og synets utvikling.",
+    "Lukter og smaker mer som en vanlig morsmelkerstatning som gjør at barnet raskt venner seg til smaken og liker produktet.",
+    "Tilsatt en unik, veldokumentert blanding av prebiotiske kostfibre GOS/FOS (0,6 g/100 ml) med lignende effekt som kostfiber i morsmelk. Avføringen blir myk og tarmfloraen ligner den hos spedbarn som ammes.",
+    "Inneholder laktose, som er en viktig energikilde i morsmelk og bidrar til en mild smak, samt til opptak av enkelte mineraler som f.eks. kalsium.",
+    "Langkjedede fettsyrer dokosaheksaensyre (DHA) og arakidonsyre (ARA) spiller en viktig rolle for hjernen og synets utvikling.",
   ],
   bruksomraader: [
     "Til kostbehandling av spedbarn og barn fra 6 måneders alder med kumelkallergi.",
