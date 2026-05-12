@@ -584,30 +584,132 @@ function IngrediensTab({ product }: { product: Product }) {
   );
 }
 
-function BestillingTab({ product }: { product: Product }) {
+function AccordionSection({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Box>
-      <Box sx={{ bgcolor: D.surface, border: `1px solid ${D.border}`, borderRadius: D.radiusSm, overflow: "hidden" }}>
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", bgcolor: "rgba(88,166,255,0.08)", px: 1.5, py: 1, borderBottom: `1px solid ${D.border}` }}>
-          {["Produktnavn", "Bestillingsnr.", "Varenr.", "Salgsenhet"].map((h) => (
-            <Typography key={h} sx={{ fontSize: 12, fontWeight: 700, color: D.blue }}>{h}</Typography>
+    <Box sx={{ border: `1px solid ${D.border}`, borderRadius: D.radiusSm, overflow: "hidden" }}>
+      <Box
+        onClick={() => setOpen(o => !o)}
+        sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, cursor: "pointer", bgcolor: D.surface, "&:hover": { bgcolor: D.surfaceAlt } }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          {icon}
+          <Typography sx={{ fontWeight: 700, fontSize: 14, color: D.text }}>{title}</Typography>
+        </Box>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", flexShrink: 0 }}>
+          <path d="M4 6l4 4 4-4" stroke={D.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </Box>
+      {open && (
+        <Box sx={{ px: 2, py: 1.5, bgcolor: D.surfaceAlt, borderTop: `1px solid ${D.border}` }}>
+          {children}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+function BestillingTab({ product }: { product: Product }) {
+  const row = product.bestilling[0];
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Bestillingsinformasjon</Typography>
+
+      {/* Product card */}
+      <Box sx={{ display: "flex", gap: 2, p: 2, bgcolor: D.surface, border: `1px solid ${D.border}`, borderRadius: D.radiusSm, alignItems: "center" }}>
+        {product.image && (
+          <Box component="img" src={product.image} alt={product.name} sx={{ width: 72, height: 72, objectFit: "contain", flexShrink: 0 }} />
+        )}
+        <Box>
+          <Typography sx={{ fontWeight: 800, fontSize: 15, color: D.text, mb: 0.5 }}>{product.name}</Typography>
+          {row && [
+            { label: "Bestillingsnr.", value: row.bestillingsnr },
+            { label: "Varenr.", value: row.varenr },
+            { label: "Salgsenhet:", value: row.salgsenhet },
+          ].map(({ label, value }) => (
+            <Typography key={label} sx={{ fontSize: 13, color: D.textSub, lineHeight: 1.7 }}>
+              <Box component="span" sx={{ color: D.textMuted }}>{label} </Box>{value}
+            </Typography>
           ))}
         </Box>
-        {product.bestilling.map((row, i) => (
-          <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", px: 1.5, py: 1.5, borderTop: i > 0 ? `1px solid ${D.border}` : "none" }}>
-            {[row.produktnavn, row.bestillingsnr, row.varenr, row.salgsenhet].map((val, j) => (
-              <Typography key={j} sx={{ fontSize: 13, color: D.text }}>{val}</Typography>
-            ))}
-          </Box>
-        ))}
       </Box>
-      <Box sx={{ mt: 2.5, p: 2, bgcolor: D.surface, border: `1px solid ${D.border}`, borderRadius: D.radiusSm }}>
-        <Typography sx={{ fontSize: 12, color: D.textSub, fontStyle: "italic" }}>
+
+      {/* Accordions */}
+      <AccordionSection
+        title="Holdbarhet og oppbevaring"
+        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-2" stroke={D.purple} strokeWidth="1.5" strokeLinecap="round"/><rect x="7" y="4" width="10" height="6" rx="1.5" stroke={D.purple} strokeWidth="1.5"/><path d="M12 12v4M10 14h4" stroke={D.purple} strokeWidth="1.4" strokeLinecap="round"/></svg>}
+      >
+        <Typography sx={{ fontSize: 13, color: D.textSub, lineHeight: 1.75 }}>{product.holdbarhet}</Typography>
+      </AccordionSection>
+
+      <AccordionSection
+        title="Viktig informasjon"
+        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={D.purple} strokeWidth="1.5"/><path d="M12 8v4M12 16h.01" stroke={D.purple} strokeWidth="1.5" strokeLinecap="round"/></svg>}
+      >
+        <Typography sx={{ fontSize: 13, color: D.textSub, lineHeight: 1.75, mb: 1 }}>{product.forsiktighetsregler}</Typography>
+        {product.kontraindikasjon && (
+          <>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: D.text, mb: 0.5 }}>Kontraindikasjon</Typography>
+            <Typography sx={{ fontSize: 13, color: D.textSub, lineHeight: 1.75 }}>{product.kontraindikasjon}</Typography>
+          </>
+        )}
+      </AccordionSection>
+
+      <AccordionSection
+        title="Kontakt Nutricia"
+        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={D.purple} strokeWidth="1.5" strokeLinejoin="round"/><circle cx="12" cy="9" r="2.5" stroke={D.purple} strokeWidth="1.4"/></svg>}
+      >
+        <Typography sx={{ fontSize: 13, color: D.textSub, lineHeight: 1.75, fontStyle: "italic", mb: 1 }}>
           Nutricias produkter er registrerte næringsmidler til spesielle medisinske formål og skal brukes i samråd med helsepersonell. Ved eneste kilde til ernæring må mikronæringsstoffstatus overvåkes.
         </Typography>
-        <Typography sx={{ fontSize: 12, color: D.textSub, mt: 1 }}>
+        <Typography sx={{ fontSize: 13, color: D.textSub }}>
           Nutricia, % Danone AS &nbsp;|&nbsp; Tlf. +47 23 00 21 00 &nbsp;|&nbsp; E-post nutricia.amnno@danone.com
         </Typography>
+      </AccordionSection>
+    </Box>
+  );
+}
+
+type Dokument = { title: string; url: string; sizeLabel: string; color?: string };
+
+function DokumentasjonTab({ dokumenter }: { dokumenter: Dokument[] }) {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <Box>
+        <Typography sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Dokumentasjon</Typography>
+        <Typography sx={{ fontSize: 13, color: D.textMuted, mt: 0.5 }}>Faglig dokumentasjon og forskningsstøtte</Typography>
+      </Box>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+        {dokumenter.map((doc, i) => (
+          <Box
+            key={i}
+            component="a"
+            href={doc.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              display: "flex", alignItems: "center", gap: 1.5,
+              p: 1.5, width: 180,
+              bgcolor: D.surface, border: `1px solid ${D.border}`, borderRadius: D.radiusSm,
+              textDecoration: "none", cursor: "pointer",
+              transition: "all 0.15s",
+              "&:hover": { borderColor: D.borderMed, boxShadow: D.shadow },
+            }}
+          >
+            <Box sx={{ flexShrink: 0 }}>
+              <svg width="28" height="34" viewBox="0 0 28 34" fill="none">
+                <rect x="0.5" y="0.5" width="27" height="33" rx="3.5" fill={doc.color ? doc.color + "14" : "rgba(74,44,130,0.08)"} stroke={doc.color ?? D.purple} strokeOpacity="0.3"/>
+                <path d="M6 10h16M6 14h16M6 18h10" stroke={doc.color ?? D.purple} strokeWidth="1.4" strokeLinecap="round"/>
+                <rect x="15" y="22" width="10" height="8" rx="2" fill={doc.color ?? D.purple} fillOpacity="0.15"/>
+                <text x="20" y="28.5" textAnchor="middle" fontSize="5" fontWeight="700" fill={doc.color ?? D.purple} fontFamily="sans-serif">PDF</text>
+              </svg>
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: D.text, lineHeight: 1.3, mb: 0.25 }}>{doc.title}</Typography>
+              <Typography sx={{ fontSize: 11, color: D.textMuted }}>PDF · {doc.sizeLabel}</Typography>
+            </Box>
+          </Box>
+        ))}
       </Box>
     </Box>
   );
@@ -640,7 +742,11 @@ export default function MelkeerstatningTab() {
 
   const product = PRODUCTS.find(p => p.id === selectedId) ?? PRODUCTS[0];
 
-  const TABS = ["Oversikt", "Næringsinnhold", "Tilberedning & dosering", "Ingredienser", "Bestillingsinfo"];
+  const TABS = ["Oversikt", "Næringsinnhold", "Tilberedning & dosering", "Ingredienser", "Bestillingsinfo", "Dokumentasjon"];
+
+  const PEPTICATE_1_DOKUMENTER: Dokument[] = [
+    { title: "Produktark Pepticate", url: "/dokumenter/pepticate-1-produktark.pdf", sizeLabel: "344 KB" },
+  ];
 
   return (
     <Box sx={{ display: "flex", height: "100%", bgcolor: D.surface, overflow: "hidden" }}>
@@ -738,6 +844,7 @@ export default function MelkeerstatningTab() {
           {activeTab === 2 && <TilberedningTab product={product} />}
           {activeTab === 3 && <IngrediensTab product={product} />}
           {activeTab === 4 && <BestillingTab product={product} />}
+          {activeTab === 5 && <DokumentasjonTab dokumenter={PEPTICATE_1_DOKUMENTER} />}
         </Box>
 
         {/* Footer */}
