@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Typography, Tabs, Tab, Chip, Divider, useTheme } from "@mui/material";
+import { Box, Typography, Tabs, Tab, Chip } from "@mui/material";
 
 // ─── Badge icons ──────────────────────────────────────────────────────────────
 const DropIcon = ({ color }: { color: string }) => (
@@ -611,7 +611,6 @@ function CheckIcon({ size = 14, color = "#22C55E" }: { size?: number; color?: st
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MelkeerstatningTab() {
-  const theme = useTheme();
   const [selectedId, setSelectedId] = useState<string>(PRODUCTS[0].id);
   const [activeTab, setActiveTab] = useState(0);
 
