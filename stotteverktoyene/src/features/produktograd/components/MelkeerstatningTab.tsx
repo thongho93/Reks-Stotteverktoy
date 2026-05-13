@@ -662,13 +662,7 @@ function NæringsinnholdTab({ product }: { product: Product }) {
   );
 }
 
-const MIXING_TABLE = [
-  { skjeer: 1, pulver: "4,5",  vann: 30,  ferdig: 33,  energi: 22  },
-  { skjeer: 2, pulver: "9,0",  vann: 60,  ferdig: 66,  energi: 44  },
-  { skjeer: 3, pulver: "13,5", vann: 90,  ferdig: 100, energi: 66  },
-  { skjeer: 4, pulver: "18,0", vann: 120, ferdig: 132, energi: 87  },
-  { skjeer: 5, pulver: "22,5", vann: 150, ferdig: 165, energi: 109 },
-];
+
 
 function TilberedningTab({ product }: { product: Product }) {
   return (
