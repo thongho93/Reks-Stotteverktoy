@@ -20,6 +20,7 @@ import { useLocation } from "react-router-dom";
 import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import TryggmammaTab from "../components/TryggmammaTab";
+import MelkeerstatningTab from "../components/MelkeerstatningTab";
 import {
   Alert,
   Box,
@@ -241,7 +242,7 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
   }
 };
 
-const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__knuse__", "__tryggmamma__"] as const;
+const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__melkeerstatning__", "__knuse__", "__tryggmamma__"] as const;
 
 function SortableSidebarItem({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -458,7 +459,7 @@ export default function ProduktOgRadPage() {
   }, [fagligDocs, fagligSearch]);
 
   const selectedFagligDoc = useMemo(() => {
-    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return null;
+    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return null;
     if (selectedFagligDocId) {
       const exact = fagligDocs.find((doc) => doc.id === selectedFagligDocId);
       if (exact) return exact;
@@ -468,11 +469,11 @@ export default function ProduktOgRadPage() {
   const fagligDocById = useMemo(() => new Map(fagligDocs.map((doc) => [doc.id, doc])), [fagligDocs]);
 
   const sortedSidebarIds = useMemo(() => {
-    const allIds = [...VIRTUAL_SIDEBAR_IDS, ...filteredFagligDocs.map((d) => d.id)];
-    if (sidebarOrder.length === 0) return allIds;
-    const valid = sidebarOrder.filter((id) => allIds.includes(id));
-    const newIds = allIds.filter((id) => !sidebarOrder.includes(id));
-    return [...valid, ...newIds];
+    const docIds = filteredFagligDocs.map((d) => d.id);
+    if (sidebarOrder.length === 0) return [...VIRTUAL_SIDEBAR_IDS, ...docIds];
+    const validDocIds = sidebarOrder.filter((id) => docIds.includes(id));
+    const newDocIds = docIds.filter((id) => !sidebarOrder.includes(id));
+    return [...VIRTUAL_SIDEBAR_IDS, ...validDocIds, ...newDocIds];
   }, [filteredFagligDocs, sidebarOrder]);
 
   const dndSensors = useSensors(
@@ -507,7 +508,7 @@ export default function ProduktOgRadPage() {
 
   useEffect(() => {
     // Built-in virtual tabs — never auto-replace them
-    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return;
+    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return;
     if (fagligDocs.length === 0) {
       setSelectedFagligDocId(null);
       return;
@@ -1526,8 +1527,9 @@ export default function ProduktOgRadPage() {
                 {fagligSidebarCollapsed && (
                   <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, py: 0.5 }}>
                     {[
-                      { id: "__nutrition__",   emoji: "🥗", label: "Ernæringsprodukter", activeColor: "rgba(34,197,94,0.35)",  activeBorder: "rgba(34,197,94,0.6)"  },
-                      { id: "__knuse__",       emoji: "💊", label: "Knuse-/delelisten",  activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
+                      { id: "__nutrition__",        emoji: "🥗", label: "Næringsmidler",    activeColor: "rgba(34,197,94,0.35)",   activeBorder: "rgba(34,197,94,0.6)"   },
+                      { id: "__melkeerstatning__",  emoji: "🍼", label: "Melkeerstatning", activeColor: "rgba(59,130,246,0.35)",  activeBorder: "rgba(59,130,246,0.6)"  },
+                      { id: "__knuse__",            emoji: "💊", label: "Knuse-/delelisten", activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
                       { id: "__tryggmamma__",  emoji: "🤰", label: "Tryggmamma",         activeColor: "rgba(236,72,153,0.35)", activeBorder: "rgba(236,72,153,0.6)" },
                     ].map(({ id, emoji, label, activeColor, activeBorder }) => {
                       const active = selectedFagligDocId === id;
@@ -1597,7 +1599,7 @@ export default function ProduktOgRadPage() {
                       {sortedSidebarIds.map((id) => {
                         if (id === "__nutrition__") return (
                           <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Ernæringsprodukter" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                            <Tooltip title="Næringsmidler" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
                               <ListItemButton
                                 selected={selectedFagligDocId === "__nutrition__"}
                                 onClick={() => setSelectedFagligDocId("__nutrition__")}
@@ -1611,7 +1613,28 @@ export default function ProduktOgRadPage() {
                                 }}
                               >
                                 <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
-                                <ListItemText primary="Ernæringsprodukter" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7" }} />
+                                <ListItemText primary="Næringsmidler" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7" }} />
+                              </ListItemButton>
+                            </Tooltip>
+                          </SortableSidebarItem>
+                        );
+                        if (id === "__melkeerstatning__") return (
+                          <SortableSidebarItem key={id} id={id}>
+                            <Tooltip title="Melkeerstatning" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
+                              <ListItemButton
+                                selected={selectedFagligDocId === "__melkeerstatning__"}
+                                onClick={() => setSelectedFagligDocId("__melkeerstatning__")}
+                                sx={{
+                                  borderRadius: 2, pl: 1, pr: 0.7,
+                                  border: "1px solid rgba(255,255,255,0.06)",
+                                  bgcolor: selectedFagligDocId === "__melkeerstatning__" ? "rgba(59,130,246,0.18)" : "rgba(22,27,34,0.85)",
+                                  "&:hover": { bgcolor: "rgba(59,130,246,0.12)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(59,130,246,0.2)", borderColor: "rgba(59,130,246,0.45)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(59,130,246,0.26)" },
+                                }}
+                              >
+                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🍼</Typography>
+                                <ListItemText primary="Melkeerstatning" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__melkeerstatning__" ? 800 : 600, color: selectedFagligDocId === "__melkeerstatning__" ? "#BFDBFE" : "#E4DCE7" }} />
                               </ListItemButton>
                             </Tooltip>
                           </SortableSidebarItem>
@@ -1731,9 +1754,11 @@ export default function ProduktOgRadPage() {
                 </Box>{/* end inner content Box */}
               </Box>{/* end collapsible sidebar Box */}
 
-              <Box sx={{ bgcolor: "#0D1117", p: (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") ? 0 : 1, overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto", display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+              <Box sx={{ bgcolor: "#0D1117", p: (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") ? 0 : 1, overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto", display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
                 {selectedFagligDocId === "__nutrition__" ? (
                   <NutritionProductFinder catalogProducts={products} />
+                ) : selectedFagligDocId === "__melkeerstatning__" ? (
+                  <MelkeerstatningTab />
                 ) : selectedFagligDocId === "__knuse__" ? (
                   <KnuseDelisteTab />
                 ) : selectedFagligDocId === "__tryggmamma__" ? (

@@ -13,7 +13,6 @@ import {
   alpha,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
@@ -22,7 +21,6 @@ import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
-import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import KeyboardReturnRoundedIcon from "@mui/icons-material/KeyboardReturnRounded";
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
@@ -124,13 +122,6 @@ type SearchEntry = {
 
 const ALL_ENTRIES: SearchEntry[] = [
   {
-    label: "Hjem",
-    path: "/",
-    Icon: HomeRoundedIcon,
-    color: "#D293AC",
-    keywords: ["home", "hjem", "start", "forside"],
-  },
-  {
     label: "OMEQ-beregning",
     path: "/omeq",
     Icon: CalculateIcon,
@@ -179,13 +170,6 @@ const ALL_ENTRIES: SearchEntry[] = [
     color: "#6B7280",
     keywords: ["statistikk", "data", "bruk", "analyse"],
     ownerOnly: true,
-  },
-  {
-    label: "Profil",
-    path: "/profil",
-    Icon: PersonRoundedIcon,
-    color: "#6B7280",
-    keywords: ["profil", "bruker", "innstillinger", "konto"],
   },
   {
     label: "Rekspert",
@@ -247,6 +231,7 @@ export function GlobalSearch({ open, onClose }: Props) {
   const [stdClockTime, setStdClockTime] = useState("11:00");
   const [stdClockDay, setStdClockDay] = useState<"today" | "tomorrow" | "sunday">("today");
   const [stdDatoInput, setStdDatoInput] = useState("");
+  const [stdSelectedPreparats, setStdSelectedPreparats] = useState<Array<{ text: string; key: string }>>([]);
 
   // ── Interaksjonssøk scoped state ─────────────────────────────────────────────
   const [intIndex, setIntIndex] = useState<{ entities: InteractionEntity[] } | null>(null);
@@ -283,12 +268,24 @@ export function GlobalSearch({ open, onClose }: Props) {
     if (!stdTemplates.length) return [];
     const q = normalize(commandQuery);
     if (!q) return stdTemplates.slice(0, 10);
-    return stdTemplates
-      .filter(
-        (t) =>
-          normalize(t.title).includes(q) ||
-          normalize(t.category ?? "").includes(q)
-      )
+    const words = q.split(/\s+/).filter(Boolean);
+    const scored = stdTemplates.flatMap((t) => {
+      const cat = normalize(t.category ?? "");
+      const title = normalize(t.title);
+      // Category: exact match = 100, word-start = 80, includes = 60
+      // Title: all words match word-start = 40, all words match includes = 20
+      let score = 0;
+      if (cat === q) score = 100;
+      else if (cat.split(/\s+/).some((w) => w.startsWith(q))) score = 80;
+      else if (cat.includes(q)) score = 60;
+      else if (words.every((w) => title.split(/\s+/).some((tw) => tw.startsWith(w)))) score = 40;
+      else if (words.every((w) => title.includes(w))) score = 20;
+      else return [];
+      return [{ t, score }];
+    });
+    return scored
+      .sort((a, b) => b.score - a.score || a.t.title.localeCompare(b.t.title))
+      .map(({ t }) => t)
       .slice(0, 8);
   }, [stdTemplates, commandQuery]);
 
@@ -405,6 +402,7 @@ export function GlobalSearch({ open, onClose }: Props) {
     setStdClockTime("11:00");
     setStdClockDay("today");
     setStdDatoInput("");
+    setStdSelectedPreparats([]);
   }, []);
 
   const resetIntState = useCallback(() => {
@@ -510,8 +508,23 @@ export function GlobalSearch({ open, onClose }: Props) {
     setStdTalls({});
     setStdFormulerings({});
     setCommandQuery("");
+    setStdSelectedPreparats([]);
     setTimeout(() => inputRef.current?.focus(), 30);
   }, []);
+
+  const commitPreparatChip = useCallback(() => {
+    const q = commandQuery.trim();
+    if (!q) return false;
+    const text = stdVnrMatch
+      ? formatPreparatForTemplate(stdVnrMatch) || stdVnrMatch.varenavn || q
+      : q;
+    const key = stdVnrMatch
+      ? String(stdVnrMatch.farmaloggNumber ?? q)
+      : q;
+    setStdSelectedPreparats((prev) => [...prev, { text, key }]);
+    setCommandQuery("");
+    return true;
+  }, [commandQuery, stdVnrMatch]);
 
   const navigateWithStdPrefill = useCallback(() => {
     if (!scopedPage || !stdSelectedTemplate) return;
@@ -520,17 +533,8 @@ export function GlobalSearch({ open, onClose }: Props) {
       templateId: stdSelectedTemplate.id,
     };
 
-    const hasPreparat = /\{\{\s*PREPARAT\d*\s*\}\}|\bPREPARAT\d*\b/i.test(
-      stdSelectedTemplate.content
-    );
-    if (hasPreparat && commandQuery.trim()) {
-      if (stdVnrMatch) {
-        // Resolved VNR → pass the drug name + VNR as key so the page shows the product name
-        palettePrefill.preparatText = formatPreparatForTemplate(stdVnrMatch) || commandQuery.trim();
-        palettePrefill.preparatKey = String(stdVnrMatch.farmaloggNumber ?? commandQuery.trim());
-      } else {
-        palettePrefill.preparatText = commandQuery.trim();
-      }
+    if (stdSelectedPreparats.length > 0) {
+      palettePrefill.preparatList = stdSelectedPreparats;
     }
 
     const tallInds = getTallTokenIndices(stdSelectedTemplate.content);
@@ -557,8 +561,7 @@ export function GlobalSearch({ open, onClose }: Props) {
   }, [
     scopedPage,
     stdSelectedTemplate,
-    commandQuery,
-    stdVnrMatch,
+    stdSelectedPreparats,
     stdTalls,
     stdFormulerings,
     stdClockTime,
@@ -653,14 +656,22 @@ export function GlobalSearch({ open, onClose }: Props) {
           } else {
             if (e.key === "Enter") {
               e.preventDefault();
-              navigateWithStdPrefill();
+              if (stdHasPreparat && commandQuery.trim()) {
+                commitPreparatChip();
+              } else {
+                navigateWithStdPrefill();
+              }
             } else if (e.key === "Escape") {
               e.preventDefault();
               if (commandQuery) setCommandQuery("");
               else goBackToStdStep0();
             } else if (e.key === "Backspace" && commandQuery === "") {
               e.preventDefault();
-              goBackToStdStep0();
+              if (stdSelectedPreparats.length > 0) {
+                setStdSelectedPreparats((prev) => prev.slice(0, -1));
+              } else {
+                goBackToStdStep0();
+              }
             }
           }
           return;
@@ -740,10 +751,10 @@ export function GlobalSearch({ open, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
     open, isScoped, isStdScoped, isIntScoped, entries, activeIndex, scopedPage, commandQuery,
-    stdStep, stdFilteredTemplates, stdDropdownIndex,
+    stdStep, stdFilteredTemplates, stdDropdownIndex, stdHasPreparat, stdSelectedPreparats,
     intFilteredOptions, intDropdownIndex, intSelected,
     navigateTo, enterScopeMode, exitScopeMode, onClose,
-    selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill,
+    selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill, commitPreparatChip,
     selectIntEntity, navigateWithIntSelected,
   ]);
 
@@ -976,11 +987,55 @@ export function GlobalSearch({ open, onClose }: Props) {
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <LightbulbOutlinedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
                         <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                          Skriv preparat / varenummer i søkefeltet over
+                          {stdSelectedPreparats.length === 0
+                            ? "Skriv preparat / varenummer i søkefeltet over"
+                            : "Trykk Enter for å legge til flere, eller Enter igjen for å åpne"}
                         </Typography>
                       </Box>
-                      {/* VNR resolved preview */}
-                      {stdVnrMatch && (
+                      {/* Added preparat chips */}
+                      {stdSelectedPreparats.length > 0 && (
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                          {stdSelectedPreparats.map((p, i) => (
+                            <Box
+                              key={i}
+                              sx={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                                px: 1.25,
+                                py: 0.4,
+                                borderRadius: 1.5,
+                                backgroundColor: (theme) =>
+                                  alpha("#4BC76A", theme.palette.mode === "dark" ? 0.15 : 0.09),
+                                border: (theme) =>
+                                  `1px solid ${alpha("#4BC76A", theme.palette.mode === "dark" ? 0.35 : 0.25)}`,
+                              }}
+                            >
+                              <CheckCircleOutlineRoundedIcon sx={{ fontSize: 13, color: "#4BC76A", flexShrink: 0 }} />
+                              <Typography variant="caption" sx={{ color: "#4BC76A", fontWeight: 600 }}>
+                                {p.text}
+                              </Typography>
+                              <Box
+                                component="span"
+                                onClick={() => setStdSelectedPreparats((prev) => prev.filter((_, idx) => idx !== i))}
+                                sx={{
+                                  ml: 0.25,
+                                  cursor: "pointer",
+                                  fontSize: "0.7rem",
+                                  color: "#4BC76A",
+                                  lineHeight: 1,
+                                  opacity: 0.7,
+                                  "&:hover": { opacity: 1 },
+                                }}
+                              >
+                                ✕
+                              </Box>
+                            </Box>
+                          ))}
+                        </Box>
+                      )}
+                      {/* VNR resolved preview for current input */}
+                      {stdVnrMatch && commandQuery.trim() && (
                         <Box
                           sx={{
                             display: "flex",
@@ -997,7 +1052,7 @@ export function GlobalSearch({ open, onClose }: Props) {
                         >
                           <CheckCircleOutlineRoundedIcon sx={{ fontSize: 15, color: "#4BC76A", flexShrink: 0 }} />
                           <Typography variant="caption" sx={{ color: "#4BC76A", fontWeight: 600 }}>
-                            {formatPreparatForTemplate(stdVnrMatch) || stdVnrMatch.varenavn || commandQuery}
+                            {formatPreparatForTemplate(stdVnrMatch) || stdVnrMatch.varenavn || commandQuery} — trykk Enter for å legge til
                           </Typography>
                         </Box>
                       )}
