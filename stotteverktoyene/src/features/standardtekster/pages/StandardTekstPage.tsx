@@ -62,8 +62,7 @@ const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
 type PalettePrefill = {
   templateId: string;
-  preparatText?: string;
-  preparatKey?: string;
+  preparatList?: Array<{ text: string; key: string }>;
   tallValues?: Record<number, string>;
   formuleringValues?: Record<number, string>;
   clockTime?: string;
@@ -77,10 +76,10 @@ function parsePalettePrefill(value: unknown): PalettePrefill | null {
   if (typeof candidate.templateId !== "string" || !candidate.templateId.trim()) return null;
 
   const result: PalettePrefill = { templateId: candidate.templateId.trim() };
-  if (typeof candidate.preparatText === "string" && candidate.preparatText.trim())
-    result.preparatText = candidate.preparatText.trim();
-  if (typeof candidate.preparatKey === "string" && candidate.preparatKey.trim())
-    result.preparatKey = candidate.preparatKey.trim();
+  if (Array.isArray(candidate.preparatList) && candidate.preparatList.length > 0)
+    result.preparatList = (candidate.preparatList as Array<{ text: string; key: string }>)
+      .filter((p) => p && typeof p.text === "string" && p.text.trim())
+      .map((p) => ({ text: p.text.trim(), key: (p.key ?? p.text).trim() }));
   if (candidate.tallValues && typeof candidate.tallValues === "object")
     result.tallValues = candidate.tallValues as Record<number, string>;
   if (candidate.formuleringValues && typeof candidate.formuleringValues === "object")
@@ -1029,11 +1028,10 @@ export default function StandardTekstPage() {
       setVirkestoffByKey({});
       setFormuleringByPreparatKey({});
 
-      if (pendingPalette.preparatText) {
-        addPickedPreparat(
-          pendingPalette.preparatText,
-          pendingPalette.preparatKey ?? pendingPalette.preparatText,
-        );
+      if (pendingPalette.preparatList?.length) {
+        for (const p of pendingPalette.preparatList) {
+          addPickedPreparat(p.text, p.key);
+        }
       }
 
       const normalizedContent = normalizeTemplateContent(selected.content);
