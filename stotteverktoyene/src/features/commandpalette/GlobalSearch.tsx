@@ -13,7 +13,6 @@ import {
   alpha,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
@@ -22,7 +21,6 @@ import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
-import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import KeyboardReturnRoundedIcon from "@mui/icons-material/KeyboardReturnRounded";
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
