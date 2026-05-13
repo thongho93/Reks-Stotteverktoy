@@ -49,7 +49,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import {
   addDoc,
   collection,
@@ -242,7 +242,7 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
   }
 };
 
-const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__melkeerstatning__", "__knuse__", "__tryggmamma__"] as const;
+const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__melkeerstatning__", "__tryggmamma__", "__knuse__"] as const;
 
 function SortableSidebarItem({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -285,6 +285,8 @@ function SortableSidebarItem({ id, children }: { id: string; children: React.Rea
 
 export default function ProduktOgRadPage() {
   const { user } = useAuthUser();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -1382,10 +1384,10 @@ export default function ProduktOgRadPage() {
             elevation={0}
             sx={{
               borderRadius: 1.5,
-              border: "1px solid rgba(140,80,120,0.35)",
-              bgcolor: "#0D1117",
+              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "rgba(140,80,120,0.2)"}`,
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FDFBFF",
               overflow: "hidden",
-              boxShadow: "0 16px 34px rgba(0,0,0,0.32)",
+              boxShadow: (theme) => theme.palette.mode === "dark" ? "0 16px 34px rgba(0,0,0,0.32)" : "0 10px 28px rgba(101,56,92,0.14)",
               display: "flex",
               flexDirection: "column",
               height: "calc(100vh - 115px)",
@@ -1394,8 +1396,8 @@ export default function ProduktOgRadPage() {
             <Box
               sx={{
                 p: 1,
-                borderBottom: "1px solid rgba(140,80,120,0.3)",
-                bgcolor: "rgba(22,27,34,0.97)",
+                borderBottom: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.3)" : "rgba(140,80,120,0.2)"}`,
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(22,27,34,0.97)" : "rgba(247,238,246,0.98)",
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
@@ -1413,9 +1415,9 @@ export default function ProduktOgRadPage() {
                     borderRadius: 2,
                     textTransform: "none",
                     fontWeight: 700,
-                    bgcolor: "#F2A2D0",
-                    color: "#2A122A",
-                    "&:hover": { bgcolor: "#F7B7DC" },
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
+                    color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0" },
                   }}
                 >
                   Bygg inn dokument
@@ -1429,11 +1431,11 @@ export default function ProduktOgRadPage() {
                     borderRadius: 2,
                     textTransform: "none",
                     fontWeight: 700,
-                    color: "#F5DDF0",
-                    borderColor: "rgba(240,184,220,0.44)",
+                    color: (theme) => theme.palette.mode === "dark" ? "#F5DDF0" : "#6E2C55",
+                    borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(240,184,220,0.44)" : "rgba(140,80,120,0.35)",
                     "&:hover": {
                       borderColor: "#F2A2D0",
-                      bgcolor: "rgba(242,162,208,0.1)",
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.1)" : "rgba(242,162,208,0.14)",
                     },
                   }}
                 >
@@ -1451,11 +1453,11 @@ export default function ProduktOgRadPage() {
                   alignItems: "center",
                   gap: 0.75,
                   borderRadius: 2,
-                  bgcolor: "rgba(13,17,23,0.95)",
-                  border: "1px solid rgba(140,80,120,0.35)",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(13,17,23,0.95)" : "rgba(255,255,255,0.95)",
+                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "rgba(140,80,120,0.28)"}`,
                 }}
               >
-                <SearchRoundedIcon sx={{ color: "#D28DB7", fontSize: 18 }} />
+                <SearchRoundedIcon sx={{ color: (theme) => theme.palette.mode === "dark" ? "#D28DB7" : "#9C4D77", fontSize: 18 }} />
                 <InputBase
                   inputRef={fagligSearchInputRef}
                   value={fagligSearch}
@@ -1464,8 +1466,8 @@ export default function ProduktOgRadPage() {
                   sx={{
                     flex: 1,
                     fontSize: 14,
-                    color: "#F2E7EF",
-                    "& input::placeholder": { color: "#AFA0B2", opacity: 1 },
+                    color: (theme) => theme.palette.mode === "dark" ? "#F2E7EF" : "#44263A",
+                    "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#AFA0B2" : "#8D7790", opacity: 1 },
                   }}
                 />
               </Paper>
@@ -1484,8 +1486,8 @@ export default function ProduktOgRadPage() {
                   width: fagligSidebarCollapsed ? 44 : 220,
                   minWidth: fagligSidebarCollapsed ? 44 : 220,
                   transition: "width 200ms ease, min-width 200ms ease",
-                  borderRight: "1px solid rgba(140,80,120,0.25)",
-                  bgcolor: "rgba(13,17,23,0.9)",
+                  borderRight: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.25)" : "rgba(140,80,120,0.2)"}`,
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(13,17,23,0.9)" : "rgba(251,245,251,0.95)",
                   display: "flex",
                   flexDirection: "column",
                   overflow: "hidden",
@@ -1501,7 +1503,7 @@ export default function ProduktOgRadPage() {
                 >
                   {!fagligSidebarCollapsed && (
                     <>
-                      <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#EED5E8", whiteSpace: "nowrap" }}>
+                      <Typography sx={{ fontSize: 16, fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#EED5E8" : "#5A2A49", whiteSpace: "nowrap" }}>
                         Dokumentfaner
                       </Typography>
                     </>
@@ -1511,9 +1513,9 @@ export default function ProduktOgRadPage() {
                       size="small"
                       onClick={() => setFagligSidebarCollapsed((v) => !v)}
                       sx={{
-                        color: "rgba(235,175,211,0.8)",
+                        color: (theme) => theme.palette.mode === "dark" ? "rgba(235,175,211,0.8)" : "rgba(115,56,92,0.85)",
                         ml: fagligSidebarCollapsed ? 0 : 0.5,
-                        "&:hover": { bgcolor: "rgba(242,162,208,0.15)", color: "#F2A2D0" },
+                        "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.15)" : "rgba(242,162,208,0.18)", color: "#F2A2D0" },
                       }}
                     >
                       {fagligSidebarCollapsed
@@ -1528,9 +1530,9 @@ export default function ProduktOgRadPage() {
                   <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, py: 0.5 }}>
                     {[
                       { id: "__nutrition__",        emoji: "🥗", label: "Næringsmidler",    activeColor: "rgba(34,197,94,0.35)",   activeBorder: "rgba(34,197,94,0.6)"   },
-                      { id: "__melkeerstatning__",  emoji: "🍼", label: "Melkeerstatning", activeColor: "rgba(59,130,246,0.35)",  activeBorder: "rgba(59,130,246,0.6)"  },
-                      { id: "__knuse__",            emoji: "💊", label: "Knuse-/delelisten", activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
+                      { id: "__melkeerstatning__",  emoji: "🍼", label: "Melkeerstatning", activeColor: "rgba(168,139,201,0.35)", activeBorder: "rgba(168,139,201,0.65)" },
                       { id: "__tryggmamma__",  emoji: "🤰", label: "Tryggmamma",         activeColor: "rgba(236,72,153,0.35)", activeBorder: "rgba(236,72,153,0.6)" },
+                      { id: "__knuse__",            emoji: "💊", label: "Knuse-/delelisten", activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
                     ].map(({ id, emoji, label, activeColor, activeBorder }) => {
                       const active = selectedFagligDocId === id;
                       return (
@@ -1586,11 +1588,11 @@ export default function ProduktOgRadPage() {
                 )}
 
                 {/* Sidebar content — hidden when collapsed */}
-                <Box sx={{ flex: 1, overflowY: "auto", display: fagligSidebarCollapsed ? "none" : "block", p: 1 }}>
+                <Box sx={{ flex: 1, overflowY: "auto", display: fagligSidebarCollapsed ? "none" : "block", p: 1.15 }}>
                 {isFagligLoading ? (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.8, py: 1.1 }}>
-                    <CircularProgress size={18} sx={{ color: "#E8B7D5" }} />
-                    <Typography sx={{ fontSize: 13, color: "#D8B4CA" }}>Laster dokumenter...</Typography>
+                    <CircularProgress size={18} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#E8B7D5" : "#A55A84" }} />
+                    <Typography sx={{ fontSize: 13, color: (theme) => theme.palette.mode === "dark" ? "#D8B4CA" : "#7A4A67" }}>Laster dokumenter...</Typography>
                   </Box>
                 ) : null}
                 <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleSidebarDragEnd}>
@@ -1604,16 +1606,20 @@ export default function ProduktOgRadPage() {
                                 selected={selectedFagligDocId === "__nutrition__"}
                                 onClick={() => setSelectedFagligDocId("__nutrition__")}
                                 sx={{
-                                  borderRadius: 2, pl: 1, pr: 0.7,
-                                  border: "1px solid rgba(255,255,255,0.06)",
-                                  bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : "rgba(22,27,34,0.85)",
-                                  "&:hover": { bgcolor: "rgba(34,197,94,0.12)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)" },
+                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
+                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
+                                  bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
+                                  backdropFilter: "blur(8px)",
+                                  WebkitBackdropFilter: "blur(8px)",
+                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
+                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
+                                  "&:hover": { bgcolor: "rgba(34,197,94,0.12)", transform: "translateY(-1px)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)", boxShadow: "0 8px 16px rgba(34,197,94,0.18)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)", transform: "translateY(-1px)" },
                                 }}
                               >
                                 <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
-                                <ListItemText primary="Næringsmidler" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? "#BBF7D0" : "#E4DCE7" }} />
+                                <ListItemText primary="Næringsmidler" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? (isDark ? "#BBF7D0" : "#166534") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
                               </ListItemButton>
                             </Tooltip>
                           </SortableSidebarItem>
@@ -1625,16 +1631,20 @@ export default function ProduktOgRadPage() {
                                 selected={selectedFagligDocId === "__melkeerstatning__"}
                                 onClick={() => setSelectedFagligDocId("__melkeerstatning__")}
                                 sx={{
-                                  borderRadius: 2, pl: 1, pr: 0.7,
-                                  border: "1px solid rgba(255,255,255,0.06)",
-                                  bgcolor: selectedFagligDocId === "__melkeerstatning__" ? "rgba(59,130,246,0.18)" : "rgba(22,27,34,0.85)",
-                                  "&:hover": { bgcolor: "rgba(59,130,246,0.12)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(59,130,246,0.2)", borderColor: "rgba(59,130,246,0.45)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(59,130,246,0.26)" },
+                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
+                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
+                                  bgcolor: selectedFagligDocId === "__melkeerstatning__" ? "rgba(168,139,201,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
+                                  backdropFilter: "blur(8px)",
+                                  WebkitBackdropFilter: "blur(8px)",
+                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
+                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
+                                  "&:hover": { bgcolor: "rgba(168,139,201,0.13)", transform: "translateY(-1px)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(168,139,201,0.24)", borderColor: "rgba(168,139,201,0.50)", boxShadow: "0 8px 16px rgba(124,92,167,0.22)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(168,139,201,0.30)", transform: "translateY(-1px)" },
                                 }}
                               >
                                 <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🍼</Typography>
-                                <ListItemText primary="Melkeerstatning" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__melkeerstatning__" ? 800 : 600, color: selectedFagligDocId === "__melkeerstatning__" ? "#BFDBFE" : "#E4DCE7" }} />
+                                <ListItemText primary="Melkeerstatning" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__melkeerstatning__" ? 800 : 600, color: selectedFagligDocId === "__melkeerstatning__" ? (isDark ? "#E6D8F5" : "#5B3A77") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
                               </ListItemButton>
                             </Tooltip>
                           </SortableSidebarItem>
@@ -1646,16 +1656,20 @@ export default function ProduktOgRadPage() {
                                 selected={selectedFagligDocId === "__knuse__"}
                                 onClick={() => setSelectedFagligDocId("__knuse__")}
                                 sx={{
-                                  borderRadius: 2, pl: 1, pr: 0.7,
-                                  border: "1px solid rgba(255,255,255,0.06)",
-                                  bgcolor: selectedFagligDocId === "__knuse__" ? "rgba(139,92,246,0.18)" : "rgba(22,27,34,0.85)",
-                                  "&:hover": { bgcolor: "rgba(139,92,246,0.12)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(139,92,246,0.2)", borderColor: "rgba(139,92,246,0.45)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(139,92,246,0.26)" },
+                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
+                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
+                                  bgcolor: selectedFagligDocId === "__knuse__" ? "rgba(139,92,246,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
+                                  backdropFilter: "blur(8px)",
+                                  WebkitBackdropFilter: "blur(8px)",
+                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
+                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
+                                  "&:hover": { bgcolor: "rgba(139,92,246,0.13)", transform: "translateY(-1px)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(139,92,246,0.24)", borderColor: "rgba(139,92,246,0.50)", boxShadow: "0 8px 16px rgba(139,92,246,0.2)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(139,92,246,0.30)", transform: "translateY(-1px)" },
                                 }}
                               >
                                 <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>💊</Typography>
-                                <ListItemText primary="Knuse-/delelisten" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__knuse__" ? 800 : 600, color: selectedFagligDocId === "__knuse__" ? "#DDD6FE" : "#E4DCE7" }} />
+                                <ListItemText primary="Knuse-/delelisten" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__knuse__" ? 800 : 600, color: selectedFagligDocId === "__knuse__" ? (isDark ? "#DDD6FE" : "#5B3A77") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
                               </ListItemButton>
                             </Tooltip>
                           </SortableSidebarItem>
@@ -1667,16 +1681,20 @@ export default function ProduktOgRadPage() {
                                 selected={selectedFagligDocId === "__tryggmamma__"}
                                 onClick={() => setSelectedFagligDocId("__tryggmamma__")}
                                 sx={{
-                                  borderRadius: 2, pl: 1, pr: 0.7,
-                                  border: "1px solid rgba(255,255,255,0.06)",
-                                  bgcolor: selectedFagligDocId === "__tryggmamma__" ? "rgba(236,72,153,0.18)" : "rgba(22,27,34,0.85)",
-                                  "&:hover": { bgcolor: "rgba(236,72,153,0.12)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(236,72,153,0.2)", borderColor: "rgba(236,72,153,0.45)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(236,72,153,0.26)" },
+                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
+                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
+                                  bgcolor: selectedFagligDocId === "__tryggmamma__" ? "rgba(236,72,153,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
+                                  backdropFilter: "blur(8px)",
+                                  WebkitBackdropFilter: "blur(8px)",
+                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
+                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
+                                  "&:hover": { bgcolor: "rgba(236,72,153,0.13)", transform: "translateY(-1px)" },
+                                  "&.Mui-selected": { bgcolor: "rgba(236,72,153,0.24)", borderColor: "rgba(236,72,153,0.50)", boxShadow: "0 8px 16px rgba(236,72,153,0.2)" },
+                                  "&.Mui-selected:hover": { bgcolor: "rgba(236,72,153,0.30)", transform: "translateY(-1px)" },
                                 }}
                               >
                                 <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🤰</Typography>
-                                <ListItemText primary="Tryggmamma" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__tryggmamma__" ? 800 : 600, color: selectedFagligDocId === "__tryggmamma__" ? "#FBCFE8" : "#E4DCE7" }} />
+                                <ListItemText primary="Tryggmamma" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__tryggmamma__" ? 800 : 600, color: selectedFagligDocId === "__tryggmamma__" ? (isDark ? "#FBCFE8" : "#9D1D62") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
                               </ListItemButton>
                             </Tooltip>
                           </SortableSidebarItem>
@@ -1697,33 +1715,39 @@ export default function ProduktOgRadPage() {
                               selected={selectedFagligDoc?.id === doc.id}
                               onClick={() => setSelectedFagligDocId(doc.id)}
                               sx={{
-                                borderRadius: 2,
-                                pl: 1 + depth * 1.8,
-                                pr: 0.7,
-                                border: selectedFagligDoc?.id === doc.id ? "1px solid rgba(242,162,208,0.45)" : "1px solid transparent",
-                                bgcolor: selectedFagligDoc?.id === doc.id ? "rgba(242,162,208,0.18)" : "transparent",
-                                "&:hover": { bgcolor: "rgba(242,162,208,0.12)" },
-                                "&.Mui-selected": { bgcolor: "rgba(242,162,208,0.2)", borderColor: "rgba(242,162,208,0.45)" },
-                                "&.Mui-selected:hover": { bgcolor: "rgba(242,162,208,0.26)" },
+                                borderRadius: "999px",
+                                minHeight: 54,
+                                mb: 0.75,
+                                pl: 1.25 + depth * 1.6,
+                                pr: 0.85,
+                                border: selectedFagligDoc?.id === doc.id ? ((theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(242,162,208,0.45)" : "rgba(186,95,148,0.4)"}`) : "1px solid transparent",
+                                bgcolor: selectedFagligDoc?.id === doc.id ? "rgba(242,162,208,0.18)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.72)" : "rgba(255,255,255,0.7)"),
+                                backdropFilter: "blur(8px)",
+                                WebkitBackdropFilter: "blur(8px)",
+                                boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.22)" : "0 6px 14px rgba(92,45,79,0.08)",
+                                transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
+                                "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.12)" : "rgba(242,162,208,0.1)", transform: "translateY(-1px)" },
+                                "&.Mui-selected": { bgcolor: "rgba(242,162,208,0.2)", borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.45)" : "rgba(186,95,148,0.4)" },
+                                "&.Mui-selected:hover": { bgcolor: "rgba(242,162,208,0.26)", transform: "translateY(-1px)" },
                               }}
                             >
                               {doc.emoji ? (
                                 <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
                               ) : doc.kind === "pdf" ? (
-                                <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#F0A1CF" }} />
+                                <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: (theme) => theme.palette.mode === "dark" ? "#F0A1CF" : "#B54B87" }} />
                               ) : (
-                                <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#9ED9FF" }} />
+                                <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: (theme) => theme.palette.mode === "dark" ? "#9ED9FF" : "#2E6FA6" }} />
                               )}
                               <Tooltip title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
                                 <ListItemText
                                   primary={doc.title}
-                                  primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600, color: selectedFagligDoc?.id === doc.id ? "#FFD8ED" : "#E4DCE7" }}
+                                  primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600, color: selectedFagligDoc?.id === doc.id ? (isDark ? "#FFD8ED" : "#6E2D58") : (isDark ? "#E4DCE7" : "#5A2E4D") }}
                                 />
                               </Tooltip>
                               <IconButton
                                 size="small"
                                 onClick={(event) => openFagligDocMenu(event, doc.id)}
-                                sx={{ ml: 0.5, color: "rgba(235,175,211,0.95)", "&:hover": { bgcolor: "rgba(242,162,208,0.18)" } }}
+                                sx={{ ml: 0.5, color: (theme) => theme.palette.mode === "dark" ? "rgba(235,175,211,0.95)" : "rgba(150,72,115,0.95)", "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.18)" : "rgba(242,162,208,0.16)" } }}
                               >
                                 <MoreVertIcon sx={{ fontSize: 18 }} />
                               </IconButton>
