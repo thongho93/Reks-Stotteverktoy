@@ -470,7 +470,182 @@ const PEPTICATE_PLUS_2: Product = {
   ],
 };
 
-const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2];
+const NEOCATE_LCP: Product = {
+  id: "neocate-lcp",
+  name: "Neocate LCP",
+  age: "0–1 år",
+  tagline: "Aminosyrebasert melkeerstatning for spedbarn med kumelkallergi og multimatvareallergi.",
+  description: "Ernæringsmessig komplett næringsprodukt i pulverform. Hypoallergen, laktosefri og egnet som eneste næringskilde.",
+  image: "/Morsmelkerstatning/Neocate-LCP-400-g-752x960.png",
+  imageScale: 0.9,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",                 color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett 0–1 år", color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                      color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                   color: "#D97706", icon: "drop"   },
+    { label: "Med nukleotider",                 color: "#A78BFA", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "0–1 år" },
+    { label: "Energitetthet", value: "0,67 kcal/ml" },
+    { label: "Protein",       value: "Frie aminosyrer" },
+    { label: "Kostfiber",     value: "Ikke tilsatt" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "0 g" },
+  ],
+  fordeler: [
+    "Inneholder alle næringsstoffer et spedbarn trenger og kan brukes som eneste ernæringskilde.",
+    "Hypoallergen sammensetning basert på frie aminosyrer gir svært lav risiko for allergisk reaksjon.",
+    "Beriket med langkjedede fettsyrer DHA og ARA som er viktige for utvikling av hjerne- og synsfunksjon.",
+    "Beriket med nukleotider som har påvist positive effekter på spedbarns immunfunksjon i tidlig spedbarnsalder.",
+    "Laktosefri, glutenfri og kostfiberfri formulering ved behov for elementalkost.",
+  ],
+  fordelerIcons: [ICON_MILK_BOTTLE, ICON_SHIELD_STAR, ICON_DROP, ICON_GUT2, ICON_GUT],
+  bruksomraader: [
+    "Til kostbehandling av spedbarn 0–1 år med kumelkallergi og multimatvareallergi.",
+    "Til andre tilstander hvor elementalkost er anbefalt, inkludert mage- og tarmsykdommer.",
+    "Kan brukes ved overgang fra parenteral til enteral ernæring og ved sondeernæring.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Morsmelk er det beste for spedbarn.",
+    "Neocate LCP er et næringsmiddel til spesielle medisinske formål.",
+    "Skal brukes under medisinsk tilsyn etter nøye vurdering av all næringstilførsel.",
+    "Ikke for parenteralt bruk.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Laktosefri",               icon: null },
+    { label: "Med DHA & ARA",            icon: null },
+    { label: "Med nukleotider",          icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 67,
+  pulverPer100ml: "13,5 g pulver",
+  macros: [
+    { label: "Fett (47 E%)",        value: 47, color: "#7C3AED", amount: "3,5 g" },
+    { label: "Karbohydrat (42 E%)", value: 42, color: "#F97316", amount: "7,1 g" },
+    { label: "Protein (11 E%)",     value: 11, color: "#3B82F6", amount: "1,8 g" },
+    { label: "Kostfiber (0 E%)",    value: 0,  color: "#22C55E", amount: "0 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",   value: "0 g"      },
+    { label: "DHA",       value: "16,6 mg"  },
+    { label: "ARA",       value: "17,0 mg"  },
+    { label: "Kalsium",   value: "78,3 mg"  },
+    { label: "Jern",      value: "1,0 mg"   },
+    { label: "Vitamin D", value: "1,59 µg"  },
+    { label: "Natrium",   value: "28,6 mg"  },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml utblandet (13,5 g pulver)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                    unit: "kJ",   per100gPulver: "2065",      per100mlUtblandet: "279" },
+          { label: "Energi (kcal)",                  unit: "kcal", per100gPulver: "493",       per100mlUtblandet: "67" },
+          { label: "Fett (47 E%)",                   unit: "g",    per100gPulver: "25,6",      per100mlUtblandet: "3,5" },
+          { label: "– hvorav mettede fettsyrer",     unit: "g",    per100gPulver: "10,1",      per100mlUtblandet: "1,4" },
+          { label: "– enumettede fettsyrer",         unit: "g",    per100gPulver: "11,4",      per100mlUtblandet: "1,5" },
+          { label: "– flerumettede fettsyrer",       unit: "g",    per100gPulver: "4,1",       per100mlUtblandet: "0,56" },
+          { label: "– linolsyre (LA)",               unit: "g",    per100gPulver: "3,33",      per100mlUtblandet: "0,450" },
+          { label: "– α-linolensyre (ALA)",          unit: "g",    per100gPulver: "0,33",      per100mlUtblandet: "0,0445" },
+          { label: "– arakidonsyre (ARA)",           unit: "mg",   per100gPulver: "130",       per100mlUtblandet: "17,0" },
+          { label: "– dokosaheksaensyre (DHA)",      unit: "mg",   per100gPulver: "120",       per100mlUtblandet: "16,6" },
+          { label: "– ratio n-6:n-3",                unit: "",     per100gPulver: "7,3:1",     per100mlUtblandet: "7,3:1" },
+          { label: "Karbohydrat (42 E%)",            unit: "g",    per100gPulver: "52,7",      per100mlUtblandet: "7,1" },
+          { label: "– hvorav sukkerarter",           unit: "g",    per100gPulver: "4,6",       per100mlUtblandet: "0,62" },
+          { label: "– laktose",                      unit: "g",    per100gPulver: "-",         per100mlUtblandet: "-" },
+          { label: "Kostfiber (0 E%)",               unit: "g",    per100gPulver: "-",         per100mlUtblandet: "-" },
+          { label: "Protein (11 E%)",                unit: "g",    per100gPulver: "13,3",      per100mlUtblandet: "1,8" },
+          { label: "Salt",                           unit: "g",    per100gPulver: "0,53",      per100mlUtblandet: "0,07" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",    unit: "mg", per100gPulver: "212",       per100mlUtblandet: "28,6" },
+          { label: "Kalium",     unit: "mg", per100gPulver: "536",       per100mlUtblandet: "72,4" },
+          { label: "Klorid",     unit: "mg", per100gPulver: "386",       per100mlUtblandet: "52,1" },
+          { label: "Kalsium",    unit: "mg", per100gPulver: "580",       per100mlUtblandet: "78,3" },
+          { label: "Fosfor",     unit: "mg", per100gPulver: "370",       per100mlUtblandet: "49,9" },
+          { label: "Magnesium",  unit: "mg", per100gPulver: "52,0",      per100mlUtblandet: "7,02" },
+          { label: "Jern",       unit: "mg", per100gPulver: "7,39",      per100mlUtblandet: "1,00" },
+          { label: "Sink",       unit: "mg", per100gPulver: "5,42",      per100mlUtblandet: "0,73" },
+          { label: "Kobber",     unit: "mg", per100gPulver: "0,42",      per100mlUtblandet: "0,057" },
+          { label: "Mangan",     unit: "mg", per100gPulver: "0,049",     per100mlUtblandet: "0,007" },
+          { label: "Molybden",   unit: "µg", per100gPulver: "11,3",      per100mlUtblandet: "1,53" },
+          { label: "Fluorid",    unit: "µg", per100gPulver: "<44,4",     per100mlUtblandet: "<5,99" },
+          { label: "Selen",      unit: "µg", per100gPulver: "18,7",      per100mlUtblandet: "2,53" },
+          { label: "Krom",       unit: "µg", per100gPulver: "10,8",      per100mlUtblandet: "1,46" },
+          { label: "Jod",        unit: "µg", per100gPulver: "103",       per100mlUtblandet: "14,0" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",      unit: "µg",         per100gPulver: "431",           per100mlUtblandet: "58,2" },
+          { label: "Vitamin D",      unit: "µg",         per100gPulver: "11,8",          per100mlUtblandet: "1,59" },
+          { label: "Vitamin E",      unit: "mg (mg α-TE)", per100gPulver: "11,0 (9,85)", per100mlUtblandet: "1,49 (1,33)" },
+          { label: "Vitamin C",      unit: "mg",         per100gPulver: "52,7",          per100mlUtblandet: "7,11" },
+          { label: "Vitamin K",      unit: "µg",         per100gPulver: "44,7",          per100mlUtblandet: "6,03" },
+          { label: "Tiamin",         unit: "mg",         per100gPulver: "0,59",          per100mlUtblandet: "0,08" },
+          { label: "Riboflavin",     unit: "mg",         per100gPulver: "0,59",          per100mlUtblandet: "0,08" },
+          { label: "Niacin",         unit: "mg (mg NE)", per100gPulver: "4,09 (9,41)",   per100mlUtblandet: "0,55 (1,27)" },
+          { label: "Pantotensyre",   unit: "mg",         per100gPulver: "3,05",          per100mlUtblandet: "0,41" },
+          { label: "Vitamin B6",     unit: "mg",         per100gPulver: "0,48",          per100mlUtblandet: "0,06" },
+          { label: "Folsyre",        unit: "µg",         per100gPulver: "68,5",          per100mlUtblandet: "9,24" },
+          { label: "Folat",          unit: "µg",         per100gPulver: "116",           per100mlUtblandet: "15,7" },
+          { label: "Vitamin B12",    unit: "µg",         per100gPulver: "1,38",          per100mlUtblandet: "0,19" },
+          { label: "Biotin",         unit: "µg",         per100gPulver: "19,2",          per100mlUtblandet: "2,59" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Kolin",        unit: "mg",            per100gPulver: "137",  per100mlUtblandet: "18,5" },
+          { label: "Inositol",     unit: "mg",            per100gPulver: "110",  per100mlUtblandet: "14,9" },
+          { label: "L-karnitin",   unit: "mg",            per100gPulver: "10,8", per100mlUtblandet: "1,46" },
+          { label: "Taurin",       unit: "mg",            per100gPulver: "32,0", per100mlUtblandet: "4,32" },
+          { label: "Nukleotider",  unit: "mg",            per100gPulver: "17,2", per100mlUtblandet: "2,33" },
+          { label: "Osmolaritet",  unit: "mOsm/l",        per100gPulver: "—",    per100mlUtblandet: "310" },
+          { label: "Osmolalitet",  unit: "mOsm/kg H₂O",   per100gPulver: "—",    per100mlUtblandet: "340" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Kok opp vann og avkjøl.",
+    "Tilsett måleskje med Neocate LCP i henhold til utblandingstabell på pakningen.",
+    "Rist eller visp til pulveret har løst seg opp.",
+    "Kan drikkes fra tåteflaske, kopp eller glass, eller gis som sondeernæring.",
+    "Kan brukes som erstatning for melk ved matlaging og baking.",
+  ],
+  dosering: "Egnet som eneste næringskilde. Doseringen er individuell og skal bestemmes i samråd med lege eller klinisk ernæringsfysiolog.",
+  mixingInfo: { konsentrasjon: "13,5", scoopGram: "4,5" },
+  mixingTable: [
+    { skjeer: 3, pulver: "13,5", vann: 90,  ferdig: 100, energi: 67  },
+    { skjeer: 4, pulver: "18,0", vann: 120, ferdig: 133, energi: 89  },
+    { skjeer: 6, pulver: "27,0", vann: 180, ferdig: 200, energi: 134 },
+    { skjeer: 7, pulver: "31,5", vann: 210, ferdig: 233, energi: 156 },
+    { skjeer: 8, pulver: "36,0", vann: 240, ferdig: 267, energi: 179 },
+  ],
+  holdbarhet: "18 måneder fra produksjonsdato. Holdbarhetsdato på pakningen. Tilbered alltid bare ett måltid om gangen. Kast blanding som er oppvarmet eller blir til overs. Ved sondemating er maks hengetid 4 timer. Uåpnet boks oppbevares i romtemperatur. Åpnet boks oppbevares med lokk, på et svalt og tørt sted. Brukes innen 1 måned.",
+  ingredienser: "Tørket glukosesirup, raffinerte vegetabilske oljer (oljesyrerik solsikkeolje, kokosolje, rapsolje, solsikkeolje), L-arginin-L-aspartat, L-leucin, L-lysinacetat, L-glutamin, L-prolin, emulgator (E472c), L-valin, glysin, L-isoleucin, dikaliumhydrogenfosfat, L-treonin, L-fenylalanin, L-tyrosin, L-serin, L-histidin, L-alanin, kalsiumhydrogenfosfat, trikaliumsitrat, natriumklorid, kalsiumkarbonat, L-cystin, kolinbitartrat, kalsiumglycerofosfat, L-tryptofan, kalsiumsitrat, magnesiumklorid, L-metionin, kalsiumfosfat tribasisk, olje fra Mortierella alpina, olje fra mikroalgen Schizochytrium sp., magnesium-L-aspartat, inositol, L-askorbinsyre, antioksidanter (solsikkelecitin, askorbylpalmitat), taurin, jernsulfat, sinksulfat, L-karnitin, DL-α-tokoferylacetat, uridin 5'-monofosfatnatriumsalt, cytidin 5'-monofosfat, nikotinamid, kalsium-D-pantotenat, inosin-5'-monofosfatnatriumsalt, adenosin 5'-monofosfat, guanosin-5'-monofosfatnatriumsalt, kobbersulfat, tiaminmononitrat, riboflavin, pyridoksinhydroklorid, retinylacetat, kaliumjodid, mangansulfat, pteroylmonoglutaminsyre, fytomenadion, natriumselenitt, kromklorid, natriummolybdat, D-biotin, kolekalsiferol, cyanokobalamin. Glutenfri. Laktosefri. Fri for sukrose og fruktose. Kostfiberfri. Halal- og koshersertifisert.",
+  smaksvarianter: "Nøytral smak.",
+  indikasjon: "Til kostbehandling av spedbarn 0–1 år med kumelkallergi, multimatvareallergi og andre tilstander hvor elementalkost er anbefalt, f.eks. gastroøsofagal refluks, eosinofil øsofagitt, kort tarm-syndrom, malabsorpsjonstilstander og ved overgang fra parenteral til enteral ernæring.",
+  kontraindikasjon: "Intoleranse mot ett eller flere av produktets ingredienser.",
+  forsiktighetsregler: "Morsmelk er det beste for spedbarn. Egnet som eneste næringskilde for spedbarn under ett år etter nøye vurdering av alle former for næringstilførsel, inkludert amming. Ikke for parenteralt bruk.",
+  bestilling: [
+    { produktnavn: "Neocate LCP, nøytral smak", bestillingsnr: "201773", varenr: "840659", salgsenhet: "400 g boks" },
+  ],
+};
+
+const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function ProductCard({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
@@ -699,13 +874,13 @@ function TilberedningTab({ product }: { product: Product }) {
             {/* Header */}
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", bgcolor: D.surfaceAlt, borderBottom: `1px solid ${D.border}` }}>
               {["Måleskjeer", "Pulver (g)", "Vann (ml)", "Ferdig mengde (ml)", "Energi (kcal)"].map((h) => (
-                <Typography key={h} sx={{ fontSize: 11.5, fontWeight: 700, color: D.text, px: 1.5, py: 1 }}>{h}</Typography>
+                <Typography key={h} sx={{ fontSize: 11.5, fontWeight: 700, color: D.text, px: 1.5, py: 1, textAlign: "center" }}>{h}</Typography>
               ))}
             </Box>
             {product.mixingTable.map((row, i) => (
               <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderTop: i > 0 ? `1px solid ${D.border}` : "none", bgcolor: i % 2 === 0 ? D.surface : D.surfaceAlt }}>
                 {[row.skjeer, row.pulver, row.vann, row.ferdig, row.energi].map((val, j) => (
-                  <Typography key={j} sx={{ fontSize: 13, color: D.text, px: 1.5, py: 1.1 }}>{val}</Typography>
+                  <Typography key={j} sx={{ fontSize: 13, color: D.text, px: 1.5, py: 1.1, textAlign: "center" }}>{val}</Typography>
                 ))}
               </Box>
             ))}
@@ -749,6 +924,14 @@ const INGR_PROPS = [
 ];
 
 function IngrediensTab({ product }: { product: Product }) {
+  const ingrProps = product.id === "neocate-lcp"
+    ? [
+        { label: "Glutenfri", icon: INGR_PROPS[0].icon },
+        { label: "Kostfiberfri", icon: INGR_PROPS[1].icon },
+        { label: "Laktosefri", icon: INGR_PROPS[2].icon },
+      ]
+    : INGR_PROPS;
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {/* Ingredienser */}
@@ -758,7 +941,7 @@ function IngrediensTab({ product }: { product: Product }) {
 
         {/* Property icons */}
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, mt: 3, pt: 2.5, borderTop: `1px solid ${D.border}` }}>
-          {INGR_PROPS.map((prop, i) => (
+          {ingrProps.map((prop, i) => (
             <Box key={i} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, py: 1.5 }}>
               {prop.icon(D.purple)}
               <Typography sx={{ fontSize: 11.5, fontWeight: 500, color: D.textSub, textAlign: "center", lineHeight: 1.3 }}>{prop.label}</Typography>
@@ -936,7 +1119,15 @@ export default function MelkeerstatningTab() {
   const PEPTICATE_PLUS_2_DOKUMENTER: Dokument[] = [
     { title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" },
   ];
-  const aktiveDokumenter = product.id === "pepticate-plus-2" ? PEPTICATE_PLUS_2_DOKUMENTER : PEPTICATE_1_DOKUMENTER;
+  const NEOCATE_LCP_DOKUMENTER: Dokument[] = [
+    { title: "Produktark Neocate LCP", url: "/Morsmelkerstatning/Neocate-LCP.pdf", sizeLabel: "530 KB" },
+  ];
+  const DOKUMENT_MAP: Record<string, Dokument[]> = {
+    "pepticate-1": PEPTICATE_1_DOKUMENTER,
+    "pepticate-plus-2": PEPTICATE_PLUS_2_DOKUMENTER,
+    "neocate-lcp": NEOCATE_LCP_DOKUMENTER,
+  };
+  const aktiveDokumenter = DOKUMENT_MAP[product.id] ?? [];
 
   return (
     <Box sx={{ display: "flex", height: "100%", bgcolor: D.surface, overflow: "hidden" }}>
@@ -986,7 +1177,9 @@ export default function MelkeerstatningTab() {
                   const Icon = b.icon === "drop" ? DropIcon : b.icon === "shield" ? ShieldCheckIcon : b.icon === "gut" ? GutIcon : StarShieldIcon;
                   return (
                     <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 1.5, py: 0.9, borderLeft: i > 0 ? `1px solid ${D.border}` : "none" }}>
-                      <Icon color={b.color} />
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Icon color={b.color} />
+                      </Box>
                       <Typography sx={{ fontSize: 12, fontWeight: 500, color: D.textSub, whiteSpace: "nowrap", lineHeight: 1.3 }}>{b.label}</Typography>
                     </Box>
                   );
