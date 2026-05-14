@@ -395,6 +395,30 @@ function SidebarPill({ label, icon, color, checked, onChange }:
   );
 }
 
+function SidebarIconPill({ label, icon, color, checked, onClick }:
+  { label: string; icon?: React.ReactNode; color?: string; checked: boolean; onClick: () => void }) {
+  const accent = color ?? D.green;
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      style={{
+        width: 26, height: 26, borderRadius: 8, border: `1.5px solid ${checked ? `${accent}80` : D.border}`,
+        background: checked ? `${accent}22` : "rgba(255,255,255,0.85)",
+        color: checked ? accent : D.textSub, cursor: "pointer",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        fontSize: 12, lineHeight: 1, padding: 0, flexShrink: 0,
+        boxShadow: checked ? `0 4px 10px ${accent}33` : "0 1px 3px rgba(0,0,0,0.05)",
+        transition: "all 0.13s",
+      }}
+    >
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: checked ? accent : D.textSub }}>
+        {icon ?? "•"}
+      </span>
+    </button>
+  );
+}
+
 // ─── Filter section ───────────────────────────────────────────────────────────
 function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -719,6 +743,10 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
     { key: "from1Year",         label: "Barn",               icon: "👶", type: "age",      color: "#475569" },
     { key: "elderly",           label: "Eldre",              icon: "🧓", type: "age",      color: C.elderlyUndernutrition },
   ];
+  const categoryFilters = useMemo(
+    () => Array.from(new Set(nutritionProducts.map(p => p.category))).sort(),
+    []
+  );
 
   return (
     <div style={{ fontFamily: D.font, background: D.bg, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -754,7 +782,7 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
         <aside style={{
           width: sidebarOpen ? 196 : 36, minWidth: sidebarOpen ? 196 : 36,
           background: D.surface, borderRight: `1px solid ${D.border}`,
-          overflow: sidebarOpen ? "auto" : "hidden",
+          overflow: "auto",
           flexShrink: 0, position: "relative",
           transition: "width 0.24s cubic-bezier(0.4,0,0.2,1), min-width 0.24s cubic-bezier(0.4,0,0.2,1)",
         }}>
@@ -773,49 +801,98 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
             {sidebarOpen ? "◂" : "▸"}
           </button>
 
-          <div style={{
-            opacity: sidebarOpen ? 1 : 0,
-            pointerEvents: sidebarOpen ? "auto" : "none",
-            transition: "opacity 0.16s",
-            padding: "12px 8px 14px 8px",
-          }}>
-            <FilterSection title="Alder">
-              {Object.entries(AGE_LABELS).map(([k, label]) => (
-                <SidebarPill key={k} label={label} icon={AGE_ICONS[k]}
-                  checked={!!filterAge[k]} onChange={v => toggle(setFilterAge, k, v)} />
-              ))}
-            </FilterSection>
-
-            <FilterSection title="Tilstand / Indikasjon">
-              {Object.entries(CLINICAL_LABELS).map(([k, label]) => (
-                <SidebarPill key={k} label={label} icon={CLINICAL_ICONS[k]} color={getC(k)}
-                  checked={!!filterClinical[k]} onChange={v => toggle(setFilterClinical, k, v)} />
-              ))}
-            </FilterSection>
-
-            <FilterSection title="Andre filter">
-              {Object.entries(PROP_LABELS).map(([k, label]) => (
-                <SidebarPill key={k} label={label} icon={renderPropIcon(k)} color={getC(k)}
-                  checked={!!filterProps[k]} onChange={v => toggle(setFilterProps, k, v)} />
-              ))}
-            </FilterSection>
-
-            <FilterSection title="Kategori">
-              {Array.from(new Set(nutritionProducts.map(p => p.category))).sort().map(cat => (
-                <SidebarPill key={cat} label={cat} color={getCat(cat).accent}
-                  checked={!!filterProps[`cat:${slugify(cat)}`]}
-                  onChange={v => toggle(setFilterProps, `cat:${slugify(cat)}`, v)} />
-              ))}
-            </FilterSection>
-
+          {!sidebarOpen ? (
             <div style={{
-              margin: "4px 4px 0", padding: "9px 11px", borderRadius: 10,
-              background: "#fffbeb", border: "1px solid #f0d060",
-              fontSize: 10.5, color: "#92400e", fontWeight: 500, lineHeight: 1.55,
+              padding: "42px 4px 10px 4px",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
             }}>
-              ℹ Ikoner med ⚠ = forsiktighet – krever avtale med lege/KEF
+              {Object.entries(AGE_LABELS).map(([k, label]) => (
+                <SidebarIconPill
+                  key={`age-${k}`}
+                  label={`Alder: ${label}`}
+                  icon={AGE_ICONS[k]}
+                  checked={!!filterAge[k]}
+                  onClick={() => toggle(setFilterAge, k, !filterAge[k])}
+                />
+              ))}
+              <div style={{ width: 18, height: 1, background: D.borderMed, margin: "3px 0" }} />
+              {Object.entries(CLINICAL_LABELS).map(([k, label]) => (
+                <SidebarIconPill
+                  key={`clinical-${k}`}
+                  label={`Tilstand/Indikasjon: ${label}`}
+                  icon={CLINICAL_ICONS[k]}
+                  color={getC(k)}
+                  checked={!!filterClinical[k]}
+                  onClick={() => toggle(setFilterClinical, k, !filterClinical[k])}
+                />
+              ))}
+              <div style={{ width: 18, height: 1, background: D.borderMed, margin: "3px 0" }} />
+              {Object.entries(PROP_LABELS).map(([k, label]) => (
+                <SidebarIconPill
+                  key={`prop-${k}`}
+                  label={`Filter: ${label}`}
+                  icon={renderPropIcon(k)}
+                  color={getC(k)}
+                  checked={!!filterProps[k]}
+                  onClick={() => toggle(setFilterProps, k, !filterProps[k])}
+                />
+              ))}
+              <div style={{ width: 18, height: 1, background: D.borderMed, margin: "3px 0" }} />
+              {categoryFilters.map(cat => {
+                const k = `cat:${slugify(cat)}`;
+                const c = getCat(cat);
+                return (
+                  <SidebarIconPill
+                    key={`cat-${k}`}
+                    label={`Kategori: ${cat}`}
+                    icon={cat.charAt(0).toUpperCase()}
+                    color={c.accent}
+                    checked={!!filterProps[k]}
+                    onClick={() => toggle(setFilterProps, k, !filterProps[k])}
+                  />
+                );
+              })}
             </div>
-          </div>
+          ) : (
+            <div style={{ padding: "12px 8px 14px 8px" }}>
+              <FilterSection title="Alder">
+                {Object.entries(AGE_LABELS).map(([k, label]) => (
+                  <SidebarPill key={k} label={label} icon={AGE_ICONS[k]}
+                    checked={!!filterAge[k]} onChange={v => toggle(setFilterAge, k, v)} />
+                ))}
+              </FilterSection>
+
+              <FilterSection title="Tilstand / Indikasjon">
+                {Object.entries(CLINICAL_LABELS).map(([k, label]) => (
+                  <SidebarPill key={k} label={label} icon={CLINICAL_ICONS[k]} color={getC(k)}
+                    checked={!!filterClinical[k]} onChange={v => toggle(setFilterClinical, k, v)} />
+                ))}
+              </FilterSection>
+
+              <FilterSection title="Andre filter">
+                {Object.entries(PROP_LABELS).map(([k, label]) => (
+                  <SidebarPill key={k} label={label} icon={renderPropIcon(k)} color={getC(k)}
+                    checked={!!filterProps[k]} onChange={v => toggle(setFilterProps, k, v)} />
+                ))}
+              </FilterSection>
+
+              <FilterSection title="Kategori">
+                {categoryFilters.map(cat => (
+                  <SidebarPill key={cat} label={cat} color={getCat(cat).accent}
+                    checked={!!filterProps[`cat:${slugify(cat)}`]}
+                    onChange={v => toggle(setFilterProps, `cat:${slugify(cat)}`, v)} />
+                ))}
+              </FilterSection>
+
+              <div style={{
+                margin: "4px 4px 0", padding: "9px 11px", borderRadius: 10,
+                background: "#fffbeb", border: "1px solid #f0d060",
+                fontSize: 10.5, color: "#92400e", fontWeight: 500, lineHeight: 1.55,
+              }}>
+                ℹ Ikoner med ⚠ = forsiktighet – krever avtale med lege/KEF
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* ── MAIN ── */}

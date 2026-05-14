@@ -35,6 +35,9 @@ produktkatalog/Produktkatalog HV 17 des 25.xlsx
 rxkatalog/*.xlsx
 rxkatalog/~$*.xlsx
 
+# Reference/source media files (not part of the app build)
+public/Morsmelkerstatning/
+
 # Generated/local data caches used for search (keep local, do not commit)
 src/features/fest/components/pimProducts.json
 src/features/produktograd/data/pharmacistAdviceData.json

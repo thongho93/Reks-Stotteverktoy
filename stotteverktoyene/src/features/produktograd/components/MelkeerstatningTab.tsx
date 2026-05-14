@@ -50,6 +50,14 @@ const D = {
   shadow:     "0 2px 8px rgba(74,44,130,0.08), 0 1px 2px rgba(74,44,130,0.06)",
 };
 
+const ICON_MICROSCOPE = (c: string) => <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(0.4 0 0 0.4 12 12)"><path style={{fill: c, strokeLinecap: "round"}} transform="translate(-25, -25.02)" d="M 19.3125 0.03125 C 19.121094 0.03125 18.933594 0.078125 18.75 0.15625 L 11.59375 3.125 C 10.855469 3.433594 10.484375 4.292969 10.78125 5.03125 C 10.78125 5.042969 10.78125 5.050781 10.78125 5.0625 L 11.5625 6.9375 C 11.867188 7.679688 12.753906 8.03125 13.5 7.71875 L 14.25 7.40625 L 15.125 9.65625 L 14.96875 9.71875 C 14.683594 9.832031 14.457031 9.902344 14.21875 10.03125 C 13.980469 10.160156 13.632813 10.40625 13.46875 10.8125 C 13.304688 11.21875 13.394531 11.585938 13.46875 11.84375 C 13.542969 12.101563 13.636719 12.3125 13.75 12.59375 C 13.75 12.605469 13.75 12.613281 13.75 12.625 L 13.9375 13.125 L 13.5 13.28125 C 8.296875 15.398438 5.769531 21.367188 7.875 26.5625 C 7.875 26.574219 7.875 26.582031 7.875 26.59375 L 10.15625 32 C 9.375 33.140625 8.90625 34.523438 8.90625 36 C 8.90625 39.410156 11.339844 42.273438 14.5625 42.9375 C 14.5625 42.957031 14.5625 42.980469 14.5625 43 C 14.757813 43.34375 14.96875 43.671875 15.1875 44 L 9.875 44 C 8.261719 44 7 45.386719 7 47 L 7 49 C 7 49.550781 7.449219 50 8 50 L 42 50 C 42.550781 50 43 49.550781 43 49 L 43 47 C 43 45.386719 41.738281 44 40.125 44 L 37.3125 44 C 39.160156 43.210938 40.101563 41.105469 39.375 39.21875 C 38.816406 37.769531 37.4375 36.832031 35.96875 36.78125 C 35.480469 36.765625 34.984375 36.84375 34.5 37.03125 L 24.65625 40.84375 C 24.644531 40.84375 24.636719 40.84375 24.625 40.84375 C 24.242188 40.996094 23.753906 40.984375 23.1875 40.75 C 22.753906 40.570313 22.332031 40.242188 21.9375 39.875 C 22.667969 38.761719 23.09375 37.421875 23.09375 36 C 23.09375 35.542969 23.019531 35.089844 22.9375 34.65625 L 35.875 29.375 C 36.410156 29.238281 36.730469 28.691406 36.59375 28.15625 C 36.457031 27.621094 35.910156 27.300781 35.375 27.4375 C 35.289063 27.449219 35.207031 27.46875 35.125 27.5 L 22.28125 32.78125 C 21.234375 30.75 19.257813 29.273438 16.90625 28.96875 L 14.84375 23.75 C 14.292969 22.386719 14.945313 20.839844 16.3125 20.28125 C 16.324219 20.28125 16.332031 20.28125 16.34375 20.28125 L 16.84375 20.0625 L 18.34375 23.71875 C 18.359375 23.78125 18.378906 23.847656 18.40625 23.90625 L 19.40625 26.34375 C 19.507813 26.582031 19.699219 26.773438 19.9375 26.875 L 22.8125 28.09375 C 23.054688 28.191406 23.320313 28.191406 23.5625 28.09375 L 27.65625 26.46875 C 27.894531 26.367188 28.085938 26.175781 28.1875 25.9375 L 29.4375 23.0625 C 29.535156 22.820313 29.535156 22.554688 29.4375 22.3125 L 28.46875 20 C 28.46875 19.980469 28.46875 19.957031 28.46875 19.9375 L 28.46875 19.90625 C 28.457031 19.894531 28.449219 19.886719 28.4375 19.875 C 28.4375 19.855469 28.4375 19.832031 28.4375 19.8125 C 28.417969 19.769531 28.398438 19.726563 28.375 19.6875 L 23.75 8.5 C 23.636719 8.21875 23.5625 8.015625 23.4375 7.78125 C 23.3125 7.546875 23.101563 7.207031 22.6875 7.03125 C 22.273438 6.855469 21.910156 6.925781 21.65625 7 C 21.402344 7.074219 21.1875 7.167969 20.90625 7.28125 L 20.71875 7.34375 L 19.8125 5.09375 L 20.65625 4.75 C 21.382813 4.445313 21.761719 3.582031 21.46875 2.84375 L 21.46875 2.8125 L 20.6875 0.9375 C 20.449219 0.390625 19.886719 0.0351563 19.3125 0.03125 Z M 19.03125 2.1875 L 19.4375 3.09375 L 13.21875 5.6875 L 12.8125 4.78125 Z M 17.96875 5.84375 L 18.875 8.125 L 17 8.90625 L 16.09375 6.625 Z M 21.84375 9.09375 C 21.871094 9.15625 21.875 9.171875 21.90625 9.25 C 21.90625 9.261719 21.90625 9.269531 21.90625 9.28125 L 26.21875 19.6875 L 19.875 22.21875 L 15.59375 11.875 C 15.589844 11.863281 15.597656 11.855469 15.59375 11.84375 C 15.554688 11.75 15.527344 11.730469 15.5 11.65625 C 15.574219 11.625 15.585938 11.601563 15.6875 11.5625 C 15.699219 11.5625 15.707031 11.5625 15.71875 11.5625 L 21.65625 9.15625 C 21.75 9.117188 21.769531 9.121094 21.84375 9.09375 Z M 14.71875 14.9375 L 16.0625 18.21875 L 15.5625 18.40625 C 13.191406 19.375 12.039063 22.125 13 24.5 L 14.78125 29.03125 C 13.617188 29.234375 12.554688 29.707031 11.65625 30.40625 L 9.71875 25.8125 C 8.027344 21.636719 10.046875 16.882813 14.21875 15.15625 C 14.234375 15.152344 14.234375 15.128906 14.25 15.125 Z M 26.96875 21.5625 L 27.4375 22.65625 L 26.5 24.78125 L 23.21875 26.09375 L 21.09375 25.1875 L 20.65625 24.09375 Z M 16 31.09375 C 18.726563 31.09375 20.90625 33.273438 20.90625 36 C 20.90625 38.726563 18.726563 40.90625 16 40.90625 C 13.273438 40.90625 11.09375 38.726563 11.09375 36 C 11.09375 33.273438 13.273438 31.09375 16 31.09375 Z M 35.90625 38.78125 C 36.59375 38.804688 37.234375 39.246094 37.5 39.9375 C 37.855469 40.859375 37.390625 41.863281 36.46875 42.21875 L 31.8125 44 L 17.6875 44 C 17.464844 43.75 17.222656 43.410156 16.96875 43.03125 C 18.335938 42.84375 19.585938 42.265625 20.59375 41.40625 C 21.140625 41.902344 21.757813 42.3125 22.4375 42.59375 C 23.34375 42.96875 24.386719 43.085938 25.375 42.6875 L 35.21875 38.90625 C 35.449219 38.816406 35.675781 38.773438 35.90625 38.78125 Z M 9.875 46 L 40.125 46 C 40.582031 46 41 46.402344 41 47 L 41 48 L 9 48 L 9 47 C 9 46.402344 9.417969 46 9.875 46 Z" /></g></svg>;
+const ICON_GUT = (c: string) => <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M24 4C24.5523 4 25 4.44772 25 5V8.45455C25 8.79457 24.942 9.13383 24.8268 9.45399C24.7117 9.77416 24.54 10.0734 24.3158 10.3316C24.0913 10.59 23.8172 10.8038 23.5047 10.9529C23.1915 11.1023 22.8497 11.1818 22.5002 11.1818H20.2589L20.2389 11.1816C19.0077 11.157 17.7858 11.656 16.8135 12.6284C15.8397 13.6023 15.1911 14.9802 15.0243 16.5086C14.9542 17.3448 15.0364 18.1876 15.2642 18.9816C15.493 19.7789 15.8618 20.5037 16.3404 21.1118C16.8187 21.7196 17.394 22.195 18.0235 22.5164C18.2493 22.6316 18.7551 22.7627 19.4071 22.8613C20.0262 22.9549 20.6417 23 21.0004 23C21.5527 23.0001 22.0004 23.4478 22.0003 24.0001C22.0003 24.5524 21.5525 25.0001 21.0002 25C20.5214 25 19.804 24.944 19.1082 24.8388C18.4452 24.7386 17.654 24.5733 17.1141 24.2976C16.2123 23.8372 15.4153 23.1703 14.7687 22.3487C14.1223 21.5274 13.6385 20.5674 13.3417 19.5331C13.045 18.4988 12.9402 17.4074 13.0325 16.3274L13.0346 16.3056C13.2443 14.3561 14.0749 12.5388 15.3992 11.2143C16.7248 9.88855 18.457 9.14858 20.2684 9.18182H22.5002C22.5445 9.18182 22.5928 9.17199 22.6436 9.14777C22.695 9.12325 22.7515 9.0826 22.8056 9.02026C22.86 8.95768 22.9093 8.87605 22.9448 8.7771C22.9804 8.67813 23 8.56818 23 8.45455V5C23 4.44772 23.4477 4 24 4Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M14.1141 23.7024C15.0167 23.2416 16.0003 23.0001 17.0002 23C17.5525 22.9999 18.0003 23.4476 18.0003 23.9999C18.0004 24.5522 17.5527 24.9999 17.0004 25C16.3252 25.0001 15.6523 25.1626 15.0235 25.4836C14.394 25.805 13.8187 26.2804 13.3404 26.8882C12.8618 27.4963 12.493 28.2211 12.2642 29.0184C12.0364 29.8124 11.9542 30.6552 12.0243 31.4914C12.1911 33.0198 12.8397 34.3977 13.8135 35.3716C14.2229 35.7811 14.9525 36.1621 15.8381 36.4358C16.708 36.7047 17.6014 36.8311 18.2389 36.8184L18.2589 36.8182H22.5002C22.8497 36.8182 23.1915 36.8977 23.5047 37.0471C23.8172 37.1962 24.0913 37.41 24.3158 37.6684C24.54 37.9266 24.7117 38.2258 24.8268 38.546C24.942 38.8662 25 39.2054 25 39.5455V43C25 43.5523 24.5523 44 24 44C23.4477 44 23 43.5523 23 43V39.5455C23 39.4318 22.9804 39.3219 22.9448 39.2229C22.9093 39.124 22.86 39.0423 22.8056 38.9797C22.7515 38.9174 22.695 38.8767 22.6436 38.8522C22.5928 38.828 22.5445 38.8182 22.5002 38.8182H18.2684C17.3844 38.8344 16.2814 38.6662 15.2474 38.3466C14.2251 38.0306 13.14 37.5266 12.3992 36.7857C11.0749 35.4612 10.2443 33.6439 10.0346 31.6944L10.0325 31.6726C9.9402 30.5926 10.045 29.5012 10.3417 28.4669C10.6385 27.4326 11.1223 26.4726 11.7687 25.6513C12.4153 24.8297 13.2123 24.1628 14.1141 23.7024Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M31.003 4C31.5553 4 32.003 4.44772 32.003 5V10.1816C32.0032 11.2022 31.8288 12.2156 31.4874 13.1646C31.146 14.1136 30.6426 14.9842 30.0001 15.7236C29.8265 15.9234 29.6267 16.1314 29.4094 16.3366C31.0698 16.4329 32.8619 16.7241 34.3796 17.5088C35.4115 18.0423 36.3328 18.8116 36.9897 19.9065C37.6456 20.9998 38.0001 22.3544 38.0001 24C38.0001 25.6409 37.6565 26.992 37.018 28.0838C36.3779 29.1785 35.4774 29.9506 34.4633 30.4869C32.9265 31.2998 31.1003 31.5847 29.419 31.6719C29.6227 31.8662 29.8159 32.0693 29.9975 32.2784C31.2915 33.7689 31.999 35.7633 31.9986 37.8182V43C31.9986 43.5523 31.5509 44 30.9986 44C30.4463 44 29.9986 43.5523 29.9986 43V37.8182C29.9989 36.2098 29.443 34.6904 28.4873 33.5896C27.4766 32.4255 26.2032 31.7066 24.9995 31.7059C24.4474 31.7056 24 31.2578 24.0001 30.7056C24.0003 30.1534 24.4479 29.7059 25.0001 29.7059H27.9972C29.9752 29.7059 32.0095 29.5222 33.5282 28.719C34.2659 28.3288 34.8675 27.7994 35.2916 27.0742C35.7173 26.3462 36.0001 25.3591 36.0001 24C36.0001 22.6456 35.7106 21.662 35.2747 20.9354C34.8397 20.2105 34.2212 19.6783 33.4611 19.2854C31.8984 18.4774 29.8138 18.2941 27.8153 18.2941H24.8182C24.266 18.294 23.8182 17.8462 23.8182 17.294C23.8183 16.7417 24.266 16.2941 24.8182 16.2941H24.8209C25.4559 16.2939 26.089 16.1502 26.6855 15.8659C27.2539 15.595 27.9926 14.9848 28.4904 14.4119C28.9628 13.8681 29.3437 13.2152 29.6055 12.4876C29.8673 11.7599 30.0032 10.9761 30.003 10.182V5C30.003 4.44772 30.4507 4 31.003 4Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M16 24C16 23.4477 16.4479 23 17.0002 23H30C30.5523 23 31 23.4477 31 24C31 24.5523 30.5523 25 30 25H17.0004C16.4481 25 16 24.5523 16 24Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M22 17.2942C22 16.7419 22.4477 16.2942 23 16.2942H25C25.5523 16.2942 26 16.7419 26 17.2942C26 17.8464 25.5523 18.2942 25 18.2942H23C22.4477 18.2942 22 17.8464 22 17.2942Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M17 30.7058C17 30.1536 17.4477 29.7058 18 29.7058L25.0001 29.7059C25.5524 29.7059 26 30.1536 26 30.7058C26 31.2581 25.5518 31.7059 24.9995 31.7059L18 31.7058C17.4477 31.7058 17 31.2581 17 30.7058Z" fill={c}/></svg>;
+const ICON_MILK_BOTTLE = (c: string) => <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(0.45 0 0 0.45 12 12)"><path style={{fill: c, strokeLinecap: "round"}} transform="translate(-25, -25)" d="M 16 3 C 15.447738123791542 3.0000552179053495 15.000055217905349 3.4477381237915417 15 4.000000000000001 L 15 7.6289062 L 9.2402344 14.349609 C 9.235611999065108 14.355417743582233 9.231054416584485 14.36127777345569 9.2265625 14.367188 C 9.223277559201216 14.371069118240886 9.220022264540527 14.374975231826733 9.2167969 14.378906 C 9.203897749252851 14.395440083526905 9.19152183070969 14.412375789721528 9.1796875 14.429688 C 9.163695121462382 14.453128137625658 9.148707593404046 14.477238286909984 9.1347656 14.501953 C 9.129414068987154 14.510985090719597 9.124205089977023 14.52010088733099 9.1191406 14.529297 C 9.11305149500169 14.540899382434677 9.107190996801013 14.552620312156492 9.1015625 14.564453 C 9.090952698314844 14.586868215822031 9.081180309627506 14.609670311548122 9.0722656 14.632812 C 9.069605137122602 14.638646485105678 9.067000850013388 14.64450642278157 9.0644531 14.650391 C 9.054973357564174 14.6754312195503 9.046502999858765 14.70084202578484 9.0390625 14.726562 C 9.037015069571225 14.734350790019183 9.03506179375724 14.742164026618191 9.0332031 14.75 C 9.028096648813117 14.768743539543639 9.02353741430429 14.787631887309082 9.0195312 14.806641 C 9.014696685075632 14.83122481020603 9.0107876936991 14.855981611044308 9.0078125 14.880859 C 9.00709758693017 14.88736312068583 9.006446522245097 14.89387410088596 9.0058594 14.900391 C 9.002728318352238 14.928291013573535 9.000773453441377 14.95631049930139 9 14.984375 C 8.999977112932108 14.988281299809705 8.999977112932108 14.992187700190295 9 14.996094 C 8.999997457445831 14.997395998758721 8.999997457445831 14.998698001241278 9 15 L 9 46 C 9.000055217905349 46.55226187620846 9.447738123791542 46.99994478209465 10 47 L 30 47 L 40 47 C 40.55226187620846 46.99994478209465 40.99994478209465 46.55226187620846 41 46 L 41 15 C 41.00036864652495 14.791386143852312 40.93549213358472 14.587878990930875 40.814453 14.417969 L 36 7.6777344 L 36 4 C 35.99994478209465 3.4477381237915408 35.55226187620846 3.0000552179053495 35 3 L 16 3 z M 17 5 L 34 5 L 34 7 L 17 7 L 17 5 z M 16.458984 9 L 33.056641 9 L 29.486328 14 L 12.173828 14 L 16.458984 9 z M 35 9.7226562 L 39 15.320312 L 39 45 L 31 45 L 31 15.322266 L 35 9.7226562 z M 11 16 L 29 16 L 29 45 L 11 45 L 11 16 z M 15 25 C 13.895 25 13 25.895 13 27 C 13 28.105 13.895 29 15 29 C 16.105 29 17 28.105 17 27 C 17 25.895 16.105 25 15 25 z M 25 25 C 23.895 25 23 25.895 23 27 C 23 28.105 23.895 29 25 29 C 26.105 29 27 28.105 27 27 C 27 25.895 26.105 25 25 25 z M 24.023438 31.988281 C 23.693476915987283 31.98302059883501 23.38216098338928 32.14087078856904 23.191406 32.410156 C 23.191406 32.410156 22.015066 34 20 34 C 17.984934 34 16.808594 32.410156 16.808594 32.410156 C 16.482832154020805 31.96358186499532 15.856730135004682 31.865644154020806 15.410156 32.191406 C 14.96358186499532 32.517167845979195 14.865644154020806 33.14326986499532 15.191406 33.589844 C 15.191406 33.589844 16.935066 36 20 36 C 23.064934 36 24.808594 33.589844 24.808594 33.589844 C 25.035156075348077 33.288937593320505 25.07343739593875 32.88625736661905 24.907633487686418 32.5480501763125 C 24.74182957943409 32.20984298600596 24.400065181014337 31.993477738206582 24.023438 31.988281 z" /></g></svg>;
+const ICON_DROP = (c: string) => <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.465 31.3984C15.2943 30.8716 14.7301 30.5833 14.2049 30.7545C13.6796 30.9257 13.3922 31.4915 13.5629 32.0183C14.3133 34.3348 15.7757 36.3536 17.7405 37.7853C19.7052 39.217 22.0714 39.9881 24.5 39.9881C25.0523 39.9881 25.5 39.5391 25.5 38.9852C25.5 38.4313 25.0523 37.9822 24.5 37.9822C22.4938 37.9822 20.5391 37.3452 18.916 36.1625C17.293 34.9798 16.0849 33.3121 15.465 31.3984Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M24 4L23.3098 4.66019L23.3061 4.66378L23.2973 4.67225L23.2648 4.70364C23.2367 4.73093 23.1956 4.77088 23.1426 4.82301C23.0366 4.92726 22.8826 5.08027 22.6874 5.27825C22.297 5.67415 21.7417 6.25027 21.0763 6.9763C19.7465 8.42721 17.9719 10.4826 16.1951 12.8995C12.6815 17.6788 9 24.0808 9 30.0801C9 37.845 15.796 44 24 44C32.204 44 39 37.845 39 30.0801C39 24.0808 35.3185 17.6788 31.8049 12.8995C30.0281 10.4826 28.2535 8.42721 26.9237 6.9763C26.2583 6.25027 25.703 5.67415 25.3126 5.27825C25.1174 5.08027 24.9634 4.92726 24.8574 4.82301C24.8044 4.77088 24.7634 4.73093 24.7352 4.70364L24.7027 4.67225L24.6939 4.66378L24 4ZM22.5487 8.3338C23.1353 7.69375 23.6326 7.17503 24 6.8001C24.3674 7.17503 24.8647 7.69375 25.4513 8.3338C26.7465 9.74705 28.4719 11.746 30.1951 14.0899C33.6815 18.8321 37 24.7771 37 30.0801C37 36.5828 31.2599 41.9941 24 41.9941C16.7401 41.9941 11 36.5828 11 30.0801C11 24.7771 14.3185 18.8321 17.8049 14.0899C19.5281 11.746 21.2535 9.74705 22.5487 8.3338Z" fill={c}/></svg>;
+const ICON_SHIELD_STAR = (c: string) => <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(0.83 0 0 0.83 12 12)"><path style={{fill: c, strokeLinecap: "round"}} transform="translate(-16, -16)" d="M 16 3.9628906 C 13.75 3.9628906 12.242497 4.8456858 10.884766 5.5839844 C 9.5270341 6.322283 8.2816307 6.9628906 6 6.9628906 L 5 6.9628906 L 5 7.9628906 C 5 15.680746 7.605007 20.701796 10.246094 23.740234 C 12.88718 26.778672 15.626953 27.890625 15.626953 27.890625 L 15.998047 28.039062 L 16.367188 27.892578 C 16.367188 27.892578 19.111702 26.794044 21.753906 23.761719 C 24.39611 20.729394 27 15.707919 27 7.9628906 L 27 6.9628906 L 26 6.9628906 C 23.730806 6.9628906 22.484223 6.3226165 21.123047 5.5839844 C 19.761871 4.8453522 18.25 3.9628906 16 3.9628906 z M 16 5.9628906 C 17.75 5.9628906 18.766848 6.580429 20.169922 7.3417969 C 21.352057 7.9832737 22.911122 8.5887739 24.931641 8.796875 C 24.742901 15.566584 22.504845 19.855009 20.246094 22.447266 C 18.194135 24.802196 16.479735 25.617856 16.001953 25.830078 C 15.522949 25.614625 13.806268 24.788874 11.753906 22.427734 C 9.4944536 19.828347 7.259685 15.539392 7.0703125 8.796875 C 9.0976324 8.5888174 10.659549 7.981657 11.839844 7.3398438 C 13.240613 6.5781424 14.25 5.9628906 16 5.9628906 z M 16 10 L 14.634766 13.117188 L 11.205078 13.482422 L 13.671875 15.677734 L 12.998047 19.074219 L 16 17.341797 L 19.001953 19.074219 L 18.328125 15.677734 L 20.794922 13.482422 L 17.365234 13.117188 L 16 10 z" /></g></svg>;
+const ICON_GUT2 = (c: string) => <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M29.5844 22.8731C30.7438 22.8731 31.8763 22.5579 32.8338 21.9687C33.806 22.5568 34.9534 22.8651 36.1242 22.8529L39.8433 21.6331C40.8913 20.8544 41.6107 19.7749 41.8813 18.5754C42.1518 17.3758 41.9569 16.1289 41.3293 15.0433C40.7017 13.9577 39.6794 13.0993 38.4336 12.6118C38.1491 11.4505 37.4326 10.4117 36.4029 9.66789L32.7725 8.5228H32.3638C31.5563 7.46088 30.344 6.70341 28.9574 6.39438L21.1741 6C19.8803 6.09689 18.6603 6.58325 17.7105 7.38081C17.2617 7.28544 16.8023 7.23601 16.3412 7.23346C15.2247 7.23553 14.1327 7.52881 13.1971 8.0779C12.2615 8.62699 11.5222 9.40843 11.0685 10.3279L8.11115 12.216C7.37528 13.1146 6.97913 14.2026 6.98108 15.3194C6.9738 15.7865 7.04266 16.2519 7.18545 16.7009C6.40957 17.6083 5.99236 18.7234 6.00011 19.869C5.99826 21.1976 6.56142 22.4764 7.57375 23.4423C7.65545 24.3935 8.02424 25.3065 8.64022 26.0824C9.2562 26.8583 10.0959 27.4677 11.0685 27.8444C12.1891 28.4776 13.138 29.3292 13.8453 30.3364C14.5527 31.3437 15.0005 32.4811 15.1559 33.6649H22.7915V28.1391C22.7901 27.158 23.0938 26.1962 23.6682 25.3627C24.2425 24.5293 25.0645 23.8576 26.041 23.4238C26.5901 23.2345 26.7252 22.9796 26.8907 22.6673C27.001 22.4592 27.1249 22.2255 27.3937 21.9687C27.6273 22.1124 27.8083 22.2399 27.9652 22.3504C28.4518 22.6929 28.7077 22.8731 29.5844 22.8731ZM34.032 20.3449C34.5652 20.6333 35.18 20.807 35.8225 20.8411L38.8778 19.839C39.4357 19.3535 39.79 18.7515 39.9302 18.1296C40.0877 17.4314 39.9791 16.6979 39.5978 16.0384C39.2129 15.3726 38.5587 14.8026 37.7048 14.4685L36.738 14.0902L36.491 13.0818C36.3463 12.4911 35.9991 11.9204 35.4592 11.4615L32.4646 10.5169H31.3721L30.7718 9.72751C30.296 9.10182 29.5621 8.60824 28.6714 8.3766L21.21 7.99854C20.3583 8.08446 19.584 8.41337 18.9966 8.90662L18.2493 9.5341L17.2948 9.33129C16.9821 9.26484 16.6609 9.22992 16.3376 9.22763C15.5675 9.23033 14.828 9.43391 14.2094 9.79695C13.59 10.1604 13.1326 10.6586 12.862 11.207L12.6151 11.7075L9.48953 13.703C9.14804 14.2036 8.98012 14.7602 8.98108 15.3101L8.98111 15.3274L8.98084 15.3448C8.97696 15.5937 9.01352 15.844 9.09138 16.0889L9.42858 17.1491L8.70555 17.9948C8.22801 18.5533 7.99572 19.2069 8.00006 19.8496L8.00011 19.8577L8.0001 19.8659C7.99906 20.6151 8.31472 21.3791 8.95437 21.9894L9.50169 22.5116L9.56642 23.2653C9.61317 23.8096 9.82528 24.3527 10.2066 24.833C10.5897 25.3156 11.1317 25.7182 11.791 25.9736L11.9261 26.026L12.0524 26.0973C12.1986 26.1799 12.3426 26.2657 12.4843 26.3546L12.4781 26.3592C15.1968 28.0179 16.3504 30.4319 16.742 31.6663H17.354V24.3727L15.1507 22.4142L13.6552 23.9098C13.2647 24.3003 12.6315 24.3003 12.241 23.9098C11.8505 23.5193 11.8505 22.8861 12.241 22.4956L14.0328 20.7037L13.4952 17.7468L11.0593 16.5289C10.5653 16.2819 10.3651 15.6812 10.6121 15.1872C10.8591 14.6933 11.4598 14.493 11.9538 14.74L14.3306 15.9285L17.242 14.0758L16.3365 11.6609C16.1425 11.1438 16.4046 10.5674 16.9217 10.3734C17.4388 10.1795 18.0152 10.4415 18.2091 10.9586L19.1822 13.5535H20.2587L20.7729 12.525L19.9576 10.6225C19.74 10.1149 19.9752 9.527 20.4828 9.30944C20.9904 9.09189 21.5783 9.32704 21.7959 9.83467L22.498 11.4729L25.286 11.9798L25.2975 11.9705L27.0994 10.5289C27.5307 10.1839 28.16 10.2538 28.505 10.6851C28.85 11.1163 28.7801 11.7456 28.3488 12.0906L27.1443 13.0543L28.4794 14.7709L28.9921 13.7457C29.1614 13.4069 29.5077 13.1929 29.8865 13.1929H32.0488C32.6011 13.1929 33.0488 13.6406 33.0488 14.1929C33.0488 14.7452 32.6011 15.1929 32.0488 15.1929H30.5045L30.2364 15.7291L31.9054 16.1C31.9852 16.1178 32.0625 16.1452 32.1357 16.1818L33.5772 16.9026C34.0712 17.1495 34.2714 17.7502 34.0245 18.2442C33.7775 18.7382 33.1768 18.9384 32.6828 18.6914L31.3514 18.0257L28.228 17.3316C28.0009 17.2811 27.7984 17.153 27.6556 16.9694L25.3674 14.0274L22.5941 13.5232C22.5539 13.5563 22.5107 13.5865 22.4648 13.6135L21.8767 14.7895V15.3552H23.0391C23.1943 15.3552 23.3474 15.3914 23.4863 15.4608L26.3694 16.9024C26.8634 17.1494 27.0636 17.75 26.8166 18.244C26.5696 18.738 25.9689 18.9382 25.475 18.6912L22.803 17.3552H21.8767V18.8782C21.8767 19.4304 21.429 19.8782 20.8767 19.8782C20.3244 19.8782 19.8767 19.4304 19.8767 18.8782V16.3629L19.8767 16.3552L19.8767 16.3476V15.5535H18.6452L15.4938 17.5589L16.0326 20.5223L19.0184 23.1762C19.2318 23.366 19.354 23.638 19.354 23.9236V31.6663H20.7916V28.1003C20.7916 25.3985 22.3008 23.7402 23.1251 22.9551C23.7844 22.327 24.7748 21.7975 25.1876 21.6113C25.2696 21.4277 25.5493 20.9512 26.0118 20.5137C26.4743 20.0762 26.9545 19.6205 27.1368 19.4473C28.3747 20.1548 29.336 20.8652 29.336 20.8652C29.336 20.8652 30.6172 20.7949 31.1993 20.5606C31.6649 20.3731 32.4766 19.8522 32.8243 19.6152L34.032 20.3449Z" fill={c}/><path d="M15 38H23V36H15V38Z" fill={c}/><path d="M23 42H15V40H23V42Z" fill={c}/></svg>;
+
+
 // ─── Product data ─────────────────────────────────────────────────────────────
 type NutritionRow = { label: string; unit: string; per100gPulver: string; per100mlUtblandet: string };
 
@@ -60,10 +68,12 @@ type Product = {
   tagline: string;
   description: string;
   image?: string;
+  imageScale?: number;
   type: "Hydrolysert" | "Aminosyrebasert";
   badges: { label: string; color: string; icon: "drop" | "shield" | "gut" | "star" }[];
   summary: { label: string; value: string }[];
   fordeler: string[];
+  fordelerIcons: ((c: string) => React.ReactNode)[];
   bruksomraader: string[];
   fodmap: { laktose: string; gos: boolean; fos: boolean };
   hurtiginfo: { label: string; icon: React.ReactNode }[];
@@ -73,8 +83,14 @@ type Product = {
     rows: NutritionRow[];
     sections: { title: string; rows: NutritionRow[] }[];
   };
+  kcalPer100ml: number;
+  pulverPer100ml: string;
+  macros: { label: string; value: number; color: string; amount: string }[];
+  nokkel: { label: string; value: string }[];
   tilberedning: string[];
   dosering: string;
+  mixingInfo: { konsentrasjon: string; scoopGram: string };
+  mixingTable: { skjeer: number; pulver: string; vann: number; ferdig: number; energi: number }[];
   holdbarhet: string;
   ingredienser: string;
   smaksvarianter: string;
@@ -133,6 +149,7 @@ const PEPTICATE_1: Product = {
     "Beriket med de langkjedede fettsyrene DHA og ARA som er viktige for utvikling av hjerne og syn.",
     "Tilsatt nukleotider i mengder som tilsvarer morsmelk og som har påvist positive effekter på immunfunksjon.",
   ],
+  fordelerIcons: [ICON_MICROSCOPE, ICON_GUT, ICON_MILK_BOTTLE, ICON_DROP, ICON_SHIELD_STAR],
   bruksomraader: [
     "Til kostbehandling av spedbarn 0–1 år med kumelkallergi og andre indikasjoner hvor elementalkost er anbefalt.",
     "Kan brukes som eneste næringskilde eller i kombinasjon med amming.",
@@ -152,6 +169,23 @@ const PEPTICATE_1: Product = {
     { label: "Hypoallergen",            icon: null },
     { label: "0–6 mnd",                 icon: null },
     { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 66,
+  pulverPer100ml: "13,6 g pulver",
+  macros: [
+    { label: "Fett (46 E%)",        value: 46, color: "#7C3AED", amount: "3,4 g" },
+    { label: "Karbohydrat (43 E%)", value: 43, color: "#F97316", amount: "7,1 g" },
+    { label: "Protein (10 E%)",     value: 10, color: "#3B82F6", amount: "1,6 g" },
+    { label: "Kostfiber (1 E%)",    value: 1,  color: "#22C55E", amount: "0,5 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",   value: "2,88 g"  },
+    { label: "DHA",       value: "16,5 mg" },
+    { label: "ARA",       value: "16,5 mg" },
+    { label: "Kalsium",   value: "61 mg"   },
+    { label: "Jern",      value: "0,54 mg" },
+    { label: "Vitamin D", value: "1,7 µg"  },
+    { label: "Natrium",   value: "20,8 mg" },
   ],
   nutrition: {
     headers: ["", "", "pr. 100 g pulver", "pr. 100 ml utblandet (13,6 g pulver)"],
@@ -241,6 +275,14 @@ const PEPTICATE_1: Product = {
     "Kan brukes som erstatning for melk ved matlaging og baking.",
   ],
   dosering: "Anbefalt konsentrasjon er 13,6 % vekt/volum: for hver måleskje (4,5 g) tilsettes 30 ml vann. Se informasjon om utblanding og tilberedning på pakningen. Doseringen er individuell og skal alltid gjøres i samråd med lege eller klinisk ernæringsfysiolog.",
+  mixingInfo: { konsentrasjon: "13,6", scoopGram: "4,5" },
+  mixingTable: [
+    { skjeer: 1, pulver: "4,5",  vann: 30,  ferdig: 33,  energi: 22  },
+    { skjeer: 2, pulver: "9,0",  vann: 60,  ferdig: 66,  energi: 44  },
+    { skjeer: 3, pulver: "13,5", vann: 90,  ferdig: 100, energi: 66  },
+    { skjeer: 4, pulver: "18,0", vann: 120, ferdig: 132, energi: 87  },
+    { skjeer: 5, pulver: "22,5", vann: 150, ferdig: 165, energi: 109 },
+  ],
   holdbarhet: "18 måneder fra produksjonsdato. Holdbarhetsdato på pakningen. Tilbered alltid bare ett måltid om gangen. Tilberedt Pepticate som ikke drikkes innen en time skal kastes. Ved sondeernæring er maks hengetid 4 timer. Uåpnet boks oppbevares i romtemperatur. Åpnet boks oppbevares med lokk, på et svalt og tørt sted. Brukes innen 1 måned. Skal ikke oppbevares i kjøleskap.",
   ingredienser: "Myseproteinhydrolysat (fra kumelk), maltodekstrin, vegetabilske oljer (palmeolje, kokosolje, rapsolje, oljesyrerik solsikkeolje, solsikkeolje), galaktooligosakkarider (fra kumelk), kalsiumfosfat, emulgator (sitronsyreestere av mono- og diglycerider av fettsyrer), fruktooligosakkarider, fiskeolje, kaliumklorid, olje fra Mortierella alpina, kolinklklorid, kaliumsitat, natriumklorid, magnesiumklorid, L-tyrosin, L-askorbinsyre, inositol, magnesiumhydrogenfosfat, taurin, natrium-L-askorbat, sinksulfat, L-karnitin, jernsulfat, DL-α-tokoferylacelat, uridin-5'-monofosfatnatrium salt, cytidin-5'-monofosfat, kalsium-D-pantotenate, adenosin-5'-monofosfat, inosin-5'-monofosfatnatriumsalt, nikotinamid, guanosin-5'-monofosfatnatriumsalt, kobbersulfat, DL-α-tokoferol, retinylpalmitat, riboflavin, tiaminhydroklorid, pyridoksinhydroklorid, manganisulfat, kaliumjodid, pteroylmonoglutaminsyre, retinylasetat, natriumselenitt, fytomenadion, D-biotin, kolekalsiferol, cyanokobalamin. Glutenfri.",
   smaksvarianter: "Nøytral smak.",
@@ -256,9 +298,10 @@ const PEPTICATE_PLUS_2: Product = {
   id: "pepticate-plus-2",
   name: "Pepticate Plus 2",
   age: "6+ måneder",
-  tagline: "Mysebasert, høygradig hydrolysert ernæringsprodukt til spedbarn fra 6 måneder med kumelkallergi. Inneholder en unik, veldokumentert blanding av prebiotiske kostfibre (GOS/FOS).",
+  tagline: "Mysebasert, høygradig hydrolysert ernæringsprodukt til spedbarn fra 6 måneder med kumelkallergi.",
   description: "Hypoallergen tilskuddsblanding i pulverform, som er egnet som en del av en balansert kost fra 6 måneders alder. Energitetthet på 0,68 kcal/ml. Tilsatt ingredienser som er en kilde til de langkjedede fettsyrer (ARA/DHA).",
   image: "/nutrition/pepticate-plus-2.png",
+  imageScale: 1.3,
   type: "Hydrolysert",
   badges: [
     { label: "Hydrolysert",          color: "#3B82F6", icon: "drop"   },
@@ -282,6 +325,7 @@ const PEPTICATE_PLUS_2: Product = {
     "Inneholder laktose, som er en viktig energikilde i morsmelk og bidrar til en mild smak, samt til opptak av enkelte mineraler som f.eks. kalsium.",
     "Langkjedede fettsyrer dokosaheksaensyre (DHA) og arakidonsyre (ARA) spiller en viktig rolle for hjernen og synets utvikling.",
   ],
+  fordelerIcons: [ICON_MICROSCOPE, ICON_GUT, ICON_MILK_BOTTLE, ICON_DROP, ICON_GUT2],
   bruksomraader: [
     "Til kostbehandling av spedbarn og barn fra 6 måneders alder med kumelkallergi.",
     "Benyttes som supplement til en balansert kost.",
@@ -301,6 +345,23 @@ const PEPTICATE_PLUS_2: Product = {
     { label: "Hypoallergen",      icon: null },
     { label: "6+ mnd",            icon: null },
     { label: "Tilskuddsblanding", icon: null },
+  ],
+  kcalPer100ml: 68,
+  pulverPer100ml: "14,3 g pulver",
+  macros: [
+    { label: "Fett (43 E%)",        value: 43, color: "#7C3AED", amount: "3,2 g" },
+    { label: "Karbohydrat (46 E%)", value: 46, color: "#F97316", amount: "7,8 g" },
+    { label: "Protein (9 E%)",      value: 9,  color: "#3B82F6", amount: "1,6 g" },
+    { label: "Kostfiber (2 E%)",    value: 2,  color: "#22C55E", amount: "0,6 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",   value: "2,98 g"  },
+    { label: "DHA",       value: "17,0 mg" },
+    { label: "ARA",       value: "17,0 mg" },
+    { label: "Kalsium",   value: "79 mg"   },
+    { label: "Jern",      value: "1,0 mg"  },
+    { label: "Vitamin D", value: "1,7 µg"  },
+    { label: "Natrium",   value: "22,0 mg" },
   ],
   nutrition: {
     headers: ["", "", "pr. 100 g pulver", "pr. 100 ml utblandet (14,3 g pulver)"],
@@ -390,6 +451,14 @@ const PEPTICATE_PLUS_2: Product = {
     "Kan brukes som erstatning for melk ved matlaging og baking.",
   ],
   dosering: "Anbefalt konsentrasjon er 14,3 % vekt/volum: for hver måleskje (4,8 g) tilsettes 30 ml vann. Se informasjon om utblanding og tilberedning på pakning. Doseringen er individuell og skal alltid gjøres i samråd med lege eller klinisk ernæringsfysiolog.",
+  mixingInfo: { konsentrasjon: "14,3", scoopGram: "4,8" },
+  mixingTable: [
+    { skjeer: 1, pulver: "4,8",  vann: 30,  ferdig: 34,  energi: 23  },
+    { skjeer: 2, pulver: "9,6",  vann: 60,  ferdig: 67,  energi: 46  },
+    { skjeer: 3, pulver: "14,4", vann: 90,  ferdig: 101, energi: 69  },
+    { skjeer: 4, pulver: "19,2", vann: 120, ferdig: 134, energi: 91  },
+    { skjeer: 5, pulver: "24,0", vann: 150, ferdig: 168, energi: 114 },
+  ],
   holdbarhet: "18 måneder fra produksjonsdato. Holdbarhetsdato på pakningen. Tilbered alltid bare ett måltid om gangen. Rester etter tilberedt Pepticate PLUS som ikke brukes innen en time skal kastes. Ved sondemating er maks hengetid 4 timer. Uåpnet boks oppbevares i romtemperatur. Åpnet boks oppbevares med lokk, på et svalt og tørt sted. Brukes innen 1 måned. Skal ikke oppbevares i kjøleskap.",
   ingredienser: "Maltodekstrin, myseproteinhydrolysat (fra kumelk), vegetabilske oljer (palmeolje, kokosolje, rapsolje, oljesyrerik solsikkeolje, solsikkeolje), galaktooligosakkarider (fra kumelk), kalsiumfosfat, emulgator (E472c), fruktooligosakkarider, fiskeolje, kaliumklorid, magnesiumhydrogenfosfat, olje fra Mortierella alpina, natriumklorid, kolinklorid, L-tyrosin, L-askorbinsyre, inositol, taurin, natrium-L-askorbat, jernsulfat, sinksulfat, L-karnitin, natriumsitrat, DL-α-tokoferylacetat, uridin-5'-monofosfatnatriumsalt, cytidin-5'-monofosfat, kalsium-D-pantotenat, adenosin-5'-monofosfat, inosin-5'-monofosfatnatriumsalt, nikotinamid, guanosin-5'-monofosfatnatriumsalt, kobbersulfat, DL-α-tokoferol, retinylpalmitat, riboflavin, tiaminhydroklorid, pyridoksinhydroklorid, kaliumjodid, pteroylmonoglutaminsyre, mangansulfat, retinylacetat, natriumselenitt, fytomenadion, D-biotin, kolekalsiferol, cyanokobalamin. Glutenfri.",
   smaksvarianter: "Nøytral smak.",
@@ -401,7 +470,182 @@ const PEPTICATE_PLUS_2: Product = {
   ],
 };
 
-const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2];
+const NEOCATE_LCP: Product = {
+  id: "neocate-lcp",
+  name: "Neocate LCP",
+  age: "0–1 år",
+  tagline: "Aminosyrebasert melkeerstatning for spedbarn med kumelkallergi og multimatvareallergi.",
+  description: "Ernæringsmessig komplett næringsprodukt i pulverform. Hypoallergen, laktosefri og egnet som eneste næringskilde.",
+  image: "/Morsmelkerstatning/Neocate-LCP-400-g-752x960.png",
+  imageScale: 0.9,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",                 color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett 0–1 år", color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                      color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                   color: "#D97706", icon: "drop"   },
+    { label: "Med nukleotider",                 color: "#A78BFA", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "0–1 år" },
+    { label: "Energitetthet", value: "0,67 kcal/ml" },
+    { label: "Protein",       value: "Frie aminosyrer" },
+    { label: "Kostfiber",     value: "Ikke tilsatt" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "0 g" },
+  ],
+  fordeler: [
+    "Inneholder alle næringsstoffer et spedbarn trenger og kan brukes som eneste ernæringskilde.",
+    "Hypoallergen sammensetning basert på frie aminosyrer gir svært lav risiko for allergisk reaksjon.",
+    "Beriket med langkjedede fettsyrer DHA og ARA som er viktige for utvikling av hjerne- og synsfunksjon.",
+    "Beriket med nukleotider som har påvist positive effekter på spedbarns immunfunksjon i tidlig spedbarnsalder.",
+    "Laktosefri, glutenfri og kostfiberfri formulering ved behov for elementalkost.",
+  ],
+  fordelerIcons: [ICON_MILK_BOTTLE, ICON_SHIELD_STAR, ICON_DROP, ICON_GUT2, ICON_GUT],
+  bruksomraader: [
+    "Til kostbehandling av spedbarn 0–1 år med kumelkallergi og multimatvareallergi.",
+    "Til andre tilstander hvor elementalkost er anbefalt, inkludert mage- og tarmsykdommer.",
+    "Kan brukes ved overgang fra parenteral til enteral ernæring og ved sondeernæring.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Morsmelk er det beste for spedbarn.",
+    "Neocate LCP er et næringsmiddel til spesielle medisinske formål.",
+    "Skal brukes under medisinsk tilsyn etter nøye vurdering av all næringstilførsel.",
+    "Ikke for parenteralt bruk.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Laktosefri",               icon: null },
+    { label: "Med DHA & ARA",            icon: null },
+    { label: "Med nukleotider",          icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 67,
+  pulverPer100ml: "13,5 g pulver",
+  macros: [
+    { label: "Fett (47 E%)",        value: 47, color: "#7C3AED", amount: "3,5 g" },
+    { label: "Karbohydrat (42 E%)", value: 42, color: "#F97316", amount: "7,1 g" },
+    { label: "Protein (11 E%)",     value: 11, color: "#3B82F6", amount: "1,8 g" },
+    { label: "Kostfiber (0 E%)",    value: 0,  color: "#22C55E", amount: "0 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",   value: "0 g"      },
+    { label: "DHA",       value: "16,6 mg"  },
+    { label: "ARA",       value: "17,0 mg"  },
+    { label: "Kalsium",   value: "78,3 mg"  },
+    { label: "Jern",      value: "1,0 mg"   },
+    { label: "Vitamin D", value: "1,59 µg"  },
+    { label: "Natrium",   value: "28,6 mg"  },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml utblandet (13,5 g pulver)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                    unit: "kJ",   per100gPulver: "2065",      per100mlUtblandet: "279" },
+          { label: "Energi (kcal)",                  unit: "kcal", per100gPulver: "493",       per100mlUtblandet: "67" },
+          { label: "Fett (47 E%)",                   unit: "g",    per100gPulver: "25,6",      per100mlUtblandet: "3,5" },
+          { label: "– hvorav mettede fettsyrer",     unit: "g",    per100gPulver: "10,1",      per100mlUtblandet: "1,4" },
+          { label: "– enumettede fettsyrer",         unit: "g",    per100gPulver: "11,4",      per100mlUtblandet: "1,5" },
+          { label: "– flerumettede fettsyrer",       unit: "g",    per100gPulver: "4,1",       per100mlUtblandet: "0,56" },
+          { label: "– linolsyre (LA)",               unit: "g",    per100gPulver: "3,33",      per100mlUtblandet: "0,450" },
+          { label: "– α-linolensyre (ALA)",          unit: "g",    per100gPulver: "0,33",      per100mlUtblandet: "0,0445" },
+          { label: "– arakidonsyre (ARA)",           unit: "mg",   per100gPulver: "130",       per100mlUtblandet: "17,0" },
+          { label: "– dokosaheksaensyre (DHA)",      unit: "mg",   per100gPulver: "120",       per100mlUtblandet: "16,6" },
+          { label: "– ratio n-6:n-3",                unit: "",     per100gPulver: "7,3:1",     per100mlUtblandet: "7,3:1" },
+          { label: "Karbohydrat (42 E%)",            unit: "g",    per100gPulver: "52,7",      per100mlUtblandet: "7,1" },
+          { label: "– hvorav sukkerarter",           unit: "g",    per100gPulver: "4,6",       per100mlUtblandet: "0,62" },
+          { label: "– laktose",                      unit: "g",    per100gPulver: "-",         per100mlUtblandet: "-" },
+          { label: "Kostfiber (0 E%)",               unit: "g",    per100gPulver: "-",         per100mlUtblandet: "-" },
+          { label: "Protein (11 E%)",                unit: "g",    per100gPulver: "13,3",      per100mlUtblandet: "1,8" },
+          { label: "Salt",                           unit: "g",    per100gPulver: "0,53",      per100mlUtblandet: "0,07" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",    unit: "mg", per100gPulver: "212",       per100mlUtblandet: "28,6" },
+          { label: "Kalium",     unit: "mg", per100gPulver: "536",       per100mlUtblandet: "72,4" },
+          { label: "Klorid",     unit: "mg", per100gPulver: "386",       per100mlUtblandet: "52,1" },
+          { label: "Kalsium",    unit: "mg", per100gPulver: "580",       per100mlUtblandet: "78,3" },
+          { label: "Fosfor",     unit: "mg", per100gPulver: "370",       per100mlUtblandet: "49,9" },
+          { label: "Magnesium",  unit: "mg", per100gPulver: "52,0",      per100mlUtblandet: "7,02" },
+          { label: "Jern",       unit: "mg", per100gPulver: "7,39",      per100mlUtblandet: "1,00" },
+          { label: "Sink",       unit: "mg", per100gPulver: "5,42",      per100mlUtblandet: "0,73" },
+          { label: "Kobber",     unit: "mg", per100gPulver: "0,42",      per100mlUtblandet: "0,057" },
+          { label: "Mangan",     unit: "mg", per100gPulver: "0,049",     per100mlUtblandet: "0,007" },
+          { label: "Molybden",   unit: "µg", per100gPulver: "11,3",      per100mlUtblandet: "1,53" },
+          { label: "Fluorid",    unit: "µg", per100gPulver: "<44,4",     per100mlUtblandet: "<5,99" },
+          { label: "Selen",      unit: "µg", per100gPulver: "18,7",      per100mlUtblandet: "2,53" },
+          { label: "Krom",       unit: "µg", per100gPulver: "10,8",      per100mlUtblandet: "1,46" },
+          { label: "Jod",        unit: "µg", per100gPulver: "103",       per100mlUtblandet: "14,0" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",      unit: "µg",         per100gPulver: "431",           per100mlUtblandet: "58,2" },
+          { label: "Vitamin D",      unit: "µg",         per100gPulver: "11,8",          per100mlUtblandet: "1,59" },
+          { label: "Vitamin E",      unit: "mg (mg α-TE)", per100gPulver: "11,0 (9,85)", per100mlUtblandet: "1,49 (1,33)" },
+          { label: "Vitamin C",      unit: "mg",         per100gPulver: "52,7",          per100mlUtblandet: "7,11" },
+          { label: "Vitamin K",      unit: "µg",         per100gPulver: "44,7",          per100mlUtblandet: "6,03" },
+          { label: "Tiamin",         unit: "mg",         per100gPulver: "0,59",          per100mlUtblandet: "0,08" },
+          { label: "Riboflavin",     unit: "mg",         per100gPulver: "0,59",          per100mlUtblandet: "0,08" },
+          { label: "Niacin",         unit: "mg (mg NE)", per100gPulver: "4,09 (9,41)",   per100mlUtblandet: "0,55 (1,27)" },
+          { label: "Pantotensyre",   unit: "mg",         per100gPulver: "3,05",          per100mlUtblandet: "0,41" },
+          { label: "Vitamin B6",     unit: "mg",         per100gPulver: "0,48",          per100mlUtblandet: "0,06" },
+          { label: "Folsyre",        unit: "µg",         per100gPulver: "68,5",          per100mlUtblandet: "9,24" },
+          { label: "Folat",          unit: "µg",         per100gPulver: "116",           per100mlUtblandet: "15,7" },
+          { label: "Vitamin B12",    unit: "µg",         per100gPulver: "1,38",          per100mlUtblandet: "0,19" },
+          { label: "Biotin",         unit: "µg",         per100gPulver: "19,2",          per100mlUtblandet: "2,59" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Kolin",        unit: "mg",            per100gPulver: "137",  per100mlUtblandet: "18,5" },
+          { label: "Inositol",     unit: "mg",            per100gPulver: "110",  per100mlUtblandet: "14,9" },
+          { label: "L-karnitin",   unit: "mg",            per100gPulver: "10,8", per100mlUtblandet: "1,46" },
+          { label: "Taurin",       unit: "mg",            per100gPulver: "32,0", per100mlUtblandet: "4,32" },
+          { label: "Nukleotider",  unit: "mg",            per100gPulver: "17,2", per100mlUtblandet: "2,33" },
+          { label: "Osmolaritet",  unit: "mOsm/l",        per100gPulver: "—",    per100mlUtblandet: "310" },
+          { label: "Osmolalitet",  unit: "mOsm/kg H₂O",   per100gPulver: "—",    per100mlUtblandet: "340" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Kok opp vann og avkjøl.",
+    "Tilsett måleskje med Neocate LCP i henhold til utblandingstabell på pakningen.",
+    "Rist eller visp til pulveret har løst seg opp.",
+    "Kan drikkes fra tåteflaske, kopp eller glass, eller gis som sondeernæring.",
+    "Kan brukes som erstatning for melk ved matlaging og baking.",
+  ],
+  dosering: "Egnet som eneste næringskilde. Doseringen er individuell og skal bestemmes i samråd med lege eller klinisk ernæringsfysiolog.",
+  mixingInfo: { konsentrasjon: "13,5", scoopGram: "4,5" },
+  mixingTable: [
+    { skjeer: 3, pulver: "13,5", vann: 90,  ferdig: 100, energi: 67  },
+    { skjeer: 4, pulver: "18,0", vann: 120, ferdig: 133, energi: 89  },
+    { skjeer: 6, pulver: "27,0", vann: 180, ferdig: 200, energi: 134 },
+    { skjeer: 7, pulver: "31,5", vann: 210, ferdig: 233, energi: 156 },
+    { skjeer: 8, pulver: "36,0", vann: 240, ferdig: 267, energi: 179 },
+  ],
+  holdbarhet: "18 måneder fra produksjonsdato. Holdbarhetsdato på pakningen. Tilbered alltid bare ett måltid om gangen. Kast blanding som er oppvarmet eller blir til overs. Ved sondemating er maks hengetid 4 timer. Uåpnet boks oppbevares i romtemperatur. Åpnet boks oppbevares med lokk, på et svalt og tørt sted. Brukes innen 1 måned.",
+  ingredienser: "Tørket glukosesirup, raffinerte vegetabilske oljer (oljesyrerik solsikkeolje, kokosolje, rapsolje, solsikkeolje), L-arginin-L-aspartat, L-leucin, L-lysinacetat, L-glutamin, L-prolin, emulgator (E472c), L-valin, glysin, L-isoleucin, dikaliumhydrogenfosfat, L-treonin, L-fenylalanin, L-tyrosin, L-serin, L-histidin, L-alanin, kalsiumhydrogenfosfat, trikaliumsitrat, natriumklorid, kalsiumkarbonat, L-cystin, kolinbitartrat, kalsiumglycerofosfat, L-tryptofan, kalsiumsitrat, magnesiumklorid, L-metionin, kalsiumfosfat tribasisk, olje fra Mortierella alpina, olje fra mikroalgen Schizochytrium sp., magnesium-L-aspartat, inositol, L-askorbinsyre, antioksidanter (solsikkelecitin, askorbylpalmitat), taurin, jernsulfat, sinksulfat, L-karnitin, DL-α-tokoferylacetat, uridin 5'-monofosfatnatriumsalt, cytidin 5'-monofosfat, nikotinamid, kalsium-D-pantotenat, inosin-5'-monofosfatnatriumsalt, adenosin 5'-monofosfat, guanosin-5'-monofosfatnatriumsalt, kobbersulfat, tiaminmononitrat, riboflavin, pyridoksinhydroklorid, retinylacetat, kaliumjodid, mangansulfat, pteroylmonoglutaminsyre, fytomenadion, natriumselenitt, kromklorid, natriummolybdat, D-biotin, kolekalsiferol, cyanokobalamin. Glutenfri. Laktosefri. Fri for sukrose og fruktose. Kostfiberfri. Halal- og koshersertifisert.",
+  smaksvarianter: "Nøytral smak.",
+  indikasjon: "Til kostbehandling av spedbarn 0–1 år med kumelkallergi, multimatvareallergi og andre tilstander hvor elementalkost er anbefalt, f.eks. gastroøsofagal refluks, eosinofil øsofagitt, kort tarm-syndrom, malabsorpsjonstilstander og ved overgang fra parenteral til enteral ernæring.",
+  kontraindikasjon: "Intoleranse mot ett eller flere av produktets ingredienser.",
+  forsiktighetsregler: "Morsmelk er det beste for spedbarn. Egnet som eneste næringskilde for spedbarn under ett år etter nøye vurdering av alle former for næringstilførsel, inkludert amming. Ikke for parenteralt bruk.",
+  bestilling: [
+    { produktnavn: "Neocate LCP, nøytral smak", bestillingsnr: "201773", varenr: "840659", salgsenhet: "400 g boks" },
+  ],
+};
+
+const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function ProductCard({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
@@ -411,7 +655,7 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
       sx={{
         display: "flex", gap: 1.5, p: 1.5, cursor: "pointer", borderRadius: "10px",
         border: `1.5px solid ${selected ? "rgba(74,44,130,0.28)" : "rgba(74,44,130,0.06)"}`,
-        bgcolor: D.surfaceAlt,
+        bgcolor: selected ? "rgba(74,44,130,0.13)" : D.surface,
         boxShadow: selected ? `0 0 0 3px rgba(74,44,130,0.07), ${D.shadow}` : D.shadow,
         transition: "all 0.15s",
         "&:hover": { borderColor: "rgba(74,44,130,0.2)", boxShadow: `0 0 0 3px rgba(74,44,130,0.05), ${D.shadow}` },
@@ -419,7 +663,7 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
     >
       <Box sx={{ width: 88, flexShrink: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", pt: 0.5 }}>
         {product.image
-          ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 88, height: 88, objectFit: "contain" }} />
+          ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 88, height: 88, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
           : <BottleIcon size={60} color={D.purple} />}
       </Box>
       <Box sx={{ minWidth: 0 }}>
@@ -432,19 +676,6 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
   );
 }
 
-const FORDEL_ICONS = [
-  // Microscope
-  (c: string) => <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(0.4 0 0 0.4 12 12)"><path style={{fill: c, strokeLinecap: "round"}} transform="translate(-25, -25.02)" d="M 19.3125 0.03125 C 19.121094 0.03125 18.933594 0.078125 18.75 0.15625 L 11.59375 3.125 C 10.855469 3.433594 10.484375 4.292969 10.78125 5.03125 C 10.78125 5.042969 10.78125 5.050781 10.78125 5.0625 L 11.5625 6.9375 C 11.867188 7.679688 12.753906 8.03125 13.5 7.71875 L 14.25 7.40625 L 15.125 9.65625 L 14.96875 9.71875 C 14.683594 9.832031 14.457031 9.902344 14.21875 10.03125 C 13.980469 10.160156 13.632813 10.40625 13.46875 10.8125 C 13.304688 11.21875 13.394531 11.585938 13.46875 11.84375 C 13.542969 12.101563 13.636719 12.3125 13.75 12.59375 C 13.75 12.605469 13.75 12.613281 13.75 12.625 L 13.9375 13.125 L 13.5 13.28125 C 8.296875 15.398438 5.769531 21.367188 7.875 26.5625 C 7.875 26.574219 7.875 26.582031 7.875 26.59375 L 10.15625 32 C 9.375 33.140625 8.90625 34.523438 8.90625 36 C 8.90625 39.410156 11.339844 42.273438 14.5625 42.9375 C 14.5625 42.957031 14.5625 42.980469 14.5625 43 C 14.757813 43.34375 14.96875 43.671875 15.1875 44 L 9.875 44 C 8.261719 44 7 45.386719 7 47 L 7 49 C 7 49.550781 7.449219 50 8 50 L 42 50 C 42.550781 50 43 49.550781 43 49 L 43 47 C 43 45.386719 41.738281 44 40.125 44 L 37.3125 44 C 39.160156 43.210938 40.101563 41.105469 39.375 39.21875 C 38.816406 37.769531 37.4375 36.832031 35.96875 36.78125 C 35.480469 36.765625 34.984375 36.84375 34.5 37.03125 L 24.65625 40.84375 C 24.644531 40.84375 24.636719 40.84375 24.625 40.84375 C 24.242188 40.996094 23.753906 40.984375 23.1875 40.75 C 22.753906 40.570313 22.332031 40.242188 21.9375 39.875 C 22.667969 38.761719 23.09375 37.421875 23.09375 36 C 23.09375 35.542969 23.019531 35.089844 22.9375 34.65625 L 35.875 29.375 C 36.410156 29.238281 36.730469 28.691406 36.59375 28.15625 C 36.457031 27.621094 35.910156 27.300781 35.375 27.4375 C 35.289063 27.449219 35.207031 27.46875 35.125 27.5 L 22.28125 32.78125 C 21.234375 30.75 19.257813 29.273438 16.90625 28.96875 L 14.84375 23.75 C 14.292969 22.386719 14.945313 20.839844 16.3125 20.28125 C 16.324219 20.28125 16.332031 20.28125 16.34375 20.28125 L 16.84375 20.0625 L 18.34375 23.71875 C 18.359375 23.78125 18.378906 23.847656 18.40625 23.90625 L 19.40625 26.34375 C 19.507813 26.582031 19.699219 26.773438 19.9375 26.875 L 22.8125 28.09375 C 23.054688 28.191406 23.320313 28.191406 23.5625 28.09375 L 27.65625 26.46875 C 27.894531 26.367188 28.085938 26.175781 28.1875 25.9375 L 29.4375 23.0625 C 29.535156 22.820313 29.535156 22.554688 29.4375 22.3125 L 28.46875 20 C 28.46875 19.980469 28.46875 19.957031 28.46875 19.9375 L 28.46875 19.90625 C 28.457031 19.894531 28.449219 19.886719 28.4375 19.875 C 28.4375 19.855469 28.4375 19.832031 28.4375 19.8125 C 28.417969 19.769531 28.398438 19.726563 28.375 19.6875 L 23.75 8.5 C 23.636719 8.21875 23.5625 8.015625 23.4375 7.78125 C 23.3125 7.546875 23.101563 7.207031 22.6875 7.03125 C 22.273438 6.855469 21.910156 6.925781 21.65625 7 C 21.402344 7.074219 21.1875 7.167969 20.90625 7.28125 L 20.71875 7.34375 L 19.8125 5.09375 L 20.65625 4.75 C 21.382813 4.445313 21.761719 3.582031 21.46875 2.84375 L 21.46875 2.8125 L 20.6875 0.9375 C 20.449219 0.390625 19.886719 0.0351563 19.3125 0.03125 Z M 19.03125 2.1875 L 19.4375 3.09375 L 13.21875 5.6875 L 12.8125 4.78125 Z M 17.96875 5.84375 L 18.875 8.125 L 17 8.90625 L 16.09375 6.625 Z M 21.84375 9.09375 C 21.871094 9.15625 21.875 9.171875 21.90625 9.25 C 21.90625 9.261719 21.90625 9.269531 21.90625 9.28125 L 26.21875 19.6875 L 19.875 22.21875 L 15.59375 11.875 C 15.589844 11.863281 15.597656 11.855469 15.59375 11.84375 C 15.554688 11.75 15.527344 11.730469 15.5 11.65625 C 15.574219 11.625 15.585938 11.601563 15.6875 11.5625 C 15.699219 11.5625 15.707031 11.5625 15.71875 11.5625 L 21.65625 9.15625 C 21.75 9.117188 21.769531 9.121094 21.84375 9.09375 Z M 14.71875 14.9375 L 16.0625 18.21875 L 15.5625 18.40625 C 13.191406 19.375 12.039063 22.125 13 24.5 L 14.78125 29.03125 C 13.617188 29.234375 12.554688 29.707031 11.65625 30.40625 L 9.71875 25.8125 C 8.027344 21.636719 10.046875 16.882813 14.21875 15.15625 C 14.234375 15.152344 14.234375 15.128906 14.25 15.125 Z M 26.96875 21.5625 L 27.4375 22.65625 L 26.5 24.78125 L 23.21875 26.09375 L 21.09375 25.1875 L 20.65625 24.09375 Z M 16 31.09375 C 18.726563 31.09375 20.90625 33.273438 20.90625 36 C 20.90625 38.726563 18.726563 40.90625 16 40.90625 C 13.273438 40.90625 11.09375 38.726563 11.09375 36 C 11.09375 33.273438 13.273438 31.09375 16 31.09375 Z M 35.90625 38.78125 C 36.59375 38.804688 37.234375 39.246094 37.5 39.9375 C 37.855469 40.859375 37.390625 41.863281 36.46875 42.21875 L 31.8125 44 L 17.6875 44 C 17.464844 43.75 17.222656 43.410156 16.96875 43.03125 C 18.335938 42.84375 19.585938 42.265625 20.59375 41.40625 C 21.140625 41.902344 21.757813 42.3125 22.4375 42.59375 C 23.34375 42.96875 24.386719 43.085938 25.375 42.6875 L 35.21875 38.90625 C 35.449219 38.816406 35.675781 38.773438 35.90625 38.78125 Z M 9.875 46 L 40.125 46 C 40.582031 46 41 46.402344 41 47 L 41 48 L 9 48 L 9 47 C 9 46.402344 9.417969 46 9.875 46 Z" /></g></svg>,
-  // Gut
-  (c: string) => <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M24 4C24.5523 4 25 4.44772 25 5V8.45455C25 8.79457 24.942 9.13383 24.8268 9.45399C24.7117 9.77416 24.54 10.0734 24.3158 10.3316C24.0913 10.59 23.8172 10.8038 23.5047 10.9529C23.1915 11.1023 22.8497 11.1818 22.5002 11.1818H20.2589L20.2389 11.1816C19.0077 11.157 17.7858 11.656 16.8135 12.6284C15.8397 13.6023 15.1911 14.9802 15.0243 16.5086C14.9542 17.3448 15.0364 18.1876 15.2642 18.9816C15.493 19.7789 15.8618 20.5037 16.3404 21.1118C16.8187 21.7196 17.394 22.195 18.0235 22.5164C18.2493 22.6316 18.7551 22.7627 19.4071 22.8613C20.0262 22.9549 20.6417 23 21.0004 23C21.5527 23.0001 22.0004 23.4478 22.0003 24.0001C22.0003 24.5524 21.5525 25.0001 21.0002 25C20.5214 25 19.804 24.944 19.1082 24.8388C18.4452 24.7386 17.654 24.5733 17.1141 24.2976C16.2123 23.8372 15.4153 23.1703 14.7687 22.3487C14.1223 21.5274 13.6385 20.5674 13.3417 19.5331C13.045 18.4988 12.9402 17.4074 13.0325 16.3274L13.0346 16.3056C13.2443 14.3561 14.0749 12.5388 15.3992 11.2143C16.7248 9.88855 18.457 9.14858 20.2684 9.18182H22.5002C22.5445 9.18182 22.5928 9.17199 22.6436 9.14777C22.695 9.12325 22.7515 9.0826 22.8056 9.02026C22.86 8.95768 22.9093 8.87605 22.9448 8.7771C22.9804 8.67813 23 8.56818 23 8.45455V5C23 4.44772 23.4477 4 24 4Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M14.1141 23.7024C15.0167 23.2416 16.0003 23.0001 17.0002 23C17.5525 22.9999 18.0003 23.4476 18.0003 23.9999C18.0004 24.5522 17.5527 24.9999 17.0004 25C16.3252 25.0001 15.6523 25.1626 15.0235 25.4836C14.394 25.805 13.8187 26.2804 13.3404 26.8882C12.8618 27.4963 12.493 28.2211 12.2642 29.0184C12.0364 29.8124 11.9542 30.6552 12.0243 31.4914C12.1911 33.0198 12.8397 34.3977 13.8135 35.3716C14.2229 35.7811 14.9525 36.1621 15.8381 36.4358C16.708 36.7047 17.6014 36.8311 18.2389 36.8184L18.2589 36.8182H22.5002C22.8497 36.8182 23.1915 36.8977 23.5047 37.0471C23.8172 37.1962 24.0913 37.41 24.3158 37.6684C24.54 37.9266 24.7117 38.2258 24.8268 38.546C24.942 38.8662 25 39.2054 25 39.5455V43C25 43.5523 24.5523 44 24 44C23.4477 44 23 43.5523 23 43V39.5455C23 39.4318 22.9804 39.3219 22.9448 39.2229C22.9093 39.124 22.86 39.0423 22.8056 38.9797C22.7515 38.9174 22.695 38.8767 22.6436 38.8522C22.5928 38.828 22.5445 38.8182 22.5002 38.8182H18.2684C17.3844 38.8344 16.2814 38.6662 15.2474 38.3466C14.2251 38.0306 13.14 37.5266 12.3992 36.7857C11.0749 35.4612 10.2443 33.6439 10.0346 31.6944L10.0325 31.6726C9.9402 30.5926 10.045 29.5012 10.3417 28.4669C10.6385 27.4326 11.1223 26.4726 11.7687 25.6513C12.4153 24.8297 13.2123 24.1628 14.1141 23.7024Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M31.003 4C31.5553 4 32.003 4.44772 32.003 5V10.1816C32.0032 11.2022 31.8288 12.2156 31.4874 13.1646C31.146 14.1136 30.6426 14.9842 30.0001 15.7236C29.8265 15.9234 29.6267 16.1314 29.4094 16.3366C31.0698 16.4329 32.8619 16.7241 34.3796 17.5088C35.4115 18.0423 36.3328 18.8116 36.9897 19.9065C37.6456 20.9998 38.0001 22.3544 38.0001 24C38.0001 25.6409 37.6565 26.992 37.018 28.0838C36.3779 29.1785 35.4774 29.9506 34.4633 30.4869C32.9265 31.2998 31.1003 31.5847 29.419 31.6719C29.6227 31.8662 29.8159 32.0693 29.9975 32.2784C31.2915 33.7689 31.999 35.7633 31.9986 37.8182V43C31.9986 43.5523 31.5509 44 30.9986 44C30.4463 44 29.9986 43.5523 29.9986 43V37.8182C29.9989 36.2098 29.443 34.6904 28.4873 33.5896C27.4766 32.4255 26.2032 31.7066 24.9995 31.7059C24.4474 31.7056 24 31.2578 24.0001 30.7056C24.0003 30.1534 24.4479 29.7059 25.0001 29.7059H27.9972C29.9752 29.7059 32.0095 29.5222 33.5282 28.719C34.2659 28.3288 34.8675 27.7994 35.2916 27.0742C35.7173 26.3462 36.0001 25.3591 36.0001 24C36.0001 22.6456 35.7106 21.662 35.2747 20.9354C34.8397 20.2105 34.2212 19.6783 33.4611 19.2854C31.8984 18.4774 29.8138 18.2941 27.8153 18.2941H24.8182C24.266 18.294 23.8182 17.8462 23.8182 17.294C23.8183 16.7417 24.266 16.2941 24.8182 16.2941H24.8209C25.4559 16.2939 26.089 16.1502 26.6855 15.8659C27.2539 15.595 27.9926 14.9848 28.4904 14.4119C28.9628 13.8681 29.3437 13.2152 29.6055 12.4876C29.8673 11.7599 30.0032 10.9761 30.003 10.182V5C30.003 4.44772 30.4507 4 31.003 4Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M16 24C16 23.4477 16.4479 23 17.0002 23H30C30.5523 23 31 23.4477 31 24C31 24.5523 30.5523 25 30 25H17.0004C16.4481 25 16 24.5523 16 24Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M22 17.2942C22 16.7419 22.4477 16.2942 23 16.2942H25C25.5523 16.2942 26 16.7419 26 17.2942C26 17.8464 25.5523 18.2942 25 18.2942H23C22.4477 18.2942 22 17.8464 22 17.2942Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M17 30.7058C17 30.1536 17.4477 29.7058 18 29.7058L25.0001 29.7059C25.5524 29.7059 26 30.1536 26 30.7058C26 31.2581 25.5518 31.7059 24.9995 31.7059L18 31.7058C17.4477 31.7058 17 31.2581 17 30.7058Z" fill={c}/></svg>,
-  // Milk bottle
-  (c: string) => <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(0.45 0 0 0.45 12 12)"><path style={{fill: c, strokeLinecap: "round"}} transform="translate(-25, -25)" d="M 16 3 C 15.447738123791542 3.0000552179053495 15.000055217905349 3.4477381237915417 15 4.000000000000001 L 15 7.6289062 L 9.2402344 14.349609 C 9.235611999065108 14.355417743582233 9.231054416584485 14.36127777345569 9.2265625 14.367188 C 9.223277559201216 14.371069118240886 9.220022264540527 14.374975231826733 9.2167969 14.378906 C 9.203897749252851 14.395440083526905 9.19152183070969 14.412375789721528 9.1796875 14.429688 C 9.163695121462382 14.453128137625658 9.148707593404046 14.477238286909984 9.1347656 14.501953 C 9.129414068987154 14.510985090719597 9.124205089977023 14.52010088733099 9.1191406 14.529297 C 9.11305149500169 14.540899382434677 9.107190996801013 14.552620312156492 9.1015625 14.564453 C 9.090952698314844 14.586868215822031 9.081180309627506 14.609670311548122 9.0722656 14.632812 C 9.069605137122602 14.638646485105678 9.067000850013388 14.64450642278157 9.0644531 14.650391 C 9.054973357564174 14.6754312195503 9.046502999858765 14.70084202578484 9.0390625 14.726562 C 9.037015069571225 14.734350790019183 9.03506179375724 14.742164026618191 9.0332031 14.75 C 9.028096648813117 14.768743539543639 9.02353741430429 14.787631887309082 9.0195312 14.806641 C 9.014696685075632 14.83122481020603 9.0107876936991 14.855981611044308 9.0078125 14.880859 C 9.00709758693017 14.88736312068583 9.006446522245097 14.89387410088596 9.0058594 14.900391 C 9.002728318352238 14.928291013573535 9.000773453441377 14.95631049930139 9 14.984375 C 8.999977112932108 14.988281299809705 8.999977112932108 14.992187700190295 9 14.996094 C 8.999997457445831 14.997395998758721 8.999997457445831 14.998698001241278 9 15 L 9 46 C 9.000055217905349 46.55226187620846 9.447738123791542 46.99994478209465 10 47 L 30 47 L 40 47 C 40.55226187620846 46.99994478209465 40.99994478209465 46.55226187620846 41 46 L 41 15 C 41.00036864652495 14.791386143852312 40.93549213358472 14.587878990930875 40.814453 14.417969 L 36 7.6777344 L 36 4 C 35.99994478209465 3.4477381237915408 35.55226187620846 3.0000552179053495 35 3 L 16 3 z M 17 5 L 34 5 L 34 7 L 17 7 L 17 5 z M 16.458984 9 L 33.056641 9 L 29.486328 14 L 12.173828 14 L 16.458984 9 z M 35 9.7226562 L 39 15.320312 L 39 45 L 31 45 L 31 15.322266 L 35 9.7226562 z M 11 16 L 29 16 L 29 45 L 11 45 L 11 16 z M 15 25 C 13.895 25 13 25.895 13 27 C 13 28.105 13.895 29 15 29 C 16.105 29 17 28.105 17 27 C 17 25.895 16.105 25 15 25 z M 25 25 C 23.895 25 23 25.895 23 27 C 23 28.105 23.895 29 25 29 C 26.105 29 27 28.105 27 27 C 27 25.895 26.105 25 25 25 z M 24.023438 31.988281 C 23.693476915987283 31.98302059883501 23.38216098338928 32.14087078856904 23.191406 32.410156 C 23.191406 32.410156 22.015066 34 20 34 C 17.984934 34 16.808594 32.410156 16.808594 32.410156 C 16.482832154020805 31.96358186499532 15.856730135004682 31.865644154020806 15.410156 32.191406 C 14.96358186499532 32.517167845979195 14.865644154020806 33.14326986499532 15.191406 33.589844 C 15.191406 33.589844 16.935066 36 20 36 C 23.064934 36 24.808594 33.589844 24.808594 33.589844 C 25.035156075348077 33.288937593320505 25.07343739593875 32.88625736661905 24.907633487686418 32.5480501763125 C 24.74182957943409 32.20984298600596 24.400065181014337 31.993477738206582 24.023438 31.988281 z" /></g></svg>,
-  // Drop
-  (c: string) => <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.465 31.3984C15.2943 30.8716 14.7301 30.5833 14.2049 30.7545C13.6796 30.9257 13.3922 31.4915 13.5629 32.0183C14.3133 34.3348 15.7757 36.3536 17.7405 37.7853C19.7052 39.217 22.0714 39.9881 24.5 39.9881C25.0523 39.9881 25.5 39.5391 25.5 38.9852C25.5 38.4313 25.0523 37.9822 24.5 37.9822C22.4938 37.9822 20.5391 37.3452 18.916 36.1625C17.293 34.9798 16.0849 33.3121 15.465 31.3984Z" fill={c}/><path fillRule="evenodd" clipRule="evenodd" d="M24 4L23.3098 4.66019L23.3061 4.66378L23.2973 4.67225L23.2648 4.70364C23.2367 4.73093 23.1956 4.77088 23.1426 4.82301C23.0366 4.92726 22.8826 5.08027 22.6874 5.27825C22.297 5.67415 21.7417 6.25027 21.0763 6.9763C19.7465 8.42721 17.9719 10.4826 16.1951 12.8995C12.6815 17.6788 9 24.0808 9 30.0801C9 37.845 15.796 44 24 44C32.204 44 39 37.845 39 30.0801C39 24.0808 35.3185 17.6788 31.8049 12.8995C30.0281 10.4826 28.2535 8.42721 26.9237 6.9763C26.2583 6.25027 25.703 5.67415 25.3126 5.27825C25.1174 5.08027 24.9634 4.92726 24.8574 4.82301C24.8044 4.77088 24.7634 4.73093 24.7352 4.70364L24.7027 4.67225L24.6939 4.66378L24 4ZM22.5487 8.3338C23.1353 7.69375 23.6326 7.17503 24 6.8001C24.3674 7.17503 24.8647 7.69375 25.4513 8.3338C26.7465 9.74705 28.4719 11.746 30.1951 14.0899C33.6815 18.8321 37 24.7771 37 30.0801C37 36.5828 31.2599 41.9941 24 41.9941C16.7401 41.9941 11 36.5828 11 30.0801C11 24.7771 14.3185 18.8321 17.8049 14.0899C19.5281 11.746 21.2535 9.74705 22.5487 8.3338Z" fill={c}/></svg>,
-  // Shield
-  (c: string) => <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(0.32 0 0 0.32 12 12)"><path style={{fill: c, strokeLinecap: "round"}} transform="translate(-40, -39.47)" d="M 40 7.882813 L 39.550781 8.105469 C 39.550781 8.105469 27.75 14 12 14 L 11 14 L 11 15 C 11 38.203125 18.089844 52.230469 25.25 60.40625 C 32.40625 68.585938 39.691406 70.953125 39.691406 70.953125 L 40 71.050781 L 40.308594 70.953125 C 40.308594 70.953125 47.59375 68.585938 54.75 60.40625 C 61.910156 52.230469 69 38.203125 69 15 L 69 14 L 68 14 C 52.25 14 40.449219 8.105469 40.449219 8.105469 Z M 40 10.09375 C 41.148438 10.648438 52.082031 15.710938 66.964844 15.953125 C 66.765625 38.148438 59.992188 51.386719 53.25 59.09375 C 46.652344 66.628906 40.460938 68.746094 40 68.902344 C 39.539063 68.746094 33.347656 66.628906 26.75 59.09375 C 20.007813 51.386719 13.234375 38.148438 13.035156 15.953125 C 27.917969 15.710938 38.851563 10.648438 40 10.09375 Z M 38.125 15.253906 L 37.777344 15.316406 L 37.683594 15.355469 L 37.074219 16.011719 L 37.238281 16.890625 L 38.042969 17.292969 L 38.390625 17.226563 L 38.484375 17.191406 L 39.089844 16.53125 L 38.925781 15.652344 Z M 42.203125 15.328125 L 41.3125 15.433594 L 40.863281 16.210938 L 41.21875 17.03125 L 41.523438 17.207031 L 41.617188 17.242188 L 42.507813 17.136719 L 42.953125 16.359375 L 42.601563 15.535156 L 42.296875 15.359375 Z M 34.3125 16.578125 L 33.964844 16.621094 L 33.871094 16.648438 L 33.21875 17.265625 L 33.324219 18.15625 L 34.097656 18.605469 L 34.449219 18.5625 L 34.546875 18.535156 L 35.195313 17.917969 L 35.089844 17.027344 Z M 46.023438 16.621094 L 45.140625 16.78125 L 44.742188 17.582031 L 45.144531 18.382813 L 45.457031 18.539063 L 45.554688 18.566406 L 46.4375 18.40625 L 46.839844 17.609375 L 46.4375 16.808594 L 46.121094 16.648438 Z M 30.4375 17.691406 L 30.082031 17.707031 L 29.984375 17.734375 L 29.296875 18.308594 L 29.34375 19.203125 L 30.09375 19.699219 L 30.441406 19.679688 L 30.542969 19.65625 L 31.230469 19.082031 L 31.179688 18.1875 Z M 49.9375 17.707031 L 49.0625 17.894531 L 48.6875 18.710938 L 49.117188 19.496094 L 49.4375 19.640625 L 49.535156 19.667969 L 50.410156 19.480469 L 50.78125 18.664063 L 50.355469 17.878906 L 50.03125 17.734375 Z M 26.46875 18.578125 L 26.121094 18.585938 L 26.019531 18.605469 L 25.3125 19.15625 L 25.328125 20.050781 L 26.058594 20.574219 L 26.410156 20.566406 L 26.511719 20.546875 L 27.21875 20 L 27.199219 19.101563 Z M 53.859375 18.589844 L 53 18.84375 L 52.6875 19.683594 L 53.171875 20.4375 L 53.503906 20.558594 L 53.605469 20.578125 L 54.464844 20.324219 L 54.773438 19.484375 L 54.285156 18.730469 L 53.957031 18.609375 Z M 57.855469 19.253906 L 57.007813 19.546875 L 56.734375 20.398438 L 57.25 21.128906 L 57.585938 21.234375 L 57.6875 21.25 L 58.53125 20.960938 L 58.808594 20.109375 L 58.289063 19.375 L 57.953125 19.269531 Z M 22.121094 19.273438 L 22.019531 19.289063 L 21.296875 19.8125 L 21.277344 20.707031 L 21.984375 21.257813 L 22.339844 21.265625 L 22.4375 21.25 L 23.164063 20.722656 L 23.179688 19.828125 L 22.472656 19.28125 Z M 18.21875 19.730469 C 18.195313 19.726563 18.171875 19.730469 18.152344 19.730469 C 18.09375 19.734375 18.078125 19.734375 18.101563 19.734375 L 17.160156 19.792969 L 17.160156 20.777344 C 17.152344 21.191406 17.402344 21.566406 17.789063 21.71875 C 18.171875 21.871094 18.613281 21.773438 18.894531 21.46875 C 19.199219 21.191406 19.304688 20.753906 19.15625 20.367188 C 19.003906 19.980469 18.632813 19.726563 18.21875 19.730469 Z M 61.75 19.730469 C 61.335938 19.738281 60.96875 20.007813 60.832031 20.398438 C 60.695313 20.792969 60.816406 21.226563 61.136719 21.496094 C 61.136719 21.496094 61.136719 21.496094 61.140625 21.5 C 61.425781 21.785156 61.859375 21.867188 62.234375 21.707031 C 62.605469 21.546875 62.847656 21.179688 62.84375 20.773438 L 62.84375 19.792969 L 61.902344 19.734375 C 61.925781 19.734375 61.90625 19.734375 61.847656 19.730469 C 61.816406 19.726563 61.785156 19.726563 61.75 19.730469 Z M 61.503906 23.871094 L 60.800781 24.425781 L 60.710938 24.769531 L 60.703125 24.871094 L 61.035156 25.703125 L 61.902344 25.933594 L 62.605469 25.375 L 62.695313 25.035156 L 62.703125 24.933594 L 62.371094 24.101563 Z M 17.953125 23.953125 L 17.328125 24.59375 L 17.28125 24.9375 L 17.28125 25.011719 L 17.285156 25.074219 L 17.746094 25.84375 L 18.636719 25.9375 L 19.246094 25.277344 L 19.28125 24.925781 L 19.28125 24.894531 L 19.277344 24.863281 L 19.277344 24.855469 L 18.84375 24.074219 Z M 61.144531 28.019531 L 60.40625 28.527344 L 60.292969 28.859375 L 60.277344 28.960938 L 60.558594 29.8125 L 61.40625 30.101563 L 62.140625 29.59375 L 62.253906 29.261719 L 62.269531 29.15625 L 61.996094 28.308594 Z M 18.242188 28.171875 L 17.675781 28.867188 L 17.660156 29.21875 L 17.671875 29.320313 L 18.175781 30.0625 L 19.074219 30.097656 L 19.640625 29.40625 L 19.65625 29.054688 L 19.640625 28.953125 L 19.136719 28.210938 Z M 60.484375 32.125 L 59.714844 32.585938 L 59.578125 32.910156 L 59.558594 33.011719 L 59.777344 33.878906 L 60.605469 34.222656 L 61.375 33.765625 L 61.511719 33.4375 L 61.53125 33.339844 L 61.3125 32.46875 Z M 19.734375 32.335938 L 18.839844 32.355469 L 18.316406 33.078125 L 18.324219 33.433594 L 18.34375 33.53125 L 18.890625 34.242188 L 19.789063 34.222656 L 20.3125 33.496094 L 20.304688 33.144531 L 20.285156 33.042969 Z M 59.515625 36.171875 L 58.714844 36.578125 L 58.558594 36.894531 L 58.53125 36.996094 L 58.691406 37.875 L 59.496094 38.273438 L 60.296875 37.867188 L 60.453125 37.550781 L 60.480469 37.453125 L 60.316406 36.574219 Z M 20.625 36.40625 L 19.734375 36.480469 L 19.257813 37.238281 L 19.285156 37.589844 L 19.3125 37.6875 L 19.90625 38.359375 L 20.800781 38.285156 L 21.277344 37.527344 L 21.246094 37.175781 L 21.21875 37.078125 Z M 58.253906 40.132813 L 57.421875 40.457031 L 57.234375 40.757813 L 57.199219 40.851563 L 57.269531 41.746094 L 58.03125 42.21875 L 58.867188 41.890625 L 59.054688 41.59375 L 59.09375 41.5 L 59.015625 40.605469 Z M 21.808594 40.378906 L 20.925781 40.539063 L 20.527344 41.34375 L 20.589844 41.6875 L 20.625 41.785156 L 21.28125 42.394531 L 22.164063 42.234375 L 22.5625 41.433594 L 22.5 41.089844 L 22.464844 40.988281 Z M 56.625 43.96875 L 55.777344 44.25 L 55.574219 44.542969 L 55.53125 44.636719 L 55.566406 45.53125 L 56.300781 46.039063 L 57.152344 45.753906 L 57.351563 45.464844 L 57.394531 45.371094 L 57.359375 44.472656 Z M 23.359375 44.234375 L 22.496094 44.464844 L 22.160156 45.296875 L 22.25 45.636719 L 22.296875 45.730469 L 23 46.285156 L 23.863281 46.054688 L 24.199219 45.222656 L 24.109375 44.882813 L 24.0625 44.792969 Z M 54.738281 47.65625 L 53.859375 47.839844 L 53.625 48.101563 L 53.574219 48.1875 L 53.5 49.082031 L 54.167969 49.675781 L 55.046875 49.496094 L 55.28125 49.230469 L 55.332031 49.144531 L 55.40625 48.25 Z M 25.1875 47.941406 L 24.355469 48.28125 L 24.125 49.144531 L 24.261719 49.472656 L 24.3125 49.558594 L 25.082031 50.019531 L 25.910156 49.6875 L 26.140625 48.816406 L 26.003906 48.492188 L 25.953125 48.40625 Z M 52.5 51.167969 L 51.613281 51.296875 L 51.367188 51.546875 L 51.308594 51.632813 L 51.183594 52.519531 L 51.816406 53.152344 L 52.703125 53.019531 L 52.953125 52.769531 L 53.011719 52.6875 L 53.136719 51.800781 Z M 27.453125 51.4375 L 26.644531 51.824219 L 26.46875 52.703125 L 26.621094 53.019531 L 26.683594 53.105469 L 27.472656 53.519531 L 28.28125 53.136719 L 28.457031 52.253906 L 28.304688 51.9375 L 28.246094 51.855469 Z M 50 54.480469 L 49.105469 54.515625 L 48.832031 54.734375 L 48.765625 54.8125 L 48.546875 55.679688 L 49.109375 56.375 L 50.003906 56.34375 L 50.277344 56.121094 L 50.34375 56.042969 L 50.5625 55.171875 Z M 29.996094 54.695313 L 29.238281 55.171875 L 29.167969 56.066406 L 29.355469 56.363281 L 29.421875 56.441406 L 30.261719 56.761719 L 31.015625 56.285156 L 31.089844 55.390625 L 30.902344 55.09375 L 30.832031 55.015625 Z M 46.316406 57.5 L 46.019531 57.691406 L 45.949219 57.761719 L 45.640625 58.605469 L 46.132813 59.351563 L 47.027344 59.40625 L 47.324219 59.214844 L 47.394531 59.144531 L 47.703125 58.300781 L 47.210938 57.550781 Z M 32.875 57.671875 L 32.171875 58.222656 L 32.199219 59.121094 L 32.414063 59.394531 L 32.492188 59.464844 L 33.359375 59.695313 L 34.0625 59.140625 L 34.039063 58.246094 L 33.820313 57.96875 L 33.746094 57.902344 Z M 43.242188 60.191406 L 42.929688 60.355469 L 42.847656 60.417969 L 42.464844 61.226563 L 42.878906 62.019531 L 43.765625 62.160156 L 44.078125 62 L 44.15625 61.9375 L 44.542969 61.125 L 44.125 60.332031 Z M 36.074219 60.308594 L 35.425781 60.925781 L 35.535156 61.816406 L 35.777344 62.074219 L 35.859375 62.132813 L 36.746094 62.28125 L 37.390625 61.660156 L 37.285156 60.773438 L 37.042969 60.515625 L 36.957031 60.457031 Z M 39.921875 62.445313 C 39.457031 62.453125 39.0625 62.78125 38.964844 63.230469 C 38.867188 63.683594 39.089844 64.144531 39.503906 64.34375 C 39.503906 64.34375 39.515625 64.351563 39.546875 64.367188 L 39.996094 64.589844 L 40.484375 64.34375 C 40.90625 64.140625 41.128906 63.667969 41.015625 63.210938 C 40.90625 62.753906 40.488281 62.433594 40.019531 62.449219 C 40.015625 62.445313 40.015625 62.445313 40.011719 62.449219 C 39.980469 62.445313 39.949219 62.445313 39.921875 62.445313 Z" /></g></svg>,
-];
-
 function OversiktTab({ product }: { product: Product }) {
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2.5 }}>
@@ -454,7 +685,7 @@ function OversiktTab({ product }: { product: Product }) {
         {product.fordeler.map((f, i) => (
           <Box key={i} sx={{ display: "flex", gap: 2, alignItems: "center", px: 2.5, py: 2, borderTop: `1px solid ${D.border}` }}>
             <Box sx={{ width: 48, height: 48, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {FORDEL_ICONS[i] ? FORDEL_ICONS[i](D.purple) : null}
+              {product.fordelerIcons[i] ? product.fordelerIcons[i](D.purple) : null}
             </Box>
             <Typography sx={{ fontSize: 13, color: D.textSub, lineHeight: 1.6 }}>{f}</Typography>
           </Box>
@@ -532,25 +763,12 @@ function DonutChart({ segments, size = 160, strokeWidth = 26 }: { segments: { va
 
 function NæringsinnholdTab({ product }: { product: Product }) {
   const [showFull, setShowFull] = useState(false);
-  const macros = [
-    { label: "Fett (46 E%)",        value: 46, color: "#7C3AED", amount: "3,4 g" },
-    { label: "Karbohydrat (43 E%)", value: 43, color: "#F97316", amount: "7,1 g" },
-    { label: "Protein (10 E%)",     value: 10, color: "#3B82F6", amount: "1,6 g" },
-    { label: "Kostfiber (1 E%)",    value: 1,  color: "#22C55E", amount: "0,5 g" },
-  ];
-  const nokkel = [
-    { label: "Laktose",    value: "2,88 g"  },
-    { label: "DHA",        value: "16,5 mg" },
-    { label: "ARA",        value: "16,5 mg" },
-    { label: "Kalsium",    value: "61 mg"   },
-    { label: "Jern",       value: "0,54 mg" },
-    { label: "Vitamin D",  value: "1,7 µg"  },
-    { label: "Natrium",    value: "20,8 mg" },
-  ];
+  const macros = product.macros;
+  const nokkel = product.nokkel;
   return (
     <Box sx={{ p: 3 }}>
       <Typography sx={{ fontWeight: 800, fontSize: 20, color: D.text, mb: 0.5 }}>Næringsinnhold</Typography>
-      <Typography sx={{ fontSize: 13, color: D.textSub, mb: 3 }}>Gjelder pr. 100 ml ferdig utblandet (13,6 g pulver)</Typography>
+      <Typography sx={{ fontSize: 13, color: D.textSub, mb: 3 }}>Gjelder pr. 100 ml ferdig utblandet ({product.pulverPer100ml})</Typography>
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2.5, mb: 2.5 }}>
         {/* Makronæringsstoffer */}
         <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", p: 2.5 }}>
@@ -559,7 +777,7 @@ function NæringsinnholdTab({ product }: { product: Product }) {
             <Box sx={{ position: "relative", flexShrink: 0 }}>
               <DonutChart segments={macros} />
               <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                <Typography sx={{ fontWeight: 800, fontSize: 22, color: D.text, lineHeight: 1 }}>66</Typography>
+                <Typography sx={{ fontWeight: 800, fontSize: 22, color: D.text, lineHeight: 1 }}>{product.kcalPer100ml}</Typography>
                 <Typography sx={{ fontSize: 11, color: D.textSub, fontWeight: 600 }}>kcal</Typography>
               </Box>
             </Box>
@@ -619,13 +837,7 @@ function NæringsinnholdTab({ product }: { product: Product }) {
   );
 }
 
-const MIXING_TABLE = [
-  { skjeer: 1, pulver: "4,5",  vann: 30,  ferdig: 33,  energi: 22  },
-  { skjeer: 2, pulver: "9,0",  vann: 60,  ferdig: 66,  energi: 44  },
-  { skjeer: 3, pulver: "13,5", vann: 90,  ferdig: 100, energi: 66  },
-  { skjeer: 4, pulver: "18,0", vann: 120, ferdig: 132, energi: 87  },
-  { skjeer: 5, pulver: "22,5", vann: 150, ferdig: 165, energi: 109 },
-];
+
 
 function TilberedningTab({ product }: { product: Product }) {
   return (
@@ -656,19 +868,19 @@ function TilberedningTab({ product }: { product: Product }) {
         {/* Utblandingstabell */}
         <Box>
           <Typography sx={{ fontWeight: 800, fontSize: 17, color: D.text, mb: 0.5 }}>Utblandingstabell</Typography>
-          <Typography sx={{ fontSize: 12.5, color: D.textSub, mb: 0.3 }}>Anbefalt konsentrasjon: 13,6 % vekt/volum</Typography>
-          <Typography sx={{ fontSize: 12.5, color: D.textSub, mb: 1.5 }}>1 måleskje = 4,5 g pulver</Typography>
+          <Typography sx={{ fontSize: 12.5, color: D.textSub, mb: 0.3 }}>Anbefalt konsentrasjon: {product.mixingInfo.konsentrasjon} % vekt/volum</Typography>
+          <Typography sx={{ fontSize: 12.5, color: D.textSub, mb: 1.5 }}>1 måleskje = {product.mixingInfo.scoopGram} g pulver</Typography>
           <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "10px", overflow: "hidden" }}>
             {/* Header */}
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", bgcolor: D.surfaceAlt, borderBottom: `1px solid ${D.border}` }}>
               {["Måleskjeer", "Pulver (g)", "Vann (ml)", "Ferdig mengde (ml)", "Energi (kcal)"].map((h) => (
-                <Typography key={h} sx={{ fontSize: 11.5, fontWeight: 700, color: D.text, px: 1.5, py: 1 }}>{h}</Typography>
+                <Typography key={h} sx={{ fontSize: 11.5, fontWeight: 700, color: D.text, px: 1.5, py: 1, textAlign: "center" }}>{h}</Typography>
               ))}
             </Box>
-            {MIXING_TABLE.map((row, i) => (
+            {product.mixingTable.map((row, i) => (
               <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderTop: i > 0 ? `1px solid ${D.border}` : "none", bgcolor: i % 2 === 0 ? D.surface : D.surfaceAlt }}>
                 {[row.skjeer, row.pulver, row.vann, row.ferdig, row.energi].map((val, j) => (
-                  <Typography key={j} sx={{ fontSize: 13, color: D.text, px: 1.5, py: 1.1 }}>{val}</Typography>
+                  <Typography key={j} sx={{ fontSize: 13, color: D.text, px: 1.5, py: 1.1, textAlign: "center" }}>{val}</Typography>
                 ))}
               </Box>
             ))}
@@ -712,6 +924,14 @@ const INGR_PROPS = [
 ];
 
 function IngrediensTab({ product }: { product: Product }) {
+  const ingrProps = product.id === "neocate-lcp"
+    ? [
+        { label: "Glutenfri", icon: INGR_PROPS[0].icon },
+        { label: "Kostfiberfri", icon: INGR_PROPS[1].icon },
+        { label: "Laktosefri", icon: INGR_PROPS[2].icon },
+      ]
+    : INGR_PROPS;
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {/* Ingredienser */}
@@ -721,7 +941,7 @@ function IngrediensTab({ product }: { product: Product }) {
 
         {/* Property icons */}
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, mt: 3, pt: 2.5, borderTop: `1px solid ${D.border}` }}>
-          {INGR_PROPS.map((prop, i) => (
+          {ingrProps.map((prop, i) => (
             <Box key={i} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, py: 1.5 }}>
               {prop.icon(D.purple)}
               <Typography sx={{ fontSize: 11.5, fontWeight: 500, color: D.textSub, textAlign: "center", lineHeight: 1.3 }}>{prop.label}</Typography>
@@ -767,7 +987,7 @@ function BestillingTab({ product }: { product: Product }) {
       {/* Product card */}
       <Box sx={{ display: "flex", gap: 2, p: 2, bgcolor: D.surface, border: `1px solid ${D.border}`, borderRadius: D.radiusSm, alignItems: "center" }}>
         {product.image && (
-          <Box component="img" src={product.image} alt={product.name} sx={{ width: 72, height: 72, objectFit: "contain", flexShrink: 0 }} />
+          <Box component="img" src={product.image} alt={product.name} sx={{ width: 72, height: 72, objectFit: "contain", flexShrink: 0, transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
         )}
         <Box>
           <Typography sx={{ fontWeight: 800, fontSize: 15, color: D.text, mb: 0.5 }}>{product.name}</Typography>
@@ -896,6 +1116,18 @@ export default function MelkeerstatningTab() {
   const PEPTICATE_1_DOKUMENTER: Dokument[] = [
     { title: "Produktark Pepticate", url: "/dokumenter/pepticate-1-produktark.pdf", sizeLabel: "344 KB" },
   ];
+  const PEPTICATE_PLUS_2_DOKUMENTER: Dokument[] = [
+    { title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" },
+  ];
+  const NEOCATE_LCP_DOKUMENTER: Dokument[] = [
+    { title: "Produktark Neocate LCP", url: "/Morsmelkerstatning/Neocate-LCP.pdf", sizeLabel: "530 KB" },
+  ];
+  const DOKUMENT_MAP: Record<string, Dokument[]> = {
+    "pepticate-1": PEPTICATE_1_DOKUMENTER,
+    "pepticate-plus-2": PEPTICATE_PLUS_2_DOKUMENTER,
+    "neocate-lcp": NEOCATE_LCP_DOKUMENTER,
+  };
+  const aktiveDokumenter = DOKUMENT_MAP[product.id] ?? [];
 
   return (
     <Box sx={{ display: "flex", height: "100%", bgcolor: D.surface, overflow: "hidden" }}>
@@ -928,7 +1160,7 @@ export default function MelkeerstatningTab() {
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               {product.image
-                ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 170, height: 160, objectFit: "contain" }} />
+                ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 170, height: 160, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
                 : <BottleIcon size={64} color={D.purple} />}
             </Box>
 
@@ -945,7 +1177,9 @@ export default function MelkeerstatningTab() {
                   const Icon = b.icon === "drop" ? DropIcon : b.icon === "shield" ? ShieldCheckIcon : b.icon === "gut" ? GutIcon : StarShieldIcon;
                   return (
                     <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 1.5, py: 0.9, borderLeft: i > 0 ? `1px solid ${D.border}` : "none" }}>
-                      <Icon color={b.color} />
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Icon color={b.color} />
+                      </Box>
                       <Typography sx={{ fontSize: 12, fontWeight: 500, color: D.textSub, whiteSpace: "nowrap", lineHeight: 1.3 }}>{b.label}</Typography>
                     </Box>
                   );
@@ -993,7 +1227,7 @@ export default function MelkeerstatningTab() {
           {activeTab === 2 && <TilberedningTab product={product} />}
           {activeTab === 3 && <IngrediensTab product={product} />}
           {activeTab === 4 && <BestillingTab product={product} />}
-          {activeTab === 5 && <DokumentasjonTab dokumenter={PEPTICATE_1_DOKUMENTER} />}
+          {activeTab === 5 && <DokumentasjonTab dokumenter={aktiveDokumenter} />}
         </Box>
 
         {/* Footer */}
