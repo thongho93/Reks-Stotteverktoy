@@ -132,7 +132,7 @@ export const OPIOIDS: OpioidDefinition[] = [
     atcCode: ["N02AJ06", "R05DA04"],
     route: ["oral", "rektal"],
     omeqFactor: 0.1,
-    helpText: "Styke til kodein er allerede valgt.",
+    helpText: "Styrke til kodein er allerede valgt.",
   },
   {
     id: "metadon-oral",

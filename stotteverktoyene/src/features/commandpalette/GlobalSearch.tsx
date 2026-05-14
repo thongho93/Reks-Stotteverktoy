@@ -41,6 +41,7 @@ import { loadInteractionsIndex } from "../interaksjoner/services/useInteractions
 import type { InteractionEntity } from "../fest/mappers/interactionsToIndex";
 import { collection, getDocs, orderBy, query as fsQuery } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
+import { buildProductIndex, parseMedicationInput } from "../omeq/lib/parseMedicationInput";
 
 // ─── Page definitions ───────────────────────────────────────────────────────
 
@@ -238,6 +239,12 @@ const BUILTIN_FAGLIG_TABS: FagligTabOption[] = [
   },
 ];
 
+type OmeqSelectedMedication = {
+  label: string;
+  medicationText: string;
+  identity: string;
+};
+
 function normalize(s: string) {
   return s
     .toLowerCase()
@@ -295,9 +302,14 @@ export function GlobalSearch({ open, onClose }: Props) {
   const [intLoading, setIntLoading] = useState(false);
   const [intSelected, setIntSelected] = useState<InteractionEntity[]>([]);
   const [intDropdownIndex, setIntDropdownIndex] = useState(0);
+  const [omeqMedItems, setOmeqMedItems] = useState<Med[]>([]);
+  const [omeqLoading, setOmeqLoading] = useState(false);
+  const [omeqSelectedMedication, setOmeqSelectedMedication] = useState<OmeqSelectedMedication | null>(null);
+  const [omeqDoseText, setOmeqDoseText] = useState("");
   const [fagligTabs, setFagligTabs] = useState<FagligTabOption[]>(BUILTIN_FAGLIG_TABS);
   const [fagligLoading, setFagligLoading] = useState(false);
   const [fagligDropdownIndex, setFagligDropdownIndex] = useState(0);
+  const omeqProductIndex = useMemo(() => buildProductIndex(), []);
 
   const entries = ALL_ENTRIES.filter(
     (e) =>
@@ -311,7 +323,38 @@ export function GlobalSearch({ open, onClose }: Props) {
   const preview = command?.parsePreview(commandQuery) ?? null;
   const isStdScoped = isScoped && scopedPage?.path === "/standardtekster";
   const isIntScoped = isScoped && scopedPage?.path === "/interaksjoner";
+  const isOmeqScoped = isScoped && scopedPage?.path === "/omeq";
   const isFagligScoped = isScoped && scopedPage?.scopeMode === "fagligTabs";
+  const omeqSelectedParsed = useMemo(() => {
+    if (!omeqSelectedMedication) return null;
+    return parseMedicationInput(
+      omeqSelectedMedication.medicationText || omeqSelectedMedication.label,
+      omeqProductIndex
+    );
+  }, [omeqSelectedMedication, omeqProductIndex]);
+  const omeqSelectedIsDepotPatch =
+    String(omeqSelectedParsed?.product?.form ?? "").toLowerCase() === "depotplaster";
+
+  const omeqExactMatch = useMemo<Med | null>(() => {
+    if (omeqSelectedMedication) return null;
+    if (!isOmeqScoped || !commandQuery.trim() || !omeqMedItems.length) return null;
+    const raw = commandQuery.trim();
+    const numeric = raw.match(/^0*(\d{4,7})$/)?.[1] ?? null;
+    if (numeric) {
+      const exact = omeqMedItems.find((med) => {
+        const farmalogg = String(med.farmaloggNumber ?? "").trim().replace(/^0+/, "") || null;
+        return farmalogg === numeric;
+      });
+      if (exact) return exact;
+    }
+
+    const q = normalize(raw);
+    const byName = omeqMedItems.filter((med) => {
+      const name = normalize(String(med.navnFormStyrke ?? med.varenavn ?? ""));
+      return name === q;
+    });
+    return byName.length === 1 ? byName[0] : null;
+  }, [isOmeqScoped, commandQuery, omeqMedItems, omeqSelectedMedication]);
 
   const fagligFilteredOptions = useMemo<FagligTabOption[]>(() => {
     const q = normalize(commandQuery);
@@ -498,6 +541,13 @@ export function GlobalSearch({ open, onClose }: Props) {
     setIntDropdownIndex(0);
   }, []);
 
+  const resetOmeqState = useCallback(() => {
+    setOmeqMedItems([]);
+    setOmeqLoading(false);
+    setOmeqSelectedMedication(null);
+    setOmeqDoseText("");
+  }, []);
+
   const resetFagligState = useCallback(() => {
     setFagligTabs(BUILTIN_FAGLIG_TABS);
     setFagligLoading(false);
@@ -532,6 +582,18 @@ export function GlobalSearch({ open, onClose }: Props) {
     }
   }, []);
 
+  const loadOmeqMedItems = useCallback(async () => {
+    setOmeqLoading(true);
+    try {
+      const meds = await loadMedicationItems();
+      setOmeqMedItems(meds);
+    } catch {
+      setOmeqMedItems([]);
+    } finally {
+      setOmeqLoading(false);
+    }
+  }, []);
+
   const loadFagligTabs = useCallback(async () => {
     setFagligLoading(true);
     try {
@@ -560,6 +622,9 @@ export function GlobalSearch({ open, onClose }: Props) {
       if (entry.path === "/standardtekster") {
         resetStdState();
         void loadStdTemplates();
+      } else if (entry.path === "/omeq") {
+        resetOmeqState();
+        void loadOmeqMedItems();
       } else if (entry.path === "/interaksjoner") {
         resetIntState();
         void loadIntIndex();
@@ -569,17 +634,27 @@ export function GlobalSearch({ open, onClose }: Props) {
       }
       setTimeout(() => inputRef.current?.focus(), 60);
     },
-    [loadStdTemplates, resetStdState, resetIntState, loadIntIndex, resetFagligState, loadFagligTabs]
+    [
+      loadStdTemplates,
+      resetStdState,
+      resetOmeqState,
+      loadOmeqMedItems,
+      resetIntState,
+      loadIntIndex,
+      resetFagligState,
+      loadFagligTabs,
+    ]
   );
 
   const exitScopeMode = useCallback(() => {
     setScopedPage(null);
     setCommandQuery("");
     resetStdState();
+    resetOmeqState();
     resetIntState();
     resetFagligState();
     setTimeout(() => inputRef.current?.focus(), 30);
-  }, [resetStdState, resetIntState, resetFagligState]);
+  }, [resetStdState, resetOmeqState, resetIntState, resetFagligState]);
 
   const navigateTo = useCallback(
     (entry: SearchEntry, withCommand = false) => {
@@ -718,6 +793,49 @@ export function GlobalSearch({ open, onClose }: Props) {
     onClose();
   }, [scopedPage, intSelected, navigate, onClose]);
 
+  const navigateWithOmeqSelection = useCallback(() => {
+    if (!scopedPage) return;
+
+    const textFromChip = omeqSelectedMedication?.medicationText?.trim() ?? "";
+    const textFromInput = commandQuery.trim();
+    const medicationText = textFromChip || textFromInput;
+    const doseText = omeqSelectedMedication && !omeqSelectedIsDepotPatch ? omeqDoseText.trim() : "";
+    if (!medicationText) {
+      navigate(scopedPage.path);
+      onClose();
+      return;
+    }
+
+    navigate(scopedPage.path, { state: { prefill: { medicationText, doseText } } });
+    onClose();
+  }, [scopedPage, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqDoseText, commandQuery, navigate, onClose]);
+
+  useEffect(() => {
+    if (!isOmeqScoped || !omeqExactMatch) return;
+    const medicationLabel = formatPreparatForTemplate(omeqExactMatch) || omeqExactMatch.varenavn || omeqExactMatch.navnFormStyrke || commandQuery.trim();
+    const productNumber = String(omeqExactMatch.farmaloggNumber ?? "").trim();
+    const normalizedProductNumber = productNumber.replace(/^0+/, "") || productNumber;
+    const medicationText = normalizedProductNumber || medicationLabel;
+    const identity = normalizedProductNumber || normalize(medicationLabel);
+    if (omeqSelectedMedication?.identity === identity) return;
+    setOmeqSelectedMedication({
+      label: medicationLabel,
+      medicationText,
+      identity,
+    });
+    setOmeqDoseText("");
+    setCommandQuery("");
+  }, [isOmeqScoped, omeqExactMatch, commandQuery, omeqSelectedMedication]);
+
+  useEffect(() => {
+    if (!isOmeqScoped || !omeqSelectedMedication || omeqSelectedIsDepotPatch) return;
+    const raw = commandQuery.trim();
+    if (!raw) return;
+    if (!/^\d+([.,]\d+)?$/.test(raw)) return;
+    setOmeqDoseText(raw);
+    setCommandQuery("");
+  }, [isOmeqScoped, omeqSelectedMedication, omeqSelectedIsDepotPatch, commandQuery]);
+
   const navigateWithFagligSelection = useCallback(
     (selection?: FagligTabOption) => {
       if (!scopedPage) return;
@@ -851,6 +969,26 @@ export function GlobalSearch({ open, onClose }: Props) {
           return;
         }
 
+        // ── OMEQ scoped keyboard handling ──
+        if (isOmeqScoped) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            navigateWithOmeqSelection();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            if (commandQuery) setCommandQuery("");
+            else if (omeqDoseText) setOmeqDoseText("");
+            else if (omeqSelectedMedication) setOmeqSelectedMedication(null);
+            else exitScopeMode();
+          } else if (e.key === "Backspace" && commandQuery === "") {
+            e.preventDefault();
+            if (omeqDoseText) setOmeqDoseText("");
+            else if (omeqSelectedMedication) setOmeqSelectedMedication(null);
+            else exitScopeMode();
+          }
+          return;
+        }
+
         // ── Faglig innhold scoped keyboard handling ──
         if (isFagligScoped) {
           if (e.key === "ArrowDown") {
@@ -916,12 +1054,12 @@ export function GlobalSearch({ open, onClose }: Props) {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
-    open, isScoped, isStdScoped, isIntScoped, isFagligScoped, entries, activeIndex, scopedPage, commandQuery,
+    open, isScoped, isStdScoped, isIntScoped, isOmeqScoped, isFagligScoped, entries, activeIndex, scopedPage, commandQuery,
     stdStep, stdFilteredTemplates, stdDropdownIndex, stdHasPreparat, stdSelectedPreparats,
-    intFilteredOptions, intDropdownIndex, intSelected, fagligFilteredOptions, fagligDropdownIndex,
+    intFilteredOptions, intDropdownIndex, intSelected, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqDoseText, fagligFilteredOptions, fagligDropdownIndex,
     navigateTo, enterScopeMode, exitScopeMode, onClose,
     selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill, commitPreparatChip,
-    selectIntEntity, navigateWithIntSelected, navigateWithFagligSelection,
+    selectIntEntity, navigateWithIntSelected, navigateWithOmeqSelection, navigateWithFagligSelection,
   ]);
 
   const shortcutLabel = "Space";
@@ -1017,6 +1155,10 @@ export function GlobalSearch({ open, onClose }: Props) {
                 : ""
               : isIntScoped
               ? "Søk etter legemiddel, virkestoff eller ATC-kode..."
+              : isOmeqScoped
+              ? omeqSelectedMedication && !omeqSelectedIsDepotPatch
+                ? "Skriv antall stk per døgn..."
+                : "Søk etter preparatnavn eller varenummer..."
               : isFagligScoped
               ? "Søk etter dokumentfane..."
               : isScoped
@@ -1471,6 +1613,112 @@ export function GlobalSearch({ open, onClose }: Props) {
               </>
             )}
           </Box>
+        ) : isOmeqScoped ? (
+          <Box sx={{ px: 2.5, py: 2, maxHeight: 400, overflowY: "auto" }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 1.5,
+                p: 2,
+                borderRadius: 2,
+                backgroundColor: (theme) =>
+                  alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.1 : 0.06),
+                border: (theme) =>
+                  `1px solid ${alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.25 : 0.18)}`,
+              }}
+            >
+              <LightbulbOutlinedIcon
+                sx={{ fontSize: 18, color: scopedPage!.color, mt: 0.25, flexShrink: 0 }}
+              />
+              <Box>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 500, color: "text.primary", mb: 0.25 }}
+                >
+                  Skriv varenummer eller preparatnavn. Ved eksakt treff velges preparat automatisk.
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+                  f.eks. 112664 eller morfin
+                </Typography>
+              </Box>
+            </Box>
+
+            {omeqLoading ? (
+              <Box sx={{ py: 2.5, display: "flex", justifyContent: "center" }}>
+                <CircularProgress size={22} />
+              </Box>
+            ) : null}
+
+            {omeqSelectedMedication && (
+              <Box sx={{ mt: 1.5, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.75 }}>
+                <Box
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 0.6,
+                    px: 1.2,
+                    py: 0.5,
+                    borderRadius: 1.5,
+                    backgroundColor: (theme) =>
+                      alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.18 : 0.1),
+                    border: (theme) =>
+                      `1px solid ${alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.35 : 0.24)}`,
+                  }}
+                >
+                  <CheckCircleOutlineRoundedIcon sx={{ fontSize: 14, color: scopedPage!.color }} />
+                  <Typography variant="caption" sx={{ color: scopedPage!.color, fontWeight: 600 }}>
+                    {omeqSelectedMedication.label}
+                  </Typography>
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => {
+                      setOmeqSelectedMedication(null);
+                      setOmeqDoseText("");
+                    }}
+                    sx={{
+                      ml: 0.2,
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      color: scopedPage!.color,
+                      fontSize: "0.8rem",
+                      lineHeight: 1,
+                      p: 0,
+                      opacity: 0.75,
+                      "&:hover": { opacity: 1 },
+                    }}
+                  >
+                    ✕
+                  </Box>
+                </Box>
+
+                {!omeqSelectedIsDepotPatch && omeqDoseText && (
+                  <Box
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.55,
+                      px: 1,
+                      py: 0.42,
+                      borderRadius: 1.35,
+                      backgroundColor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
+                      border: (theme) => `1px solid ${theme.palette.divider}`,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                      Antall/døgn:
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 700 }}>
+                      {omeqDoseText}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
         ) : isFagligScoped ? (
           <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
             {fagligLoading ? (
@@ -1697,6 +1945,17 @@ export function GlobalSearch({ open, onClose }: Props) {
                 <KbdHint keys={["Esc"]} label="tilbake" />
               </>
             )
+          ) : isOmeqScoped ? (
+            <>
+              {omeqSelectedMedication && (
+                <KbdHint
+                  keys={["⌫"]}
+                  label={!omeqSelectedIsDepotPatch && omeqDoseText ? "fjern antall" : "fjern preparat"}
+                />
+              )}
+              <KbdHint keys={["↵"]} label="gå til OMEQ" />
+              <KbdHint keys={["Esc"]} label="tilbake" />
+            </>
           ) : isFagligScoped ? (
             <>
               <KbdHint keys={["↑", "↓"]} label="naviger" />
