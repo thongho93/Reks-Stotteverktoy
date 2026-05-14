@@ -24,6 +24,7 @@ import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
 import KeyboardReturnRoundedIcon from "@mui/icons-material/KeyboardReturnRounded";
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { useNavigate } from "react-router-dom";
 import { useAuthUser } from "../../app/auth/useAuthUser";
 import { readCachedOrFetchStandardTekster } from "../standardtekster/hooks/useStandardTekster";
@@ -38,10 +39,17 @@ import {
 } from "../standardtekster/utils/preparat";
 import { loadMedicationItems, type Med } from "../fest/components/MedicationSearch";
 import { loadInteractionsIndex } from "../interaksjoner/services/useInteractions";
-import type { InteractionEntity } from "../fest/mappers/interactionsToIndex";
+import {
+  matchInteractionsBySelectedTerms,
+  type InteractionEntity,
+  type InteractionIndex,
+  type MatchResult,
+} from "../fest/mappers/interactionsToIndex";
+import { isAvoidRelevance, relevanceKind, RelevanceIcon } from "../interaksjoner/utils/relevance";
 import { collection, getDocs, orderBy, query as fsQuery } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { buildProductIndex, parseMedicationInput } from "../omeq/lib/parseMedicationInput";
+import { ATC_PRODUCTS } from "../omeq/data/atcProducts";
 
 // ─── Page definitions ───────────────────────────────────────────────────────
 
@@ -245,6 +253,55 @@ type OmeqSelectedMedication = {
   identity: string;
 };
 
+type OmeqSuggestion = {
+  label: string;
+  medicationText: string;
+  identity: string;
+  productNumber?: string;
+};
+
+type OmeqPreparedRow = {
+  id: string;
+  label: string;
+  medicationText: string;
+  identity: string;
+  doseText: string;
+};
+
+const PREPARAT_SUFFIX_RE = /\s*\(preparatnavn\)\s*$/i;
+
+function cleanMatchTerm(value: string): string {
+  return String(value ?? "")
+    .replace(PREPARAT_SUFFIX_RE, "")
+    .trim();
+}
+
+function readStandardteksterFavorites(uid?: string | null): string[] {
+  try {
+    if (uid) {
+      const perUserRaw = localStorage.getItem(`standardtekster:${uid}:favoritesBackup`);
+      if (perUserRaw) {
+        const parsed = JSON.parse(perUserRaw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((x): x is string => typeof x === "string");
+        }
+      }
+    }
+
+    const legacyRaw = localStorage.getItem("standardtekster:favorites");
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((x): x is string => typeof x === "string");
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return [];
+}
+
 function normalize(s: string) {
   return s
     .toLowerCase()
@@ -279,12 +336,13 @@ export function GlobalSearch({ open, onClose }: Props) {
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingClickEntryRef = useRef<SearchEntry | null>(null);
   const navigate = useNavigate();
-  const { isOwner, isRekspert, role } = useAuthUser() as any;
+  const { user, isOwner, isRekspert, role } = useAuthUser() as any;
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
   const hasOwnerAccess = Boolean(isOwner) || role === "owner";
 
   // ── Standardtekster multi-step state ────────────────────────────────────────
   const [stdTemplates, setStdTemplates] = useState<StandardTekst[]>([]);
+  const [stdFavoriteTemplateIds, setStdFavoriteTemplateIds] = useState<string[]>([]);
   const [stdMedItems, setStdMedItems] = useState<Med[]>([]);
   const [stdLoading, setStdLoading] = useState(false);
   const [stdStep, setStdStep] = useState<0 | 1>(0); // 0 = search template, 1 = fill fields
@@ -298,14 +356,15 @@ export function GlobalSearch({ open, onClose }: Props) {
   const [stdSelectedPreparats, setStdSelectedPreparats] = useState<Array<{ text: string; key: string }>>([]);
 
   // ── Interaksjonssøk scoped state ─────────────────────────────────────────────
-  const [intIndex, setIntIndex] = useState<{ entities: InteractionEntity[] } | null>(null);
+  const [intIndex, setIntIndex] = useState<InteractionIndex | null>(null);
   const [intLoading, setIntLoading] = useState(false);
   const [intSelected, setIntSelected] = useState<InteractionEntity[]>([]);
   const [intDropdownIndex, setIntDropdownIndex] = useState(0);
-  const [omeqMedItems, setOmeqMedItems] = useState<Med[]>([]);
-  const [omeqLoading, setOmeqLoading] = useState(false);
+  const [intActiveResult, setIntActiveResult] = useState(0);
   const [omeqSelectedMedication, setOmeqSelectedMedication] = useState<OmeqSelectedMedication | null>(null);
+  const [omeqDropdownIndex, setOmeqDropdownIndex] = useState(0);
   const [omeqDoseText, setOmeqDoseText] = useState("");
+  const [omeqPreparedRows, setOmeqPreparedRows] = useState<OmeqPreparedRow[]>([]);
   const [fagligTabs, setFagligTabs] = useState<FagligTabOption[]>(BUILTIN_FAGLIG_TABS);
   const [fagligLoading, setFagligLoading] = useState(false);
   const [fagligDropdownIndex, setFagligDropdownIndex] = useState(0);
@@ -334,27 +393,126 @@ export function GlobalSearch({ open, onClose }: Props) {
   }, [omeqSelectedMedication, omeqProductIndex]);
   const omeqSelectedIsDepotPatch =
     String(omeqSelectedParsed?.product?.form ?? "").toLowerCase() === "depotplaster";
+  const omeqDoseIsValid = /^\d+([.,]\d+)?$/.test(omeqDoseText.trim());
+  const omeqDraftReady = Boolean(
+    omeqSelectedMedication && (omeqSelectedIsDepotPatch || omeqDoseIsValid)
+  );
+  const omeqDraftIsDuplicate = Boolean(
+    omeqSelectedMedication && omeqPreparedRows.some((row) => row.identity === omeqSelectedMedication.identity)
+  );
 
-  const omeqExactMatch = useMemo<Med | null>(() => {
+  const omeqCatalogOptions = useMemo<OmeqSuggestion[]>(() => {
+    const out: OmeqSuggestion[] = [];
+    const seen = new Set<string>();
+
+    Object.values(ATC_PRODUCTS)
+      .flatMap((arr) => arr ?? [])
+      .forEach((product) => {
+        const base = `${product.name ?? ""}${product.form ? ` ${product.form}` : ""}`.trim();
+        const variants = Array.isArray(product.variants) ? product.variants : [];
+
+        if (variants.length > 0) {
+          variants.forEach((variant) => {
+            const strength = String(variant?.strength ?? "").trim();
+            const prefix = `${base}${strength ? ` ${strength}` : ""}`.trim();
+            const nums = Array.isArray(variant?.productNumbers)
+              ? variant.productNumbers.map((n) => String(Number(n))).filter(Boolean)
+              : [];
+            if (nums.length > 0) {
+              nums.forEach((num) => {
+                const label = `${prefix} (${num})`.trim();
+                if (!label || seen.has(label)) return;
+                seen.add(label);
+                out.push({
+                  label,
+                  medicationText: label,
+                  identity: num,
+                  productNumber: num,
+                });
+              });
+            } else {
+              if (!prefix || seen.has(prefix)) return;
+              seen.add(prefix);
+              out.push({
+                label: prefix,
+                medicationText: prefix,
+                identity: normalize(prefix),
+              });
+            }
+          });
+          return;
+        }
+
+        const strengths = Array.isArray(product.strengths) ? product.strengths : [];
+        if (strengths.length > 0) {
+          strengths.forEach((strength) => {
+            const label = `${base} ${String(strength ?? "").trim()}`.replace(/\s+/g, " ").trim();
+            if (!label || seen.has(label)) return;
+            seen.add(label);
+            out.push({
+              label,
+              medicationText: label,
+              identity: normalize(label),
+            });
+          });
+          return;
+        }
+
+        if (!base || seen.has(base)) return;
+        seen.add(base);
+        out.push({
+          label: base,
+          medicationText: base,
+          identity: normalize(base),
+        });
+      });
+
+    return out.sort((a, b) => a.label.localeCompare(b.label, "nb"));
+  }, []);
+
+  const omeqExactSuggestion = useMemo<OmeqSuggestion | null>(() => {
     if (omeqSelectedMedication) return null;
-    if (!isOmeqScoped || !commandQuery.trim() || !omeqMedItems.length) return null;
+    if (!isOmeqScoped || !commandQuery.trim() || omeqCatalogOptions.length === 0) return null;
     const raw = commandQuery.trim();
     const numeric = raw.match(/^0*(\d{4,7})$/)?.[1] ?? null;
     if (numeric) {
-      const exact = omeqMedItems.find((med) => {
-        const farmalogg = String(med.farmaloggNumber ?? "").trim().replace(/^0+/, "") || null;
-        return farmalogg === numeric;
-      });
-      if (exact) return exact;
+      const exact = omeqCatalogOptions.filter((o) => o.productNumber === numeric);
+      return exact.length === 1 ? exact[0] : null;
     }
 
     const q = normalize(raw);
-    const byName = omeqMedItems.filter((med) => {
-      const name = normalize(String(med.navnFormStyrke ?? med.varenavn ?? ""));
-      return name === q;
-    });
-    return byName.length === 1 ? byName[0] : null;
-  }, [isOmeqScoped, commandQuery, omeqMedItems, omeqSelectedMedication]);
+    const exactByLabel = omeqCatalogOptions.filter((o) => normalize(o.label) === q);
+    return exactByLabel.length === 1 ? exactByLabel[0] : null;
+  }, [isOmeqScoped, commandQuery, omeqCatalogOptions, omeqSelectedMedication]);
+
+  const omeqSuggestions = useMemo<OmeqSuggestion[]>(() => {
+    if (!isOmeqScoped || omeqSelectedMedication || !omeqCatalogOptions.length) return [];
+    const raw = commandQuery.trim();
+    if (!raw) return [];
+
+    const numeric = raw.match(/^0*(\d+)$/)?.[1] ?? null;
+    if (numeric) {
+      const startsWith = omeqCatalogOptions
+        .filter((o) => (o.productNumber ?? "").startsWith(numeric))
+        .sort((a, b) => {
+          const aNum = a.productNumber ?? "";
+          const bNum = b.productNumber ?? "";
+          const aExact = aNum === numeric ? 0 : 1;
+          const bExact = bNum === numeric ? 0 : 1;
+          if (aExact !== bExact) return aExact - bExact;
+          if (aNum.length !== bNum.length) return aNum.length - bNum.length;
+          return a.label.localeCompare(b.label, "nb");
+        });
+      return startsWith.slice(0, 25);
+    }
+
+    const q = normalize(raw);
+    const starts = omeqCatalogOptions.filter((o) => normalize(o.label).startsWith(q));
+    const contains = omeqCatalogOptions.filter(
+      (o) => !normalize(o.label).startsWith(q) && normalize(o.label).includes(q)
+    );
+    return [...starts, ...contains].slice(0, 25);
+  }, [isOmeqScoped, omeqSelectedMedication, omeqCatalogOptions, commandQuery]);
 
   const fagligFilteredOptions = useMemo<FagligTabOption[]>(() => {
     const q = normalize(commandQuery);
@@ -394,12 +552,51 @@ export function GlobalSearch({ open, onClose }: Props) {
     return [...starts, ...includes].slice(0, 12);
   }, [intIndex, commandQuery]);
 
+  const intLabelByTerm = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of intSelected) {
+      const cleanedLabel = cleanMatchTerm(s.label);
+      map.set(s.key, cleanedLabel);
+      if (s.atc) map.set(s.atc, cleanedLabel);
+    }
+    return map;
+  }, [intSelected]);
+
+  const intResults = useMemo<MatchResult[]>(() => {
+    if (!intIndex || intSelected.length < 2) return [];
+    const terms = intSelected.flatMap((s) => (s.atc ? [s.key, s.atc] : [s.key]));
+    const allMatches = matchInteractionsBySelectedTerms(intIndex, terms);
+    return allMatches.filter((m) => {
+      const interaction = intIndex.interactions[m.interactionIndex];
+      if (!interaction) return false;
+      return isAvoidRelevance(interaction.relevansV, interaction.relevansDn);
+    });
+  }, [intIndex, intSelected]);
+
   const stdFilteredTemplates = useMemo(() => {
     if (!stdTemplates.length) return [];
+    const favoritesIndex = new Map<string, number>();
+    stdFavoriteTemplateIds.forEach((id, i) => favoritesIndex.set(id, i));
+
+    const favoriteOnly = stdTemplates
+      .filter((t) => stdFavoriteTemplateIds.includes(t.id))
+      .sort((a, b) => {
+        const aPos = favoritesIndex.get(a.id);
+        const bPos = favoritesIndex.get(b.id);
+        if (typeof aPos === "number" && typeof bPos === "number" && aPos !== bPos) {
+          return aPos - bPos;
+        }
+        return a.title.localeCompare(b.title, "nb");
+      });
     const q = normalize(commandQuery);
-    if (!q) return stdTemplates.slice(0, 10);
+    const favoritesOnlyMode = !q;
+    if (favoritesOnlyMode) {
+      if (!favoriteOnly.length) return [];
+      return favoriteOnly.slice(0, 10);
+    }
     const words = q.split(/\s+/).filter(Boolean);
-    const scored = stdTemplates.flatMap((t) => {
+    const searchPool = stdTemplates;
+    const scored = searchPool.flatMap((t) => {
       const cat = normalize(t.category ?? "");
       const title = normalize(t.title);
       // Category: exact match = 100, word-start = 80, includes = 60
@@ -417,7 +614,7 @@ export function GlobalSearch({ open, onClose }: Props) {
       .sort((a, b) => b.score - a.score || a.t.title.localeCompare(b.t.title))
       .map(({ t }) => t)
       .slice(0, 8);
-  }, [stdTemplates, commandQuery]);
+  }, [stdTemplates, stdFavoriteTemplateIds, commandQuery]);
 
   const stdHasPreparat = useMemo(
     () =>
@@ -523,6 +720,7 @@ export function GlobalSearch({ open, onClose }: Props) {
 
   const resetStdState = useCallback(() => {
     setStdTemplates([]);
+    setStdFavoriteTemplateIds([]);
     setStdLoading(false);
     setStdStep(0);
     setStdSelectedTemplate(null);
@@ -539,13 +737,14 @@ export function GlobalSearch({ open, onClose }: Props) {
     setIntLoading(false);
     setIntSelected([]);
     setIntDropdownIndex(0);
+    setIntActiveResult(0);
   }, []);
 
   const resetOmeqState = useCallback(() => {
-    setOmeqMedItems([]);
-    setOmeqLoading(false);
     setOmeqSelectedMedication(null);
+    setOmeqDropdownIndex(0);
     setOmeqDoseText("");
+    setOmeqPreparedRows([]);
   }, []);
 
   const resetFagligState = useCallback(() => {
@@ -561,14 +760,17 @@ export function GlobalSearch({ open, onClose }: Props) {
         readCachedOrFetchStandardTekster(),
         loadMedicationItems(),
       ]);
+      const favoriteIds = readStandardteksterFavorites(user?.uid ?? null);
       setStdTemplates(all.filter((t) => t.isActive !== false));
+      setStdFavoriteTemplateIds(favoriteIds);
       setStdMedItems(meds);
     } catch {
       setStdTemplates([]);
+      setStdFavoriteTemplateIds([]);
     } finally {
       setStdLoading(false);
     }
-  }, []);
+  }, [user?.uid]);
 
   const loadIntIndex = useCallback(async () => {
     setIntLoading(true);
@@ -579,18 +781,6 @@ export function GlobalSearch({ open, onClose }: Props) {
       // ignore
     } finally {
       setIntLoading(false);
-    }
-  }, []);
-
-  const loadOmeqMedItems = useCallback(async () => {
-    setOmeqLoading(true);
-    try {
-      const meds = await loadMedicationItems();
-      setOmeqMedItems(meds);
-    } catch {
-      setOmeqMedItems([]);
-    } finally {
-      setOmeqLoading(false);
     }
   }, []);
 
@@ -624,7 +814,6 @@ export function GlobalSearch({ open, onClose }: Props) {
         void loadStdTemplates();
       } else if (entry.path === "/omeq") {
         resetOmeqState();
-        void loadOmeqMedItems();
       } else if (entry.path === "/interaksjoner") {
         resetIntState();
         void loadIntIndex();
@@ -638,7 +827,6 @@ export function GlobalSearch({ open, onClose }: Props) {
       loadStdTemplates,
       resetStdState,
       resetOmeqState,
-      loadOmeqMedItems,
       resetIntState,
       loadIntIndex,
       resetFagligState,
@@ -787,45 +975,121 @@ export function GlobalSearch({ open, onClose }: Props) {
     []
   );
 
+  useEffect(() => {
+    if (!isIntScoped) return;
+    if (intSelected.length < 2 || intResults.length === 0) {
+      setIntActiveResult(0);
+      return;
+    }
+    setIntActiveResult((prev) => Math.min(prev, intResults.length - 1));
+  }, [isIntScoped, intSelected.length, intResults.length]);
+
   const navigateWithIntSelected = useCallback(() => {
     if (!scopedPage) return;
     navigate(scopedPage.path, { state: { selectedEntities: intSelected } });
     onClose();
   }, [scopedPage, intSelected, navigate, onClose]);
 
+  const navigateWithIntResult = useCallback(
+    (interactionIndex: number) => {
+      if (!scopedPage) return;
+      navigate(scopedPage.path, {
+        state: {
+          selectedEntities: intSelected,
+          activeInteractionIndex: interactionIndex,
+        },
+      });
+      onClose();
+    },
+    [scopedPage, intSelected, navigate, onClose]
+  );
+
   const navigateWithOmeqSelection = useCallback(() => {
     if (!scopedPage) return;
 
-    const textFromChip = omeqSelectedMedication?.medicationText?.trim() ?? "";
-    const textFromInput = commandQuery.trim();
-    const medicationText = textFromChip || textFromInput;
-    const doseText = omeqSelectedMedication && !omeqSelectedIsDepotPatch ? omeqDoseText.trim() : "";
-    if (!medicationText) {
+    const rowsFromPrepared = omeqPreparedRows.map((row) => ({
+      medicationText: row.medicationText,
+      doseText: row.doseText,
+    }));
+    const hasCurrent = Boolean(omeqSelectedMedication?.medicationText.trim());
+    const currentIsReady = omeqDraftReady;
+    const currentIsDuplicate = Boolean(
+      omeqSelectedMedication &&
+      omeqPreparedRows.some((row) => row.identity === omeqSelectedMedication.identity)
+    );
+    const rows = hasCurrent && currentIsReady && !currentIsDuplicate
+      ? [
+          ...rowsFromPrepared,
+          {
+            medicationText: omeqSelectedMedication!.medicationText.trim(),
+            doseText: omeqSelectedIsDepotPatch ? "" : omeqDoseText.trim(),
+          },
+        ]
+      : rowsFromPrepared;
+
+    if (rows.length === 0) {
       navigate(scopedPage.path);
       onClose();
       return;
     }
 
-    navigate(scopedPage.path, { state: { prefill: { medicationText, doseText } } });
+    navigate(scopedPage.path, {
+      state: {
+        prefillRows: rows,
+        prefill: rows[0],
+      },
+    });
     onClose();
-  }, [scopedPage, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqDoseText, commandQuery, navigate, onClose]);
+  }, [scopedPage, omeqPreparedRows, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqDoseText, omeqDraftReady, navigate, onClose]);
 
-  useEffect(() => {
-    if (!isOmeqScoped || !omeqExactMatch) return;
-    const medicationLabel = formatPreparatForTemplate(omeqExactMatch) || omeqExactMatch.varenavn || omeqExactMatch.navnFormStyrke || commandQuery.trim();
-    const productNumber = String(omeqExactMatch.farmaloggNumber ?? "").trim();
-    const normalizedProductNumber = productNumber.replace(/^0+/, "") || productNumber;
-    const medicationText = normalizedProductNumber || medicationLabel;
-    const identity = normalizedProductNumber || normalize(medicationLabel);
-    if (omeqSelectedMedication?.identity === identity) return;
+  const selectOmeqSuggestion = useCallback((suggestion: OmeqSuggestion) => {
     setOmeqSelectedMedication({
-      label: medicationLabel,
-      medicationText,
-      identity,
+      label: suggestion.label,
+      medicationText: suggestion.medicationText,
+      identity: suggestion.identity,
     });
     setOmeqDoseText("");
     setCommandQuery("");
-  }, [isOmeqScoped, omeqExactMatch, commandQuery, omeqSelectedMedication]);
+    setOmeqDropdownIndex(0);
+  }, []);
+
+  const commitOmeqRow = useCallback(() => {
+    if (!omeqSelectedMedication) return false;
+    const dose = omeqDoseText.trim();
+    if (!omeqSelectedIsDepotPatch && !omeqDoseIsValid) return false;
+    const identity = omeqSelectedMedication.identity;
+    if (omeqPreparedRows.some((row) => row.identity === identity)) return false;
+
+    setOmeqPreparedRows((prev) => {
+      return [
+        ...prev,
+        {
+          id: `${identity}-${Date.now()}`,
+          label: omeqSelectedMedication.label,
+          medicationText: omeqSelectedMedication.medicationText.trim(),
+          identity,
+          doseText: omeqSelectedIsDepotPatch ? "" : dose,
+        },
+      ];
+    });
+    setOmeqSelectedMedication(null);
+    setOmeqDoseText("");
+    setCommandQuery("");
+    setOmeqDropdownIndex(0);
+    return true;
+  }, [omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqDoseIsValid, omeqDoseText, omeqPreparedRows]);
+
+  useEffect(() => {
+    if (!isOmeqScoped || !omeqExactSuggestion) return;
+    if (omeqSelectedMedication?.identity === omeqExactSuggestion.identity) return;
+    setOmeqSelectedMedication({
+      label: omeqExactSuggestion.label,
+      medicationText: omeqExactSuggestion.medicationText,
+      identity: omeqExactSuggestion.identity,
+    });
+    setOmeqDoseText("");
+    setCommandQuery("");
+  }, [isOmeqScoped, omeqExactSuggestion, omeqSelectedMedication]);
 
   useEffect(() => {
     if (!isOmeqScoped || !omeqSelectedMedication || omeqSelectedIsDepotPatch) return;
@@ -835,6 +1099,11 @@ export function GlobalSearch({ open, onClose }: Props) {
     setOmeqDoseText(raw);
     setCommandQuery("");
   }, [isOmeqScoped, omeqSelectedMedication, omeqSelectedIsDepotPatch, commandQuery]);
+
+  useEffect(() => {
+    if (!isOmeqScoped) return;
+    setOmeqDropdownIndex(0);
+  }, [isOmeqScoped, commandQuery]);
 
   const navigateWithFagligSelection = useCallback(
     (selection?: FagligTabOption) => {
@@ -951,6 +1220,9 @@ export function GlobalSearch({ open, onClose }: Props) {
             if (commandQuery.trim() && intFilteredOptions.length > 0) {
               const entity = intFilteredOptions[intDropdownIndex] ?? intFilteredOptions[0];
               if (entity) selectIntEntity(entity);
+            } else if (intSelected.length >= 2 && intResults.length > 0) {
+              const selectedResult = intResults[Math.min(intActiveResult, intResults.length - 1)];
+              if (selectedResult) navigateWithIntResult(selectedResult.interactionIndex);
             } else {
               navigateWithIntSelected();
             }
@@ -971,19 +1243,42 @@ export function GlobalSearch({ open, onClose }: Props) {
 
         // ── OMEQ scoped keyboard handling ──
         if (isOmeqScoped) {
-          if (e.key === "Enter") {
+          if (e.key === "ArrowDown") {
+            if (omeqSuggestions.length > 0) {
+              e.preventDefault();
+              setOmeqDropdownIndex((i) => Math.min(i + 1, omeqSuggestions.length - 1));
+            }
+          } else if (e.key === "ArrowUp") {
+            if (omeqSuggestions.length > 0) {
+              e.preventDefault();
+              setOmeqDropdownIndex((i) => Math.max(i - 1, 0));
+            }
+          } else if (e.key === "Enter") {
             e.preventDefault();
-            navigateWithOmeqSelection();
+            if (!omeqSelectedMedication && omeqSuggestions.length > 0 && commandQuery.trim()) {
+              const option = omeqSuggestions[omeqDropdownIndex] ?? omeqSuggestions[0];
+              if (option) selectOmeqSuggestion(option);
+            } else if (omeqSelectedMedication) {
+              if (omeqDraftReady && !omeqDraftIsDuplicate) {
+                commitOmeqRow();
+              } else {
+                navigateWithOmeqSelection();
+              }
+            } else {
+              navigateWithOmeqSelection();
+            }
           } else if (e.key === "Escape") {
             e.preventDefault();
             if (commandQuery) setCommandQuery("");
             else if (omeqDoseText) setOmeqDoseText("");
             else if (omeqSelectedMedication) setOmeqSelectedMedication(null);
+            else if (omeqPreparedRows.length > 0) setOmeqPreparedRows((prev) => prev.slice(0, -1));
             else exitScopeMode();
           } else if (e.key === "Backspace" && commandQuery === "") {
             e.preventDefault();
             if (omeqDoseText) setOmeqDoseText("");
             else if (omeqSelectedMedication) setOmeqSelectedMedication(null);
+            else if (omeqPreparedRows.length > 0) setOmeqPreparedRows((prev) => prev.slice(0, -1));
             else exitScopeMode();
           }
           return;
@@ -1056,10 +1351,10 @@ export function GlobalSearch({ open, onClose }: Props) {
   }, [
     open, isScoped, isStdScoped, isIntScoped, isOmeqScoped, isFagligScoped, entries, activeIndex, scopedPage, commandQuery,
     stdStep, stdFilteredTemplates, stdDropdownIndex, stdHasPreparat, stdSelectedPreparats,
-    intFilteredOptions, intDropdownIndex, intSelected, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqDoseText, fagligFilteredOptions, fagligDropdownIndex,
+    intFilteredOptions, intDropdownIndex, intSelected, intResults, intActiveResult, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqSuggestions, omeqDropdownIndex, omeqDoseText, omeqPreparedRows, omeqDraftReady, omeqDraftIsDuplicate, fagligFilteredOptions, fagligDropdownIndex,
     navigateTo, enterScopeMode, exitScopeMode, onClose,
     selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill, commitPreparatChip,
-    selectIntEntity, navigateWithIntSelected, navigateWithOmeqSelection, navigateWithFagligSelection,
+    selectIntEntity, navigateWithIntSelected, navigateWithIntResult, selectOmeqSuggestion, commitOmeqRow, navigateWithOmeqSelection, navigateWithFagligSelection,
   ]);
 
   const shortcutLabel = "Space";
@@ -1068,37 +1363,62 @@ export function GlobalSearch({ open, onClose }: Props) {
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="sm"
+      maxWidth={false}
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          width: { xs: "calc(100vw - 24px)", sm: "min(784px, calc(100vw - 120px))" },
+          maxWidth: 784,
+          borderRadius: { xs: 3.2, sm: 4.2 },
           overflow: "hidden",
+          border: (theme) =>
+            `1px solid ${
+              theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.88)"
+            }`,
+          background: (theme) =>
+            theme.palette.mode === "dark"
+              ? "linear-gradient(180deg, rgba(27,31,39,0.96) 0%, rgba(18,21,28,0.97) 100%)"
+              : "linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(249,251,252,0.98) 100%)",
+          position: "relative",
           boxShadow: (theme) =>
             theme.palette.mode === "dark"
-              ? "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)"
-              : "0 32px 80px rgba(15,23,42,0.22), 0 0 0 1px rgba(0,0,0,0.05)",
+              ? "0 38px 120px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,255,255,0.05)"
+              : "0 34px 90px rgba(9,16,28,0.26), 0 10px 35px rgba(9,16,28,0.12)",
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            background: (theme) =>
+              theme.palette.mode === "dark"
+                ? "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 22%)"
+                : "linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0) 26%)",
+          },
         },
       }}
       sx={{
         "& .MuiBackdrop-root": {
-          backdropFilter: "blur(6px)",
-          backgroundColor: "rgba(0,0,0,0.28)",
+          backdropFilter: "blur(14px) saturate(1.08)",
+          backgroundColor: "rgba(15,23,42,0.34)",
         },
       }}
     >
       {/* ── Search / command input ── */}
       <Box
         sx={{
-          px: 2,
-          py: 1.5,
+          px: { xs: 2, sm: 2.6 },
+          py: { xs: 1.35, sm: 1.55 },
           display: "flex",
           alignItems: "center",
           gap: 1.5,
           borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+          background: (theme) =>
+            theme.palette.mode === "dark"
+              ? "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%)"
+              : "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.64) 100%)",
         }}
       >
-        <SearchIcon sx={{ color: "text.secondary", fontSize: 22, flexShrink: 0 }} />
+        <SearchIcon sx={{ color: "text.secondary", fontSize: 24, flexShrink: 0 }} />
 
         {/* Scoped page chip */}
         {scopedPage && (
@@ -1169,7 +1489,7 @@ export function GlobalSearch({ open, onClose }: Props) {
           variant="standard"
           InputProps={{
             disableUnderline: true,
-            sx: { fontSize: "1.05rem", fontWeight: 400 },
+            sx: { fontSize: "1.24rem", fontWeight: 500, letterSpacing: "-0.01em" },
           }}
         />
 
@@ -1211,61 +1531,115 @@ export function GlobalSearch({ open, onClose }: Props) {
                 </Box>
               ) : stdFilteredTemplates.length === 0 ? (
                 <Box sx={{ py: 4, textAlign: "center" }}>
+                  {!commandQuery.trim() && (
+                    <Box
+                      sx={{
+                        mx: "auto",
+                        mb: 1.25,
+                        px: 1.2,
+                        py: 0.45,
+                        width: "fit-content",
+                        borderRadius: 999,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        backgroundColor: (theme) =>
+                          alpha("#F9A825", theme.palette.mode === "dark" ? 0.2 : 0.12),
+                        border: `1px solid ${alpha("#F9A825", 0.34)}`,
+                      }}
+                    >
+                      <StarRoundedIcon sx={{ fontSize: 14, color: "#F9A825" }} />
+                      <Typography variant="caption" sx={{ color: "#B7791F", fontWeight: 700 }}>
+                        Favoritter
+                      </Typography>
+                    </Box>
+                  )}
                   <Typography color="text.secondary" variant="body2">
                     {commandQuery.trim()
                       ? `Ingen standardtekster for «${commandQuery}»`
-                      : "Ingen standardtekster funnet"}
+                      : "Ingen favoritter funnet"}
                   </Typography>
                 </Box>
               ) : (
-                <List disablePadding sx={{ py: 0.5 }}>
-                  {stdFilteredTemplates.map((t, i) => {
-                    const isActive = i === stdDropdownIndex;
-                    return (
-                      <ListItemButton
-                        key={t.id}
-                        selected={isActive}
-                        onClick={() => selectStdTemplate(t)}
-                        onMouseMove={() => setStdDropdownIndex(i)}
-                        sx={{
-                          mx: 0.75,
-                          my: 0.25,
-                          borderRadius: 2,
-                          px: 1.5,
-                          py: 1,
-                          borderLeft: `3px solid ${isActive ? "#4BC76A" : "transparent"}`,
-                          transition: "background-color 80ms, border-color 80ms",
-                          "&.Mui-selected": {
-                            backgroundColor: (theme) =>
-                              alpha("#4BC76A", theme.palette.mode === "dark" ? 0.16 : 0.09),
-                          },
-                          "&.Mui-selected:hover": {
-                            backgroundColor: (theme) =>
-                              alpha("#4BC76A", theme.palette.mode === "dark" ? 0.2 : 0.12),
-                          },
-                        }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 36, color: "#4BC76A" }}>
-                          <DescriptionIcon sx={{ fontSize: 20 }} />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={t.title}
-                          secondary={t.category ?? undefined}
-                          primaryTypographyProps={{
-                            fontWeight: isActive ? 600 : 400,
-                            fontSize: "0.92rem",
+                <>
+                  {!commandQuery.trim() && (
+                    <Box
+                      sx={{
+                        mx: 1,
+                        mt: 0.75,
+                        mb: 0.5,
+                        px: 1.1,
+                        py: 0.45,
+                        width: "fit-content",
+                        borderRadius: 999,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        backgroundColor: (theme) =>
+                          alpha("#F9A825", theme.palette.mode === "dark" ? 0.2 : 0.12),
+                        border: `1px solid ${alpha("#F9A825", 0.34)}`,
+                      }}
+                    >
+                      <StarRoundedIcon sx={{ fontSize: 14, color: "#F9A825" }} />
+                      <Typography variant="caption" sx={{ color: "#B7791F", fontWeight: 700 }}>
+                        Favoritter
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <List disablePadding sx={{ py: 0.5 }}>
+                    {stdFilteredTemplates.map((t, i) => {
+                      const isActive = i === stdDropdownIndex;
+                      return (
+                        <ListItemButton
+                          key={t.id}
+                          selected={isActive}
+                          onClick={() => selectStdTemplate(t)}
+                          onMouseMove={() => setStdDropdownIndex(i)}
+                          sx={{
+                            mx: 0.75,
+                            my: 0.25,
+                            borderRadius: 2,
+                            px: 1.5,
+                            py: 1,
+                            borderLeft: `3px solid ${isActive ? "#4BC76A" : "transparent"}`,
+                            transition: "background-color 80ms, border-color 80ms",
+                            "&:hover": {
+                              backgroundColor: (theme) =>
+                                alpha("#4BC76A", theme.palette.mode === "dark" ? 0.14 : 0.07),
+                            },
+                            "&.Mui-selected": {
+                              backgroundColor: (theme) =>
+                                alpha("#4BC76A", theme.palette.mode === "dark" ? 0.16 : 0.09),
+                            },
+                            "&.Mui-selected:hover": {
+                              backgroundColor: (theme) =>
+                                alpha("#4BC76A", theme.palette.mode === "dark" ? 0.2 : 0.12),
+                            },
                           }}
-                          secondaryTypographyProps={{ fontSize: "0.73rem", sx: { opacity: 0.6 } }}
-                        />
-                        {isActive && (
-                          <KeyboardReturnRoundedIcon
-                            sx={{ fontSize: 16, color: "text.disabled", ml: 1 }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 36, color: "#4BC76A" }}>
+                            <DescriptionIcon sx={{ fontSize: 20 }} />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={t.title}
+                            secondary={t.category ?? undefined}
+                            primaryTypographyProps={{
+                              fontWeight: isActive ? 600 : 400,
+                              fontSize: "0.92rem",
+                            }}
+                            secondaryTypographyProps={{ fontSize: "0.73rem", sx: { opacity: 0.6 } }}
                           />
-                        )}
-                      </ListItemButton>
-                    );
-                  })}
-                </List>
+                          {isActive && (
+                            <KeyboardReturnRoundedIcon
+                              sx={{ fontSize: 16, color: "text.disabled", ml: 1 }}
+                            />
+                          )}
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                </>
               )}
             </Box>
           ) : (
@@ -1574,6 +1948,156 @@ export function GlobalSearch({ open, onClose }: Props) {
                   </Box>
                 )}
 
+                {/* Auto-result when >= 2 selected */}
+                {intSelected.length >= 2 && (
+                  <Box
+                    sx={{
+                      px: 2,
+                      pb: 1.75,
+                      pt: intSelected.length > 0 ? 0.5 : 1.25,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.1 }}>
+                      <Typography sx={{ fontWeight: 800, color: "#B04442" }}>
+                        Treff
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={`${intResults.length} treff`}
+                        sx={{
+                          fontWeight: 700,
+                          color: "#B04442",
+                          backgroundColor: (theme) =>
+                            theme.palette.mode === "dark" ? "rgba(200,70,70,0.2)" : "rgba(255,94,91,0.1)",
+                          border: (theme) =>
+                            `1px solid ${theme.palette.mode === "dark" ? "rgba(220,90,90,0.32)" : "rgba(176,68,66,0.22)"}`,
+                        }}
+                      />
+                    </Box>
+
+                    {intResults.length > 0 && intIndex ? (
+                      <Box
+                        sx={{
+                          border: (theme) =>
+                            `1px solid ${theme.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
+                          borderRadius: 2,
+                          overflow: "hidden",
+                          backgroundColor: (theme) =>
+                            theme.palette.mode === "dark" ? "#0F1213" : "#FFF8F8",
+                        }}
+                      >
+                        <List disablePadding>
+                          {intResults.map((r, i) => {
+                            const it = intIndex.interactions[r.interactionIndex];
+                            if (!it) return null;
+                            const isActive = i === intActiveResult;
+                            const kind = relevanceKind(it.relevansV, it.relevansDn);
+
+                            const groupLines = r.matchedGroups.slice(0, 2).map((gi) => {
+                              const group = it.substansgrupper?.[gi];
+                              const name = group?.navn || group?.substanser?.[0]?.substans || "(Ukjent)";
+                              const atc = group?.substanser?.[0]?.atc;
+                              const terms = (r.groupToSelectedTerms[gi] ?? [])
+                                .map((t) => intLabelByTerm.get(t) ?? t)
+                                .filter(Boolean);
+                              const suffix = terms.length > 0 ? ` (søkeinput ${Array.from(new Set(terms)).join(", ")})` : "";
+                              return `${name}${atc ? ` ${atc}` : ""}${suffix}`;
+                            });
+
+                            return (
+                              <ListItemButton
+                                key={`int-result-${r.interactionIndex}-${i}`}
+                                selected={isActive}
+                                onMouseMove={() => setIntActiveResult(i)}
+                                onClick={() => navigateWithIntResult(r.interactionIndex)}
+                                sx={{
+                                  display: "grid",
+                                  gridTemplateColumns: kind ? "1fr auto" : "1fr",
+                                  alignItems: "flex-start",
+                                  gap: 1,
+                                  px: 1.5,
+                                  py: 1.25,
+                                  borderLeft: `3px solid ${isActive ? "#FF5E5B" : "transparent"}`,
+                                  borderBottom:
+                                    i !== intResults.length - 1
+                                      ? (theme) => `1px solid ${theme.palette.divider}`
+                                      : "none",
+                                  "&:hover": {
+                                    backgroundColor: (theme) =>
+                                      theme.palette.mode === "dark" ? "rgba(200,70,70,0.1)" : "rgba(255,94,91,0.05)",
+                                  },
+                                  "&.Mui-selected": {
+                                    backgroundColor: (theme) =>
+                                      theme.palette.mode === "dark" ? "rgba(200,70,70,0.2)" : "rgba(255,94,91,0.08)",
+                                  },
+                                  "&.Mui-selected:hover": {
+                                    backgroundColor: (theme) =>
+                                      theme.palette.mode === "dark" ? "rgba(200,70,70,0.28)" : "rgba(255,94,91,0.14)",
+                                  },
+                                }}
+                              >
+                                <Box sx={{ gridColumn: "1 / 2", minWidth: 0 }}>
+                                  {groupLines.map((line, idx) => (
+                                    <Typography
+                                      key={`${r.interactionIndex}-${idx}`}
+                                      sx={{
+                                        fontWeight: 800,
+                                        lineHeight: 1.2,
+                                        mb: idx === groupLines.length - 1 ? 0 : 0.35,
+                                      }}
+                                    >
+                                      {line}
+                                    </Typography>
+                                  ))}
+                                  {it.kliniskKonsekvens ? (
+                                    <Typography
+                                      color="text.secondary"
+                                      sx={{
+                                        mt: 0.8,
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                      }}
+                                    >
+                                      {it.kliniskKonsekvens}
+                                    </Typography>
+                                  ) : null}
+                                </Box>
+
+                                {kind ? (
+                                  <Chip
+                                    size="small"
+                                    icon={<RelevanceIcon kind={kind} />}
+                                    label={it.relevansDn ?? ""}
+                                    variant="outlined"
+                                    sx={{
+                                      mt: 0.15,
+                                      fontWeight: 700,
+                                      maxWidth: 190,
+                                      gridColumn: "2 / 3",
+                                      justifySelf: "end",
+                                      "& .MuiChip-label": {
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      },
+                                    }}
+                                  />
+                                ) : null}
+                              </ListItemButton>
+                            );
+                          })}
+                        </List>
+                      </Box>
+                    ) : (
+                      <Typography color="text.secondary" variant="body2">
+                        Ingen treff.
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
                 {/* Empty-state hint */}
                 {!commandQuery.trim() && intSelected.length === 0 && (
                   <Box sx={{ px: 3, py: 2.5 }}>
@@ -1615,6 +2139,50 @@ export function GlobalSearch({ open, onClose }: Props) {
           </Box>
         ) : isOmeqScoped ? (
           <Box sx={{ px: 2.5, py: 2, maxHeight: 400, overflowY: "auto" }}>
+            {!omeqSelectedMedication && commandQuery.trim() && omeqSuggestions.length > 0 && (
+              <List disablePadding sx={{ mb: 1.2 }}>
+                {omeqSuggestions.map((option, i) => {
+                  const isActive = i === omeqDropdownIndex;
+                  return (
+                    <ListItemButton
+                      key={option.identity}
+                      selected={isActive}
+                      onClick={() => selectOmeqSuggestion(option)}
+                      onMouseMove={() => setOmeqDropdownIndex(i)}
+                      sx={{
+                        mb: 0.35,
+                        borderRadius: 2,
+                        px: 1.5,
+                        py: 0.85,
+                        borderLeft: `3px solid ${isActive ? scopedPage!.color : "transparent"}`,
+                        transition: "background-color 80ms, border-color 80ms",
+                        "&:hover": {
+                          backgroundColor: (theme) =>
+                            alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                        },
+                        "&.Mui-selected": {
+                          backgroundColor: (theme) =>
+                            alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.17 : 0.1),
+                        },
+                        "&.Mui-selected:hover": {
+                          backgroundColor: (theme) =>
+                            alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.21 : 0.13),
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={option.label}
+                        primaryTypographyProps={{ fontWeight: isActive ? 600 : 400, fontSize: "0.92rem" }}
+                      />
+                      {isActive && (
+                        <KeyboardReturnRoundedIcon sx={{ fontSize: 16, color: "text.disabled", ml: 1 }} />
+                      )}
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            )}
+
             <Box
               sx={{
                 display: "flex",
@@ -1644,11 +2212,51 @@ export function GlobalSearch({ open, onClose }: Props) {
               </Box>
             </Box>
 
-            {omeqLoading ? (
-              <Box sx={{ py: 2.5, display: "flex", justifyContent: "center" }}>
-                <CircularProgress size={22} />
+            {omeqPreparedRows.length > 0 && (
+              <Box sx={{ mt: 1.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mb: 0.8 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                    Linjer til OMEQ
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={`${omeqPreparedRows.length} valgt`}
+                    sx={{
+                      height: 20,
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      color: scopedPage!.color,
+                      backgroundColor: (theme) =>
+                        alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.24 : 0.1),
+                      border: `1px solid ${alpha(scopedPage!.color, 0.28)}`,
+                    }}
+                  />
+                </Box>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.7 }}>
+                  {omeqPreparedRows.map((row) => (
+                    <Chip
+                      key={row.id}
+                      size="small"
+                      label={row.doseText ? `${row.label} • ${row.doseText}/døgn` : row.label}
+                      onDelete={() =>
+                        setOmeqPreparedRows((prev) => prev.filter((prepared) => prepared.id !== row.id))
+                      }
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: "0.74rem",
+                        color: scopedPage!.color,
+                        backgroundColor: (theme) =>
+                          alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.2 : 0.09),
+                        border: (theme) =>
+                          `1px solid ${alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.42 : 0.26)}`,
+                        "& .MuiChip-deleteIcon": { color: alpha(scopedPage!.color, 0.72) },
+                        "& .MuiChip-deleteIcon:hover": { color: scopedPage!.color },
+                      }}
+                    />
+                  ))}
+                </Box>
               </Box>
-            ) : null}
+            )}
 
             {omeqSelectedMedication && (
               <Box sx={{ mt: 1.5, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.75 }}>
@@ -1715,6 +2323,36 @@ export function GlobalSearch({ open, onClose }: Props) {
                       {omeqDoseText}
                     </Typography>
                   </Box>
+                )}
+
+                {omeqDraftReady && (
+                  <Chip
+                    size="small"
+                    label={omeqDraftIsDuplicate ? "Allerede lagt til" : "Legg til linje"}
+                    clickable={!omeqDraftIsDuplicate}
+                    onClick={() => {
+                      if (!omeqDraftIsDuplicate && commitOmeqRow()) {
+                        setTimeout(() => inputRef.current?.focus(), 30);
+                      }
+                    }}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      color: omeqDraftIsDuplicate ? "text.secondary" : scopedPage!.color,
+                      backgroundColor: (theme) =>
+                        omeqDraftIsDuplicate
+                          ? theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(0,0,0,0.05)"
+                          : alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.24 : 0.12),
+                      border: (theme) =>
+                        `1px solid ${
+                          omeqDraftIsDuplicate
+                            ? theme.palette.divider
+                            : alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.42 : 0.3)
+                        }`,
+                    }}
+                  />
                 )}
               </Box>
             )}
@@ -1841,7 +2479,7 @@ export function GlobalSearch({ open, onClose }: Props) {
         )
       ) : (
         // Normal mode: result list
-        <Box sx={{ maxHeight: 420, overflowY: "auto" }}>
+        <Box sx={{ maxHeight: 500, overflowY: "auto" }}>
           {entries.length === 0 ? (
             <Box sx={{ py: 5, textAlign: "center" }}>
               <Typography color="text.secondary" variant="body2">
@@ -1905,15 +2543,15 @@ export function GlobalSearch({ open, onClose }: Props) {
       {/* ── Footer hints ── */}
       <Box
         sx={{
-          px: 2,
-          py: 0.75,
+          px: { xs: 2, sm: 2.2 },
+          py: 0.86,
           borderTop: (theme) => `1px solid ${theme.palette.divider}`,
           display: "flex",
           gap: 2,
           alignItems: "center",
           justifyContent: "flex-end",
           backgroundColor: (theme) =>
-            theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)",
+            theme.palette.mode === "dark" ? "rgba(255,255,255,0.035)" : "rgba(246,250,249,0.86)",
         }}
       >
         {isScoped ? (
@@ -1953,7 +2591,10 @@ export function GlobalSearch({ open, onClose }: Props) {
                   label={!omeqSelectedIsDepotPatch && omeqDoseText ? "fjern antall" : "fjern preparat"}
                 />
               )}
-              <KbdHint keys={["↵"]} label="gå til OMEQ" />
+              {!omeqSelectedMedication && omeqPreparedRows.length > 0 && (
+                <KbdHint keys={["⌫"]} label="fjern siste linje" />
+              )}
+              <KbdHint keys={["↵"]} label={omeqDraftReady && !omeqDraftIsDuplicate ? "legg til linje" : "gå til OMEQ"} />
               <KbdHint keys={["Esc"]} label="tilbake" />
             </>
           ) : isFagligScoped ? (

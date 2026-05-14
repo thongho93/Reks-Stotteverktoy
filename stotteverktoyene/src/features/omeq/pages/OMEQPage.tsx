@@ -43,6 +43,10 @@ import { OPIOIDS } from "../data/opioids";
 import { formToRoute } from "../data/atcProducts";
 
 type Row = OMEQRowValue & { id: string };
+type OmeqPrefillState = {
+  prefillRows?: Array<{ medicationText?: string; doseText?: string }>;
+  prefill?: { medicationText?: string; doseText?: string };
+};
 const OMEQ_STANDARDTEKST_TITLE = "OMEQ overstiger vedtak";
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
@@ -175,15 +179,36 @@ export default function OMEQPage() {
     return () => clearTimeout(t);
   }, [focusRowId]);
 
-  // Pre-fill first row when navigated from the global command palette
+  // Pre-fill rows when navigated from the global command palette
   useEffect(() => {
-    const prefill = (location.state as { prefill?: { medicationText?: string; doseText?: string } } | null)?.prefill;
+    const state = (location.state as OmeqPrefillState | null) ?? null;
+    const prefillRows = (state?.prefillRows ?? [])
+      .map((row) => ({
+        medicationText: String(row?.medicationText ?? "").trim(),
+        doseText: String(row?.doseText ?? "").trim(),
+      }))
+      .filter((row) => row.medicationText.length > 0);
+
+    if (prefillRows.length > 0) {
+      setRows(
+        prefillRows.map((row) => ({
+          ...makeRow(),
+          medicationText: row.medicationText,
+          doseText: row.doseText,
+        })),
+      );
+      return;
+    }
+
+    const prefill = state?.prefill;
     if (!prefill?.medicationText) return;
-    setRows((prev) =>
-      prev.map((r, i) =>
-        i === 0 ? { ...r, medicationText: prefill.medicationText!, doseText: prefill.doseText ?? "" } : r
-      )
-    );
+    setRows([
+      {
+        ...makeRow(),
+        medicationText: prefill.medicationText,
+        doseText: prefill.doseText ?? "",
+      },
+    ]);
   }, [location.state]);
 
   const resetAll = useCallback(() => {
