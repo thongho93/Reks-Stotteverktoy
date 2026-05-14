@@ -39,6 +39,8 @@ import {
 import { loadMedicationItems, type Med } from "../fest/components/MedicationSearch";
 import { loadInteractionsIndex } from "../interaksjoner/services/useInteractions";
 import type { InteractionEntity } from "../fest/mappers/interactionsToIndex";
+import { collection, getDocs, orderBy, query as fsQuery } from "firebase/firestore";
+import { db } from "../../firebase/firebase";
 
 // ─── Page definitions ───────────────────────────────────────────────────────
 
@@ -111,17 +113,21 @@ const PAGE_COMMANDS: Record<string, PageCommand> = {
 // ─── Search entries ──────────────────────────────────────────────────────────
 
 type SearchEntry = {
+  id: string;
   label: string;
   path: string;
   Icon: React.ElementType;
   color: string;
   keywords?: string[];
+  state?: Record<string, unknown>;
+  scopeMode?: "default" | "fagligTabs";
   admin?: boolean;
   ownerOnly?: boolean;
 };
 
 const ALL_ENTRIES: SearchEntry[] = [
   {
+    id: "omeq",
     label: "OMEQ-beregning",
     path: "/omeq",
     Icon: CalculateIcon,
@@ -129,6 +135,7 @@ const ALL_ENTRIES: SearchEntry[] = [
     keywords: ["omeq", "opioid", "beregning", "kalkulator", "dose"],
   },
   {
+    id: "standardtekster",
     label: "Standardtekster",
     path: "/standardtekster",
     Icon: DescriptionIcon,
@@ -136,6 +143,7 @@ const ALL_ENTRIES: SearchEntry[] = [
     keywords: ["tekst", "standard", "preparat", "mal", "template"],
   },
   {
+    id: "interaksjoner",
     label: "Interaksjonssøk",
     path: "/interaksjoner",
     Icon: CompareArrowsIcon,
@@ -143,6 +151,7 @@ const ALL_ENTRIES: SearchEntry[] = [
     keywords: ["interaksjon", "legemiddel", "søk", "kollisjoner"],
   },
   {
+    id: "produkt-og-rad",
     label: "Produkt og råd",
     path: "/produkt-og-rad",
     Icon: TipsAndUpdatesRoundedIcon,
@@ -150,6 +159,17 @@ const ALL_ENTRIES: SearchEntry[] = [
     keywords: ["produkt", "ernæring", "råd", "nutrition", "fresubin"],
   },
   {
+    id: "faglig-innhold",
+    label: "Faglig innhold",
+    path: "/produkt-og-rad",
+    Icon: LightbulbOutlinedIcon,
+    color: "#8E44AD",
+    keywords: ["faglig", "innhold", "dokument", "notat", "kunnskap"],
+    state: { activeTab: 1 },
+    scopeMode: "fagligTabs",
+  },
+  {
+    id: "tilbakemelding",
     label: "Innspill og notater",
     path: "/tilbakemelding",
     Icon: FeedbackRoundedIcon,
@@ -157,6 +177,7 @@ const ALL_ENTRIES: SearchEntry[] = [
     keywords: ["notat", "feedback", "rutine", "innspill", "tilbakemelding"],
   },
   {
+    id: "anbrudd",
     label: "Innkjøp og anbrudd",
     path: "/anbrudd",
     Icon: ChecklistRoundedIcon,
@@ -164,6 +185,7 @@ const ALL_ENTRIES: SearchEntry[] = [
     keywords: ["innkjøp", "anbrudd", "skjema", "bestilling"],
   },
   {
+    id: "statistikk",
     label: "Statistikk",
     path: "/statistikk",
     Icon: BarChartRoundedIcon,
@@ -172,12 +194,47 @@ const ALL_ENTRIES: SearchEntry[] = [
     ownerOnly: true,
   },
   {
+    id: "rekspert",
     label: "Rekspert",
     path: "/rekspert",
     Icon: ConstructionIcon,
     color: "#00A3D7",
     keywords: ["admin", "rekspert", "verktøy", "administrasjon"],
     admin: true,
+  },
+];
+
+type FagligTabOption = {
+  id: string;
+  label: string;
+  emoji?: string;
+  keywords?: string[];
+};
+
+const BUILTIN_FAGLIG_TABS: FagligTabOption[] = [
+  {
+    id: "__nutrition__",
+    label: "Næringsmidler",
+    emoji: "🥗",
+    keywords: ["naeringsmidler", "naring", "ernaring", "kost", "nutrition"],
+  },
+  {
+    id: "__melkeerstatning__",
+    label: "Melkeerstatning",
+    emoji: "🍼",
+    keywords: ["melkeerstatning", "morsmelk", "baby", "spedbarn"],
+  },
+  {
+    id: "__tryggmamma__",
+    label: "Tryggmamma",
+    emoji: "🤰",
+    keywords: ["tryggmamma", "gravid", "amming", "mamma"],
+  },
+  {
+    id: "__knuse__",
+    label: "Knuse-/delelisten",
+    emoji: "💊",
+    keywords: ["knuse", "dele", "tablett", "kapsel"],
   },
 ];
 
@@ -238,6 +295,9 @@ export function GlobalSearch({ open, onClose }: Props) {
   const [intLoading, setIntLoading] = useState(false);
   const [intSelected, setIntSelected] = useState<InteractionEntity[]>([]);
   const [intDropdownIndex, setIntDropdownIndex] = useState(0);
+  const [fagligTabs, setFagligTabs] = useState<FagligTabOption[]>(BUILTIN_FAGLIG_TABS);
+  const [fagligLoading, setFagligLoading] = useState(false);
+  const [fagligDropdownIndex, setFagligDropdownIndex] = useState(0);
 
   const entries = ALL_ENTRIES.filter(
     (e) =>
@@ -251,6 +311,33 @@ export function GlobalSearch({ open, onClose }: Props) {
   const preview = command?.parsePreview(commandQuery) ?? null;
   const isStdScoped = isScoped && scopedPage?.path === "/standardtekster";
   const isIntScoped = isScoped && scopedPage?.path === "/interaksjoner";
+  const isFagligScoped = isScoped && scopedPage?.scopeMode === "fagligTabs";
+
+  const fagligFilteredOptions = useMemo<FagligTabOption[]>(() => {
+    const q = normalize(commandQuery);
+    if (!q) return fagligTabs;
+    const words = q.split(/\s+/).filter(Boolean);
+
+    const score = (option: FagligTabOption) => {
+      const label = normalize(option.label);
+      const keywordText = normalize((option.keywords ?? []).join(" "));
+      let value = 0;
+      if (label === q) value += 120;
+      if (label.startsWith(q)) value += 80;
+      if (label.includes(q)) value += 60;
+      if (keywordText.includes(q)) value += 40;
+      if (words.length > 1 && words.every((w) => label.includes(w) || keywordText.includes(w))) {
+        value += 25;
+      }
+      return value;
+    };
+
+    return fagligTabs
+      .map((option) => ({ option, score: score(option) }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.option.label.localeCompare(b.option.label))
+      .map((item) => item.option);
+  }, [fagligTabs, commandQuery]);
 
   const intFilteredOptions = useMemo<InteractionEntity[]>(() => {
     if (!intIndex?.entities?.length || !commandQuery.trim()) return [];
@@ -411,6 +498,12 @@ export function GlobalSearch({ open, onClose }: Props) {
     setIntDropdownIndex(0);
   }, []);
 
+  const resetFagligState = useCallback(() => {
+    setFagligTabs(BUILTIN_FAGLIG_TABS);
+    setFagligLoading(false);
+    setFagligDropdownIndex(0);
+  }, []);
+
   const loadStdTemplates = useCallback(async () => {
     setStdLoading(true);
     try {
@@ -439,6 +532,27 @@ export function GlobalSearch({ open, onClose }: Props) {
     }
   }, []);
 
+  const loadFagligTabs = useCallback(async () => {
+    setFagligLoading(true);
+    try {
+      const snapshot = await getDocs(fsQuery(collection(db, "fagligDocuments"), orderBy("updatedAtMs", "desc")));
+      const dynamicTabs: FagligTabOption[] = snapshot.docs.map((snap) => {
+        const data = snap.data() as Record<string, unknown>;
+        return {
+          id: snap.id,
+          label: String(data.title ?? "Nytt dokument").trim() || "Nytt dokument",
+          emoji: typeof data.emoji === "string" ? data.emoji : undefined,
+          keywords: ["dokument", "faglig"],
+        };
+      });
+      setFagligTabs([...BUILTIN_FAGLIG_TABS, ...dynamicTabs]);
+    } catch {
+      setFagligTabs(BUILTIN_FAGLIG_TABS);
+    } finally {
+      setFagligLoading(false);
+    }
+  }, []);
+
   const enterScopeMode = useCallback(
     (entry: SearchEntry) => {
       setScopedPage(entry);
@@ -449,10 +563,13 @@ export function GlobalSearch({ open, onClose }: Props) {
       } else if (entry.path === "/interaksjoner") {
         resetIntState();
         void loadIntIndex();
+      } else if (entry.scopeMode === "fagligTabs") {
+        resetFagligState();
+        void loadFagligTabs();
       }
       setTimeout(() => inputRef.current?.focus(), 60);
     },
-    [loadStdTemplates, resetStdState, resetIntState, loadIntIndex]
+    [loadStdTemplates, resetStdState, resetIntState, loadIntIndex, resetFagligState, loadFagligTabs]
   );
 
   const exitScopeMode = useCallback(() => {
@@ -460,13 +577,17 @@ export function GlobalSearch({ open, onClose }: Props) {
     setCommandQuery("");
     resetStdState();
     resetIntState();
+    resetFagligState();
     setTimeout(() => inputRef.current?.focus(), 30);
-  }, [resetStdState, resetIntState]);
+  }, [resetStdState, resetIntState, resetFagligState]);
 
   const navigateTo = useCallback(
     (entry: SearchEntry, withCommand = false) => {
+      const entryState = entry.state ?? {};
       if (withCommand && command && commandQuery.trim()) {
-        navigate(entry.path, { state: command.buildState(commandQuery) });
+        navigate(entry.path, { state: { ...entryState, ...command.buildState(commandQuery) } });
+      } else if (Object.keys(entryState).length > 0) {
+        navigate(entry.path, { state: entryState });
       } else {
         navigate(entry.path);
       }
@@ -597,6 +718,28 @@ export function GlobalSearch({ open, onClose }: Props) {
     onClose();
   }, [scopedPage, intSelected, navigate, onClose]);
 
+  const navigateWithFagligSelection = useCallback(
+    (selection?: FagligTabOption) => {
+      if (!scopedPage) return;
+      const fallback = fagligFilteredOptions[0];
+      const target = selection ?? fallback;
+      if (!target) {
+        navigate(scopedPage.path, { state: { ...(scopedPage.state ?? {}), activeTab: 1 } });
+        onClose();
+        return;
+      }
+      navigate(scopedPage.path, {
+        state: {
+          ...(scopedPage.state ?? {}),
+          activeTab: 1,
+          selectedFagligDocId: target.id,
+        },
+      });
+      onClose();
+    },
+    [scopedPage, fagligFilteredOptions, navigate, onClose]
+  );
+
   const handleItemClick = useCallback((entry: SearchEntry) => {
     const hasCommand = Boolean(PAGE_COMMANDS[entry.path]);
 
@@ -708,6 +851,29 @@ export function GlobalSearch({ open, onClose }: Props) {
           return;
         }
 
+        // ── Faglig innhold scoped keyboard handling ──
+        if (isFagligScoped) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setFagligDropdownIndex((i) => Math.min(i + 1, Math.max(0, fagligFilteredOptions.length - 1)));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setFagligDropdownIndex((i) => Math.max(i - 1, 0));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const selected = fagligFilteredOptions[fagligDropdownIndex] ?? fagligFilteredOptions[0];
+            navigateWithFagligSelection(selected);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            if (commandQuery) setCommandQuery("");
+            else exitScopeMode();
+          } else if (e.key === "Backspace" && commandQuery === "") {
+            e.preventDefault();
+            exitScopeMode();
+          }
+          return;
+        }
+
         // ── Other pages scoped keyboard handling ──
         if (e.key === "Escape") {
           e.preventDefault();
@@ -750,12 +916,12 @@ export function GlobalSearch({ open, onClose }: Props) {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
-    open, isScoped, isStdScoped, isIntScoped, entries, activeIndex, scopedPage, commandQuery,
+    open, isScoped, isStdScoped, isIntScoped, isFagligScoped, entries, activeIndex, scopedPage, commandQuery,
     stdStep, stdFilteredTemplates, stdDropdownIndex, stdHasPreparat, stdSelectedPreparats,
-    intFilteredOptions, intDropdownIndex, intSelected,
+    intFilteredOptions, intDropdownIndex, intSelected, fagligFilteredOptions, fagligDropdownIndex,
     navigateTo, enterScopeMode, exitScopeMode, onClose,
     selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill, commitPreparatChip,
-    selectIntEntity, navigateWithIntSelected,
+    selectIntEntity, navigateWithIntSelected, navigateWithFagligSelection,
   ]);
 
   const shortcutLabel = "Space";
@@ -851,6 +1017,8 @@ export function GlobalSearch({ open, onClose }: Props) {
                 : ""
               : isIntScoped
               ? "Søk etter legemiddel, virkestoff eller ATC-kode..."
+              : isFagligScoped
+              ? "Søk etter dokumentfane..."
               : isScoped
               ? (command?.placeholder ?? "")
               : "Søk etter side..."
@@ -1303,6 +1471,68 @@ export function GlobalSearch({ open, onClose }: Props) {
               </>
             )}
           </Box>
+        ) : isFagligScoped ? (
+          <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
+            {fagligLoading ? (
+              <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : fagligFilteredOptions.length === 0 ? (
+              <Box sx={{ py: 4, textAlign: "center" }}>
+                <Typography color="text.secondary" variant="body2">
+                  {commandQuery.trim()
+                    ? `Ingen dokumentfaner for «${commandQuery}»`
+                    : "Ingen dokumentfaner funnet"}
+                </Typography>
+              </Box>
+            ) : (
+              <List disablePadding sx={{ py: 0.5 }}>
+                {fagligFilteredOptions.map((option, i) => {
+                  const isActive = i === fagligDropdownIndex;
+                  return (
+                    <ListItemButton
+                      key={option.id}
+                      selected={isActive}
+                      onClick={() => navigateWithFagligSelection(option)}
+                      onMouseMove={() => setFagligDropdownIndex(i)}
+                      sx={{
+                        mx: 0.75,
+                        my: 0.25,
+                        borderRadius: 2,
+                        px: 1.5,
+                        py: 0.9,
+                        borderLeft: `3px solid ${isActive ? scopedPage!.color : "transparent"}`,
+                        transition: "background-color 80ms, border-color 80ms",
+                        "&.Mui-selected": {
+                          backgroundColor: (theme) =>
+                            alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.16 : 0.09),
+                        },
+                        "&.Mui-selected:hover": {
+                          backgroundColor: (theme) =>
+                            alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.2 : 0.12),
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={`${option.emoji ? `${option.emoji} ` : ""}${option.label}`}
+                        secondary={option.id.startsWith("__") ? "Innebygd dokumentfane" : "Dokumentfane"}
+                        primaryTypographyProps={{
+                          fontWeight: isActive ? 600 : 400,
+                          fontSize: "0.92rem",
+                        }}
+                        secondaryTypographyProps={{ fontSize: "0.73rem", sx: { opacity: 0.6 } }}
+                      />
+                      {isActive && (
+                        <KeyboardReturnRoundedIcon
+                          sx={{ fontSize: 16, color: "text.disabled", ml: 1 }}
+                        />
+                      )}
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            )}
+          </Box>
         ) : (
           // ── Other pages: existing hint card + live preview ──
           <Box sx={{ px: 3, py: 2.5 }}>
@@ -1376,7 +1606,7 @@ export function GlobalSearch({ open, onClose }: Props) {
                 const isActive = i === activeIndex;
                 return (
                   <ListItemButton
-                    key={entry.path}
+                    key={entry.id}
                     ref={isActive ? (activeItemRef as React.RefObject<HTMLDivElement>) : undefined}
                     selected={isActive}
                     onClick={() => handleItemClick(entry)}
@@ -1467,6 +1697,12 @@ export function GlobalSearch({ open, onClose }: Props) {
                 <KbdHint keys={["Esc"]} label="tilbake" />
               </>
             )
+          ) : isFagligScoped ? (
+            <>
+              <KbdHint keys={["↑", "↓"]} label="naviger" />
+              <KbdHint keys={["↵"]} label="åpne dokumentfane" />
+              <KbdHint keys={["Esc"]} label="tilbake" />
+            </>
           ) : (
             <>
               <KbdHint keys={["↵"]} label={`Gå til ${scopedPage!.label}`} />
