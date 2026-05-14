@@ -620,6 +620,9 @@ export default function StandardTekstSidebar({
                 e.preventDefault();
                 e.stopPropagation();
                 setSearch("");
+                // Keep initial autofocus behavior, but allow Escape to dismiss focus.
+                searchInputRef?.current?.blur();
+                (e.currentTarget as HTMLInputElement | null)?.blur?.();
                 return;
               }
 

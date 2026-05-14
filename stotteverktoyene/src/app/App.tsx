@@ -63,6 +63,14 @@ const ANBRUDD_SHAREPOINT_URL = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_UR
 const SIDEBAR_WIDTH_EXPANDED = 260;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 
+function getIsoWeekNumber(date: Date): number {
+  const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  return Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
 type SidebarItem = {
   label: string;
   path: string;
@@ -135,6 +143,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
   const navigate = useNavigate();
   const location = useLocation();
+  const currentWeekNumber = React.useMemo(() => getIsoWeekNumber(new Date()), []);
 
   const isSelected = (path: string) => {
     if (path === "/omeq") return location.pathname === "/" || location.pathname === "/omeq";
@@ -358,6 +367,42 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       </List>
       <Box sx={{ flexGrow: 1 }} />
       <Divider />
+      <Box
+        sx={{
+          px: collapsed ? 0.6 : 1.4,
+          pt: 1.1,
+          pb: 0.7,
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <Tooltip title={collapsed ? `Uke ${currentWeekNumber}` : ""} placement="right">
+          <Box
+            sx={{
+              minWidth: collapsed ? 44 : "100%",
+              px: collapsed ? 0.75 : 1.1,
+              py: 0.55,
+              borderRadius: 999,
+              textAlign: "center",
+              border: (theme) => `1px solid ${alpha(theme.palette.text.primary, 0.14)}`,
+              backgroundColor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.025)",
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: collapsed ? "0.86rem" : "0.8rem",
+                fontWeight: 700,
+                color: "text.secondary",
+                lineHeight: 1.2,
+                letterSpacing: collapsed ? "0.02em" : "0.01em",
+              }}
+            >
+              {collapsed ? `${currentWeekNumber}` : `Uke ${currentWeekNumber}`}
+            </Typography>
+          </Box>
+        </Tooltip>
+      </Box>
       <Box
         sx={{
           display: "flex",
