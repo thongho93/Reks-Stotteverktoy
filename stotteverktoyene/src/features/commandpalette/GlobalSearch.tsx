@@ -117,6 +117,16 @@ const PAGE_COMMANDS: Record<string, PageCommand> = {
       return { searchQuery: query.trim() };
     },
   },
+  "/tilbakemelding": {
+    placeholder: "Søk i mine notater...",
+    example: "tittel først, deretter innhold",
+    parsePreview(query) {
+      return query.trim() ? `Søker i mine notater: ${query.trim()}` : null;
+    },
+    buildState(query) {
+      return { initialTab: "notater", noteSearchQuery: query.trim() };
+    },
+  },
 };
 
 // ─── Search entries ──────────────────────────────────────────────────────────
@@ -268,6 +278,15 @@ type OmeqPreparedRow = {
   doseText: string;
 };
 
+type TilbakemeldingNoteOption = {
+  id: string;
+  title: string;
+  content: string;
+  snippet: string;
+  matchType: "title" | "content";
+  updatedAtMs: number;
+};
+
 const PREPARAT_SUFFIX_RE = /\s*\(preparatnavn\)\s*$/i;
 
 function cleanMatchTerm(value: string): string {
@@ -300,6 +319,37 @@ function readStandardteksterFavorites(uid?: string | null): string[] {
   }
 
   return [];
+}
+
+function toMillis(value: unknown): number {
+  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis: unknown }).toMillis === "function") {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  return 0;
+}
+
+function buildTilbakemeldingNoteContent(data: Record<string, unknown>): string {
+  const checklistItems = Array.isArray(data.checklistItems)
+    ? data.checklistItems
+        .map((item) => {
+          if (!item || typeof item !== "object") return "";
+          const text = String((item as { text?: unknown }).text ?? "").trim();
+          if (!text) return "";
+          const done = Boolean((item as { done?: unknown }).done);
+          return done ? `[x] ${text}` : text;
+        })
+        .filter(Boolean)
+    : [];
+
+  if (String(data.noteMode ?? "") === "checklist" || checklistItems.length > 0) {
+    return checklistItems.join("\n");
+  }
+
+  return String(data.content ?? "");
+}
+
+function buildTilbakemeldingSnippet(content: string): string {
+  return content.replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 function normalize(s: string) {
@@ -368,6 +418,9 @@ export function GlobalSearch({ open, onClose }: Props) {
   const [fagligTabs, setFagligTabs] = useState<FagligTabOption[]>(BUILTIN_FAGLIG_TABS);
   const [fagligLoading, setFagligLoading] = useState(false);
   const [fagligDropdownIndex, setFagligDropdownIndex] = useState(0);
+  const [tilbakemeldingNotes, setTilbakemeldingNotes] = useState<TilbakemeldingNoteOption[]>([]);
+  const [tilbakemeldingLoading, setTilbakemeldingLoading] = useState(false);
+  const [tilbakemeldingDropdownIndex, setTilbakemeldingDropdownIndex] = useState(0);
   const omeqProductIndex = useMemo(() => buildProductIndex(), []);
 
   const entries = ALL_ENTRIES.filter(
@@ -384,6 +437,7 @@ export function GlobalSearch({ open, onClose }: Props) {
   const isIntScoped = isScoped && scopedPage?.path === "/interaksjoner";
   const isOmeqScoped = isScoped && scopedPage?.path === "/omeq";
   const isFagligScoped = isScoped && scopedPage?.scopeMode === "fagligTabs";
+  const isTilbakemeldingScoped = isScoped && scopedPage?.path === "/tilbakemelding";
   const omeqSelectedParsed = useMemo(() => {
     if (!omeqSelectedMedication) return null;
     return parseMedicationInput(
@@ -539,6 +593,44 @@ export function GlobalSearch({ open, onClose }: Props) {
       .sort((a, b) => b.score - a.score || a.option.label.localeCompare(b.option.label))
       .map((item) => item.option);
   }, [fagligTabs, commandQuery]);
+
+  const tilbakemeldingFilteredNotes = useMemo<TilbakemeldingNoteOption[]>(() => {
+    const raw = commandQuery.trim();
+    if (!raw) return [];
+
+    const query = raw.toLocaleLowerCase("nb-NO");
+    const titleMatches: Array<{ note: TilbakemeldingNoteOption; score: number }> = [];
+    const contentMatches: Array<{ note: TilbakemeldingNoteOption; score: number }> = [];
+
+    tilbakemeldingNotes.forEach((note) => {
+      const title = (note.title || "Uten tittel").trim();
+      const titleLower = title.toLocaleLowerCase("nb-NO");
+      const contentLower = note.content.toLocaleLowerCase("nb-NO");
+
+      if (titleLower.includes(query)) {
+        const score = titleLower === query ? 3 : titleLower.startsWith(query) ? 2 : 1;
+        titleMatches.push({ note, score });
+        return;
+      }
+
+      if (contentLower.includes(query)) {
+        const score = contentLower.startsWith(query) ? 2 : 1;
+        contentMatches.push({ note, score });
+      }
+    });
+
+    const sortMatches = (matches: Array<{ note: TilbakemeldingNoteOption; score: number }>) =>
+      matches
+        .sort(
+          (a, b) =>
+            b.score - a.score ||
+            b.note.updatedAtMs - a.note.updatedAtMs ||
+            a.note.title.localeCompare(b.note.title, "nb"),
+        )
+        .map(({ note }) => note);
+
+    return [...sortMatches(titleMatches), ...sortMatches(contentMatches)].slice(0, 20);
+  }, [tilbakemeldingNotes, commandQuery]);
 
   const intFilteredOptions = useMemo<InteractionEntity[]>(() => {
     if (!intIndex?.entities?.length || !commandQuery.trim()) return [];
@@ -753,6 +845,12 @@ export function GlobalSearch({ open, onClose }: Props) {
     setFagligDropdownIndex(0);
   }, []);
 
+  const resetTilbakemeldingState = useCallback(() => {
+    setTilbakemeldingNotes([]);
+    setTilbakemeldingLoading(false);
+    setTilbakemeldingDropdownIndex(0);
+  }, []);
+
   const loadStdTemplates = useCallback(async () => {
     setStdLoading(true);
     try {
@@ -805,6 +903,40 @@ export function GlobalSearch({ open, onClose }: Props) {
     }
   }, []);
 
+  const loadTilbakemeldingNotes = useCallback(async () => {
+    if (!user?.uid) {
+      setTilbakemeldingNotes([]);
+      setTilbakemeldingLoading(false);
+      return;
+    }
+
+    setTilbakemeldingLoading(true);
+    try {
+      const notesRef = collection(db, "users", user.uid, "privateNotes");
+      const snapshot = await getDocs(notesRef);
+      const loaded = snapshot.docs
+        .map((noteDoc) => {
+          const data = noteDoc.data() as Record<string, unknown>;
+          const title = String(data.title ?? "").trim() || "Uten tittel";
+          const content = buildTilbakemeldingNoteContent(data);
+          return {
+            id: noteDoc.id,
+            title,
+            content,
+            snippet: buildTilbakemeldingSnippet(content),
+            matchType: "title" as const,
+            updatedAtMs: toMillis(data.updatedAt),
+          };
+        })
+        .sort((a, b) => b.updatedAtMs - a.updatedAtMs || a.title.localeCompare(b.title, "nb"));
+      setTilbakemeldingNotes(loaded);
+    } catch {
+      setTilbakemeldingNotes([]);
+    } finally {
+      setTilbakemeldingLoading(false);
+    }
+  }, [user?.uid]);
+
   const enterScopeMode = useCallback(
     (entry: SearchEntry) => {
       setScopedPage(entry);
@@ -817,6 +949,9 @@ export function GlobalSearch({ open, onClose }: Props) {
       } else if (entry.path === "/interaksjoner") {
         resetIntState();
         void loadIntIndex();
+      } else if (entry.path === "/tilbakemelding") {
+        resetTilbakemeldingState();
+        void loadTilbakemeldingNotes();
       } else if (entry.scopeMode === "fagligTabs") {
         resetFagligState();
         void loadFagligTabs();
@@ -829,6 +964,8 @@ export function GlobalSearch({ open, onClose }: Props) {
       resetOmeqState,
       resetIntState,
       loadIntIndex,
+      resetTilbakemeldingState,
+      loadTilbakemeldingNotes,
       resetFagligState,
       loadFagligTabs,
     ]
@@ -841,8 +978,9 @@ export function GlobalSearch({ open, onClose }: Props) {
     resetOmeqState();
     resetIntState();
     resetFagligState();
+    resetTilbakemeldingState();
     setTimeout(() => inputRef.current?.focus(), 30);
-  }, [resetStdState, resetOmeqState, resetIntState, resetFagligState]);
+  }, [resetStdState, resetOmeqState, resetIntState, resetFagligState, resetTilbakemeldingState]);
 
   const navigateTo = useCallback(
     (entry: SearchEntry, withCommand = false) => {
@@ -1105,6 +1243,11 @@ export function GlobalSearch({ open, onClose }: Props) {
     setOmeqDropdownIndex(0);
   }, [isOmeqScoped, commandQuery]);
 
+  useEffect(() => {
+    if (!isTilbakemeldingScoped) return;
+    setTilbakemeldingDropdownIndex(0);
+  }, [isTilbakemeldingScoped, commandQuery]);
+
   const navigateWithFagligSelection = useCallback(
     (selection?: FagligTabOption) => {
       if (!scopedPage) return;
@@ -1125,6 +1268,24 @@ export function GlobalSearch({ open, onClose }: Props) {
       onClose();
     },
     [scopedPage, fagligFilteredOptions, navigate, onClose]
+  );
+
+  const navigateWithTilbakemeldingSelection = useCallback(
+    (selection?: TilbakemeldingNoteOption) => {
+      if (!scopedPage) return;
+      const target = selection ?? tilbakemeldingFilteredNotes[0];
+      const noteSearchQuery = commandQuery.trim();
+
+      navigate(scopedPage.path, {
+        state: {
+          initialTab: "notater",
+          noteSearchQuery,
+          selectedNoteId: target?.id ?? null,
+        },
+      });
+      onClose();
+    },
+    [scopedPage, tilbakemeldingFilteredNotes, commandQuery, navigate, onClose],
   );
 
   const handleItemClick = useCallback((entry: SearchEntry) => {
@@ -1307,6 +1468,30 @@ export function GlobalSearch({ open, onClose }: Props) {
           return;
         }
 
+        if (isTilbakemeldingScoped) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setTilbakemeldingDropdownIndex((i) =>
+              Math.min(i + 1, Math.max(0, tilbakemeldingFilteredNotes.length - 1)),
+            );
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setTilbakemeldingDropdownIndex((i) => Math.max(i - 1, 0));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const selected = tilbakemeldingFilteredNotes[tilbakemeldingDropdownIndex] ?? tilbakemeldingFilteredNotes[0];
+            navigateWithTilbakemeldingSelection(selected);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            if (commandQuery) setCommandQuery("");
+            else exitScopeMode();
+          } else if (e.key === "Backspace" && commandQuery === "") {
+            e.preventDefault();
+            exitScopeMode();
+          }
+          return;
+        }
+
         // ── Other pages scoped keyboard handling ──
         if (e.key === "Escape") {
           e.preventDefault();
@@ -1349,12 +1534,12 @@ export function GlobalSearch({ open, onClose }: Props) {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
-    open, isScoped, isStdScoped, isIntScoped, isOmeqScoped, isFagligScoped, entries, activeIndex, scopedPage, commandQuery,
+    open, isScoped, isStdScoped, isIntScoped, isOmeqScoped, isFagligScoped, isTilbakemeldingScoped, entries, activeIndex, scopedPage, commandQuery,
     stdStep, stdFilteredTemplates, stdDropdownIndex, stdHasPreparat, stdSelectedPreparats,
-    intFilteredOptions, intDropdownIndex, intSelected, intResults, intActiveResult, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqSuggestions, omeqDropdownIndex, omeqDoseText, omeqPreparedRows, omeqDraftReady, omeqDraftIsDuplicate, fagligFilteredOptions, fagligDropdownIndex,
+    intFilteredOptions, intDropdownIndex, intSelected, intResults, intActiveResult, omeqSelectedMedication, omeqSelectedIsDepotPatch, omeqSuggestions, omeqDropdownIndex, omeqDoseText, omeqPreparedRows, omeqDraftReady, omeqDraftIsDuplicate, fagligFilteredOptions, fagligDropdownIndex, tilbakemeldingFilteredNotes, tilbakemeldingDropdownIndex,
     navigateTo, enterScopeMode, exitScopeMode, onClose,
     selectStdTemplate, goBackToStdStep0, navigateWithStdPrefill, commitPreparatChip,
-    selectIntEntity, navigateWithIntSelected, navigateWithIntResult, selectOmeqSuggestion, commitOmeqRow, navigateWithOmeqSelection, navigateWithFagligSelection,
+    selectIntEntity, navigateWithIntSelected, navigateWithIntResult, selectOmeqSuggestion, commitOmeqRow, navigateWithOmeqSelection, navigateWithFagligSelection, navigateWithTilbakemeldingSelection,
   ]);
 
   const shortcutLabel = "Space";
@@ -2419,6 +2604,106 @@ export function GlobalSearch({ open, onClose }: Props) {
               </List>
             )}
           </Box>
+        ) : isTilbakemeldingScoped ? (
+          <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
+            {tilbakemeldingLoading ? (
+              <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : !commandQuery.trim() ? (
+              <Box sx={{ px: 3, py: 2.5 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 1.5,
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: (theme) =>
+                      alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.1 : 0.06),
+                    border: (theme) =>
+                      `1px solid ${alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.25 : 0.18)}`,
+                  }}
+                >
+                  <LightbulbOutlinedIcon
+                    sx={{ fontSize: 18, color: scopedPage!.color, mt: 0.25, flexShrink: 0 }}
+                  />
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 500, color: "text.primary", mb: 0.25 }}
+                    >
+                      Søk i Mine notater etter tittel først, deretter innhold.
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+                      f.eks. hello, huskeliste eller en tekstbit fra notatet
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ) : tilbakemeldingFilteredNotes.length === 0 ? (
+              <Box sx={{ py: 4, textAlign: "center" }}>
+                <Typography color="text.secondary" variant="body2">
+                  Ingen notater matcher «{commandQuery.trim()}»
+                </Typography>
+              </Box>
+            ) : (
+              <List disablePadding sx={{ py: 0.5 }}>
+                {tilbakemeldingFilteredNotes.map((option, i) => {
+                  const isActive = i === tilbakemeldingDropdownIndex;
+                  return (
+                    <ListItemButton
+                      key={`${option.id}-${option.matchType}`}
+                      selected={isActive}
+                      onClick={() => navigateWithTilbakemeldingSelection(option)}
+                      onMouseMove={() => setTilbakemeldingDropdownIndex(i)}
+                      sx={{
+                        mx: 0.75,
+                        my: 0.25,
+                        borderRadius: 2,
+                        px: 1.5,
+                        py: 0.9,
+                        borderLeft: `3px solid ${isActive ? scopedPage!.color : "transparent"}`,
+                        transition: "background-color 80ms, border-color 80ms",
+                        "&.Mui-selected": {
+                          backgroundColor: (theme) =>
+                            alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.16 : 0.09),
+                        },
+                        "&.Mui-selected:hover": {
+                          backgroundColor: (theme) =>
+                            alpha(scopedPage!.color, theme.palette.mode === "dark" ? 0.2 : 0.12),
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={option.title}
+                        secondary={`${option.matchType === "title" ? "Tittel" : "Innhold"}${option.snippet ? ` • ${option.snippet}` : ""}`}
+                        primaryTypographyProps={{
+                          fontWeight: isActive ? 600 : 400,
+                          fontSize: "0.92rem",
+                        }}
+                        secondaryTypographyProps={{
+                          fontSize: "0.73rem",
+                          sx: {
+                            opacity: 0.7,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          },
+                        }}
+                      />
+                      {isActive && (
+                        <KeyboardReturnRoundedIcon
+                          sx={{ fontSize: 16, color: "text.disabled", ml: 1 }}
+                        />
+                      )}
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            )}
+          </Box>
         ) : (
           // ── Other pages: existing hint card + live preview ──
           <Box sx={{ px: 3, py: 2.5 }}>
@@ -2601,6 +2886,12 @@ export function GlobalSearch({ open, onClose }: Props) {
             <>
               <KbdHint keys={["↑", "↓"]} label="naviger" />
               <KbdHint keys={["↵"]} label="åpne dokumentfane" />
+              <KbdHint keys={["Esc"]} label="tilbake" />
+            </>
+          ) : isTilbakemeldingScoped ? (
+            <>
+              <KbdHint keys={["↑", "↓"]} label="naviger" />
+              <KbdHint keys={["↵"]} label="åpne notat" />
               <KbdHint keys={["Esc"]} label="tilbake" />
             </>
           ) : (

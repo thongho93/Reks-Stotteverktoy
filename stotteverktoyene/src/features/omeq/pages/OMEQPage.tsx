@@ -132,6 +132,15 @@ const makeRow = (): Row => ({
   doseText: "",
 });
 
+const normalizeVedtakText = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^-?\d+[,.]0$/.test(trimmed)) {
+    return trimmed.replace(/[,.]0$/, "");
+  }
+  return trimmed;
+};
+
 export default function OMEQPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -142,7 +151,7 @@ export default function OMEQPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
-  const wasVedtakOkRef = useRef(false);
+  const lastCopiedVedtakSummaryRef = useRef<string | null>(null);
   const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem("omeq.autoPasteNumericClipboard");
@@ -229,6 +238,7 @@ export default function OMEQPage() {
     setVedtakOmeq("");
     setDebouncedVedtakOmeq("");
     setCopyToastMessage(null);
+    lastCopiedVedtakSummaryRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -304,7 +314,13 @@ export default function OMEQPage() {
   const totalOmeqText = useMemo(() => String(totalOmeq).replace(".", ","), [totalOmeq]);
 
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedVedtakOmeq(vedtakOmeq), 500);
+    const id = setTimeout(() => {
+      const normalized = normalizeVedtakText(vedtakOmeq);
+      setDebouncedVedtakOmeq(normalized);
+      if (normalized !== vedtakOmeq) {
+        setVedtakOmeq(normalized);
+      }
+    }, 500);
     return () => clearTimeout(id);
   }, [vedtakOmeq]);
 
@@ -345,14 +361,19 @@ export default function OMEQPage() {
   }, []);
 
   useEffect(() => {
-    const turnedGreen = vedtakIsOk && !wasVedtakOkRef.current;
-    wasVedtakOkRef.current = vedtakIsOk;
-    if (!turnedGreen) return;
-    const text = `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${vedtakOmeq} mg`;
+    if (!vedtakIsOk) {
+      lastCopiedVedtakSummaryRef.current = null;
+      return;
+    }
+    const text = `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${debouncedVedtakOmeq} mg`;
+    if (lastCopiedVedtakSummaryRef.current === text) return;
     void copyVedtakSummary(text).then((ok) => {
+      if (ok) {
+        lastCopiedVedtakSummaryRef.current = text;
+      }
       setCopyToastMessage(ok ? "Kopiert til utklippstavle" : "Kunne ikke kopiere automatisk");
     });
-  }, [vedtakIsOk, totalOmeqText, vedtakOmeq, copyVedtakSummary]);
+  }, [vedtakIsOk, totalOmeqText, debouncedVedtakOmeq, copyVedtakSummary]);
 
   const canOpenOmeqStandardtekst =
     selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
