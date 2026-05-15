@@ -198,17 +198,24 @@ export default function InteraksjonerPage() {
 
   const [selected, setSelected] = React.useState<InteractionEntity[]>([]);
   const [inputValue, setInputValue] = React.useState("");
+  const [pendingActiveInteractionIndex, setPendingActiveInteractionIndex] = React.useState<number | null>(null);
 
   // Pre-fill search when navigated from the global command palette
   React.useEffect(() => {
     const state = location.state as {
       searchQuery?: string;
       selectedEntities?: InteractionEntity[];
+      activeInteractionIndex?: number;
     } | null;
     if (!state) return;
 
     if (Array.isArray(state.selectedEntities) && state.selectedEntities.length > 0) {
       setSelected(state.selectedEntities);
+      if (typeof state.activeInteractionIndex === "number") {
+        setPendingActiveInteractionIndex(state.activeInteractionIndex);
+      } else {
+        setPendingActiveInteractionIndex(null);
+      }
       setInputValue("");
       return;
     }
@@ -521,6 +528,14 @@ export default function InteraksjonerPage() {
 
     handleSearch();
   }, [index, selected, handleSearch]);
+
+  React.useEffect(() => {
+    if (pendingActiveInteractionIndex == null || results.length === 0) return;
+    const matchIdx = results.findIndex((r) => r.interactionIndex === pendingActiveInteractionIndex);
+    if (matchIdx === -1) return;
+    setActiveResult(matchIdx);
+    setPendingActiveInteractionIndex(null);
+  }, [pendingActiveInteractionIndex, results]);
 
   React.useEffect(() => {
     // Ensure input is focused when the page mounts

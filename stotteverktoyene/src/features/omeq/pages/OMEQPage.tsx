@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -47,6 +47,10 @@ import { OPIOIDS } from "../data/opioids";
 import { formToRoute } from "../data/atcProducts";
 
 type Row = OMEQRowValue & { id: string };
+type OmeqPrefillState = {
+  prefillRows?: Array<{ medicationText?: string; doseText?: string }>;
+  prefill?: { medicationText?: string; doseText?: string };
+};
 const OMEQ_STANDARDTEKST_TITLE = "OMEQ overstiger vedtak";
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
@@ -128,16 +132,26 @@ const makeRow = (): Row => ({
   doseText: "",
 });
 
+const normalizeVedtakText = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^-?\d+[,.]0$/.test(trimmed)) {
+    return trimmed.replace(/[,.]0$/, "");
+  }
+  return trimmed;
+};
+
 export default function OMEQPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [rows, setRows] = useState<Row[]>([makeRow()]);
   const [vedtakOmeq, setVedtakOmeq] = useState<string>("");
   const [debouncedVedtakOmeq, setDebouncedVedtakOmeq] = useState<string>("");
-  const [copiedOpen, setCopiedOpen] = useState(false);
+  const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
+  const lastCopiedVedtakSummaryRef = useRef<string | null>(null);
   const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem("omeq.autoPasteNumericClipboard");
@@ -182,15 +196,36 @@ export default function OMEQPage() {
     return () => clearTimeout(t);
   }, [focusRowId]);
 
-  // Pre-fill first row when navigated from the global command palette
+  // Pre-fill rows when navigated from the global command palette
   useEffect(() => {
-    const prefill = (location.state as { prefill?: { medicationText?: string; doseText?: string } } | null)?.prefill;
+    const state = (location.state as OmeqPrefillState | null) ?? null;
+    const prefillRows = (state?.prefillRows ?? [])
+      .map((row) => ({
+        medicationText: String(row?.medicationText ?? "").trim(),
+        doseText: String(row?.doseText ?? "").trim(),
+      }))
+      .filter((row) => row.medicationText.length > 0);
+
+    if (prefillRows.length > 0) {
+      setRows(
+        prefillRows.map((row) => ({
+          ...makeRow(),
+          medicationText: row.medicationText,
+          doseText: row.doseText,
+        })),
+      );
+      return;
+    }
+
+    const prefill = state?.prefill;
     if (!prefill?.medicationText) return;
-    setRows((prev) =>
-      prev.map((r, i) =>
-        i === 0 ? { ...r, medicationText: prefill.medicationText!, doseText: prefill.doseText ?? "" } : r
-      )
-    );
+    setRows([
+      {
+        ...makeRow(),
+        medicationText: prefill.medicationText,
+        doseText: prefill.doseText ?? "",
+      },
+    ]);
   }, [location.state]);
 
   const resetAll = useCallback(() => {
@@ -202,6 +237,8 @@ export default function OMEQPage() {
     setFocusRowId(firstRow.id);
     setVedtakOmeq("");
     setDebouncedVedtakOmeq("");
+    setCopyToastMessage(null);
+    lastCopiedVedtakSummaryRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -277,21 +314,69 @@ export default function OMEQPage() {
   const totalOmeqText = useMemo(() => String(totalOmeq).replace(".", ","), [totalOmeq]);
 
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedVedtakOmeq(vedtakOmeq), 500);
+    const id = setTimeout(() => {
+      const normalized = normalizeVedtakText(vedtakOmeq);
+      setDebouncedVedtakOmeq(normalized);
+      if (normalized !== vedtakOmeq) {
+        setVedtakOmeq(normalized);
+      }
+    }, 500);
     return () => clearTimeout(id);
   }, [vedtakOmeq]);
 
   const vedtakNum = useMemo(() => parseFloat(debouncedVedtakOmeq.replace(",", ".")), [debouncedVedtakOmeq]);
-  const hasVedtak = useMemo(() => debouncedVedtakOmeq.trim() !== "" && Number.isFinite(vedtakNum), [debouncedVedtakOmeq, vedtakNum]);
+  const hasVedtak = useMemo(
+    () => debouncedVedtakOmeq.trim() !== "" && Number.isFinite(vedtakNum),
+    [debouncedVedtakOmeq, vedtakNum],
+  );
   const vedtakIsOk = useMemo(() => hasVedtak && totalOmeq <= vedtakNum, [hasVedtak, totalOmeq, vedtakNum]);
 
-  useEffect(() => {
-    if (!vedtakIsOk) return;
-    const text = `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${vedtakOmeq} mg`;
-    navigator.clipboard.writeText(text).then(() => setCopiedOpen(true)).catch(() => {});
-  }, [vedtakIsOk, totalOmeqText, vedtakOmeq]);
+  const copyVedtakSummary = useCallback(async (text: string) => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
 
-  const canOpenOmeqStandardtekst = selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
+    try {
+      if (typeof document === "undefined") return false;
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      textArea.style.pointerEvents = "none";
+      document.body.appendChild(textArea);
+      textArea.select();
+      textArea.setSelectionRange(0, text.length);
+      const success = document.execCommand("copy");
+      document.body.removeChild(textArea);
+      return success;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!vedtakIsOk) {
+      lastCopiedVedtakSummaryRef.current = null;
+      return;
+    }
+    const text = `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${debouncedVedtakOmeq} mg`;
+    if (lastCopiedVedtakSummaryRef.current === text) return;
+    void copyVedtakSummary(text).then((ok) => {
+      if (ok) {
+        lastCopiedVedtakSummaryRef.current = text;
+      }
+      setCopyToastMessage(ok ? "Kopiert til utklippstavle" : "Kunne ikke kopiere automatisk");
+    });
+  }, [vedtakIsOk, totalOmeqText, debouncedVedtakOmeq, copyVedtakSummary]);
+
+  const canOpenOmeqStandardtekst =
+    selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
 
   const openOmeqStandardtekst = useCallback(() => {
     if (!canOpenOmeqStandardtekst) return;
@@ -691,11 +776,11 @@ export default function OMEQPage() {
         ))}
       </Paper>
       <Snackbar
-        open={copiedOpen}
-        onClose={() => setCopiedOpen(false)}
+        open={Boolean(copyToastMessage)}
+        onClose={() => setCopyToastMessage(null)}
         autoHideDuration={2500}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        message="Kopiert til utklippstavle"
+        message={copyToastMessage ?? ""}
       />
     </Container>
   );
