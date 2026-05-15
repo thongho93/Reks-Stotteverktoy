@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -12,7 +12,9 @@ import {
   ListItem,
   ListItemText,
   Paper,
+  Snackbar,
   Switch,
+  TextField,
   Tooltip,
   Typography,
   Table,
@@ -26,6 +28,8 @@ import AddIcon from "@mui/icons-material/Add";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { alpha } from "@mui/material/styles";
@@ -132,9 +136,13 @@ export default function OMEQPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [rows, setRows] = useState<Row[]>([makeRow()]);
+  const [vedtakOmeq, setVedtakOmeq] = useState<string>("");
+  const [debouncedVedtakOmeq, setDebouncedVedtakOmeq] = useState<string>("");
+  const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
+  const wasVedtakOkRef = useRef(false);
   const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem("omeq.autoPasteNumericClipboard");
@@ -218,6 +226,9 @@ export default function OMEQPage() {
     setShowHelp(false);
     setShowInfoTable(false);
     setFocusRowId(firstRow.id);
+    setVedtakOmeq("");
+    setDebouncedVedtakOmeq("");
+    setCopyToastMessage(null);
   }, []);
 
   useEffect(() => {
@@ -292,7 +303,59 @@ export default function OMEQPage() {
 
   const totalOmeqText = useMemo(() => String(totalOmeq).replace(".", ","), [totalOmeq]);
 
-  const canOpenOmeqStandardtekst = selectedPreparats.length > 0 && totalOmeq > 0;
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedVedtakOmeq(vedtakOmeq), 500);
+    return () => clearTimeout(id);
+  }, [vedtakOmeq]);
+
+  const vedtakNum = useMemo(() => parseFloat(debouncedVedtakOmeq.replace(",", ".")), [debouncedVedtakOmeq]);
+  const hasVedtak = useMemo(
+    () => debouncedVedtakOmeq.trim() !== "" && Number.isFinite(vedtakNum),
+    [debouncedVedtakOmeq, vedtakNum],
+  );
+  const vedtakIsOk = useMemo(() => hasVedtak && totalOmeq <= vedtakNum, [hasVedtak, totalOmeq, vedtakNum]);
+
+  const copyVedtakSummary = useCallback(async (text: string) => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+
+    try {
+      if (typeof document === "undefined") return false;
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      textArea.style.pointerEvents = "none";
+      document.body.appendChild(textArea);
+      textArea.select();
+      textArea.setSelectionRange(0, text.length);
+      const success = document.execCommand("copy");
+      document.body.removeChild(textArea);
+      return success;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    const turnedGreen = vedtakIsOk && !wasVedtakOkRef.current;
+    wasVedtakOkRef.current = vedtakIsOk;
+    if (!turnedGreen) return;
+    const text = `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${vedtakOmeq} mg`;
+    void copyVedtakSummary(text).then((ok) => {
+      setCopyToastMessage(ok ? "Kopiert til utklippstavle" : "Kunne ikke kopiere automatisk");
+    });
+  }, [vedtakIsOk, totalOmeqText, vedtakOmeq, copyVedtakSummary]);
+
+  const canOpenOmeqStandardtekst =
+    selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
 
   const openOmeqStandardtekst = useCallback(() => {
     if (!canOpenOmeqStandardtekst) return;
@@ -302,6 +365,7 @@ export default function OMEQPage() {
       templateTitle: OMEQ_STANDARDTEKST_TITLE,
       preparats: selectedPreparats,
       totalOmeq: totalOmeqText,
+      vedtakOmeq,
     };
 
     try {
@@ -315,7 +379,7 @@ export default function OMEQPage() {
         omeqPrefill: payload,
       },
     });
-  }, [canOpenOmeqStandardtekst, navigate, selectedPreparats, totalOmeqText]);
+  }, [canOpenOmeqStandardtekst, navigate, selectedPreparats, totalOmeqText, vedtakOmeq]);
 
   const formatFactor = (n: number) => {
     // display with comma for decimals
@@ -626,13 +690,40 @@ export default function OMEQPage() {
                     </Tooltip>
                   </Box>
 
-                  <Box className={styles.totalOmeqBox}>
-                    <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
-                      Total OMEQ
-                    </Typography>
-                    <Typography variant="h5" className={styles.totalOmeqValue}>
-                      {totalOmeq}
-                    </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box className={styles.totalOmeqBox}>
+                      <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
+                        Total OMEQ
+                      </Typography>
+                      <Typography variant="h5" className={styles.totalOmeqValue}>
+                        {totalOmeq}
+                      </Typography>
+                    </Box>
+
+                    {hasVedtak &&
+                      (vedtakIsOk ? (
+                        <CheckCircleIcon sx={{ color: "#3B9C5F", fontSize: 26 }} />
+                      ) : (
+                        <CancelIcon sx={{ color: "#C74A4A", fontSize: 26 }} />
+                      ))}
+
+                    <Box className={styles.totalOmeqBox}>
+                      <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
+                        OMEQ vedtak
+                      </Typography>
+                      <TextField
+                        variant="standard"
+                        value={vedtakOmeq}
+                        onChange={(e) => setVedtakOmeq(e.target.value)}
+                        placeholder="0"
+                        inputProps={{
+                          inputMode: "decimal",
+                          style: { textAlign: "center", fontWeight: 700, fontSize: "1.25rem" },
+                        }}
+                        InputProps={{ disableUnderline: true }}
+                        sx={{ width: 72 }}
+                      />
+                    </Box>
                   </Box>
 
                   <Paper
@@ -668,6 +759,13 @@ export default function OMEQPage() {
           </Box>
         ))}
       </Paper>
+      <Snackbar
+        open={Boolean(copyToastMessage)}
+        onClose={() => setCopyToastMessage(null)}
+        autoHideDuration={2500}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        message={copyToastMessage ?? ""}
+      />
     </Container>
   );
 }
