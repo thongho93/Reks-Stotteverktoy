@@ -401,7 +401,7 @@ export function GlobalSearch({ open, onClose }: Props) {
   const [stdTalls, setStdTalls] = useState<Record<number, string>>({});
   const [stdFormulerings, setStdFormulerings] = useState<Record<number, string>>({});
   const [stdClockTime, setStdClockTime] = useState("11:00");
-  const [stdClockDay, setStdClockDay] = useState<"today" | "tomorrow">("today");
+  const [stdClockDay, setStdClockDay] = useState<"today" | "tomorrow" | "sunday">("today");
   const [stdDatoInput, setStdDatoInput] = useState("");
   const [stdSelectedPreparats, setStdSelectedPreparats] = useState<Array<{ text: string; key: string }>>([]);
 
@@ -1973,7 +1973,7 @@ export function GlobalSearch({ open, onClose }: Props) {
                         placeholder="11:00"
                       />
                       <Box sx={{ display: "flex", gap: 0.5 }}>
-                        {(["today", "tomorrow"] as const).map((day) => (
+                        {(["today", "tomorrow", "sunday"] as const).map((day) => (
                           <Box
                             key={day}
                             onClick={() => setStdClockDay(day)}
@@ -1998,7 +1998,7 @@ export function GlobalSearch({ open, onClose }: Props) {
                               userSelect: "none",
                             }}
                           >
-                            {day === "today" ? "I dag" : "I morgen"}
+                            {day === "today" ? "I dag" : day === "tomorrow" ? "I morgen" : "Søndag"}
                           </Box>
                         ))}
                       </Box>

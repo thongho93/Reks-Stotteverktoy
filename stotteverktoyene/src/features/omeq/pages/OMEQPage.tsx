@@ -25,11 +25,11 @@ import {
   TableRow,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import CancelIcon from "@mui/icons-material/Cancel";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import CancelIcon from "@mui/icons-material/Cancel";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { alpha } from "@mui/material/styles";
@@ -711,7 +711,7 @@ export default function OMEQPage() {
                     </Tooltip>
                   </Box>
 
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box className={styles.omeqCompareRow}>
                     <Box className={styles.totalOmeqBox}>
                       <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
                         Total OMEQ
@@ -721,14 +721,12 @@ export default function OMEQPage() {
                       </Typography>
                     </Box>
 
-                    {hasVedtak &&
-                      (vedtakIsOk ? (
-                        <CheckCircleIcon sx={{ color: "#3B9C5F", fontSize: 26 }} />
-                      ) : (
-                        <CancelIcon sx={{ color: "#C74A4A", fontSize: 26 }} />
-                      ))}
-
-                    <Box className={styles.totalOmeqBox}>
+                    {hasVedtak && (
+                      vedtakIsOk
+                        ? <CheckCircleIcon className={styles.omeqCheckOk} />
+                        : <CancelIcon className={styles.omeqCheckFail} />
+                    )}
+                    <Box className={styles.vedtakOmeqBox}>
                       <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
                         OMEQ vedtak
                       </Typography>
@@ -737,10 +735,7 @@ export default function OMEQPage() {
                         value={vedtakOmeq}
                         onChange={(e) => setVedtakOmeq(e.target.value)}
                         placeholder="0"
-                        inputProps={{
-                          inputMode: "decimal",
-                          style: { textAlign: "center", fontWeight: 700, fontSize: "1.25rem" },
-                        }}
+                        inputProps={{ inputMode: "decimal", style: { textAlign: "center", fontWeight: 700, fontSize: "1.25rem" } }}
                         InputProps={{ disableUnderline: true }}
                         sx={{ width: 72 }}
                       />
