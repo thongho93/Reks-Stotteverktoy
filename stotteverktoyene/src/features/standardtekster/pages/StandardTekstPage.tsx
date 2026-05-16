@@ -1623,7 +1623,6 @@ export default function StandardTekstPage() {
           }}
           variant="text"
           size="small"
-          endIcon={<OpenInNewIcon sx={{ fontSize: "13px !important", opacity: 0.6 }} />}
           sx={(theme) => ({
             justifyContent: "space-between",
             textAlign: "left",

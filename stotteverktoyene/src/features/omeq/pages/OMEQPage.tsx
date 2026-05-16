@@ -32,7 +32,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import { alpha } from "@mui/material/styles";
+import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 
 import styles from "../../../styles/app.module.css";
 
@@ -459,7 +459,20 @@ export default function OMEQPage() {
     });
   }, []);
 
+  const BLUE = "#29A1FF";
+  const baseTheme = useTheme();
+  const blueTheme = createTheme(baseTheme, {
+    palette: { primary: { main: BLUE } },
+  });
+
   return (
+  <ThemeProvider theme={blueTheme}>
+    <Box sx={(theme) => ({
+      position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
+      background: theme.palette.mode === "dark"
+        ? "linear-gradient(160deg, rgba(41,161,255,0.1) 0%, rgba(41,161,255,0.04) 100%)"
+        : "linear-gradient(160deg, rgba(41,161,255,0.08) 0%, rgba(41,161,255,0.03) 100%)",
+    })} />
     <Container maxWidth={false} className={styles.appContainer}>
       {/* Header row (outside card) */}
       <Box
@@ -682,9 +695,7 @@ export default function OMEQPage() {
                         sx={{
                           backgroundColor: "primary.main",
                           color: "white",
-                          "&:hover": {
-                            backgroundColor: "primary.main",
-                          },
+                          "&:hover": { backgroundColor: "primary.dark" },
                         }}
                         className={styles.addRowButton}
                       >
@@ -700,9 +711,7 @@ export default function OMEQPage() {
                           border: "1px solid",
                           borderColor: "primary.main",
                           color: "primary.main",
-                          "&:hover": {
-                            backgroundColor: "action.hover",
-                          },
+                          "&:hover": { backgroundColor: "action.hover" },
                         }}
                         className={styles.addRowButton}
                       >
@@ -748,8 +757,8 @@ export default function OMEQPage() {
                       width: "100%",
                       p: 1.5,
                       borderRadius: 2,
-                      borderColor: alpha(theme.palette.primary.main, 0.25),
-                      backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                      borderColor: alpha(theme.palette.primary.main, 0.3),
+                      backgroundColor: alpha(theme.palette.primary.main, 0.06),
                     })}
                   >
                     <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
@@ -783,5 +792,6 @@ export default function OMEQPage() {
         message={copyToastMessage ?? ""}
       />
     </Container>
+  </ThemeProvider>
   );
 }

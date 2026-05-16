@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import { useLocation } from "react-router-dom";
 import {
   Alert,
@@ -132,6 +133,10 @@ type HistoryItem = {
 };
 
 export default function InteraksjonerPage() {
+  const RED = "#FF5E5B";
+  const baseTheme = useTheme();
+  const redTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: { main: RED } } }), [baseTheme]);
+
   const { index, loading, error, reload } = useInteractions();
   const location = useLocation();
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -584,17 +589,16 @@ export default function InteraksjonerPage() {
   }, [isResizingSplit, getSplitRatioFromClientX]);
 
   return (
+  <ThemeProvider theme={redTheme}>
     <Box
       sx={{
-        mx: -2,
-        mt: -2,
-        minHeight: "100vh",
+        position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
         bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FBF5F5",
         backgroundImage: (t) => t.palette.mode === "dark"
           ? "radial-gradient(circle at 6% -10%, rgba(200,60,60,0.11) 0%, rgba(200,60,60,0) 38%), radial-gradient(circle at 92% -6%, rgba(150,40,40,0.09) 0%, rgba(150,40,40,0) 32%)"
           : "radial-gradient(circle at 6% -10%, rgba(255,94,91,0.16) 0%, rgba(255,94,91,0) 38%), radial-gradient(circle at 92% -6%, rgba(200,60,60,0.12) 0%, rgba(200,60,60,0) 32%)",
       }}
-    >
+    />
     <Box
       sx={{
         maxWidth: 1760,
@@ -1777,6 +1781,6 @@ export default function InteraksjonerPage() {
         }}
       />
     </Box>
-    </Box>
+  </ThemeProvider>
   );
 }

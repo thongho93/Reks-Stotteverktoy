@@ -1279,6 +1279,13 @@ export default function MedicationSearch({
                   onClick={() => pickResult(m)}
                   selected={index === highlightedIndex}
                   onMouseEnter={() => setHighlightedIndex(index)}
+                  sx={{
+                    "&.Mui-selected": {
+                      bgcolor: "rgba(92,170,126,0.13)",
+                      "&:hover": { bgcolor: "rgba(92,170,126,0.18)" },
+                    },
+                    "&:hover": { bgcolor: "rgba(92,170,126,0.07)" },
+                  }}
                 >
                   {(() => {
                     const secondaryParts = [
