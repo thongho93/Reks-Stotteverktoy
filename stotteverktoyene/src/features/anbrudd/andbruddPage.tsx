@@ -209,31 +209,6 @@ export default function AndbruddPage() {
         minHeight: 0,
       }}
     >
-      <Box
-        sx={{
-          position: "absolute",
-          top: -120,
-          right: -120,
-          width: 320,
-          height: 320,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${alpha(ANBRUDD_ACCENT_LINE, 0.2)} 0%, transparent 68%)`,
-          pointerEvents: "none",
-        }}
-      />
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: -140,
-          left: -90,
-          width: 300,
-          height: 300,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${alpha(ANBRUDD_ACCENT_LINE, 0.13)} 0%, transparent 70%)`,
-          pointerEvents: "none",
-        }}
-      />
-
       <Box sx={{ position: "relative", zIndex: 1 }}>
         <Box role="tablist" aria-label="Skjema tabs" sx={{ mb: 2 }}>
           <Box
