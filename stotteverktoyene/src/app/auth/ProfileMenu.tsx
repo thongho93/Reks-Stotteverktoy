@@ -9,7 +9,6 @@ import {
   ListItemText,
   Menu,
   MenuItem,
-  Switch,
   Typography,
 } from "@mui/material";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
@@ -18,6 +17,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/firebase";
 import { useAuthUser } from "./useAuthUser";
 import { useColorMode } from "../../styles/colorModeContext";
+import ThemeModeSwitch from "./ThemeModeSwitch";
 import styles from "../../styles/standardTekstPage.module.css";
 
 export function ProfileMenu() {
@@ -87,13 +87,7 @@ export function ProfileMenu() {
           Min profil
         </MenuItem>
 
-        <MenuItem
-          className={styles.profileThemeToggleItem}
-          onClick={(event) => {
-            event.preventDefault();
-            toggleMode();
-          }}
-        >
+        <MenuItem className={styles.profileThemeToggleItem}>
           <ListItemIcon>
             {mode === "dark" ? (
               <DarkModeRoundedIcon fontSize="small" />
@@ -102,13 +96,10 @@ export function ProfileMenu() {
             )}
           </ListItemIcon>
           <ListItemText primary="Mørk modus" />
-          <Switch
-            size="small"
-            edge="end"
+          <ThemeModeSwitch
             checked={mode === "dark"}
-            onChange={() => toggleMode()}
-            onClick={(event) => event.stopPropagation()}
-            inputProps={{ "aria-label": "Bytt mellom lys og mørk modus" }}
+            onChange={toggleMode}
+            ariaLabel="Bytt mellom lys og mørk modus"
           />
         </MenuItem>
 

@@ -5,7 +5,6 @@ import {
   FormControlLabel,
   Paper,
   Stack,
-  Switch,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -13,6 +12,7 @@ import ClearAllIcon from "@mui/icons-material/ClearAll";
 import MedicationSearch from "../../fest/components/MedicationSearch";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { formatPreparatForTemplate, formatPreparatRowText } from "../utils/preparat";
+import PinkSwitch from "./PinkSwitch";
 
 type PreparatRowId = string | number;
 
@@ -304,10 +304,9 @@ export default function PreparatPanel({
         <Box className={styles.preparatToggleRow}>
         <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
           <FormControlLabel
-            sx={{ m: 0 }}
+            sx={{ m: 0, gap: 0.75 }}
             control={
-              <Switch
-                size="small"
+              <PinkSwitch
                 checked={clearOnCopy}
                 onChange={(e) => onClearOnCopyChange?.(e.target.checked)}
               />
@@ -318,10 +317,9 @@ export default function PreparatPanel({
 
         <Tooltip title="Når dette er på, settes produsentnavn inn i teksten (f.eks. Metformin Sandoz).">
           <FormControlLabel
-            sx={{ m: 0 }}
+            sx={{ m: 0, gap: 0.75 }}
             control={
-              <Switch
-                size="small"
+              <PinkSwitch
                 checked={includeManufacturerInText}
                 onChange={(e) => onIncludeManufacturerInTextChange?.(e.target.checked)}
               />
@@ -332,10 +330,9 @@ export default function PreparatPanel({
 
         <Tooltip title="Når dette er på, tas pakningsstørrelse med i teksten (f.eks. ... 60).">
           <FormControlLabel
-            sx={{ m: 0 }}
+            sx={{ m: 0, gap: 0.75 }}
             control={
-              <Switch
-                size="small"
+              <PinkSwitch
                 checked={includePackSizeInText}
                 onChange={(e) => onIncludePackSizeInTextChange?.(e.target.checked)}
               />
@@ -346,10 +343,9 @@ export default function PreparatPanel({
 
         <Tooltip title="Når feltet er aktivt, limes kopiert tall automatisk inn i søket (f.eks. 3111).">
           <FormControlLabel
-            sx={{ m: 0 }}
+            sx={{ m: 0, gap: 0.75 }}
             control={
-              <Switch
-                size="small"
+              <PinkSwitch
                 checked={autoPasteNumericClipboard}
                 onChange={(e) => onAutoPasteNumericClipboardChange?.(e.target.checked)}
               />
