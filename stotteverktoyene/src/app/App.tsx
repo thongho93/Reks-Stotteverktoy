@@ -2,6 +2,7 @@ import React, { Suspense } from "react";
 import {
   Box,
   CircularProgress,
+  Collapse,
   Divider,
   Drawer,
   IconButton,
@@ -17,6 +18,8 @@ import { alpha } from "@mui/material/styles";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
@@ -31,6 +34,7 @@ import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearc
 import ConstructionIcon from "@mui/icons-material/Construction";
 import RequireRekspert from "./auth/RequireRekspert";
 import { ProfileMenu } from "./auth/ProfileMenu";
+import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
 
 const HomePage = React.lazy(() => import("./HomePage"));
 const OMEQPage = React.lazy(() => import("../features/omeq/pages/OMEQPage"));
@@ -150,6 +154,38 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     return location.pathname === path;
   };
 
+  const isProduktOgRad = location.pathname === "/produkt-og-rad";
+  const [produktOpen, setProduktOpen] = React.useState(isProduktOgRad);
+  React.useEffect(() => { if (isProduktOgRad) setProduktOpen(true); }, [isProduktOgRad]);
+
+  const produktSubItems = [
+    { label: "Produkt og råd", search: "" },
+    { label: "Faglig innhold", search: "?fagdoc=" },
+    { label: "Rutiner", search: "?tab=rutiner" },
+  ];
+
+  const activeSubItem = () => {
+    const params = new URLSearchParams(location.search);
+    if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) return 2;
+    if (params.has(FAGLIG_DOC_QUERY_KEY)) return 1;
+    return 0;
+  };
+
+  const isInnspill = location.pathname === "/tilbakemelding";
+  const [innspillOpen, setInnspillOpen] = React.useState(isInnspill);
+  React.useEffect(() => { if (isInnspill) setInnspillOpen(true); }, [isInnspill]);
+
+  const innspillSubItems = [
+    { label: "Mine notater", search: "" },
+    { label: "Innspill", search: "?tab=meldeskjema" },
+  ];
+
+  const activeInnspillSubItem = () => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("tab") === "meldeskjema") return 1;
+    return 0;
+  };
+
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   const navItemButtonSx = (item: SidebarItem) => ({
@@ -253,18 +289,40 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           userSelect: "none",
         }}
       >
-        <Typography
-          sx={{
-            fontWeight: 800,
-            fontSize: collapsed ? 20 : 35,
-            color: "primary.main",
-            letterSpacing: "0.04em",
-            textShadow: (theme) =>
-              theme.palette.mode === "dark" ? "0 4px 16px rgba(230, 165, 190, 0.22)" : "none",
-          }}
-        >
-          REKS+
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0 }}>
+          {collapsed ? (
+            <Tooltip title="Reks+" placement="right">
+              <Box
+                component="img"
+                src="/logo.svg"
+                alt="REKS+ logo"
+                sx={{ width: 52, height: 52, flexShrink: 0 }}
+              />
+            </Tooltip>
+          ) : (
+            <>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 28,
+                  color: "primary.main",
+                  letterSpacing: "0.04em",
+                  lineHeight: 1,
+                  textShadow: (theme) =>
+                    theme.palette.mode === "dark" ? "0 4px 16px rgba(230, 165, 190, 0.22)" : "none",
+                }}
+              >
+                REKS
+              </Typography>
+              <Box
+                component="img"
+                src="/logo.svg"
+                alt=""
+                sx={{ width: 56, height: 56, flexShrink: 0 }}
+              />
+            </>
+          )}
+        </Box>
       </Box>
       <Toolbar
         sx={{
@@ -286,36 +344,148 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       <List sx={{ py: 0.5 }}>
         {mainItems.map((item, index) => (
           <React.Fragment key={item.path}>
-            <Tooltip title={collapsed ? item.label : ""} placement="right">
-              <ListItemButton
-                selected={isSelected(item.path)}
-                onClick={() => {
-                  logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
-                  navigate(item.path);
-                }}
-                sx={navItemButtonSx(item)}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: collapsed ? 0 : 2,
-                    justifyContent: "center",
-                    display: "flex",
-                    alignItems: "center",
+            {item.path === "/produkt-og-rad" ? (
+              <>
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Tooltip title={collapsed ? item.label : ""} placement="right">
+                    <ListItemButton
+                      selected={isProduktOgRad}
+                      onClick={() => {
+                        logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+                        navigate(item.path);
+                        if (!isProduktOgRad) setProduktOpen(true);
+                      }}
+                      sx={{ ...navItemButtonSx(item), flex: 1 }}
+                    >
+                      <ListItemIcon
+                        sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
+                      >
+                        <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
+                      </ListItemIcon>
+                      {!collapsed && <ListItemText primary={item.label} />}
+                    </ListItemButton>
+                  </Tooltip>
+                  {!collapsed && (
+                    <IconButton
+                      size="small"
+                      aria-label={produktOpen ? "Skjul undermeny" : "Vis undermeny"}
+                      onClick={() => setProduktOpen((o) => !o)}
+                      sx={{ p: 0.5, flexShrink: 0 }}
+                    >
+                      {produktOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                    </IconButton>
+                  )}
+                </Box>
+                {!collapsed && (
+                  <Collapse in={produktOpen} timeout="auto" unmountOnExit>
+                    <List disablePadding>
+                      {produktSubItems.map((sub, i) => (
+                        <ListItemButton
+                          key={sub.label}
+                          selected={isProduktOgRad && activeSubItem() === i}
+                          onClick={() => navigate(`/produkt-og-rad${sub.search}`)}
+                          sx={{
+                            pl: 5,
+                            py: 0.6,
+                            fontSize: 13,
+                            color: isProduktOgRad && activeSubItem() === i ? "primary.main" : "text.secondary",
+                            fontWeight: isProduktOgRad && activeSubItem() === i ? 700 : 400,
+                            "&.Mui-selected": {
+                              bgcolor: "transparent",
+                              color: "primary.main",
+                            },
+                            "&:hover": { bgcolor: "action.hover" },
+                          }}
+                        >
+                          <ListItemText
+                            primary={sub.label}
+                            primaryTypographyProps={{ fontSize: 13, fontWeight: isProduktOgRad && activeSubItem() === i ? 700 : 400 }}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </Collapse>
+                )}
+              </>
+            ) : item.path === "/tilbakemelding" ? (
+              <>
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Tooltip title={collapsed ? item.label : ""} placement="right">
+                    <ListItemButton
+                      selected={isInnspill}
+                      onClick={() => {
+                        logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+                        navigate(item.path);
+                        if (!isInnspill) setInnspillOpen(true);
+                      }}
+                      sx={{ ...navItemButtonSx(item), flex: 1 }}
+                    >
+                      <ListItemIcon
+                        sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
+                      >
+                        <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
+                      </ListItemIcon>
+                      {!collapsed && <ListItemText primary={item.label} />}
+                    </ListItemButton>
+                  </Tooltip>
+                  {!collapsed && (
+                    <IconButton
+                      size="small"
+                      aria-label={innspillOpen ? "Skjul undermeny" : "Vis undermeny"}
+                      onClick={() => setInnspillOpen((o) => !o)}
+                      sx={{ p: 0.5, flexShrink: 0 }}
+                    >
+                      {innspillOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                    </IconButton>
+                  )}
+                </Box>
+                {!collapsed && (
+                  <Collapse in={innspillOpen} timeout="auto" unmountOnExit>
+                    <List disablePadding>
+                      {innspillSubItems.map((sub, i) => (
+                        <ListItemButton
+                          key={sub.label}
+                          selected={isInnspill && activeInnspillSubItem() === i}
+                          onClick={() => navigate(`/tilbakemelding${sub.search}`)}
+                          sx={{
+                            pl: 5,
+                            py: 0.6,
+                            color: isInnspill && activeInnspillSubItem() === i ? "primary.main" : "text.secondary",
+                            "&.Mui-selected": { bgcolor: "transparent", color: "primary.main" },
+                            "&:hover": { bgcolor: "action.hover" },
+                          }}
+                        >
+                          <ListItemText
+                            primary={sub.label}
+                            primaryTypographyProps={{ fontSize: 13, fontWeight: isInnspill && activeInnspillSubItem() === i ? 700 : 400 }}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </Collapse>
+                )}
+              </>
+            ) : (
+              <Tooltip title={collapsed ? item.label : ""} placement="right">
+                <ListItemButton
+                  selected={isSelected(item.path)}
+                  onClick={() => {
+                    logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+                    navigate(item.path);
                   }}
+                  sx={navItemButtonSx(item)}
                 >
-                  <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
-                </ListItemIcon>
-                {!collapsed && <ListItemText primary={item.label} />}
-              </ListItemButton>
-            </Tooltip>
+                  <ListItemIcon
+                    sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
+                  >
+                    <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
+                  </ListItemIcon>
+                  {!collapsed && <ListItemText primary={item.label} />}
+                </ListItemButton>
+              </Tooltip>
+            )}
             {index < mainItems.length - 1 && (
-              <Divider
-                sx={{
-                  mx: collapsed ? 1.5 : 2,
-                  opacity: 0.45,
-                }}
-              />
+              <Divider sx={{ mx: collapsed ? 1.5 : 2, opacity: 0.45 }} />
             )}
           </React.Fragment>
         ))}
@@ -456,19 +626,19 @@ function Layout() {
   const { open: searchOpen, closeSearch } = useGlobalSearchHotkey();
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <GlobalSearch open={searchOpen} onClose={closeSearch} />
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-      <Box component="main" sx={{ flex: 1, p: 2 }}>
+      <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {keepAnbruddMounted && (
-          <Box sx={{ display: isAnbruddRoute ? "block" : "none" }}>
+          <Box sx={{ display: isAnbruddRoute ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0, mx: -2, my: -2, p: 2 }}>
             <Suspense fallback={<RouteLoader />}>
               <AndbruddPage />
             </Suspense>
           </Box>
         )}
 
-        <Box sx={{ display: isAnbruddRoute ? "none" : "block" }}>
+        <Box sx={{ display: isAnbruddRoute ? "none" : "block", flex: 1, overflowY: "auto" }}>
           <Suspense fallback={<RouteLoader />}>
             <Routes>
               <Route path="/" element={<HomePage />} />

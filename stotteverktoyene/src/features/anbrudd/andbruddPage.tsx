@@ -5,7 +5,6 @@ import {
   Button,
   CircularProgress,
   IconButton,
-  Paper,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -17,11 +16,9 @@ const ANBRUDD_SURFACE = "#FFF7EC";
 const ANBRUDD_SURFACE_SOFT = "#FDF1E1";
 const ANBRUDD_SURFACE_ELEVATED = "#FFFFFF";
 const ANBRUDD_HOVER_SURFACE = "#F9E4CA";
-const ANBRUDD_BORDER = "#E7C7A2";
 const ANBRUDD_TEXT_PRIMARY = "#2E241A";
 const ANBRUDD_TEXT_SECONDARY = "#584530";
 const ANBRUDD_ACCENT_TEXT = "#8F5523";
-const ANBRUDD_ACCENT_LINE = "#D07A35";
 const ANBRUDD_TAB_ACTIVE_BG = "#FFE8CC";
 const ANBRUDD_ICON = "#7A5331";
 
@@ -200,44 +197,77 @@ export default function AndbruddPage() {
   });
 
   return (
-    <Paper
+    <Box
       sx={{
         position: "relative",
         overflow: "hidden",
         p: { xs: 1.5, sm: 2.5 },
-        borderRadius: 4,
         color: ANBRUDD_TEXT_PRIMARY,
-        border: `1px solid ${ANBRUDD_BORDER}`,
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
         background: `linear-gradient(145deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
-        boxShadow: `0 14px 42px ${alpha(ANBRUDD_ACCENT_TEXT, 0.12)}`,
       }}
     >
-      <Box
-        sx={{
-          position: "absolute",
-          top: -120,
-          right: -120,
-          width: 320,
-          height: 320,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${alpha(ANBRUDD_ACCENT_LINE, 0.2)} 0%, transparent 68%)`,
-          pointerEvents: "none",
-        }}
-      />
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: -140,
-          left: -90,
-          width: 300,
-          height: 300,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${alpha(ANBRUDD_ACCENT_LINE, 0.13)} 0%, transparent 70%)`,
-          pointerEvents: "none",
-        }}
-      />
-
       <Box sx={{ position: "relative", zIndex: 1 }}>
+        <Box role="tablist" aria-label="Skjema tabs" sx={{ mb: 2 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+              gap: 1,
+              maxWidth: 760,
+            }}
+          >
+            <ButtonBase
+              role="tab"
+              aria-selected={tab === "anbruddOversikt"}
+              onClick={() => activateTab("anbruddOversikt")}
+              sx={viewCardSx(tab === "anbruddOversikt")}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2.5 }}>
+                <Typography sx={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
+                  Anbruddsoversikt
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", pl: 2 }}>
+                  <Tooltip title="Oppdater oversikten">
+                    <IconButton
+                      size="small"
+                      aria-label="Oppdater anbruddsoversikt"
+                      sx={{
+                        color: ANBRUDD_ICON,
+                        bgcolor: alpha(ANBRUDD_SURFACE_ELEVATED, 0.7),
+                        "&:hover": { backgroundColor: ANBRUDD_HOVER_SURFACE },
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        refreshOversikt();
+                      }}
+                    >
+                      <RefreshRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </ButtonBase>
+
+            <ButtonBase
+              role="tab"
+              aria-selected={tab === "produktskjema"}
+              onClick={() => activateTab("produktskjema")}
+              sx={viewCardSx(tab === "produktskjema")}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", minHeight: 48 }}>
+                <Typography sx={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
+                  Produktskjema
+                </Typography>
+              </Box>
+            </ButtonBase>
+          </Box>
+        </Box>
+
         {showOversiktControls && (
           <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, mb: 1.75 }}>
             {anbruddSkjemaOpenUrl && (
@@ -293,63 +323,6 @@ export default function AndbruddPage() {
             </Box>
           </Box>
         )}
-
-        <Box role="tablist" aria-label="Skjema tabs" sx={{ mb: 2 }}>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
-              gap: 1,
-              maxWidth: 760,
-            }}
-          >
-            <ButtonBase
-              role="tab"
-              aria-selected={tab === "anbruddOversikt"}
-              onClick={() => activateTab("anbruddOversikt")}
-              sx={viewCardSx(tab === "anbruddOversikt")}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2.5 }}>
-                <Typography sx={{ fontWeight: 750, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
-                  Anbruddsoversikt
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", pl: 2 }}>
-                  <Tooltip title="Oppdater oversikten">
-                    <IconButton
-                      size="small"
-                      aria-label="Oppdater anbruddsoversikt"
-                      sx={{
-                        color: ANBRUDD_ICON,
-                        bgcolor: alpha(ANBRUDD_SURFACE_ELEVATED, 0.7),
-                        "&:hover": { backgroundColor: ANBRUDD_HOVER_SURFACE },
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        refreshOversikt();
-                      }}
-                    >
-                      <RefreshRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-            </ButtonBase>
-
-            <ButtonBase
-              role="tab"
-              aria-selected={tab === "produktskjema"}
-              onClick={() => activateTab("produktskjema")}
-              sx={viewCardSx(tab === "produktskjema")}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", minHeight: 48 }}>
-                <Typography sx={{ fontWeight: 750, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
-                  Produktskjema
-                </Typography>
-              </Box>
-            </ButtonBase>
-          </Box>
-        </Box>
       </Box>
 
       {current.src ? (
@@ -357,12 +330,10 @@ export default function AndbruddPage() {
           <Box
             sx={{
               position: "relative",
-              minHeight: current.height,
-              borderRadius: 3,
+              flex: 1,
+              minHeight: 0,
+              borderRadius: "2px",
               overflow: "hidden",
-              border: `1px solid ${alpha(ANBRUDD_ACCENT_TEXT, 0.2)}`,
-              bgcolor: ANBRUDD_SURFACE_ELEVATED,
-              boxShadow: `0 18px 34px ${alpha(ANBRUDD_ACCENT_TEXT, 0.12)}`,
             }}
           >
             {!iframeLoaded[tab] && (
@@ -373,10 +344,7 @@ export default function AndbruddPage() {
                   display: "grid",
                   placeItems: "center",
                   gap: 1.5,
-                  background: `linear-gradient(180deg, ${alpha(ANBRUDD_SURFACE_ELEVATED, 0.96)} 0%, ${alpha(
-                    ANBRUDD_SURFACE,
-                    0.98
-                  )} 100%)`,
+                  background: `linear-gradient(180deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
                   backdropFilter: "blur(2px)",
                   zIndex: 1,
                   textAlign: "center",
@@ -420,7 +388,7 @@ export default function AndbruddPage() {
                 allowFullScreen
                 style={{
                   width: "100%",
-                  height: `${current.height}px`,
+                  height: "100%",
                   border: 0,
                   display: "block",
                   visibility: tab === "anbruddOversikt" ? "visible" : "hidden",
@@ -452,7 +420,7 @@ export default function AndbruddPage() {
                 allowFullScreen
                 style={{
                   width: "100%",
-                  height: `${current.height}px`,
+                  height: "100%",
                   border: 0,
                   display: "block",
                   visibility: tab === "produktskjema" ? "visible" : "hidden",
@@ -467,6 +435,6 @@ export default function AndbruddPage() {
       ) : (
         <Typography color="error">{current.missing}</Typography>
       )}
-    </Paper>
+    </Box>
   );
 }

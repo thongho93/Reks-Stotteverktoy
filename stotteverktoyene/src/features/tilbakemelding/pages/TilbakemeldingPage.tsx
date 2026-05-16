@@ -50,6 +50,7 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, server
 import { useLocation } from "react-router-dom";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
+import { ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../../produktograd/queryKeys";
 
 const MELDESKJEMA_EMBED_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLScKadKrBcIT-8a9CgD4QFfCjXsERjolCZbhojJU8jFhy8V6ZA/viewform?embedded=true";
@@ -57,8 +58,6 @@ const MELDESKJEMA_RESPONSES_URL =
   "https://docs.google.com/forms/d/1dQq_pvU1lXf295odpYPWXs0_zX693iLbKxSFfNS3sAQ/edit#responses";
 const SHARED_ROUTINES_COLLECTION = "sharedRoutines";
 const SHARED_ROUTINES_DOC_ID = "global";
-const ROUTINE_TAB_QUERY_KEY = "tab";
-const ROUTINE_DOC_QUERY_KEY = "rutine";
 const ROUTINE_TEXT_STYLE_OPTIONS = [
   { value: "p", label: "Normal tekst" },
   { value: "h1", label: "Tittel" },
@@ -638,6 +637,15 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
   const { user, isOwner, firstName } = useAuthUser();
   const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">(initialRouteState.initialTab);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (!params.has(ROUTINE_TAB_QUERY_KEY)) return;
+    const tabParam = params.get(ROUTINE_TAB_QUERY_KEY);
+    if (tabParam === "meldeskjema" || tabParam === "rutiner" || tabParam === "notater") {
+      setTab(tabParam);
+    }
+  }, [location.search]);
 
   const [savedNotesList, setSavedNotesList] = React.useState<PrivateNote[]>([]);
   const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
