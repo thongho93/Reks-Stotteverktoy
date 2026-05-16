@@ -17,7 +17,6 @@ import {
   Paper,
   Snackbar,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -48,6 +47,7 @@ import styles from "../../../styles/standardTekstPage.module.css";
 import { useStandardTekster } from "../hooks/useStandardTekster";
 import { useStandardTekstHotkeys } from "../hooks/useStandardTekstHotkeys";
 import PreparatPanel from "../components/PreparatPanel";
+import PinkSwitch from "../components/PinkSwitch";
 import { deleteStandardTekst } from "../utils/deleteStandardTekst";
 import type { StandardTekstFollowUp } from "../types";
 import { logUsage } from "../../../shared/services/usage";
@@ -2560,8 +2560,7 @@ export default function StandardTekstPage() {
           <FormControlLabel
             sx={{ m: 0 }}
             control={
-              <Switch
-                size="small"
+              <PinkSwitch
                 checked={adminViewEnabled}
                 onChange={(e) => setAdminViewEnabled(e.target.checked)}
               />

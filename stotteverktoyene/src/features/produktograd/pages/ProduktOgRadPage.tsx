@@ -21,6 +21,7 @@ import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import TryggmammaTab from "../components/TryggmammaTab";
 import MelkeerstatningTab from "../components/MelkeerstatningTab";
+import TilbakemeldingPage from "../../tilbakemelding/pages/TilbakemeldingPage";
 import {
   Alert,
   Box,
@@ -124,6 +125,8 @@ const NUMERIC_QUERY_RE = /^\d+$/;
 const MAX_RENDERED_RESULTS = 120;
 const PAGE_MAX_WIDTH = 1500;
 const FAGLIG_DOC_QUERY_KEY = "fagdoc";
+const ROUTINE_TAB_QUERY_KEY = "tab";
+const ROUTINE_DOC_QUERY_KEY = "rutine";
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
 const ATC_INGREDIENT: Record<string, string> = {
   A02BC01: "Omeprazol",
@@ -292,7 +295,13 @@ export default function ProduktOgRadPage() {
   const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligTitleInputRef = useRef<HTMLInputElement | null>(null);
   const textSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) return 2;
+    if (params.has(FAGLIG_DOC_QUERY_KEY)) return 1;
+    return 0;
+  });
   const [query, setQuery] = useState("");
   const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
 
@@ -325,6 +334,17 @@ export default function ProduktOgRadPage() {
       }
     }
   }, [location.state]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) {
+      setActiveTab(2);
+      return;
+    }
+    if (params.has(FAGLIG_DOC_QUERY_KEY)) {
+      setActiveTab(1);
+    }
+  }, [location.search]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);
@@ -565,6 +585,8 @@ export default function ProduktOgRadPage() {
       const key = event.key.toLowerCase();
 
       if ((event.ctrlKey || event.metaKey) && key === "s") {
+        if (activeTab === 2) return;
+
         event.preventDefault();
         if (activeTab === 1) {
           const input = fagligSearchInputRef.current;
@@ -934,7 +956,7 @@ export default function ProduktOgRadPage() {
               mt: 0.15,
               mx: "auto",
               width: "100%",
-              maxWidth: 700,
+              maxWidth: 980,
               minHeight: { xs: 38, md: 44 },
               p: 0.25,
               borderRadius: 3,
@@ -975,6 +997,32 @@ export default function ProduktOgRadPage() {
             <Tab
               disableRipple
               label="Faglig innhold"
+              sx={{
+                minHeight: { xs: 36, md: 42 },
+                textTransform: "none",
+                borderRadius: 2.5,
+                fontSize: { xs: 14, md: 17 },
+                fontWeight: 800,
+                letterSpacing: "0.01em",
+                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
+                bgcolor: "transparent",
+                border: "none",
+                transition: "all 160ms ease",
+                "&:hover": {
+                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
+                  bgcolor: "rgba(255,255,255,0.08)",
+                },
+                "&.Mui-selected": {
+                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
+                  fontWeight: 800,
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
+                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
+                },
+              }}
+            />
+            <Tab
+              disableRipple
+              label="Rutiner"
               sx={{
                 minHeight: { xs: 36, md: 42 },
                 textTransform: "none",
@@ -1399,6 +1447,10 @@ export default function ProduktOgRadPage() {
               ) : null}
             </Box>
           )}
+        </Box>
+      ) : activeTab === 2 ? (
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 1, md: 1.5 }, py: 0.75 }}>
+          <TilbakemeldingPage variant="rutinerOnly" />
         </Box>
       ) : (
         <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 1, md: 1.5 }, py: 0.75 }}>

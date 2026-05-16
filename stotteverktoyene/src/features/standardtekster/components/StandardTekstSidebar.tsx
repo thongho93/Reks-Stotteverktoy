@@ -11,7 +11,6 @@ import {
   ListItemButton,
   ListItemText,
   Paper,
-  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -33,6 +32,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/Auth";
 import { logUsage } from "../../../shared/services/usage";
+import PinkSwitch from "./PinkSwitch";
 
 const storageKey = (base: string, uid?: string | null) =>
   uid ? `standardtekster:${uid}:${base}` : `standardtekster:${base}`;
@@ -733,8 +733,7 @@ export default function StandardTekstSidebar({
           <FormControlLabel
             sx={{ m: 0, mt: 0.25 }}
             control={
-              <Switch
-                size="small"
+              <PinkSwitch
                 checked={showInactive}
                 onChange={(e) => setShowInactive(e.target.checked)}
                 disabled={disabled}
