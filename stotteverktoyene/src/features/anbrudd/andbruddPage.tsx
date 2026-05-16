@@ -13,10 +13,8 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
 type TabKey = "produktskjema" | "anbruddOversikt";
 const ANBRUDD_SURFACE = "#FFF7EC";
-const ANBRUDD_SURFACE_SOFT = "#FDF1E1";
 const ANBRUDD_SURFACE_ELEVATED = "#FFFFFF";
 const ANBRUDD_HOVER_SURFACE = "#F9E4CA";
-const ANBRUDD_BORDER = "#E7C7A2";
 const ANBRUDD_TEXT_PRIMARY = "#2E241A";
 const ANBRUDD_TEXT_SECONDARY = "#584530";
 const ANBRUDD_ACCENT_TEXT = "#8F5523";
