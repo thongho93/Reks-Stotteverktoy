@@ -5,7 +5,6 @@ import {
   Button,
   CircularProgress,
   IconButton,
-  Paper,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -200,19 +199,15 @@ export default function AndbruddPage() {
   });
 
   return (
-    <Paper
+    <Box
       sx={{
         position: "relative",
         overflow: "hidden",
         p: { xs: 1.5, sm: 2.5 },
-        borderRadius: 4,
         color: ANBRUDD_TEXT_PRIMARY,
-        border: `1px solid ${ANBRUDD_BORDER}`,
-        background: `linear-gradient(145deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
-        boxShadow: `0 14px 42px ${alpha(ANBRUDD_ACCENT_TEXT, 0.12)}`,
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        flex: 1,
         minHeight: 0,
       }}
     >
@@ -472,6 +467,6 @@ export default function AndbruddPage() {
       ) : (
         <Typography color="error">{current.missing}</Typography>
       )}
-    </Paper>
+    </Box>
   );
 }

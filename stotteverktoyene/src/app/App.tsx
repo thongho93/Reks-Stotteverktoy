@@ -628,7 +628,7 @@ function Layout() {
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {keepAnbruddMounted && (
-          <Box sx={{ display: isAnbruddRoute ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0 }}>
+          <Box sx={{ display: isAnbruddRoute ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0, mx: -2, my: -2, p: 2, background: "linear-gradient(145deg, #FFF7EC 0%, #FDF1E1 100%)" }}>
             <Suspense fallback={<RouteLoader />}>
               <AndbruddPage />
             </Suspense>
