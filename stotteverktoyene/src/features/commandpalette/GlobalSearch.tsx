@@ -596,7 +596,7 @@ export function GlobalSearch({ open, onClose }: Props) {
 
   const tilbakemeldingFilteredNotes = useMemo<TilbakemeldingNoteOption[]>(() => {
     const raw = commandQuery.trim();
-    if (!raw) return [];
+    if (raw.length < 2) return [];
 
     const query = raw.toLocaleLowerCase("nb-NO");
     const titleMatches: Array<{ note: TilbakemeldingNoteOption; score: number }> = [];
@@ -609,13 +609,13 @@ export function GlobalSearch({ open, onClose }: Props) {
 
       if (titleLower.includes(query)) {
         const score = titleLower === query ? 3 : titleLower.startsWith(query) ? 2 : 1;
-        titleMatches.push({ note, score });
+        titleMatches.push({ note: { ...note, matchType: "title" }, score });
         return;
       }
 
       if (contentLower.includes(query)) {
         const score = contentLower.startsWith(query) ? 2 : 1;
-        contentMatches.push({ note, score });
+        contentMatches.push({ note: { ...note, matchType: "content" }, score });
       }
     });
 
