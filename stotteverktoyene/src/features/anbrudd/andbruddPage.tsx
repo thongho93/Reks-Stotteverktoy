@@ -238,62 +238,6 @@ export default function AndbruddPage() {
       />
 
       <Box sx={{ position: "relative", zIndex: 1 }}>
-        {showOversiktControls && (
-          <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, mb: 1.75 }}>
-            {anbruddSkjemaOpenUrl && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={actionButtonSx}
-                onClick={() => window.open(anbruddSkjemaOpenUrl, "_blank", "noopener,noreferrer")}
-              >
-                Anbruddskjema
-              </Button>
-            )}
-            {anbruddEtikettOpenUrl && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={actionButtonSx}
-                onClick={() => window.open(anbruddEtikettOpenUrl, "_blank", "noopener,noreferrer")}
-              >
-                Anbruddsetikett
-              </Button>
-            )}
-            {current.editUrl && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={actionButtonSx}
-                onClick={() => window.open(current.editUrl, "_blank", "noopener,noreferrer")}
-              >
-                Anbruddsoversikt
-              </Button>
-            )}
-          </Box>
-        )}
-
-        {showOversiktControls && (
-          <Box sx={{ mb: 2 }}>
-            <Box
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 1,
-                px: 1.4,
-                py: 0.7,
-                borderRadius: 999,
-                bgcolor: alpha(ANBRUDD_ACCENT_TEXT, 0.1),
-                border: `1px solid ${alpha(ANBRUDD_ACCENT_TEXT, 0.22)}`,
-              }}
-            >
-              <Typography variant="body2" sx={{ color: ANBRUDD_TEXT_SECONDARY, fontWeight: 600 }}>
-                Sist oppdatert visning: {formatRefreshTime(lastLoadedAt[tab])}
-              </Typography>
-            </Box>
-          </Box>
-        )}
-
         <Box role="tablist" aria-label="Skjema tabs" sx={{ mb: 2 }}>
           <Box
             sx={{
@@ -350,6 +294,62 @@ export default function AndbruddPage() {
             </ButtonBase>
           </Box>
         </Box>
+
+        {showOversiktControls && (
+          <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, mb: 1.75 }}>
+            {anbruddSkjemaOpenUrl && (
+              <Button
+                size="small"
+                variant="outlined"
+                sx={actionButtonSx}
+                onClick={() => window.open(anbruddSkjemaOpenUrl, "_blank", "noopener,noreferrer")}
+              >
+                Anbruddskjema
+              </Button>
+            )}
+            {anbruddEtikettOpenUrl && (
+              <Button
+                size="small"
+                variant="outlined"
+                sx={actionButtonSx}
+                onClick={() => window.open(anbruddEtikettOpenUrl, "_blank", "noopener,noreferrer")}
+              >
+                Anbruddsetikett
+              </Button>
+            )}
+            {current.editUrl && (
+              <Button
+                size="small"
+                variant="outlined"
+                sx={actionButtonSx}
+                onClick={() => window.open(current.editUrl, "_blank", "noopener,noreferrer")}
+              >
+                Anbruddsoversikt
+              </Button>
+            )}
+          </Box>
+        )}
+
+        {showOversiktControls && (
+          <Box sx={{ mb: 2 }}>
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1.4,
+                py: 0.7,
+                borderRadius: 999,
+                bgcolor: alpha(ANBRUDD_ACCENT_TEXT, 0.1),
+                border: `1px solid ${alpha(ANBRUDD_ACCENT_TEXT, 0.22)}`,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: ANBRUDD_TEXT_SECONDARY, fontWeight: 600 }}>
+                Sist oppdatert visning: {formatRefreshTime(lastLoadedAt[tab])}
+              </Typography>
+            </Box>
+          </Box>
+        )}
       </Box>
 
       {current.src ? (
