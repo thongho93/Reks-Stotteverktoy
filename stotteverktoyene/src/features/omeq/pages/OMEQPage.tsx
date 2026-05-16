@@ -461,9 +461,7 @@ export default function OMEQPage() {
 
   const BLUE = "#29A1FF";
   const baseTheme = useTheme();
-  const blueTheme = createTheme(baseTheme, {
-    palette: { primary: { main: BLUE } },
-  });
+  const blueTheme = useMemo(() => createTheme(baseTheme, { palette: { primary: { main: BLUE } } }), [baseTheme]);
 
   return (
   <ThemeProvider theme={blueTheme}>

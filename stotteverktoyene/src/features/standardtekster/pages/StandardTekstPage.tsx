@@ -1611,10 +1611,15 @@ export default function StandardTekstPage() {
     </Box>
   );
 
+  const sortedFollowUps = useMemo(
+    () => [...((selected?.followUps ?? []) as StandardTekstFollowUp[])].sort((a, b) => a.label.localeCompare(b.label, "nb")),
+    [selected?.followUps]
+  );
+
   // Preview for follow-up texts
   const followUpsPreview = selected?.followUps?.length ? (
     <>
-      {[...(selected.followUps as StandardTekstFollowUp[])].sort((a, b) => a.label.localeCompare(b.label, "nb")).map((fu: StandardTekstFollowUp) => (
+      {sortedFollowUps.map((fu: StandardTekstFollowUp) => (
         <Button
           key={fu.id}
           onClick={(e) => {

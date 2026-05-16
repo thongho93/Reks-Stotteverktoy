@@ -329,6 +329,8 @@ export default function PreparatPanel({
             <Tooltip key={label} title={title} placement="top" arrow>
               <Box
                 component="button"
+                type="button"
+                aria-pressed={checked}
                 onClick={() => onChange?.(!checked)}
                 sx={(theme) => ({
                   display: "flex",
