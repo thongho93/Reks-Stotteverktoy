@@ -305,8 +305,18 @@ export default function ProduktOgRadPage() {
   const [query, setQuery] = useState("");
   const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
 
-  // Pre-fill search when navigated from the global command palette
+  // Sync active tab from URL params (priority) or location.state (command palette / explicit navigation)
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) {
+      setActiveTab(2);
+      return;
+    }
+    if (params.has(FAGLIG_DOC_QUERY_KEY)) {
+      setActiveTab(1);
+      return;
+    }
+    // No URL params: use location.state (command palette) or default to tab 0
     const state = location.state as {
       searchQuery?: string;
       activeTab?: number;
@@ -325,6 +335,8 @@ export default function ProduktOgRadPage() {
         setSelectedFagligDocId(stateSelectedFagligDocId);
       }
       setTimeout(() => fagligSearchInputRef.current?.focus(), 100);
+    } else {
+      setActiveTab(0);
     }
 
     if (searchQuery) {
@@ -333,20 +345,7 @@ export default function ProduktOgRadPage() {
         setTimeout(() => searchInputRef.current?.focus(), 100);
       }
     }
-  }, [location.state]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) {
-      setActiveTab(2);
-      return;
-    }
-    if (params.has(FAGLIG_DOC_QUERY_KEY)) {
-      setActiveTab(1);
-      return;
-    }
-    setActiveTab(0);
-  }, [location.search]);
+  }, [location.search, location.state]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);

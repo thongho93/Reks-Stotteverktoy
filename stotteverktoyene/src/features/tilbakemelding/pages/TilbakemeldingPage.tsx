@@ -641,11 +641,10 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
+    if (!params.has(ROUTINE_TAB_QUERY_KEY)) return;
     const tabParam = params.get(ROUTINE_TAB_QUERY_KEY);
-    if (tabParam === "meldeskjema") {
-      setTab("meldeskjema");
-    } else if (!tabParam) {
-      setTab("notater");
+    if (tabParam === "meldeskjema" || tabParam === "rutiner" || tabParam === "notater") {
+      setTab(tabParam);
     }
   }, [location.search]);
 

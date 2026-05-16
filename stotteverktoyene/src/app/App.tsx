@@ -155,6 +155,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const isProduktOgRad = location.pathname === "/produkt-og-rad";
   const [produktOpen, setProdukOpen] = React.useState(isProduktOgRad);
+  React.useEffect(() => { if (isProduktOgRad) setProdukOpen(true); }, [isProduktOgRad]);
 
   const produktSubItems = [
     { label: "Produkt og råd", search: "" },
@@ -171,6 +172,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const isInnspill = location.pathname === "/tilbakemelding";
   const [innspillOpen, setInnspillOpen] = React.useState(isInnspill);
+  React.useEffect(() => { if (isInnspill) setInnspillOpen(true); }, [isInnspill]);
 
   const innspillSubItems = [
     { label: "Mine notater", search: "" },
