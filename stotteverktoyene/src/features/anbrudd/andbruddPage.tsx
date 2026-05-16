@@ -254,7 +254,7 @@ export default function AndbruddPage() {
               sx={viewCardSx(tab === "anbruddOversikt")}
             >
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2.5 }}>
-                <Typography sx={{ fontWeight: 750, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
+                <Typography sx={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
                   Anbruddsoversikt
                 </Typography>
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", pl: 2 }}>
@@ -287,7 +287,7 @@ export default function AndbruddPage() {
               sx={viewCardSx(tab === "produktskjema")}
             >
               <Box sx={{ display: "flex", alignItems: "center", minHeight: 48 }}>
-                <Typography sx={{ fontWeight: 750, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
+                <Typography sx={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
                   Produktskjema
                 </Typography>
               </Box>
