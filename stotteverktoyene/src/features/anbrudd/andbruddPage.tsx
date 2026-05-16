@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   ButtonBase,
@@ -31,11 +31,18 @@ const anbruddSkjemaOpenUrl = (import.meta.env.VITE_ANBRUDD_OFFICE_FORM_URL ??
   | string
   | undefined;
 const anbruddEtikettOpenUrl = (import.meta.env.VITE_ANBRUDD_ETIKETT_OPEN_URL ??
-  "https://farmasietno.sharepoint.com/:x:/s/Reseptekspedisjon827-Farmasyter/IQA-XrifJGC2QKLZlwvgJE9lAcrp1P4NQBDiMeSzKSu2lYw?e=N2ZnkM") as
+  "https://farmasietno-my.sharepoint.com/:x:/g/personal/jenny_kvarme_farmasiet_no/IQAyYWdzIziXQL0xo7k1HsgOAWGFnpFU8u7fYaW1J5ELpis?e=85lDkh") as
+  | string
+  | undefined;
+const anbruddOversiktOpenUrl = (import.meta.env.VITE_ANBRUDD_OVERSIKT_OPEN_URL ??
+  "https://farmasietno.sharepoint.com/:x:/s/Reseptekspedisjon827/IQCQmy33FSXsRoKQnMZfFlFdATiJj8T-G2uqFjFWEnsrFvg?e=2CYbVq") as
   | string
   | undefined;
 const sharepointEmbedUrl = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
-  import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL) as string | undefined;
+  import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL ??
+  "https://farmasietno.sharepoint.com/sites/Reseptekspedisjon827/_layouts/15/Doc.aspx?sourcedoc={f72d9b90-2515-46ec-8290-9cc65f16515d}&action=embedview&wdAllowInteractivity=False&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True&edaebf=rslc0") as
+  | string
+  | undefined;
 
 const withRefreshParam = (src: string | undefined, refreshKey?: number) => {
   if (!src) return src;
@@ -54,6 +61,16 @@ const formatRefreshTime = (value: string | null) => {
     dateStyle: "short",
     timeStyle: "medium",
   }).format(date);
+};
+
+const toOrigin = (url: string | undefined) => {
+  if (!url) return null;
+
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
 };
 
 export default function AndbruddPage() {
@@ -76,6 +93,45 @@ export default function AndbruddPage() {
     () => withRefreshParam(sharepointEmbedUrl, oversiktRefreshKey),
     [oversiktRefreshKey]
   );
+
+  useEffect(() => {
+    const resources = [produktskjemaSrc, sharepointEmbedUrl]
+      .map(toOrigin)
+      .filter((origin): origin is string => Boolean(origin));
+    const uniqueOrigins = Array.from(new Set(resources));
+    const links: HTMLLinkElement[] = [];
+
+    uniqueOrigins.forEach((origin) => {
+      const dnsPrefetch = document.createElement("link");
+      dnsPrefetch.rel = "dns-prefetch";
+      dnsPrefetch.href = origin;
+      document.head.appendChild(dnsPrefetch);
+      links.push(dnsPrefetch);
+
+      const preconnect = document.createElement("link");
+      preconnect.rel = "preconnect";
+      preconnect.href = origin;
+      preconnect.crossOrigin = "anonymous";
+      document.head.appendChild(preconnect);
+      links.push(preconnect);
+    });
+
+    return () => {
+      links.forEach((link) => link.remove());
+    };
+  }, [produktskjemaSrc]);
+
+  useEffect(() => {
+    if (!produktskjemaSrc || hasVisited.produktskjema) return;
+
+    const warmupTimer = window.setTimeout(() => {
+      setHasVisited((prev) => (prev.produktskjema ? prev : { ...prev, produktskjema: true }));
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(warmupTimer);
+    };
+  }, [hasVisited.produktskjema, produktskjemaSrc]);
   const current = tab === "produktskjema"
     ? {
         src: produktskjemaSrc,
@@ -86,7 +142,7 @@ export default function AndbruddPage() {
       }
     : {
         src: oversiktSrc,
-        editUrl: sharepointEmbedUrl,
+        editUrl: anbruddOversiktOpenUrl,
         missing:
           "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
         iframeTitle: "SharePoint Excel",
@@ -392,7 +448,7 @@ export default function AndbruddPage() {
                 }}
                 frameBorder={0}
                 scrolling="no"
-                loading="lazy"
+                loading="eager"
                 allowFullScreen
                 style={{
                   width: "100%",

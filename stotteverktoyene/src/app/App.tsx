@@ -430,6 +430,8 @@ function Layout() {
   }, [collapsed]);
 
   const location = useLocation();
+  const isAnbruddRoute = location.pathname === "/anbrudd" || location.pathname === "/produktskjema";
+  const [keepAnbruddMounted, setKeepAnbruddMounted] = React.useState(isAnbruddRoute);
 
   React.useEffect(() => {
     logUsage("app_open");
@@ -445,6 +447,12 @@ function Layout() {
     logUsage("page_view", { page, pagePath: location.pathname });
   }, [location.pathname]);
 
+  React.useEffect(() => {
+    if (isAnbruddRoute) {
+      setKeepAnbruddMounted(true);
+    }
+  }, [isAnbruddRoute]);
+
   const { open: searchOpen, closeSearch } = useGlobalSearchHotkey();
 
   return (
@@ -452,26 +460,36 @@ function Layout() {
       <GlobalSearch open={searchOpen} onClose={closeSearch} />
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <Box component="main" sx={{ flex: 1, p: 2 }}>
-        <Suspense fallback={<RouteLoader />}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/omeq" element={<OMEQPage />} />
-            <Route path="/standardtekster" element={<StandardTekstPage />} />
-            <Route path="/interaksjoner" element={<InteraksjonerPage />} />
-            <Route path="/produkt-og-rad" element={<ProduktOgRadPage />} />
-            <Route path="/profil" element={<ProfilePage />} />
-            <Route path="/statistikk" element={<StatistikkPage />} />
-            <Route path="/produktskjema" element={<Navigate to="/anbrudd" replace />} />
-            <Route path="/anbrudd" element={<AndbruddPage />} />
-            <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
-            <Route element={<RequireRekspert />}>
-              <Route path="/rekspert" element={<RekspertPage />} />
-            </Route>
-            <Route path="/intern-chat" element={<Navigate to="/omeq" replace />} />
-            <Route path="/teams-chat" element={<Navigate to="/omeq" replace />} />
-            <Route path="*" element={<Navigate to="/omeq" replace />} />
-          </Routes>
-        </Suspense>
+        {keepAnbruddMounted && (
+          <Box sx={{ display: isAnbruddRoute ? "block" : "none" }}>
+            <Suspense fallback={<RouteLoader />}>
+              <AndbruddPage />
+            </Suspense>
+          </Box>
+        )}
+
+        <Box sx={{ display: isAnbruddRoute ? "none" : "block" }}>
+          <Suspense fallback={<RouteLoader />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/omeq" element={<OMEQPage />} />
+              <Route path="/standardtekster" element={<StandardTekstPage />} />
+              <Route path="/interaksjoner" element={<InteraksjonerPage />} />
+              <Route path="/produkt-og-rad" element={<ProduktOgRadPage />} />
+              <Route path="/profil" element={<ProfilePage />} />
+              <Route path="/statistikk" element={<StatistikkPage />} />
+              <Route path="/produktskjema" element={<Navigate to="/anbrudd" replace />} />
+              <Route path="/anbrudd" element={null} />
+              <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
+              <Route element={<RequireRekspert />}>
+                <Route path="/rekspert" element={<RekspertPage />} />
+              </Route>
+              <Route path="/intern-chat" element={<Navigate to="/omeq" replace />} />
+              <Route path="/teams-chat" element={<Navigate to="/omeq" replace />} />
+              <Route path="*" element={<Navigate to="/omeq" replace />} />
+            </Routes>
+          </Suspense>
+        </Box>
       </Box>
     </Box>
   );
