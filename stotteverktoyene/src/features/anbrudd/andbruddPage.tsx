@@ -331,7 +331,7 @@ export default function AndbruddPage() {
               position: "relative",
               flex: 1,
               minHeight: 0,
-              borderRadius: 3,
+              borderRadius: "2px",
               overflow: "hidden",
             }}
           >
