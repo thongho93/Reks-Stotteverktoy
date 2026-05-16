@@ -358,9 +358,6 @@ export default function AndbruddPage() {
               minHeight: 0,
               borderRadius: 3,
               overflow: "hidden",
-              border: `1px solid ${alpha(ANBRUDD_ACCENT_TEXT, 0.2)}`,
-              bgcolor: ANBRUDD_SURFACE_ELEVATED,
-              boxShadow: `0 18px 34px ${alpha(ANBRUDD_ACCENT_TEXT, 0.12)}`,
             }}
           >
             {!iframeLoaded[tab] && (
@@ -371,10 +368,7 @@ export default function AndbruddPage() {
                   display: "grid",
                   placeItems: "center",
                   gap: 1.5,
-                  background: `linear-gradient(180deg, ${alpha(ANBRUDD_SURFACE_ELEVATED, 0.96)} 0%, ${alpha(
-                    ANBRUDD_SURFACE,
-                    0.98
-                  )} 100%)`,
+                  background: `linear-gradient(180deg, #FFF7EC 0%, #FDF1E1 100%)`,
                   backdropFilter: "blur(2px)",
                   zIndex: 1,
                   textAlign: "center",
