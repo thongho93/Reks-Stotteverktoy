@@ -343,7 +343,9 @@ export default function ProduktOgRadPage() {
     }
     if (params.has(FAGLIG_DOC_QUERY_KEY)) {
       setActiveTab(1);
+      return;
     }
+    setActiveTab(0);
   }, [location.search]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

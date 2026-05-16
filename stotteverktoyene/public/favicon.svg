@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="petalGradient" x1="120" y1="80" x2="392" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F4A1C8"/>
+      <stop offset="0.45" stop-color="#D86BA8"/>
+      <stop offset="1" stop-color="#7B3FA1"/>
+    </linearGradient>
+
+    <linearGradient id="bgGradient" x1="72" y1="48" x2="440" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFF1F8"/>
+    </linearGradient>
+
+    <filter id="shadow" x="40" y="40" width="432" height="432" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#C85A9C" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect x="48" y="48" width="416" height="416" rx="96" fill="url(#bgGradient)"/>
+
+  <g filter="url(#shadow)">
+    <path d="M256 78C294 108 320 134 320 178C320 206 307 232 284 256C307 280 320 306 320 334C320 378 294 404 256 434C218 404 192 378 192 334C192 306 205 280 228 256C205 232 192 206 192 178C192 134 218 108 256 78Z" fill="url(#petalGradient)"/>
+
+    <path d="M78 256C108 218 134 192 178 192C206 192 232 205 256 228C280 205 306 192 334 192C378 192 404 218 434 256C404 294 378 320 334 320C306 320 280 307 256 284C232 307 206 320 178 320C134 320 108 294 78 256Z" fill="url(#petalGradient)" opacity="0.92"/>
+
+    <circle cx="256" cy="256" r="74" fill="#F2A5CC" opacity="0.28"/>
+
+    <path d="M236 188C236 176.954 244.954 168 256 168C267.046 168 276 176.954 276 188V236H324C335.046 236 344 244.954 344 256C344 267.046 335.046 276 324 276H276V324C276 335.046 267.046 344 256 344C244.954 344 236 335.046 236 324V276H188C176.954 276 168 267.046 168 256C168 244.954 176.954 236 188 236H236V188Z" fill="white"/>
+  </g>
+</svg>
