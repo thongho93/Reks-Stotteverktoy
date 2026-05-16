@@ -12,6 +12,8 @@ import { alpha } from "@mui/material/styles";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
 type TabKey = "produktskjema" | "anbruddOversikt";
+const ANBRUDD_SURFACE = "#FFF7EC";
+const ANBRUDD_SURFACE_SOFT = "#FDF1E1";
 const ANBRUDD_SURFACE_ELEVATED = "#FFFFFF";
 const ANBRUDD_HOVER_SURFACE = "#F9E4CA";
 const ANBRUDD_TEXT_PRIMARY = "#2E241A";
@@ -205,6 +207,7 @@ export default function AndbruddPage() {
         flexDirection: "column",
         flex: 1,
         minHeight: 0,
+        background: `linear-gradient(145deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
       }}
     >
       <Box sx={{ position: "relative", zIndex: 1 }}>
@@ -341,7 +344,7 @@ export default function AndbruddPage() {
                   display: "grid",
                   placeItems: "center",
                   gap: 1.5,
-                  background: `linear-gradient(180deg, #FFF7EC 0%, #FDF1E1 100%)`,
+                  background: `linear-gradient(180deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
                   backdropFilter: "blur(2px)",
                   zIndex: 1,
                   textAlign: "center",

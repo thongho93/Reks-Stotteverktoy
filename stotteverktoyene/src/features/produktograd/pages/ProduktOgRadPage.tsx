@@ -78,6 +78,7 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
+import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../queryKeys";
 
 type AdviceProduct = {
   id: string;
@@ -124,9 +125,6 @@ const toDigits = (value: string): string => value.replace(/\D+/g, "");
 const NUMERIC_QUERY_RE = /^\d+$/;
 const MAX_RENDERED_RESULTS = 120;
 const PAGE_MAX_WIDTH = 1500;
-const FAGLIG_DOC_QUERY_KEY = "fagdoc";
-const ROUTINE_TAB_QUERY_KEY = "tab";
-const ROUTINE_DOC_QUERY_KEY = "rutine";
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
 const ATC_INGREDIENT: Record<string, string> = {
   A02BC01: "Omeprazol",
