@@ -307,10 +307,31 @@ export default function ProduktOgRadPage() {
 
   // Pre-fill search when navigated from the global command palette
   useEffect(() => {
-    const searchQuery = (location.state as { searchQuery?: string } | null)?.searchQuery;
+    const state = location.state as {
+      searchQuery?: string;
+      activeTab?: number;
+      selectedFagligDocId?: string;
+    } | null;
+    const searchQuery = state?.searchQuery;
+    const stateSelectedFagligDocId =
+      typeof state?.selectedFagligDocId === "string" && state.selectedFagligDocId.trim()
+        ? state.selectedFagligDocId.trim()
+        : null;
+    const openFagligTab = state?.activeTab === 1 || Boolean(stateSelectedFagligDocId);
+
+    if (openFagligTab) {
+      setActiveTab(1);
+      if (stateSelectedFagligDocId) {
+        setSelectedFagligDocId(stateSelectedFagligDocId);
+      }
+      setTimeout(() => fagligSearchInputRef.current?.focus(), 100);
+    }
+
     if (searchQuery) {
       setQuery(searchQuery);
-      setTimeout(() => searchInputRef.current?.focus(), 100);
+      if (!openFagligTab) {
+        setTimeout(() => searchInputRef.current?.focus(), 100);
+      }
     }
   }, [location.state]);
 
@@ -529,6 +550,7 @@ export default function ProduktOgRadPage() {
   );
 
   useEffect(() => {
+    if (isFagligLoading) return;
     // Built-in virtual tabs — never auto-replace them
     if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return;
     if (fagligDocs.length === 0) {
@@ -538,7 +560,7 @@ export default function ProduktOgRadPage() {
     if (!selectedFagligDocId || !fagligDocs.some((doc) => doc.id === selectedFagligDocId)) {
       setSelectedFagligDocId(fagligDocs[0].id);
     }
-  }, [fagligDocs, selectedFagligDocId]);
+  }, [fagligDocs, isFagligLoading, selectedFagligDocId]);
 
   useEffect(() => {
     localStorage.setItem("faglig-sidebar-collapsed", String(fagligSidebarCollapsed));

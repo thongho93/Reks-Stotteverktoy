@@ -47,6 +47,7 @@ import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutli
 import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { useLocation } from "react-router-dom";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 
@@ -103,6 +104,12 @@ type PrivateNote = {
   checklistItems: NoteChecklistItem[];
   color: string | null;
   updatedAtMs: number;
+};
+
+type TilbakemeldingRouteState = {
+  initialTab?: "meldeskjema" | "rutiner" | "notater";
+  noteSearchQuery?: string;
+  selectedNoteId?: string | null;
 };
 
 type NoteChecklistItem = {
@@ -597,6 +604,11 @@ function mapFirebaseError(error: unknown, fallback: string): string {
 
 export default function TilbakemeldingPage({ variant = "default" }: TilbakemeldingPageProps) {
   const isRutinerOnly = variant === "rutinerOnly";
+  const location = useLocation();
+  const routeState = React.useMemo(
+    () => ((location.state as TilbakemeldingRouteState | null) ?? null),
+    [location.state],
+  );
   const initialRouteState = React.useMemo(() => {
     if (isRutinerOnly) {
       if (typeof window === "undefined") {
@@ -607,6 +619,10 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
       return { initialTab: "rutiner" as "meldeskjema" | "rutiner" | "notater", routineDocId };
     }
 
+    const stateTab = routeState?.initialTab;
+    if (stateTab === "meldeskjema" || stateTab === "rutiner" || stateTab === "notater") {
+      return { initialTab: stateTab, routineDocId: null as string | null };
+    }
     if (typeof window === "undefined") {
       return { initialTab: "notater" as "meldeskjema" | "rutiner" | "notater", routineDocId: null as string | null };
     }
@@ -618,7 +634,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
         ? tabParam
         : "notater";
     return { initialTab, routineDocId };
-  }, [isRutinerOnly]);
+  }, [isRutinerOnly, routeState]);
 
   const { user, isOwner, firstName } = useAuthUser();
   const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">(initialRouteState.initialTab);
@@ -688,6 +704,19 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     () => firstName?.trim() || user?.displayName?.trim() || user?.email?.trim() || "Ukjent bruker",
     [firstName, user?.displayName, user?.email]
   );
+  const getNoteClipboardText = React.useCallback(
+    (note: PrivateNote) =>
+      note.mode === "checklist" ? buildChecklistContent(note.checklistItems) : note.content,
+    []
+  );
+  const selectNote = React.useCallback((note: PrivateNote) => {
+    setSelectedNoteId(note.id);
+    setDraftMode(note.mode);
+    setDraftTitle(note.title);
+    setDraftContent(note.content);
+    setDraftChecklistItems(note.checklistItems);
+    setDraftColor(note.color);
+  }, []);
 
   const persistNotesOrder = React.useCallback(
     async (notes: PrivateNote[]) => {
@@ -796,12 +825,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
           setSavedNotesList(loadedNotes);
 
           if (loadedNotes.length > 0) {
-            setSelectedNoteId(loadedNotes[0].id);
-            setDraftMode(loadedNotes[0].mode);
-            setDraftTitle(loadedNotes[0].title);
-            setDraftContent(loadedNotes[0].content);
-            setDraftChecklistItems(loadedNotes[0].checklistItems);
-            setDraftColor(loadedNotes[0].color);
+            selectNote(loadedNotes[0]);
           } else {
             setSelectedNoteId(null);
             setDraftMode("text");
@@ -827,7 +851,26 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     return () => {
       cancelled = true;
     };
-  }, [user?.uid]);
+  }, [selectNote, user?.uid]);
+
+  React.useEffect(() => {
+    if (!routeState) return;
+    if (routeState.initialTab === "meldeskjema" || routeState.initialTab === "rutiner" || routeState.initialTab === "notater") {
+      setTab(routeState.initialTab);
+    }
+    if (typeof routeState.noteSearchQuery === "string") {
+      setSearchQuery(routeState.noteSearchQuery);
+    }
+  }, [routeState]);
+
+  React.useEffect(() => {
+    const targetId = typeof routeState?.selectedNoteId === "string" ? routeState.selectedNoteId.trim() : "";
+    if (!targetId || savedNotesList.length === 0) return;
+    const note = savedNotesList.find((item) => item.id === targetId);
+    if (!note) return;
+
+    selectNote(note);
+  }, [routeState?.selectedNoteId, savedNotesList, selectNote]);
 
   const copyNoteToClipboard = React.useCallback(
     async (content: string, mode: "auto" | "manual") => {
@@ -998,16 +1041,11 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
   ]);
 
   const handleOpenEditor = React.useCallback((note: PrivateNote) => {
-    setSelectedNoteId(note.id);
-    setDraftMode(note.mode);
-    setDraftTitle(note.title);
-    setDraftContent(note.content);
-    setDraftChecklistItems(note.checklistItems);
-    setDraftColor(note.color);
+    selectNote(note);
     setEditorOpen(true);
     setError(null);
     setSuccess(null);
-  }, []);
+  }, [selectNote]);
 
   const saveExistingNote = React.useCallback(
     async (
@@ -1190,6 +1228,12 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     () => savedNotesList.find((note) => note.id === selectedNoteId) ?? null,
     [savedNotesList, selectedNoteId]
   );
+  React.useEffect(() => {
+    if (filteredNotes.length === 0) return;
+    if (!selectedNoteId) return;
+    if (filteredNotes.some((note) => note.id === selectedNoteId)) return;
+    selectNote(filteredNotes[0]);
+  }, [filteredNotes, selectedNoteId, selectNote]);
   const activeEditorColor = selectedNote ? draftColor ?? getNoteColor(selectedNote) : draftColor;
   const hasActiveSearch = searchQuery.trim().length >= 2;
   const sharedRoutineDocRef = React.useMemo(
@@ -2107,22 +2151,59 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
         }
       }
 
+      if (tab === "notater" && !editorOpen) {
+        const activeElement = document.activeElement as HTMLElement | null;
+        const isTextInput =
+          activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          Boolean(activeElement?.isContentEditable);
+
+        const isCopyShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c";
+        if (isCopyShortcut && selectedNote) {
+          if (isTextInput) return;
+          event.preventDefault();
+          void copyNoteToClipboard(getNoteClipboardText(selectedNote), "manual");
+          return;
+        }
+
+        if ((event.key === "ArrowDown" || event.key === "ArrowUp") && filteredNotes.length > 0) {
+          if (isTextInput) return;
+          event.preventDefault();
+          const currentIndex = selectedNoteId
+            ? filteredNotes.findIndex((note) => note.id === selectedNoteId)
+            : -1;
+          const fallbackIndex = event.key === "ArrowDown" ? 0 : filteredNotes.length - 1;
+          const nextIndex =
+            currentIndex === -1
+              ? fallbackIndex
+              : event.key === "ArrowDown"
+                ? Math.min(currentIndex + 1, filteredNotes.length - 1)
+                : Math.max(currentIndex - 1, 0);
+          const nextNote = filteredNotes[nextIndex];
+          if (!nextNote) return;
+          selectNote(nextNote);
+          return;
+        }
+      }
+
       if (event.key !== "Escape" || tab !== "notater") return;
       const input = notesSearchInputRef.current;
       if (!input || document.activeElement !== input) return;
 
       event.preventDefault();
-      setSearchQuery("");
-      window.requestAnimationFrame(() => {
-        input.focus();
-      });
+      if (searchQuery.trim().length > 0) {
+        setSearchQuery("");
+        return;
+      }
+
+      input.blur();
     };
 
     window.addEventListener("keydown", handleRoutineSearchShortcut);
     return () => {
       window.removeEventListener("keydown", handleRoutineSearchShortcut);
     };
-  }, [tab]);
+  }, [copyNoteToClipboard, editorOpen, filteredNotes, getNoteClipboardText, searchQuery, selectedNote, selectedNoteId, selectNote, tab]);
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -3471,10 +3552,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                         key={note.id}
                         variant="outlined"
                         onClick={() => {
-                          void copyNoteToClipboard(
-                            note.mode === "checklist" ? buildChecklistContent(note.checklistItems) : note.content,
-                            "manual"
-                          );
+                          selectNote(note);
+                          void copyNoteToClipboard(getNoteClipboardText(note), "manual");
                         }}
                         draggable
                         onDragStart={(event) => {

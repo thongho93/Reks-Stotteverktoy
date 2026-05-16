@@ -57,6 +57,7 @@ type OMEQStandardtekstPrefill = {
   templateTitle: string;
   preparats: string[];
   totalOmeq: string;
+  vedtakOmeq?: string;
 };
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
@@ -66,7 +67,7 @@ type PalettePrefill = {
   tallValues?: Record<number, string>;
   formuleringValues?: Record<number, string>;
   clockTime?: string;
-  clockDay?: "today" | "tomorrow";
+  clockDay?: "today" | "tomorrow" | "sunday";
   datoInput?: string;
 };
 
@@ -86,7 +87,7 @@ function parsePalettePrefill(value: unknown): PalettePrefill | null {
     result.formuleringValues = candidate.formuleringValues as Record<number, string>;
   if (typeof candidate.clockTime === "string" && candidate.clockTime.trim())
     result.clockTime = candidate.clockTime.trim();
-  if (candidate.clockDay === "today" || candidate.clockDay === "tomorrow")
+  if (candidate.clockDay === "today" || candidate.clockDay === "tomorrow" || candidate.clockDay === "sunday")
     result.clockDay = candidate.clockDay;
   if (typeof candidate.datoInput === "string" && candidate.datoInput.trim())
     result.datoInput = candidate.datoInput.trim();
@@ -94,7 +95,7 @@ function parsePalettePrefill(value: unknown): PalettePrefill | null {
   return result;
 }
 
-type ClockTallDay = "today" | "tomorrow";
+type ClockTallDay = "today" | "tomorrow" | "sunday";
 const CLOCK_TALL_OPTIONS = ["11:00", "14:00", "15:00"] as const;
 const DEFAULT_CLOCK_TALL_TIME = "11:00";
 const CUSTOM_CLOCK_VALUE = "__custom__";
@@ -121,6 +122,7 @@ function formatClockTallValue(time: string, day: ClockTallDay): string {
   const displayTime =
     match && match[2] === "00" ? String(Number(match[1])) : trimmedTime;
 
+  if (day === "sunday") return `${displayTime} på søndag`;
   return `${displayTime} ${day === "tomorrow" ? "i morgen" : "i dag"}`;
 }
 
@@ -249,6 +251,7 @@ function parseOmeqStandardtekstPrefill(value: unknown): OMEQStandardtekstPrefill
     templateTitle: candidate.templateTitle.trim(),
     preparats,
     totalOmeq: candidate.totalOmeq.trim(),
+    vedtakOmeq: typeof candidate.vedtakOmeq === "string" ? candidate.vedtakOmeq.trim() : undefined,
   };
 }
 
@@ -1008,6 +1011,7 @@ export default function StandardTekstPage() {
 
       const nextTallValues = buildInitialTallValues(normalizeTemplateContent(selected.content));
       nextTallValues[1] = pending.totalOmeq;
+      if (pending.vedtakOmeq) nextTallValues[0] = pending.vedtakOmeq;
       setTallByIndex(nextTallValues);
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
@@ -2246,9 +2250,7 @@ export default function StandardTekstPage() {
                           clockTime as (typeof CLOCK_TALL_OPTIONS)[number],
                         )
                           ? clockTime
-                          : clockCustomMode
-                            ? CUSTOM_CLOCK_VALUE
-                            : "";
+                          : "";
 
                         return (
                           <Box
@@ -2291,13 +2293,11 @@ export default function StandardTekstPage() {
                                 }
                               }}
                             >
-                              <MenuItem value="">Velg klokkeslett</MenuItem>
                               {CLOCK_TALL_OPTIONS.map((time) => (
                                 <MenuItem key={time} value={time}>
                                   kl. {time.slice(0, 2)}
                                 </MenuItem>
                               ))}
-                              <MenuItem value={CUSTOM_CLOCK_VALUE}>Skriv eget klokkeslett</MenuItem>
                             </TextField>
 
                             <TextField
@@ -2315,6 +2315,7 @@ export default function StandardTekstPage() {
                             >
                               <MenuItem value="today">I dag</MenuItem>
                               <MenuItem value="tomorrow">I morgen</MenuItem>
+                              <MenuItem value="sunday">Søndag</MenuItem>
                             </TextField>
 
                             {clockCustomMode && (
