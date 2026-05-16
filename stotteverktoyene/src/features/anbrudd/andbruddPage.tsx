@@ -210,6 +210,10 @@ export default function AndbruddPage() {
         border: `1px solid ${ANBRUDD_BORDER}`,
         background: `linear-gradient(145deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
         boxShadow: `0 14px 42px ${alpha(ANBRUDD_ACCENT_TEXT, 0.12)}`,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        minHeight: 0,
       }}
     >
       <Box
@@ -357,7 +361,8 @@ export default function AndbruddPage() {
           <Box
             sx={{
               position: "relative",
-              minHeight: current.height,
+              flex: 1,
+              minHeight: 0,
               borderRadius: 3,
               overflow: "hidden",
               border: `1px solid ${alpha(ANBRUDD_ACCENT_TEXT, 0.2)}`,
@@ -420,7 +425,7 @@ export default function AndbruddPage() {
                 allowFullScreen
                 style={{
                   width: "100%",
-                  height: `${current.height}px`,
+                  height: "100%",
                   border: 0,
                   display: "block",
                   visibility: tab === "anbruddOversikt" ? "visible" : "hidden",
@@ -452,7 +457,7 @@ export default function AndbruddPage() {
                 allowFullScreen
                 style={{
                   width: "100%",
-                  height: `${current.height}px`,
+                  height: "100%",
                   border: 0,
                   display: "block",
                   visibility: tab === "produktskjema" ? "visible" : "hidden",

@@ -623,19 +623,19 @@ function Layout() {
   const { open: searchOpen, closeSearch } = useGlobalSearchHotkey();
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <GlobalSearch open={searchOpen} onClose={closeSearch} />
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-      <Box component="main" sx={{ flex: 1, p: 2 }}>
+      <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {keepAnbruddMounted && (
-          <Box sx={{ display: isAnbruddRoute ? "block" : "none" }}>
+          <Box sx={{ display: isAnbruddRoute ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <Suspense fallback={<RouteLoader />}>
               <AndbruddPage />
             </Suspense>
           </Box>
         )}
 
-        <Box sx={{ display: isAnbruddRoute ? "none" : "block" }}>
+        <Box sx={{ display: isAnbruddRoute ? "none" : "block", flex: 1, overflowY: "auto" }}>
           <Suspense fallback={<RouteLoader />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
