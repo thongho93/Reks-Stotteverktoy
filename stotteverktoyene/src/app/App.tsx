@@ -93,9 +93,7 @@ const InnkjopIcon = createSvgIcon(
   </>,
   "InnkjopIcon"
 );
-import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
-import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";

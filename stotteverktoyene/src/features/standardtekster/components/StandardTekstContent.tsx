@@ -51,21 +51,7 @@ type Props = {
   categoryOptions?: string[];
 };
 
-function renderTitleWithBreak(title: string, forceBreak: boolean): ReactNode {
-  if (!forceBreak) return title;
 
-  const match = title.match(/^(.+?\s[-–])\s+(.+)$/);
-  if (!match) return title;
-
-  return (
-    <>
-      {match[1]}
-      <Box component="span" sx={{ display: "block" }}>
-        {match[2]}
-      </Box>
-    </>
-  );
-}
 
 export default function StandardTekstContent({
   selected,
@@ -94,8 +80,6 @@ export default function StandardTekstContent({
 }: Props) {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const hasHeaderRight = !isEditing && headerRightCount > 0;
-  const hasCompactHeaderRight = hasHeaderRight && headerRightCount <= 2;
-  const hasFewHeaderRight = hasHeaderRight && headerRightCount >= 3 && headerRightCount < 4;
 
   const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const didInitNewStandardtekstContentRef = useRef(false);
