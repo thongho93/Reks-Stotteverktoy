@@ -45,7 +45,6 @@ type Props = {
   editorTools?: ReactNode;
   belowContent?: ReactNode;
   headerRight?: ReactNode;
-  headerRightCount?: number;
 
   previewNode: ReactNode;
   categoryOptions?: string[];
@@ -74,12 +73,10 @@ export default function StandardTekstContent({
   editorTools,
   belowContent,
   headerRight,
-  headerRightCount = 0,
   previewNode,
   categoryOptions = [],
 }: Props) {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const hasHeaderRight = !isEditing && headerRightCount > 0;
 
   const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const didInitNewStandardtekstContentRef = useRef(false);

@@ -2576,7 +2576,6 @@ export default function StandardTekstPage() {
               ) : null
             }
             headerRight={!isEditing ? followUpsPreview : null}
-            headerRightCount={selected?.followUps?.length ?? 0}
             categoryOptions={categoryOptions}
           />
         </Box>
