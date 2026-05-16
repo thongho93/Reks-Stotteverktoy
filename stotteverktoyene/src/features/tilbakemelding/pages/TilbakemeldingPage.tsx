@@ -138,6 +138,10 @@ type RoutineSearchOption = {
   snippet: string;
 };
 
+type TilbakemeldingPageProps = {
+  variant?: "default" | "rutinerOnly";
+};
+
 const ROUTINE_EMOJI_OPTIONS: RoutineEmojiOption[] = [
   { emoji: "😀", label: "Grinende ansikt", keywords: ["smil", "glad", "happy", "grin"], category: "smileys" },
   { emoji: "😃", label: "Smilende ansikt", keywords: ["smil", "glede", "joy"], category: "smileys" },
@@ -591,22 +595,30 @@ function mapFirebaseError(error: unknown, fallback: string): string {
   return code ? `${fallback} (${code})` : fallback;
 }
 
-export default function TilbakemeldingPage() {
+export default function TilbakemeldingPage({ variant = "default" }: TilbakemeldingPageProps) {
+  const isRutinerOnly = variant === "rutinerOnly";
   const initialRouteState = React.useMemo(() => {
+    if (isRutinerOnly) {
+      if (typeof window === "undefined") {
+        return { initialTab: "rutiner" as "meldeskjema" | "rutiner" | "notater", routineDocId: null as string | null };
+      }
+      const params = new URLSearchParams(window.location.search);
+      const routineDocId = (params.get(ROUTINE_DOC_QUERY_KEY) ?? "").trim() || null;
+      return { initialTab: "rutiner" as "meldeskjema" | "rutiner" | "notater", routineDocId };
+    }
+
     if (typeof window === "undefined") {
       return { initialTab: "notater" as "meldeskjema" | "rutiner" | "notater", routineDocId: null as string | null };
     }
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get(ROUTINE_TAB_QUERY_KEY);
-    const routineDocId = (params.get(ROUTINE_DOC_QUERY_KEY) ?? "").trim() || null;
+    const routineDocId = null;
     const initialTab: "meldeskjema" | "rutiner" | "notater" =
-      tabParam === "meldeskjema" || tabParam === "rutiner" || tabParam === "notater"
+      tabParam === "meldeskjema" || tabParam === "notater"
         ? tabParam
-        : routineDocId
-          ? "rutiner"
-          : "notater";
+        : "notater";
     return { initialTab, routineDocId };
-  }, []);
+  }, [isRutinerOnly]);
 
   const { user, isOwner, firstName } = useAuthUser();
   const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">(initialRouteState.initialTab);
@@ -2114,18 +2126,19 @@ export default function TilbakemeldingPage() {
 
   return (
     <Box sx={{ width: "100%" }}>
-      <Paper sx={{ mb: 2 }}>
-        <Tabs
-          value={tab}
-          onChange={(_, nextTab: "meldeskjema" | "rutiner" | "notater") => setTab(nextTab)}
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          <Tab value="notater" label="Mine notater" />
-          <Tab value="rutiner" label="Rutiner" />
-          <Tab value="meldeskjema" label="Innspill" />
-        </Tabs>
-      </Paper>
+      {!isRutinerOnly ? (
+        <Paper sx={{ mb: 2 }}>
+          <Tabs
+            value={tab}
+            onChange={(_, nextTab: "meldeskjema" | "rutiner" | "notater") => setTab(nextTab)}
+            variant="scrollable"
+            scrollButtons="auto"
+          >
+            <Tab value="notater" label="Mine notater" />
+            <Tab value="meldeskjema" label="Innspill" />
+          </Tabs>
+        </Paper>
+      ) : null}
 
       {tab === "meldeskjema" ? (
         <>
