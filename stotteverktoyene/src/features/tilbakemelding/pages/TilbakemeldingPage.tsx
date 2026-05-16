@@ -50,7 +50,6 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, server
 import { useLocation } from "react-router-dom";
 import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
-import { useLocation } from "react-router-dom";
 
 const MELDESKJEMA_EMBED_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLScKadKrBcIT-8a9CgD4QFfCjXsERjolCZbhojJU8jFhy8V6ZA/viewform?embedded=true";
@@ -638,7 +637,6 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
   }, [isRutinerOnly, routeState]);
 
   const { user, isOwner, firstName } = useAuthUser();
-  const location = useLocation();
   const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">(initialRouteState.initialTab);
 
   React.useEffect(() => {
