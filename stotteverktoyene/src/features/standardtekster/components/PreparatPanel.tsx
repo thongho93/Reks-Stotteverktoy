@@ -133,6 +133,7 @@ export default function PreparatPanel({
             inputRef={inputRef}
             autoPasteNumericClipboard={autoPasteNumericClipboard}
             resetSignal={searchResetSignal}
+            accentColor="#5CAA7E"
             onPick={(med) => {
               const baseText = formatPreparatForTemplate(med);
               if (!baseText) return;

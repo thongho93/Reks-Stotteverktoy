@@ -69,6 +69,7 @@ type Props = {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   autoPasteNumericClipboard?: boolean;
   resetSignal?: string | number | null;
+  accentColor?: string;
 };
 
 const NOISE_TOKENS = new Set([
@@ -554,6 +555,7 @@ export default function MedicationSearch({
   inputRef,
   autoPasteNumericClipboard = false,
   resetSignal = null,
+  accentColor,
 }: Props) {
   const [query, setQuery] = useState("");
   const queryRef = useRef("");
@@ -1295,13 +1297,16 @@ export default function MedicationSearch({
                   onClick={() => pickResult(m)}
                   selected={index === highlightedIndex}
                   onMouseEnter={() => setHighlightedIndex(index)}
-                  sx={(theme) => ({
-                    "&.Mui-selected": {
-                      bgcolor: alpha(theme.palette.primary.main, 0.13),
-                      "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.18) },
-                    },
-                    "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.07) },
-                  })}
+                  sx={(theme) => {
+                    const color = accentColor ?? theme.palette.primary.main;
+                    return {
+                      "&.Mui-selected": {
+                        bgcolor: alpha(color, 0.13),
+                        "&:hover": { bgcolor: alpha(color, 0.18) },
+                      },
+                      "&:hover": { bgcolor: alpha(color, 0.07) },
+                    };
+                  }}
                 >
                   {(() => {
                     const secondaryParts = [
