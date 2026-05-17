@@ -5,12 +5,11 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   CircularProgress,
   ClickAwayListener,
   Dialog,
-  DialogActions,
   DialogContent,
-  DialogTitle,
   IconButton,
   InputBase,
   MenuItem,
@@ -20,11 +19,11 @@ import {
   Popover,
   Paper,
   Snackbar,
-  Tab,
-  Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import type { FirebaseError } from "firebase/app";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -46,6 +45,12 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutline";
 import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import StarBorderRoundedIcon from "@mui/icons-material/StarBorderRounded";
+import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import FormatListBulletedRoundedIcon from "@mui/icons-material/FormatListBulletedRounded";
+import FormatListNumberedRoundedIcon from "@mui/icons-material/FormatListNumberedRounded";
+import OpenInFullRoundedIcon from "@mui/icons-material/OpenInFullRounded";
+import CloseFullscreenRoundedIcon from "@mui/icons-material/CloseFullscreenRounded";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { useLocation } from "react-router-dom";
 import { db } from "../../../firebase/firebase";
@@ -103,6 +108,8 @@ type PrivateNote = {
   checklistItems: NoteChecklistItem[];
   color: string | null;
   updatedAtMs: number;
+  tags: string[];
+  isFavorite: boolean;
 };
 
 type TilbakemeldingRouteState = {
@@ -338,15 +345,20 @@ function toMillis(value: any): number {
   return 0;
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function buildNoteTitle(title: string, content: string): string {
   const trimmedTitle = title.trim();
   if (trimmedTitle) return trimmedTitle;
 
+  const plain = stripHtml(content);
   const firstNonEmptyLine =
-    content
+    plain
       .split("\n")
       .map((line) => line.trim())
-      .find(Boolean) ?? "";
+      .find(Boolean) ?? plain.slice(0, 60);
 
   if (!firstNonEmptyLine) return "Uten tittel";
   return firstNonEmptyLine.slice(0, 60);
@@ -447,15 +459,21 @@ function isValidNoteColor(value: unknown): value is string {
   return typeof value === "string" && KEEP_CARD_COLORS.includes(value);
 }
 
-function getNoteColor(note: Pick<PrivateNote, "id" | "color">): string {
-  if (note.color && isValidNoteColor(note.color)) return note.color;
-  let hash = 0;
-  for (let i = 0; i < note.id.length; i += 1) {
-    hash = (hash << 5) - hash + note.id.charCodeAt(i);
-    hash |= 0;
+function promptValidUrl(): string | null {
+  const url = window.prompt("Lenke URL:");
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "mailto:") {
+      return url;
+    }
+  } catch {
+    // invalid URL
   }
-  return KEEP_CARD_COLORS[Math.abs(hash) % KEEP_CARD_COLORS.length];
+  return null;
 }
+
+
 
 function reorderByIds(items: PrivateNote[], fromId: string, toId: string): PrivateNote[] {
   const fromIndex = items.findIndex((item) => item.id === fromId);
@@ -603,6 +621,10 @@ function mapFirebaseError(error: unknown, fallback: string): string {
 
 export default function TilbakemeldingPage({ variant = "default" }: TilbakemeldingPageProps) {
   const isRutinerOnly = variant === "rutinerOnly";
+  const baseTheme = useTheme();
+  const isDark = baseTheme.palette.mode === "dark";
+  const PURPLE = "#B648E8";
+  const purpleTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: { main: PURPLE } } }), [baseTheme]);
   const location = useLocation();
   const routeState = React.useMemo(
     () => ((location.state as TilbakemeldingRouteState | null) ?? null),
@@ -654,6 +676,15 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
   const [draftContent, setDraftContent] = React.useState("");
   const [draftChecklistItems, setDraftChecklistItems] = React.useState<NoteChecklistItem[]>([]);
   const [draftColor, setDraftColor] = React.useState<string | null>(null);
+  const [draftTags, setDraftTags] = React.useState<string[]>([]);
+  const [draftIsFavorite, setDraftIsFavorite] = React.useState(false);
+  const [noteFormatState, setNoteFormatState] = React.useState({ bold: false, italic: false, underline: false });
+  const [tagInputValue, setTagInputValue] = React.useState("");
+  const [showTagInput, setShowTagInput] = React.useState(false);
+  const [editorFullscreen, setEditorFullscreen] = React.useState(false);
+  const noteEditorRef = React.useRef<HTMLDivElement>(null);
+  const composerContentRef = React.useRef<HTMLDivElement>(null);
+  const [composerFormatState, setComposerFormatState] = React.useState({ bold: false, italic: false, underline: false });
   const [searchQuery, setSearchQuery] = React.useState("");
   const [routineDocuments, setRoutineDocuments] = React.useState<RoutineDocument[]>([]);
   const [selectedRoutineDocumentId, setSelectedRoutineDocumentId] = React.useState<string | null>(null);
@@ -787,6 +818,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
             checklistItems,
             color: isValidNoteColor(data.color) ? data.color : null,
             updatedAtMs: toMillis(data.updatedAt),
+            tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
+            isFavorite: data.isFavorite === true,
           };
         });
 
@@ -814,6 +847,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                 checklistItems: [],
                 color: null,
                 updatedAtMs: Date.now(),
+                tags: [],
+                isFavorite: false,
               },
             ];
           }
@@ -979,6 +1014,51 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     );
   }, [draftChecklistItems, draftContent, draftMode]);
 
+  const updateNoteFormatState = React.useCallback(() => {
+    setNoteFormatState({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
+    });
+  }, []);
+
+  const runNoteCommand = React.useCallback((command: string, value?: string) => {
+    const editor = noteEditorRef.current;
+    if (!editor) return;
+    editor.focus();
+    document.execCommand("styleWithCSS", false, "true");
+    document.execCommand(command, false, value);
+    setDraftContent(editor.innerHTML);
+    window.setTimeout(updateNoteFormatState, 0);
+  }, [updateNoteFormatState]);
+
+  const updateComposerFormatState = React.useCallback(() => {
+    setComposerFormatState({ bold: document.queryCommandState("bold"), italic: document.queryCommandState("italic"), underline: document.queryCommandState("underline") });
+  }, []);
+
+  const runComposerCommand = React.useCallback((command: string, value?: string) => {
+    const editor = composerContentRef.current;
+    if (!editor) return;
+    editor.focus();
+    document.execCommand("styleWithCSS", false, "true");
+    document.execCommand(command, false, value);
+    setDraftContent(editor.innerHTML);
+    window.setTimeout(updateComposerFormatState, 0);
+  }, [updateComposerFormatState]);
+
+  const addTag = React.useCallback(() => {
+    const raw = tagInputValue.trim().replace(/^#+/, "");
+    if (raw && !draftTags.includes(raw)) {
+      setDraftTags((prev) => [...prev, raw]);
+    }
+    setTagInputValue("");
+    setShowTagInput(false);
+  }, [draftTags, tagInputValue]);
+
+  const removeTag = React.useCallback((tag: string) => {
+    setDraftTags((prev) => prev.filter((t) => t !== tag));
+  }, []);
+
   const createNoteFromComposer = React.useCallback(async () => {
     if (!user?.uid || savingNotes) return false;
 
@@ -1014,6 +1094,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
         checklistItems: draftMode === "checklist" ? normalizedChecklist : [],
         color: draftColor ?? null,
         updatedAtMs: Date.now(),
+        tags: [],
+        isFavorite: false,
       };
 
       const reordered = [created, ...savedNotesList];
@@ -1050,6 +1132,12 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
   const handleOpenEditor = React.useCallback((note: PrivateNote) => {
     selectNote(note);
+    setDraftTags(note.tags ?? []);
+    setDraftIsFavorite(note.isFavorite ?? false);
+    setEditorFullscreen(false);
+    setShowTagInput(false);
+    setTagInputValue("");
+    setNoteFormatState({ bold: false, italic: false, underline: false });
     setEditorOpen(true);
     setError(null);
     setSuccess(null);
@@ -1061,7 +1149,9 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
       nextTitle: string,
       nextContent: string,
       nextChecklistItems: NoteChecklistItem[],
-      nextColor: string | null
+      nextColor: string | null,
+      nextTags?: string[],
+      nextIsFavorite?: boolean
     ) => {
       if (!user?.uid || !selectedNoteId) return false;
 
@@ -1069,13 +1159,17 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
       const normalizedChecklist = normalizeChecklistItems(nextChecklistItems);
       const computedContent = nextMode === "checklist" ? buildChecklistContent(normalizedChecklist) : nextContent;
       const computedTitle = buildNoteTitle(nextTitle, computedContent);
+      const tags = nextTags ?? current?.tags ?? [];
+      const isFavorite = nextIsFavorite ?? current?.isFavorite ?? false;
       if (
         current &&
         current.title === computedTitle &&
         current.content === computedContent &&
         current.mode === nextMode &&
         JSON.stringify(current.checklistItems) === JSON.stringify(normalizedChecklist) &&
-        current.color === nextColor
+        current.color === nextColor &&
+        JSON.stringify(current.tags) === JSON.stringify(tags) &&
+        current.isFavorite === isFavorite
       ) {
         return true;
       }
@@ -1090,6 +1184,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
             noteMode: nextMode,
             checklistItems: nextMode === "checklist" ? normalizedChecklist : [],
             color: nextColor ?? null,
+            tags,
+            isFavorite,
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -1104,6 +1200,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                   content: computedContent,
                   checklistItems: nextMode === "checklist" ? normalizedChecklist : [],
                   color: nextColor ?? null,
+                  tags,
+                  isFavorite,
                   updatedAtMs: Date.now(),
                 }
               : note
@@ -1131,16 +1229,19 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
       current.title !== buildNoteTitle(draftTitle, computedContent) ||
       current.content !== computedContent ||
       JSON.stringify(current.checklistItems) !== JSON.stringify(normalizedChecklist) ||
-      current.color !== draftColor
+      current.color !== draftColor ||
+      JSON.stringify(current.tags) !== JSON.stringify(draftTags) ||
+      current.isFavorite !== draftIsFavorite
     );
-  }, [draftChecklistItems, draftColor, draftContent, draftMode, draftTitle, editorOpen, savedNotesList, selectedNoteId]);
+  }, [draftChecklistItems, draftColor, draftContent, draftIsFavorite, draftMode, draftTags, draftTitle, editorOpen, savedNotesList, selectedNoteId]);
 
   const handleCloseEditor = React.useCallback(() => {
     if (hasEditorPendingChanges) {
-      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems, draftColor);
+      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems, draftColor, draftTags, draftIsFavorite);
     }
     setEditorOpen(false);
-  }, [draftChecklistItems, draftColor, draftContent, draftMode, draftTitle, hasEditorPendingChanges, saveExistingNote]);
+    setEditorFullscreen(false);
+  }, [draftChecklistItems, draftColor, draftContent, draftIsFavorite, draftMode, draftTags, draftTitle, hasEditorPendingChanges, saveExistingNote]);
 
   const handleDeleteNote = React.useCallback(async () => {
     if (!user?.uid || !selectedNoteId) return false;
@@ -1210,7 +1311,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     if (!hasEditorPendingChanges) return;
 
     const timeout = window.setTimeout(() => {
-      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems, draftColor);
+      void saveExistingNote(draftMode, draftTitle, draftContent, draftChecklistItems, draftColor, draftTags, draftIsFavorite);
     }, 700);
 
     return () => {
@@ -1220,13 +1321,40 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     draftChecklistItems,
     draftColor,
     draftContent,
+    draftIsFavorite,
     draftMode,
+    draftTags,
     draftTitle,
     editorOpen,
     hasEditorPendingChanges,
     saveExistingNote,
     selectedNoteId,
   ]);
+
+  React.useEffect(() => {
+    if (!editorOpen) return;
+    const timer = window.setTimeout(() => {
+      if (noteEditorRef.current) {
+        noteEditorRef.current.innerHTML = draftContent;
+      }
+    }, 80);
+    return () => window.clearTimeout(timer);
+  // Only init when editor opens (not on every draftContent change)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorOpen, selectedNoteId]);
+
+  React.useEffect(() => {
+    if (!composerExpanded) return;
+    setDraftContent("");
+    const timer = window.setTimeout(() => {
+      if (composerContentRef.current) {
+        composerContentRef.current.innerHTML = "";
+      }
+    }, 80);
+    return () => window.clearTimeout(timer);
+  // Only init when composer opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerExpanded]);
 
   const filteredNotes = React.useMemo(
     () => savedNotesList.filter((note) => matchesSearchQuery(note, searchQuery)),
@@ -1242,8 +1370,6 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     if (filteredNotes.some((note) => note.id === selectedNoteId)) return;
     selectNote(filteredNotes[0]);
   }, [filteredNotes, selectedNoteId, selectNote]);
-  const activeEditorColor = selectedNote ? draftColor ?? getNoteColor(selectedNote) : draftColor;
-  const hasActiveSearch = searchQuery.trim().length >= 2;
   const sharedRoutineDocRef = React.useMemo(
     () => doc(db, SHARED_ROUTINES_COLLECTION, SHARED_ROUTINES_DOC_ID),
     []
@@ -2214,19 +2340,101 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
   }, [copyNoteToClipboard, editorOpen, filteredNotes, getNoteClipboardText, searchQuery, selectedNote, selectedNoteId, selectNote, tab]);
 
   return (
+    <ThemeProvider theme={purpleTheme}>
+      <Box
+        sx={{
+          position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
+          bgcolor: isDark ? "#0D0B12" : "#FAF6FE",
+          backgroundImage: isDark
+            ? "radial-gradient(circle at 8% -12%, rgba(140,40,200,0.12) 0%, rgba(140,40,200,0) 40%), radial-gradient(circle at 94% -4%, rgba(100,20,160,0.10) 0%, rgba(100,20,160,0) 34%)"
+            : "radial-gradient(circle at 8% -12%, rgba(182,72,232,0.14) 0%, rgba(182,72,232,0) 40%), radial-gradient(circle at 94% -4%, rgba(140,40,200,0.10) 0%, rgba(140,40,200,0) 34%)",
+        }}
+      />
     <Box sx={{ width: "100%" }}>
       {!isRutinerOnly ? (
-        <Paper sx={{ mb: 2 }}>
-          <Tabs
-            value={tab}
-            onChange={(_, nextTab: "meldeskjema" | "rutiner" | "notater") => setTab(nextTab)}
-            variant="scrollable"
-            scrollButtons="auto"
-          >
-            <Tab value="notater" label="Mine notater" />
-            <Tab value="meldeskjema" label="Innspill" />
-          </Tabs>
-        </Paper>
+        <Box
+          role="tablist"
+          sx={{
+            display: "flex",
+            px: 1,
+            pt: 0.25,
+            pb: 0,
+            gap: 0,
+            bgcolor: "background.paper",
+            borderRadius: "4px 4px 0 0",
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          {(
+            [
+              {
+                value: "notater",
+                label: "Mine notater",
+                icon: (
+                  <Box component="svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" sx={{ width: 26, height: 26, flexShrink: 0 }}>
+                    <path d="M26 6C26.5523 6 27 6.44772 27 7V11C27 11.5523 26.5523 12 26 12C25.4477 12 25 11.5523 25 11V10H19.0001L19.0001 8H25V7C25 6.44772 25.4477 6 26 6Z" fill="currentColor"/>
+                    <path d="M16 6C15.4477 6 15 6.44772 15 7V8H13C11.3431 8 10 9.34315 10 11V35C10 36.6569 11.3431 38 13 38H30C31.6569 38 33 36.6569 33 35V11C33 9.34315 31.6569 8 30 8H29.0001V10H30C30.5523 10 31 10.4477 31 11V35C31 35.5523 30.5523 36 30 36H13C12.4477 36 12 35.5523 12 35V11C12 10.4477 12.4477 10 13 10H15V11C15 11.5523 15.4477 12 16 12C16.5523 12 17 11.5523 17 11V7C17 6.44772 16.5523 6 16 6Z" fill="currentColor"/>
+                    <path d="M14 19C14 18.4477 14.4477 18 15 18H28C28.5523 18 29 18.4477 29 19C29 19.5523 28.5523 20 28 20H15C14.4477 20 14 19.5523 14 19Z" fill="currentColor"/>
+                    <path d="M15 23C14.4477 23 14 23.4477 14 24C14 24.5523 14.4477 25 15 25H22C22.5523 25 23 24.5523 23 24C23 23.4477 22.5523 23 22 23H15Z" fill="currentColor"/>
+                    <path d="M14 29C14 28.4477 14.4477 28 15 28H26C26.5523 28 27 28.4477 27 29C27 29.5523 26.5523 30 26 30H15C14.4477 30 14 29.5523 14 29Z" fill="currentColor"/>
+                    <path d="M13 40C10.2386 40 8 37.7614 8 35V10H6V35C6 38.866 9.13401 42 13 42H30V40H13Z" fill="currentColor"/>
+                    <path fillRule="evenodd" clipRule="evenodd" d="M36 13C36 11.3431 37.3431 10 39 10C40.6569 10 42 11.3431 42 13V33.3028L39 37.8028L36 33.3028V13ZM39 12C38.4477 12 38 12.4477 38 13V15H40V13C40 12.4477 39.5523 12 39 12ZM39 34.1972L40 32.6972V17H38V32.6972L39 34.1972Z" fill="currentColor"/>
+                  </Box>
+                ),
+              },
+              {
+                value: "meldeskjema",
+                label: "Innspill",
+                icon: (
+                  <Box component="svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" sx={{ width: 26, height: 26, flexShrink: 0 }}>
+                    <g transform="matrix(0.96 0 0 0.96 24 24)">
+                      <path transform="translate(-25, -25)" d="M 11.5 2 C 9.5788117 2 8 3.5788117 8 5.5 L 8 44.5 C 8 46.421188 9.5788117 48 11.5 48 L 38.5 48 C 40.421188 48 42 46.421188 42 44.5 L 42 14.585938 L 29.414062 2 L 11.5 2 z M 11.5 4 L 28 4 L 28 12.5 C 28 14.421188 29.578812 16 31.5 16 L 40 16 L 40 44.5 C 40 45.340812 39.340812 46 38.5 46 L 11.5 46 C 10.659188 46 10 45.340812 10 44.5 L 10 5.5 C 10 4.6591883 10.659188 4 11.5 4 z M 30 5.4140625 L 38.585938 14 L 31.5 14 C 30.659188 14 30 13.340812 30 12.5 L 30 5.4140625 z M 18.5 24.5 C 17.67157287525381 24.5 17 25.17157287525381 17 26 C 17 26.82842712474619 17.67157287525381 27.5 18.5 27.5 C 19.32842712474619 27.5 20 26.82842712474619 20 26 C 20 25.17157287525381 19.32842712474619 24.5 18.5 24.5 z M 22 25 L 22 27 L 33 27 L 33 25 L 22 25 z M 18.5 29.5 C 17.67157287525381 29.5 17 30.17157287525381 17 31 C 17 31.82842712474619 17.67157287525381 32.5 18.5 32.5 C 19.32842712474619 32.5 20 31.82842712474619 20 31 C 20 30.17157287525381 19.32842712474619 29.5 18.5 29.5 z M 22 30 L 22 32 L 33 32 L 33 30 L 22 30 z M 18.5 34.5 C 17.67157287525381 34.5 17 35.17157287525381 17 36 C 17 36.82842712474619 17.67157287525381 37.5 18.5 37.5 C 19.32842712474619 37.5 20 36.82842712474619 20 36 C 20 35.17157287525381 19.32842712474619 34.5 18.5 34.5 z M 22 35 L 22 37 L 33 37 L 33 35 L 22 35 z" fill="currentColor" strokeLinecap="round"/>
+                    </g>
+                  </Box>
+                ),
+              },
+            ] as { value: "notater" | "meldeskjema"; label: string; icon: React.ReactNode }[]
+          ).map(({ value, label, icon }) => {
+            const isActive = tab === value;
+            return (
+              <Box
+                key={value}
+                role="tab"
+                aria-selected={isActive}
+                component="button"
+                type="button"
+                onClick={() => setTab(value)}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 2,
+                  py: 1,
+                  borderRadius: 0,
+                  border: "none",
+                  outline: "none",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  bgcolor: "transparent",
+                  boxShadow: "none",
+                  "&:focus, &:focus-visible": { outline: "none" },
+                  fontSize: "1.25rem",
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? "#B07FD4" : "text.secondary",
+                  transition: "color 0.15s ease",
+                  "&:hover": {
+                    bgcolor: "transparent",
+                    color: isActive ? "#B07FD4" : "text.primary",
+                  },
+                }}
+              >
+                {icon}
+                {label}
+              </Box>
+            );
+          })}
+        </Box>
       ) : null}
 
       {tab === "meldeskjema" ? (
@@ -2263,6 +2471,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
               height: { xs: isOwner ? "calc(100vh - 390px)" : "calc(100vh - 310px)", md: isOwner ? "calc(100vh - 360px)" : "calc(100vh - 280px)" },
               minHeight: 520,
               overflow: "hidden",
+              borderRadius: isOwner ? undefined : "0 0 4px 4px",
             }}
           >
             <Box
@@ -3137,7 +3346,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
           </Box>
         </Paper>
       ) : (
-        <Paper sx={{ p: { xs: 2, md: 3 } }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: "0 0 4px 4px", boxShadow: (theme) => theme.shadows[1], mt: 0 }}>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
@@ -3260,188 +3469,144 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                   ) : (
                     <ClickAwayListener
                       onClickAway={() => {
+                        if (composerContentRef.current) setDraftContent(composerContentRef.current.innerHTML);
                         void createNoteFromComposer();
                         setComposerExpanded(false);
                       }}
                     >
                       <Paper
                         variant="outlined"
-                      sx={{
-                        px: 2,
-                        py: 1.5,
-                        borderRadius: 2,
-                        borderColor: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(230,165,190,0.5)"
-                            : "rgba(186,104,200,0.55)",
-                        bgcolor: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(22,31,43,0.98)"
-                            : "rgba(255,255,255,0.98)",
-                        backgroundImage: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "linear-gradient(160deg, rgba(28,38,53,0.99) 0%, rgba(22,31,43,0.96) 100%)"
-                            : "linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(252,248,252,0.96) 100%)",
-                        boxShadow: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "0 20px 36px rgba(2,6,18,0.44)"
-                            : "0 20px 36px rgba(186,104,200,0.2)",
-                      }}
-                    >
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
-                          <InputBase
-                            value={draftTitle}
-                            onChange={(event) => {
-                              setDraftTitle(event.target.value);
-                              if (success) setSuccess(null);
-                            }}
-                            placeholder="Tittel"
-                            fullWidth
-                            autoFocus
-                            sx={{
-                              px: 0.25,
-                              fontSize: "1.35rem",
-                              fontWeight: 600,
-                              color: "text.primary",
-                              "& input::placeholder": {
-                                color: "text.secondary",
-                                opacity: 1,
-                              },
-                            }}
-                          />
-                          <IconButton
-                            size="small"
-                            onClick={toggleDraftChecklistMode}
-                            aria-label={draftMode === "checklist" ? "Bytt til vanlig notattekst" : "Bytt til sjekkliste"}
-                            sx={{
-                              color: draftMode === "checklist" ? "primary.main" : "text.secondary",
-                              border: "1px solid",
-                              borderColor: draftMode === "checklist" ? "primary.main" : "divider",
-                              bgcolor: "background.paper",
-                              "&:hover": {
-                                bgcolor: "action.hover",
-                              },
-                            }}
-                          >
-                            <CheckBoxOutlinedIcon fontSize="small" />
-                          </IconButton>
+                        sx={{
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          borderColor: "divider",
+                          "&:focus-within": { borderColor: "primary.main" },
+                          transition: "border-color 0.15s",
+                        }}
+                      >
+                        {/* TITTEL */}
+                        <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.68rem" }}>
+                            Tittel
+                          </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", border: "1px solid", borderColor: "divider", borderRadius: "8px", px: 1.5, py: 0.75, "&:focus-within": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgba(182,72,232,0.12)" }, transition: "border-color 0.15s, box-shadow 0.15s" }}>
+                            <InputBase
+                              value={draftTitle}
+                              onChange={(e) => { setDraftTitle(e.target.value); if (success) setSuccess(null); }}
+                              placeholder="Uten tittel"
+                              fullWidth
+                              autoFocus
+                              sx={{ fontSize: "1.05rem", fontWeight: 500, color: "text.primary" }}
+                            />
+                            <Tooltip title={draftIsFavorite ? "Fjern fra favoritter" : "Legg til favoritter"}>
+                              <IconButton size="small" onClick={() => setDraftIsFavorite((p) => !p)} sx={{ color: draftIsFavorite ? "warning.main" : "text.disabled", flexShrink: 0, ml: 0.5, "&:focus, &:focus-visible": { outline: "none" } }}>
+                                {draftIsFavorite ? <StarRoundedIcon sx={{ fontSize: 20 }} /> : <StarBorderRoundedIcon sx={{ fontSize: 20 }} />}
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
                         </Box>
 
-                        {draftMode === "checklist" ? (
-                          <Box>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                              {sortChecklistItems(draftChecklistItems)
-                                .filter((item) => !item.done)
-                                .map((item, index, activeItems) => (
-                                  <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                    <Checkbox
-                                      checked={item.done}
-                                      onChange={(event) => {
-                                        toggleChecklistItemDone(item.id, event.target.checked);
-                                        if (success) setSuccess(null);
-                                      }}
-                                      size="small"
-                                    />
-                                    <InputBase
-                                      value={item.text}
-                                      onChange={(event) => {
-                                        updateChecklistItemText(item.id, event.target.value);
-                                        if (success) setSuccess(null);
-                                      }}
-                                      onKeyDown={(event) => {
-                                        if (event.key === "Enter" && index === activeItems.length - 1) {
-                                          event.preventDefault();
-                                          addChecklistItem();
-                                        }
-                                      }}
-                                      placeholder="Listeelement"
-                                      fullWidth
-                                      sx={{
-                                        fontSize: "1.05rem",
-                                        color: "text.primary",
-                                        "& input::placeholder": {
-                                          color: "text.secondary",
-                                          opacity: 1,
-                                        },
-                                      }}
-                                    />
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        removeChecklistItem(item.id);
-                                        if (success) setSuccess(null);
-                                      }}
-                                      aria-label="Fjern punkt"
-                                    >
-                                      <CloseIcon fontSize="small" />
+                        {/* NOTATINNHOLD */}
+                        <Box sx={{ px: 2, pb: 1.5 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.68rem" }}>
+                            Notatinnhold
+                          </Typography>
+                          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "8px", overflow: "hidden", "&:focus-within": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgba(182,72,232,0.12)" }, transition: "border-color 0.15s, box-shadow 0.15s" }}>
+                            {/* Toolbar */}
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, px: 1, py: 0.5, borderBottom: "1px solid", borderColor: "divider", bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)" }}>
+                              {draftMode === "text" ? (
+                                <>
+                                  {[
+                                    { cmd: "bold", icon: <FormatBoldIcon sx={{ fontSize: 17 }} />, label: "Fet", active: composerFormatState.bold },
+                                    { cmd: "italic", icon: <FormatItalicIcon sx={{ fontSize: 17 }} />, label: "Kursiv", active: composerFormatState.italic },
+                                    { cmd: "underline", icon: <FormatUnderlinedIcon sx={{ fontSize: 17 }} />, label: "Understreket", active: composerFormatState.underline },
+                                  ].map(({ cmd, icon, label, active }) => (
+                                    <Tooltip key={cmd} title={label}>
+                                      <IconButton size="small" onMouseDown={(e) => e.preventDefault()} onClick={() => runComposerCommand(cmd)} sx={{ width: 28, height: 28, color: active ? "primary.main" : "text.secondary", bgcolor: active ? "rgba(182,72,232,0.10)" : "transparent", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}>
+                                        {icon}
+                                      </IconButton>
+                                    </Tooltip>
+                                  ))}
+                                  <Box sx={{ width: "1px", height: 16, bgcolor: "divider", mx: 0.25 }} />
+                                  {[
+                                    { cmd: "insertUnorderedList", icon: <FormatListBulletedRoundedIcon sx={{ fontSize: 17 }} />, label: "Punktliste" },
+                                    { cmd: "insertOrderedList", icon: <FormatListNumberedRoundedIcon sx={{ fontSize: 17 }} />, label: "Nummerert liste" },
+                                  ].map(({ cmd, icon, label }) => (
+                                    <Tooltip key={cmd} title={label}>
+                                      <IconButton size="small" onMouseDown={(e) => e.preventDefault()} onClick={() => runComposerCommand(cmd)} sx={{ width: 28, height: 28, color: "text.secondary", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}>
+                                        {icon}
+                                      </IconButton>
+                                    </Tooltip>
+                                  ))}
+                                  <Box sx={{ width: "1px", height: 16, bgcolor: "divider", mx: 0.25 }} />
+                                  <Tooltip title="Legg til lenke">
+                                    <IconButton size="small" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = promptValidUrl(); if (url) runComposerCommand("createLink", url); }} sx={{ width: 28, height: 28, color: "text.secondary", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}>
+                                      <LinkOutlinedIcon sx={{ fontSize: 17 }} />
                                     </IconButton>
-                                  </Box>
-                                ))}
+                                  </Tooltip>
+                                </>
+                              ) : null}
+                              <Box sx={{ flex: 1 }} />
+                              <Tooltip title={draftMode === "checklist" ? "Bytt til tekst" : "Bytt til sjekkliste"}>
+                                <IconButton size="small" onMouseDown={(e) => e.preventDefault()} onClick={toggleDraftChecklistMode} sx={{ width: 28, height: 28, color: draftMode === "checklist" ? "primary.main" : "text.secondary", bgcolor: draftMode === "checklist" ? "rgba(182,72,232,0.10)" : "transparent", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}>
+                                  <CheckBoxOutlinedIcon sx={{ fontSize: 17 }} />
+                                </IconButton>
+                              </Tooltip>
                             </Box>
 
-                            <Button variant="text" size="small" onClick={addChecklistItem} sx={{ mt: 0.5 }}>
-                              + Listeelement
-                            </Button>
-
-                            {sortChecklistItems(draftChecklistItems).some((item) => item.done) && (
-                              <Box sx={{ mt: 1.25 }}>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-                                  Fullført
-                                </Typography>
+                            {/* Body */}
+                            {draftMode === "checklist" ? (
+                              <Box sx={{ px: 2, py: 1.5 }}>
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                                  {sortChecklistItems(draftChecklistItems)
-                                    .filter((item) => item.done)
-                                    .map((item) => (
-                                      <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                        <Checkbox
-                                          checked={item.done}
-                                          onChange={(event) => {
-                                            toggleChecklistItemDone(item.id, event.target.checked);
-                                            if (success) setSuccess(null);
-                                          }}
-                                          size="small"
-                                        />
-                                        <Typography
-                                          variant="body2"
-                                          sx={{
-                                            flex: 1,
-                                            textDecoration: "line-through",
-                                            color: "text.secondary",
-                                            wordBreak: "break-word",
-                                          }}
-                                        >
-                                          {item.text}
-                                        </Typography>
-                                      </Box>
-                                    ))}
+                                  {sortChecklistItems(draftChecklistItems).filter((item) => !item.done).map((item, index, activeItems) => (
+                                    <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                      <Checkbox checked={item.done} onChange={(e) => { toggleChecklistItemDone(item.id, e.target.checked); if (success) setSuccess(null); }} size="small" sx={{ p: 0.5 }} />
+                                      <InputBase value={item.text} onChange={(e) => { updateChecklistItemText(item.id, e.target.value); if (success) setSuccess(null); }} onKeyDown={(e) => { if (e.key === "Enter" && index === activeItems.length - 1) { e.preventDefault(); addChecklistItem(); } }} placeholder="Listeelement" fullWidth sx={{ fontSize: "0.95rem" }} />
+                                      <IconButton size="small" onClick={() => { removeChecklistItem(item.id); if (success) setSuccess(null); }} aria-label="Fjern punkt"><CloseIcon sx={{ fontSize: 15 }} /></IconButton>
+                                    </Box>
+                                  ))}
                                 </Box>
+                                <Button variant="text" size="small" onClick={addChecklistItem} sx={{ mt: 0.5, color: "primary.main", textTransform: "none", fontWeight: 500 }}>+ Listeelement</Button>
                               </Box>
+                            ) : (
+                              <Box
+                                ref={composerContentRef}
+                                contentEditable
+                                suppressContentEditableWarning
+                                onInput={() => { setDraftContent(composerContentRef.current?.innerHTML ?? ""); if (success) setSuccess(null); }}
+                                onKeyUp={updateComposerFormatState}
+                                onMouseUp={updateComposerFormatState}
+                                data-placeholder="Skriv et notat..."
+                                sx={{
+                                  px: 2, py: 1.5,
+                                  minHeight: 120,
+                                  outline: "none",
+                                  fontSize: "0.95rem",
+                                  lineHeight: 1.6,
+                                  color: "text.primary",
+                                  "&:empty:before": { content: "attr(data-placeholder)", color: "text.disabled" },
+                                }}
+                              />
                             )}
+
+                            {/* Footer */}
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: 1.5, py: 0.75, borderTop: "1px solid", borderColor: "divider", bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)" }}>
+                              <Typography variant="caption" color="text.disabled">
+                                {stripHtml(draftContent).length} tegn
+                              </Typography>
+                            </Box>
                           </Box>
-                        ) : (
-                          <InputBase
-                            value={draftContent}
-                            onChange={(event) => {
-                              setDraftContent(event.target.value);
-                              if (success) setSuccess(null);
-                            }}
-                            placeholder="Skriv et notat"
-                            fullWidth
-                            multiline
-                            minRows={3}
-                            maxRows={6}
-                            sx={{
-                              px: 0.25,
-                              fontSize: "1.1rem",
-                              lineHeight: 1.5,
-                              color: "text.primary",
-                              "& textarea::placeholder": {
-                                color: "text.secondary",
-                                opacity: 1,
-                              },
-                            }}
-                          />
-                        )}
+                        </Box>
+
+                        {/* Footer actions */}
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, px: 2, pb: 2 }}>
+                          <Button size="small" onClick={() => { setComposerExpanded(false); }} sx={{ borderRadius: "8px", color: "text.secondary", "&:focus, &:focus-visible": { outline: "none" } }}>
+                            Avbryt
+                          </Button>
+                          <Button variant="contained" size="small" startIcon={<CheckIcon />} onClick={() => { if (composerContentRef.current) setDraftContent(composerContentRef.current.innerHTML); void createNoteFromComposer(); setComposerExpanded(false); }} sx={{ borderRadius: "8px", "&:focus, &:focus-visible": { outline: "none" } }}>
+                            Lagre notat
+                          </Button>
+                        </Box>
                       </Paper>
                     </ClickAwayListener>
                   )}
@@ -3525,21 +3690,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
               <Box
                 sx={{
-                  ...(hasActiveSearch
-                    ? {
-                        display: "grid",
-                        gridTemplateColumns: {
-                          xs: "1fr",
-                          sm: "repeat(2, minmax(0, 1fr))",
-                          lg: "repeat(3, minmax(0, 1fr))",
-                          xl: "repeat(4, minmax(0, 1fr))",
-                        },
-                        gap: 2,
-                      }
-                    : {
-                        columnCount: { xs: 1, sm: 2, md: 3, xl: 4 },
-                        columnGap: 2,
-                      }),
+                  columnCount: { xs: 1, sm: 2, md: 3, xl: 4 },
+                  columnGap: "16px",
                 }}
               >
                 {savedNotesList.length === 0 ? (
@@ -3553,8 +3705,6 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                 ) : (
                   filteredNotes.map((note) => {
                     const isSelected = note.id === selectedNoteId;
-                    const noteBackground = getNoteColor(note);
-
                     return (
                       <Paper
                         key={note.id}
@@ -3606,185 +3756,107 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                           setDragOverNoteId(null);
                         }}
                         sx={{
-                          p: 1.5,
-                          mb: hasActiveSearch ? 0 : 2,
-                          display: hasActiveSearch ? "block" : "inline-block",
+                          p: 2,
+                          mb: 2,
+                          display: "inline-block",
                           width: "100%",
-                          breakInside: hasActiveSearch ? "auto" : "avoid",
+                          breakInside: "avoid",
                           cursor: draggingNoteId === note.id ? "grabbing" : "pointer",
+                          bgcolor: "background.paper",
                           borderColor:
                             dragOverNoteId === note.id && draggingNoteId !== note.id
                               ? "primary.main"
                               : isSelected
                               ? "primary.main"
                               : "divider",
-                          bgcolor: noteBackground,
-                          color: (theme) =>
-                            theme.palette.mode === "dark" ? "#1A2B40" : theme.palette.text.primary,
-                          boxShadow: isSelected ? "0 0 0 1px rgba(25,118,210,0.35)" : "none",
-                          transition: "transform 120ms ease, box-shadow 120ms ease",
-                          opacity: draggingNoteId === note.id ? 0.55 : 1,
+                          boxShadow: isSelected
+                            ? "0 0 0 2px rgba(182,72,232,0.18)"
+                            : "none",
+                          transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
+                          opacity: draggingNoteId === note.id ? 0.5 : 1,
                           "&:hover": {
-                            transform: "translateY(-2px)",
-                            boxShadow: (theme) =>
-                              theme.palette.mode === "dark"
-                                ? "0 10px 26px rgba(2,6,18,0.42)"
-                                : "0 8px 24px rgba(0,0,0,0.12)",
+                            transform: draggingNoteId ? "none" : "translateY(-3px)",
+                            boxShadow: draggingNoteId
+                              ? "none"
+                              : isDark
+                              ? "0 12px 28px rgba(0,0,0,0.35)"
+                              : "0 8px 24px rgba(0,0,0,0.10)",
+                            borderColor: isSelected ? "primary.main" : "text.disabled",
                           },
                         }}
                       >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            gap: 1,
-                          }}
-                        >
-                          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                        {/* Header */}
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 1 }}>
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ fontWeight: 700, lineHeight: 1.35, wordBreak: "break-word" }}
+                          >
                             {note.title || "Uten tittel"}
                           </Typography>
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-                            <DragIndicatorIcon
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, flexShrink: 0, mt: -0.25 }}>
+                            <IconButton
+                              size="small"
+                              onClick={(event) => { event.stopPropagation(); handleOpenEditor(note); }}
                               sx={{
-                                fontSize: 18,
-                                color: (theme) =>
-                                  theme.palette.mode === "dark" ? "#516987" : theme.palette.text.secondary,
-                              }}
-                            />
-                            <Box
-                              component="button"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleOpenEditor(note);
-                              }}
-                              sx={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 0.75,
-                                color: (theme) =>
-                                  theme.palette.mode === "dark" ? "#253A55" : theme.palette.text.secondary,
-                                border: "1px solid",
-                                borderColor: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "rgba(31,42,58,0.24)"
-                                    : theme.palette.divider,
-                                bgcolor: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "rgba(255,255,255,0.48)"
-                                    : "transparent",
-                                px: 1.2,
-                                py: 0.4,
-                                minHeight: 40,
-                                minWidth: 98,
-                                borderRadius: 1.25,
-                                cursor: "pointer",
-                                transition: "background-color 120ms ease, border-color 120ms ease",
-                                "&:hover": {
-                                  bgcolor: (theme) =>
-                                    theme.palette.mode === "dark"
-                                      ? "rgba(255,255,255,0.62)"
-                                      : theme.palette.action.hover,
-                                  borderColor: (theme) =>
-                                    theme.palette.mode === "dark"
-                                      ? "rgba(31,42,58,0.35)"
-                                      : theme.palette.text.secondary,
-                                },
-                                "&:focus-visible": {
-                                  outline: "2px solid",
-                                  outlineColor: "primary.main",
-                                  outlineOffset: 1,
-                                },
+                                color: "text.disabled",
+                                "&:hover": { color: "primary.main", bgcolor: "action.hover" },
+                                "&:focus, &:focus-visible": { outline: "none" },
                               }}
                             >
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                Endre
-                              </Typography>
-                            </Box>
+                              <EditNoteRoundedIcon sx={{ fontSize: 24 }} />
+                            </IconButton>
+                            <DragIndicatorIcon
+                              sx={{ fontSize: 20, color: "text.disabled", cursor: draggingNoteId === note.id ? "grabbing" : "grab" }}
+                            />
                           </Box>
                         </Box>
-                        {note.mode === "checklist" ? (
-                          <Box sx={{ mt: 0.75 }}>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
-                              {note.checklistItems
-                                .filter((item) => !item.done)
-                                .slice(0, 4)
-                                .map((item) => (
-                                  <Typography
-                                    key={item.id}
-                                    variant="body2"
-                                    sx={{
-                                      color: (theme) =>
-                                        theme.palette.mode === "dark" ? "#334D6A" : theme.palette.text.secondary,
-                                      whiteSpace: "pre-wrap",
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    • {item.text}
-                                  </Typography>
-                                ))}
-                            </Box>
 
-                            {note.checklistItems.some((item) => item.done) && (
-                              <Box sx={{ mt: 0.75 }}>
+                        {/* Content */}
+                        {note.mode === "checklist" ? (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.4 }}>
+                            {note.checklistItems
+                              .filter((item) => !item.done)
+                              .slice(0, 4)
+                              .map((item) => (
                                 <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: (theme) =>
-                                      theme.palette.mode === "dark" ? "#425E7C" : theme.palette.text.secondary,
-                                    display: "block",
-                                    mb: 0.25,
-                                  }}
+                                  key={item.id}
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ wordBreak: "break-word" }}
                                 >
-                                  Fullført ({note.checklistItems.filter((item) => item.done).length})
+                                  • {item.text}
                                 </Typography>
-                                {note.checklistItems
-                                  .filter((item) => item.done)
-                                  .slice(0, 2)
-                                  .map((item) => (
-                                    <Typography
-                                      key={item.id}
-                                      variant="body2"
-                                      sx={{
-                                        color: (theme) =>
-                                          theme.palette.mode === "dark" ? "#4A6584" : theme.palette.text.secondary,
-                                        textDecoration: "line-through",
-                                        whiteSpace: "pre-wrap",
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {item.text}
-                                    </Typography>
-                                  ))}
-                              </Box>
+                              ))}
+                            {note.checklistItems.some((item) => item.done) && (
+                              <Typography variant="caption" color="text.disabled" sx={{ mt: 0.25 }}>
+                                +{note.checklistItems.filter((item) => item.done).length} fullført
+                              </Typography>
                             )}
                           </Box>
                         ) : (
                           <Typography
                             variant="body2"
+                            color="text.secondary"
                             sx={{
-                              color: (theme) =>
-                                theme.palette.mode === "dark" ? "#334D6A" : theme.palette.text.secondary,
-                              mt: 0.75,
-                              whiteSpace: "pre-wrap",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 4,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              lineHeight: 1.55,
                               wordBreak: "break-word",
                             }}
                           >
-                            {note.content}
+                            {stripHtml(note.content)}
                           </Typography>
                         )}
+
+                        {/* Footer */}
                         <Typography
                           variant="caption"
-                          sx={{
-                            color: (theme) =>
-                              theme.palette.mode === "dark" ? "#425E7C" : theme.palette.text.secondary,
-                            mt: 1.25,
-                            display: "block",
-                          }}
+                          color="text.disabled"
+                          sx={{ display: "block", mt: 1.5 }}
                         >
-                          Oppdatert: {formatDateTime(note.updatedAtMs)}
+                          {formatDateTime(note.updatedAtMs)}
                         </Typography>
                       </Paper>
                     );
@@ -3824,236 +3896,387 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
         open={editorOpen}
         onClose={handleCloseEditor}
         fullWidth
+        fullScreen={editorFullscreen}
         maxWidth="sm"
-        PaperProps={{
-          sx: {
-            maxWidth: 544,
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: editorFullscreen ? 0 : "5px", maxWidth: editorFullscreen ? "100%" : 580 } }}
       >
-        <DialogTitle>Rediger notat</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mt: 1.5, mb: 1.25 }}>
-            <InputBase
-              value={draftTitle}
-              onChange={(event) => {
-                setDraftTitle(event.target.value);
-                if (success) setSuccess(null);
-              }}
-              placeholder="Tittel"
-              fullWidth
-              multiline
-              minRows={1}
-              maxRows={4}
-              sx={{
-                px: 0.25,
-                fontSize: "1.35rem",
-                fontWeight: 600,
-                lineHeight: 1.3,
-                color: "text.primary",
-                "& textarea": {
-                  resize: "none",
-                },
-              }}
-            />
-            <IconButton
-              size="small"
-              onClick={toggleDraftChecklistMode}
-              aria-label={draftMode === "checklist" ? "Bytt til vanlig notattekst" : "Bytt til sjekkliste"}
-              sx={{
-                color: draftMode === "checklist" ? "primary.main" : "text.secondary",
-                border: "1px solid",
-                borderColor: draftMode === "checklist" ? "primary.main" : "divider",
-                bgcolor: "background.paper",
-                "&:hover": {
-                  bgcolor: "action.hover",
-                },
-              }}
-            >
-              <CheckBoxOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Box>
-
-          {draftMode === "checklist" ? (
-            <Box>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                {sortChecklistItems(draftChecklistItems)
-                  .filter((item) => !item.done)
-                  .map((item, index, activeItems) => (
-                    <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Checkbox
-                        checked={item.done}
-                        onChange={(event) => {
-                          toggleChecklistItemDone(item.id, event.target.checked);
-                          if (success) setSuccess(null);
-                        }}
-                        size="small"
-                      />
-                      <InputBase
-                        value={item.text}
-                        onChange={(event) => {
-                          updateChecklistItemText(item.id, event.target.value);
-                          if (success) setSuccess(null);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" && index === activeItems.length - 1) {
-                            event.preventDefault();
-                            addChecklistItem();
-                          }
-                        }}
-                        placeholder="Listeelement"
-                        fullWidth
-                        sx={{
-                          fontSize: "1.05rem",
-                          color: "text.primary",
-                          "& input::placeholder": {
-                            color: "text.secondary",
-                            opacity: 1,
-                          },
-                        }}
-                      />
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          removeChecklistItem(item.id);
-                          if (success) setSuccess(null);
-                        }}
-                        aria-label="Fjern punkt"
-                      >
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  ))}
-              </Box>
-
-              <Button variant="text" size="small" onClick={addChecklistItem} sx={{ mt: 0.75 }}>
-                + Listeelement
-              </Button>
-
-              {sortChecklistItems(draftChecklistItems).some((item) => item.done) && (
-                <Box sx={{ mt: 1.5 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-                    Fullført ({sortChecklistItems(draftChecklistItems).filter((item) => item.done).length})
-                  </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                    {sortChecklistItems(draftChecklistItems)
-                      .filter((item) => item.done)
-                      .map((item) => (
-                        <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                          <Checkbox
-                            checked={item.done}
-                            onChange={(event) => {
-                              toggleChecklistItemDone(item.id, event.target.checked);
-                              if (success) setSuccess(null);
-                            }}
-                            size="small"
-                          />
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              flex: 1,
-                              textDecoration: "line-through",
-                              color: "text.secondary",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {item.text}
-                          </Typography>
-                        </Box>
-                      ))}
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          ) : (
-            <TextField
-              label="Notat"
-              value={draftContent}
-              onChange={(event) => {
-                setDraftContent(event.target.value);
-                if (success) setSuccess(null);
-              }}
-              fullWidth
-              multiline
-              minRows={10}
-            />
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
-            {editorSaving ? "Lagrer automatisk..." : "Endringer lagres automatisk"}
+        {/* ── Header ── */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 1.5,
+            py: 1,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <IconButton size="small" onClick={handleCloseEditor} sx={{ color: "text.secondary" }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+          <Typography variant="subtitle1" sx={{ flex: 1, fontWeight: 600, ml: 0.5 }}>
+            Rediger notat
           </Typography>
           <Box
             sx={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 0.6,
-              flexWrap: "wrap",
-              maxWidth: { xs: 220, sm: 320, md: 360 },
-              justifyContent: "flex-end",
+              gap: 0.5,
+              px: 1.25,
+              py: 0.35,
+              borderRadius: "8px",
+              border: "1px solid",
+              borderColor: editorSaving ? "text.disabled" : "primary.main",
+              color: editorSaving ? "text.disabled" : "primary.main",
+              bgcolor: editorSaving ? "transparent" : "rgba(182,72,232,0.07)",
+              transition: "all 0.2s ease",
             }}
           >
-            {KEEP_CARD_COLORS.map((color) => {
-              const isActive = activeEditorColor === color;
-              return (
+            <CheckIcon sx={{ fontSize: 13 }} />
+            <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.72rem" }}>
+              {editorSaving ? "Lagrer..." : "Lagret"}
+            </Typography>
+          </Box>
+        </Box>
+
+        <DialogContent sx={{ px: 3, py: 2.5, display: "flex", flexDirection: "column", gap: 2.5 }}>
+          {/* ── Title ── */}
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.68rem" }}>
+              Tittel
+            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: "8px",
+                px: 1.5,
+                py: 0.75,
+                "&:focus-within": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgba(182,72,232,0.12)" },
+                transition: "border-color 0.15s, box-shadow 0.15s",
+              }}
+            >
+              <InputBase
+                value={draftTitle}
+                onChange={(e) => { setDraftTitle(e.target.value); if (success) setSuccess(null); }}
+                placeholder="Uten tittel"
+                fullWidth
+                sx={{ fontSize: "1.05rem", fontWeight: 500, color: "text.primary" }}
+              />
+              <Tooltip title={draftIsFavorite ? "Fjern fra favoritter" : "Legg til favoritter"}>
                 <IconButton
-                  key={color}
-                  onClick={() => {
-                    setDraftColor(color);
-                    if (success) setSuccess(null);
-                  }}
-                  aria-label="Velg notatfarge"
+                  size="small"
+                  onClick={() => setDraftIsFavorite((prev) => !prev)}
                   sx={{
-                    width: 26,
-                    height: 26,
-                    p: 0,
-                    border: "1px solid",
-                    borderColor: (theme) =>
-                      isActive
-                        ? theme.palette.text.primary
-                        : theme.palette.mode === "dark"
-                          ? "rgba(165,177,198,0.38)"
-                          : "rgba(15,23,42,0.22)",
-                    bgcolor: color,
-                    boxShadow: (theme) =>
-                      isActive
-                        ? theme.palette.mode === "dark"
-                          ? "0 0 0 2px rgba(165,177,198,0.34)"
-                          : "0 0 0 2px rgba(15,23,42,0.18)"
-                        : "none",
-                    "&:hover": {
-                      transform: "scale(1.08)",
-                      borderColor: "text.primary",
-                    },
+                    color: draftIsFavorite ? "warning.main" : "text.disabled",
+                    flexShrink: 0,
+                    ml: 0.5,
+                    "&:focus, &:focus-visible": { outline: "none" },
                   }}
                 >
-                  {isActive && (
-                    <CheckIcon
-                      sx={{
-                        fontSize: 16,
-                        color: (theme) =>
-                          theme.palette.mode === "dark" ? "rgba(248,250,252,0.94)" : "rgba(15,23,42,0.86)",
-                      }}
-                    />
-                  )}
+                  {draftIsFavorite ? <StarRoundedIcon sx={{ fontSize: 20 }} /> : <StarBorderRoundedIcon sx={{ fontSize: 20 }} />}
                 </IconButton>
-              );
-            })}
+              </Tooltip>
+            </Box>
           </Box>
-          {selectedNoteId && (
-            <Button
-              color="error"
-              onClick={async () => {
-                const deleted = await handleDeleteNote();
-                if (deleted) setEditorOpen(false);
+
+          {/* ── Content ── */}
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.68rem" }}>
+              Notatinnhold
+            </Typography>
+            <Box
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: "8px",
+                overflow: "hidden",
+                "&:focus-within": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgba(182,72,232,0.12)" },
+                transition: "border-color 0.15s, box-shadow 0.15s",
               }}
-              disabled={savingNotes || deletingNote}
             >
-              {deletingNote ? "Sletter..." : "Slett"}
-            </Button>
-          )}
-        </DialogActions>
+              {/* Toolbar */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.25,
+                  px: 1,
+                  py: 0.5,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  flexWrap: "wrap",
+                  bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                }}
+              >
+                {draftMode === "text" ? (
+                  <>
+                    {[
+                      { cmd: "bold", icon: <FormatBoldIcon sx={{ fontSize: 17 }} />, label: "Fet", active: noteFormatState.bold },
+                      { cmd: "italic", icon: <FormatItalicIcon sx={{ fontSize: 17 }} />, label: "Kursiv", active: noteFormatState.italic },
+                      { cmd: "underline", icon: <FormatUnderlinedIcon sx={{ fontSize: 17 }} />, label: "Understreket", active: noteFormatState.underline },
+                    ].map(({ cmd, icon, label, active }) => (
+                      <Tooltip key={cmd} title={label}>
+                        <IconButton
+                          size="small"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => runNoteCommand(cmd)}
+                          sx={{
+                            width: 28, height: 28,
+                            color: active ? "primary.main" : "text.secondary",
+                            bgcolor: active ? "rgba(182,72,232,0.10)" : "transparent",
+                            borderRadius: 1,
+                            "&:focus, &:focus-visible": { outline: "none" },
+                          }}
+                        >
+                          {icon}
+                        </IconButton>
+                      </Tooltip>
+                    ))}
+                    <Box sx={{ width: "1px", height: 16, bgcolor: "divider", mx: 0.25 }} />
+                    {[
+                      { cmd: "insertUnorderedList", icon: <FormatListBulletedRoundedIcon sx={{ fontSize: 17 }} />, label: "Punktliste" },
+                      { cmd: "insertOrderedList", icon: <FormatListNumberedRoundedIcon sx={{ fontSize: 17 }} />, label: "Nummerert liste" },
+                    ].map(({ cmd, icon, label }) => (
+                      <Tooltip key={cmd} title={label}>
+                        <IconButton
+                          size="small"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => runNoteCommand(cmd)}
+                          sx={{ width: 28, height: 28, color: "text.secondary", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}
+                        >
+                          {icon}
+                        </IconButton>
+                      </Tooltip>
+                    ))}
+                    <Box sx={{ width: "1px", height: 16, bgcolor: "divider", mx: 0.25 }} />
+                    <Tooltip title="Legg til lenke">
+                      <IconButton
+                        size="small"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          const url = promptValidUrl();
+                          if (url) runNoteCommand("createLink", url);
+                        }}
+                        sx={{ width: 28, height: 28, color: "text.secondary", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}
+                      >
+                        <LinkOutlinedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                ) : null}
+                <Box sx={{ flex: 1 }} />
+                <Tooltip title={draftMode === "checklist" ? "Bytt til tekst" : "Bytt til sjekkliste"}>
+                  <IconButton
+                    size="small"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={toggleDraftChecklistMode}
+                    sx={{
+                      width: 28, height: 28,
+                      color: draftMode === "checklist" ? "primary.main" : "text.secondary",
+                      bgcolor: draftMode === "checklist" ? "rgba(182,72,232,0.10)" : "transparent",
+                      borderRadius: 1,
+                      "&:focus, &:focus-visible": { outline: "none" },
+                    }}
+                  >
+                    <CheckBoxOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+
+              {/* Editor body */}
+              {draftMode === "checklist" ? (
+                <Box sx={{ px: 2, py: 1.5 }}>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    {sortChecklistItems(draftChecklistItems)
+                      .filter((item) => !item.done)
+                      .map((item, index, activeItems) => (
+                        <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Checkbox checked={item.done} onChange={(e) => { toggleChecklistItemDone(item.id, e.target.checked); if (success) setSuccess(null); }} size="small" sx={{ p: 0.5 }} />
+                          <InputBase
+                            value={item.text}
+                            onChange={(e) => { updateChecklistItemText(item.id, e.target.value); if (success) setSuccess(null); }}
+                            onKeyDown={(e) => { if (e.key === "Enter" && index === activeItems.length - 1) { e.preventDefault(); addChecklistItem(); } }}
+                            placeholder="Listeelement"
+                            fullWidth
+                            sx={{ fontSize: "0.95rem" }}
+                          />
+                          <IconButton size="small" onClick={() => { removeChecklistItem(item.id); if (success) setSuccess(null); }} aria-label="Fjern punkt">
+                            <CloseIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </Box>
+                      ))}
+                  </Box>
+                  <Button variant="text" size="small" onClick={addChecklistItem} sx={{ mt: 0.5 }}>+ Listeelement</Button>
+                  {sortChecklistItems(draftChecklistItems).some((item) => item.done) && (
+                    <Box sx={{ mt: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                        Fullført ({sortChecklistItems(draftChecklistItems).filter((i) => i.done).length})
+                      </Typography>
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                        {sortChecklistItems(draftChecklistItems).filter((item) => item.done).map((item) => (
+                          <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                            <Checkbox checked={item.done} onChange={(e) => { toggleChecklistItemDone(item.id, e.target.checked); if (success) setSuccess(null); }} size="small" sx={{ p: 0.5 }} />
+                            <Typography variant="body2" sx={{ flex: 1, textDecoration: "line-through", color: "text.secondary" }}>{item.text}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                <>
+                  <Box
+                    ref={noteEditorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={() => { setDraftContent(noteEditorRef.current?.innerHTML ?? ""); if (success) setSuccess(null); }}
+                    onKeyUp={updateNoteFormatState}
+                    onMouseUp={updateNoteFormatState}
+                    onSelect={updateNoteFormatState}
+                    sx={{
+                      minHeight: 200,
+                      maxHeight: editorFullscreen ? "calc(100vh - 340px)" : 300,
+                      overflow: "auto",
+                      px: 2,
+                      py: 1.5,
+                      outline: "none",
+                      lineHeight: 1.65,
+                      fontSize: "0.95rem",
+                      color: "text.primary",
+                      "& p": { m: 0, mb: 0.75 },
+                      "& ul, & ol": { pl: 2.5, mb: 0.75 },
+                      "& a": { color: "primary.main", textDecoration: "underline" },
+                      "&:empty::before": { content: '"Skriv notatinnhold..."', color: "text.disabled", pointerEvents: "none" },
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: 0.5,
+                      px: 1,
+                      py: 0.4,
+                      borderTop: "1px solid",
+                      borderColor: "divider",
+                      bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
+                    }}
+                  >
+                    <Typography variant="caption" color="text.disabled" sx={{ flex: 1, pl: 0.5 }}>
+                      {stripHtml(draftContent).length} tegn
+                    </Typography>
+                    <Tooltip title={editorFullscreen ? "Minimer" : "Utvid"}>
+                      <IconButton size="small" onClick={() => setEditorFullscreen((v) => !v)} sx={{ color: "text.disabled", "&:focus, &:focus-visible": { outline: "none" } }}>
+                        {editorFullscreen
+                          ? <CloseFullscreenRoundedIcon sx={{ fontSize: 15 }} />
+                          : <OpenInFullRoundedIcon sx={{ fontSize: 15 }} />}
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </>
+              )}
+            </Box>
+          </Box>
+
+          {/* ── Tags ── */}
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.68rem" }}>
+              Tags
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
+              {draftTags.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={`#${tag}`}
+                  size="small"
+                  onDelete={() => removeTag(tag)}
+                  sx={{
+                    bgcolor: "rgba(182,72,232,0.10)",
+                    color: "primary.main",
+                    fontWeight: 500,
+                    "& .MuiChip-deleteIcon": { color: "primary.main", opacity: 0.6, "&:hover": { opacity: 1 } },
+                  }}
+                />
+              ))}
+              {showTagInput ? (
+                <InputBase
+                  value={tagInputValue}
+                  onChange={(e) => setTagInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); addTag(); }
+                    if (e.key === "Escape") { setShowTagInput(false); setTagInputValue(""); }
+                  }}
+                  onBlur={addTag}
+                  autoFocus
+                  placeholder="Legg til tagg"
+                  sx={{
+                    fontSize: "0.8125rem",
+                    px: 1,
+                    py: 0.25,
+                    border: "1px solid",
+                    borderColor: "primary.main",
+                    borderRadius: 999,
+                    minWidth: 110,
+                    color: "text.primary",
+                  }}
+                />
+              ) : (
+                <Button
+                  size="small"
+                  startIcon={<AddIcon sx={{ fontSize: 15 }} />}
+                  onClick={() => setShowTagInput(true)}
+                  sx={{ color: "text.secondary", fontSize: "0.8125rem", textTransform: "none", px: 1, py: 0.25, borderRadius: 999, minHeight: 0 }}
+                >
+                  Legg til tagg
+                </Button>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+
+        {/* ── Footer ── */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 3,
+            py: 1.5,
+            borderTop: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            startIcon={<DeleteOutlineIcon />}
+            onClick={async () => {
+              const deleted = await handleDeleteNote();
+              if (deleted) setEditorOpen(false);
+            }}
+            disabled={deletingNote}
+            sx={{ borderRadius: "8px", "&:focus, &:focus-visible": { outline: "none" } }}
+          >
+            {deletingNote ? "Sletter..." : "Slett notat"}
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<CheckIcon />}
+            onClick={handleCloseEditor}
+            sx={{ borderRadius: "8px", px: 2.5, "&:focus, &:focus-visible": { outline: "none" } }}
+          >
+            Ferdig
+          </Button>
+        </Box>
+
       </Dialog>
     </Box>
+    </ThemeProvider>
   );
 }

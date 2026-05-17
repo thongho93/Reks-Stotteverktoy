@@ -13,6 +13,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 const SPREADSHEET_EDIT_URL =
   "https://docs.google.com/spreadsheets/d/1rBMivx3lHY4CKrFev_On__YVendKv6O7i_Zzcoy9QYg/edit?gid=1369769996#gid=1369769996";
@@ -1279,6 +1280,13 @@ export default function MedicationSearch({
                   onClick={() => pickResult(m)}
                   selected={index === highlightedIndex}
                   onMouseEnter={() => setHighlightedIndex(index)}
+                  sx={(theme) => ({
+                    "&.Mui-selected": {
+                      bgcolor: alpha(theme.palette.primary.main, 0.13),
+                      "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.18) },
+                    },
+                    "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.07) },
+                  })}
                 >
                   {(() => {
                     const secondaryParts = [

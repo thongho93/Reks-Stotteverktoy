@@ -623,7 +623,7 @@
   font-size: clamp(1.05rem, 1rem + 0.14vw, 1.15rem);
   color: #182337;
   padding-top: 8px;
-  padding-right: clamp(18px, 6vw, 132px);
+  padding-right: 0;
 }
 
 @media (max-width: 899px) {
@@ -851,35 +851,13 @@
 
 .preparatToggleRow {
   margin-top: 0;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
-  align-items: center;
   grid-area: toggles;
-  align-content: flex-start;
-  padding: 6px 8px;
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
-}
-
-.preparatToggleRow :global(.MuiFormControlLabel-root) {
-  margin: 0;
-  padding: 2px 8px 2px 4px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.36);
-  background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
-}
-
-.preparatToggleRow :global(.MuiSwitch-root) {
-  transform: scale(0.9);
-  margin-right: 2px;
-}
-
-.preparatToggleRow :global(.MuiTypography-caption) {
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: #243044;
+  padding: 0;
+  border: none;
+  background: none;
 }
 
 @media (min-width: 1200px) {
@@ -893,25 +871,9 @@
   }
 
   .preparatToggleRow {
-    display: grid;
-    grid-template-columns: repeat(2, max-content);
-    gap: 8px;
-    align-items: start;
-    justify-items: start;
-    justify-content: start;
-    min-height: 0;
-    width: max-content;
-    max-width: 100%;
     justify-self: end;
     align-self: start;
-  }
-
-  .preparatToggleRow :global(.MuiFormControlLabel-root) {
-    width: auto;
-    max-width: 100%;
-    justify-self: start;
-    justify-content: flex-start;
-    margin: 0;
+    width: max-content;
   }
 }
 
@@ -1224,19 +1186,6 @@
   color: var(--std-text);
 }
 
-:global([data-app-theme="dark"]) .preparatToggleRow {
-  border-color: var(--std-border);
-  background: var(--std-surface-raised);
-}
-
-:global([data-app-theme="dark"]) .preparatToggleRow :global(.MuiFormControlLabel-root) {
-  border-color: var(--std-border-strong);
-  background: var(--std-surface-soft);
-}
-
-:global([data-app-theme="dark"]) .preparatToggleRow :global(.MuiTypography-caption) {
-  color: var(--app-text-strong);
-}
 
 :global([data-app-theme="dark"]) .inputControlCard {
   border-color: var(--std-border-strong) !important;

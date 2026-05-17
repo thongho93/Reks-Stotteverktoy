@@ -45,27 +45,12 @@ type Props = {
   editorTools?: ReactNode;
   belowContent?: ReactNode;
   headerRight?: ReactNode;
-  headerRightCount?: number;
 
   previewNode: ReactNode;
   categoryOptions?: string[];
 };
 
-function renderTitleWithBreak(title: string, forceBreak: boolean): ReactNode {
-  if (!forceBreak) return title;
 
-  const match = title.match(/^(.+?\s[-–])\s+(.+)$/);
-  if (!match) return title;
-
-  return (
-    <>
-      {match[1]}
-      <Box component="span" sx={{ display: "block" }}>
-        {match[2]}
-      </Box>
-    </>
-  );
-}
 
 export default function StandardTekstContent({
   selected,
@@ -88,14 +73,10 @@ export default function StandardTekstContent({
   editorTools,
   belowContent,
   headerRight,
-  headerRightCount = 0,
   previewNode,
   categoryOptions = [],
 }: Props) {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const hasHeaderRight = !isEditing && headerRightCount > 0;
-  const hasCompactHeaderRight = hasHeaderRight && headerRightCount <= 2;
-  const hasFewHeaderRight = hasHeaderRight && headerRightCount >= 3 && headerRightCount < 4;
 
   const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const didInitNewStandardtekstContentRef = useRef(false);
@@ -339,37 +320,20 @@ export default function StandardTekstContent({
               }}
             />
           ) : null}
-          <Box
-            className={`${styles.contentHeader} ${
-              !hasHeaderRight ? styles.contentHeaderNoFollowUps : ""
-            } ${hasCompactHeaderRight ? styles.contentHeaderCompactRight : ""}`}
-          >
-            <Typography
-              variant="h2"
-              className={`${styles.title} ${
-                hasFewHeaderRight ? styles.titleWithFewFollowUps : ""
-              } ${!hasHeaderRight || hasCompactHeaderRight ? styles.titleNoFollowUps : ""}
-              `}
-            >
-              {renderTitleWithBreak(selected.title, hasHeaderRight && !hasCompactHeaderRight)}
-            </Typography>
-            {!isEditing && headerRight ? (
-              <Box
-                className={`${styles.headerRightWrap} ${
-                  hasFewHeaderRight ? styles.headerRightWrapFew : ""
-                } ${hasCompactHeaderRight ? styles.headerRightWrapCompact : ""}`}
-                onClick={(e) => e.stopPropagation()}
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: "20px", minHeight: 0 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                variant="h2"
+                className={`${styles.title} ${styles.titleNoFollowUps}`}
               >
-                {headerRight}
-              </Box>
-            ) : null}
-          </Box>
+                {selected.title}
+              </Typography>
 
-          {isAdmin && isEditing && (
-            <Typography variant="body2" color="text.secondary" className={styles.category}>
-              {selected.category}
-            </Typography>
-          )}
+              {isAdmin && isEditing && (
+                <Typography variant="body2" color="text.secondary" className={styles.category}>
+                  {selected.category}
+                </Typography>
+              )}
 
           {isEditing ? (
             <>
@@ -651,6 +615,41 @@ export default function StandardTekstContent({
               )}
             </>
           )}
+            </Box>
+
+            {!isEditing && headerRight ? (
+              <Box
+                onClick={(e) => e.stopPropagation()}
+                sx={(theme) => ({
+                  flexShrink: 0,
+                  width: 158,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "5px",
+                  borderLeft: `1px solid ${theme.palette.mode === "dark" ? "rgba(92,170,126,0.18)" : "rgba(92,170,126,0.22)"}`,
+                  pl: "16px",
+                  ml: "4px",
+                  pt: "2px",
+                })}
+              >
+                <Typography
+                  variant="caption"
+                  sx={(theme) => ({
+                    fontWeight: 600,
+                    fontSize: "0.7rem",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: theme.palette.mode === "dark" ? "rgba(165,177,198,0.5)" : "rgba(100,116,139,0.7)",
+                    mb: "2px",
+                    display: "block",
+                  })}
+                >
+                  Oppfølging
+                </Typography>
+                {headerRight}
+              </Box>
+            ) : null}
+          </Box>
         </>
       )}
     </Paper>

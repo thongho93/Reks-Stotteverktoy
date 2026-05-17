@@ -1611,25 +1611,52 @@ export default function StandardTekstPage() {
     </Box>
   );
 
+  const sortedFollowUps = useMemo(
+    () => [...((selected?.followUps ?? []) as StandardTekstFollowUp[])].sort((a, b) => a.label.localeCompare(b.label, "nb")),
+    [selected?.followUps]
+  );
+
   // Preview for follow-up texts
   const followUpsPreview = selected?.followUps?.length ? (
-    <Box className={styles.followUpsPreviewRow}>
-      {(selected.followUps as StandardTekstFollowUp[]).map((fu: StandardTekstFollowUp) => (
+    <>
+      {sortedFollowUps.map((fu: StandardTekstFollowUp) => (
         <Button
           key={fu.id}
           onClick={(e) => {
             e.stopPropagation();
             openFollowUp(fu.id);
           }}
-          variant="outlined"
+          variant="text"
           size="small"
-          startIcon={<OpenInNewIcon />}
-          className={styles.followUpChip}
+          sx={(theme) => ({
+            justifyContent: "space-between",
+            textAlign: "left",
+            textTransform: "none",
+            borderRadius: "10px",
+            px: 1.25,
+            py: 0.7,
+            fontSize: "0.775rem",
+            fontWeight: 550,
+            lineHeight: 1.3,
+            width: "100%",
+            color: theme.palette.mode === "dark" ? "rgba(165,177,198,0.85)" : "#374151",
+            border: "1px solid",
+            borderColor: theme.palette.mode === "dark" ? "rgba(165,177,198,0.14)" : "rgba(148,163,184,0.26)",
+            background: theme.palette.mode === "dark" ? "rgba(14,21,33,0.4)" : "rgba(248,250,252,0.7)",
+            transition: "all 130ms ease",
+            "& .MuiButton-endIcon": { ml: "auto", pl: 0.5, flexShrink: 0 },
+            "&:hover": {
+              background: theme.palette.mode === "dark" ? "rgba(92,170,126,0.12)" : "rgba(92,170,126,0.09)",
+              borderColor: theme.palette.mode === "dark" ? "rgba(92,170,126,0.42)" : "rgba(92,170,126,0.38)",
+              color: theme.palette.mode === "dark" ? "#42C18D" : "#236b49",
+              transform: "translateX(2px)",
+            },
+          })}
         >
           {fu.label}
         </Button>
       ))}
-    </Box>
+    </>
   ) : null;
 
   const copyBodyToClipboard = async (): Promise<boolean> => {
@@ -2549,7 +2576,6 @@ export default function StandardTekstPage() {
               ) : null
             }
             headerRight={!isEditing ? followUpsPreview : null}
-            headerRightCount={selected?.followUps?.length ?? 0}
             categoryOptions={categoryOptions}
           />
         </Box>

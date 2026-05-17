@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Box,
   ButtonBase,
@@ -8,7 +9,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
 type TabKey = "produktskjema" | "anbruddOversikt";
@@ -71,7 +72,17 @@ const toOrigin = (url: string | undefined) => {
 };
 
 export default function AndbruddPage() {
-  const [tab, setTab] = useState<TabKey>("anbruddOversikt");
+  const baseTheme = useTheme();
+  const isDark = baseTheme.palette.mode === "dark";
+  const ORANGE = "#FFA726";
+  const orangeTheme = useMemo(() => createTheme(baseTheme, { palette: { primary: { main: ORANGE } } }), [baseTheme]);
+
+  const location = useLocation();
+  const [tab, setTab] = useState<TabKey>(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+  });
+
   const [oversiktRefreshKey, setOversiktRefreshKey] = useState(0);
   const [iframeLoaded, setIframeLoaded] = useState<Record<TabKey, boolean>>({
     produktskjema: false,
@@ -85,6 +96,13 @@ export default function AndbruddPage() {
     produktskjema: null,
     anbruddOversikt: null,
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+    setTab(next);
+    setHasVisited((prev) => (prev[next] ? prev : { ...prev, [next]: true }));
+  }, [location.search]);
   const produktskjemaSrc = produktskjemaEmbedUrl;
   const oversiktSrc = useMemo(
     () => withRefreshParam(sharepointEmbedUrl, oversiktRefreshKey),
@@ -197,19 +215,26 @@ export default function AndbruddPage() {
   });
 
   return (
-    <Box
-      sx={{
-        position: "relative",
-        overflow: "hidden",
-        p: { xs: 1.5, sm: 2.5 },
-        color: ANBRUDD_TEXT_PRIMARY,
-        display: "flex",
-        flexDirection: "column",
-        flex: 1,
-        minHeight: 0,
-        background: `linear-gradient(145deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
-      }}
-    >
+    <ThemeProvider theme={orangeTheme}>
+      <Box
+        sx={{
+          position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
+          bgcolor: isDark ? "#0F1108" : "#FFF7EC",
+          backgroundImage: isDark
+            ? "radial-gradient(circle at 8% -12%, rgba(180,100,0,0.12) 0%, rgba(180,100,0,0) 40%), radial-gradient(circle at 94% -4%, rgba(140,80,0,0.10) 0%, rgba(140,80,0,0) 34%)"
+            : "radial-gradient(circle at 8% -12%, rgba(255,167,38,0.2) 0%, rgba(255,167,38,0) 40%), radial-gradient(circle at 94% -4%, rgba(230,130,0,0.14) 0%, rgba(230,130,0,0) 34%)",
+        }}
+      />
+      <Box
+        sx={{
+          p: { xs: 1.5, sm: 2.5 },
+          color: ANBRUDD_TEXT_PRIMARY,
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
       <Box sx={{ position: "relative", zIndex: 1 }}>
         <Box role="tablist" aria-label="Skjema tabs" sx={{ mb: 2 }}>
           <Box
@@ -277,7 +302,7 @@ export default function AndbruddPage() {
                 sx={actionButtonSx}
                 onClick={() => window.open(anbruddSkjemaOpenUrl, "_blank", "noopener,noreferrer")}
               >
-                Anbruddskjema
+                Skjema
               </Button>
             )}
             {anbruddEtikettOpenUrl && (
@@ -287,7 +312,7 @@ export default function AndbruddPage() {
                 sx={actionButtonSx}
                 onClick={() => window.open(anbruddEtikettOpenUrl, "_blank", "noopener,noreferrer")}
               >
-                Anbruddsetikett
+                Etikett
               </Button>
             )}
             {current.editUrl && (
@@ -297,7 +322,7 @@ export default function AndbruddPage() {
                 sx={actionButtonSx}
                 onClick={() => window.open(current.editUrl, "_blank", "noopener,noreferrer")}
               >
-                Anbruddsoversikt
+                Oversikt
               </Button>
             )}
           </Box>
@@ -436,5 +461,6 @@ export default function AndbruddPage() {
         <Typography color="error">{current.missing}</Typography>
       )}
     </Box>
+    </ThemeProvider>
   );
 }
