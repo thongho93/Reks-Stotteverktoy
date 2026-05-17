@@ -239,6 +239,20 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     return 0;
   };
 
+  const isAnbrudd = location.pathname === "/anbrudd";
+  const [anbruddOpen, setAnbruddOpen] = React.useState(isAnbrudd);
+  React.useEffect(() => { if (isAnbrudd) setAnbruddOpen(true); }, [isAnbrudd]);
+
+  const anbruddSubItems = [
+    { label: "Anbruddsoversikt", search: "" },
+    { label: "Produktskjema", search: "?tab=produktskjema" },
+  ];
+
+  const activeAnbruddSubItem = () => {
+    const params = new URLSearchParams(location.search);
+    return params.get("tab") === "produktskjema" ? 1 : 0;
+  };
+
   const isInnspill = location.pathname === "/tilbakemelding";
   const [innspillOpen, setInnspillOpen] = React.useState(isInnspill);
   React.useEffect(() => { if (isInnspill) setInnspillOpen(true); }, [isInnspill]);
@@ -428,7 +442,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       <ListItemIcon
                         sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
                       >
-                        <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
+                        <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
                       </ListItemIcon>
                       {!collapsed && <ListItemText primary={item.label} />}
                     </ListItemButton>
@@ -475,6 +489,64 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                   </Collapse>
                 )}
               </>
+            ) : item.path === "/anbrudd" ? (
+              <>
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Tooltip title={collapsed ? item.label : ""} placement="right">
+                    <ListItemButton
+                      selected={isAnbrudd}
+                      onClick={() => {
+                        logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+                        navigate(item.path);
+                        if (!isAnbrudd) setAnbruddOpen(true);
+                      }}
+                      sx={{ ...navItemButtonSx(item), flex: 1 }}
+                    >
+                      <ListItemIcon
+                        sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
+                      >
+                        <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
+                      </ListItemIcon>
+                      {!collapsed && <ListItemText primary={item.label} />}
+                    </ListItemButton>
+                  </Tooltip>
+                  {!collapsed && (
+                    <IconButton
+                      size="small"
+                      aria-label={anbruddOpen ? "Skjul undermeny" : "Vis undermeny"}
+                      onClick={() => setAnbruddOpen((o) => !o)}
+                      sx={{ p: 0.5, flexShrink: 0 }}
+                    >
+                      {anbruddOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                    </IconButton>
+                  )}
+                </Box>
+                {!collapsed && (
+                  <Collapse in={anbruddOpen} timeout="auto" unmountOnExit>
+                    <List disablePadding>
+                      {anbruddSubItems.map((sub, i) => (
+                        <ListItemButton
+                          key={sub.label}
+                          selected={isAnbrudd && activeAnbruddSubItem() === i}
+                          onClick={() => navigate(`/anbrudd${sub.search}`)}
+                          sx={{
+                            pl: 5,
+                            py: 0.6,
+                            color: isAnbrudd && activeAnbruddSubItem() === i ? "primary.main" : "text.secondary",
+                            "&.Mui-selected": { bgcolor: "transparent", color: "primary.main" },
+                            "&:hover": { bgcolor: "action.hover" },
+                          }}
+                        >
+                          <ListItemText
+                            primary={sub.label}
+                            primaryTypographyProps={{ fontSize: 13, fontWeight: isAnbrudd && activeAnbruddSubItem() === i ? 700 : 400 }}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </Collapse>
+                )}
+              </>
             ) : item.path === "/tilbakemelding" ? (
               <>
                 <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -491,7 +563,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       <ListItemIcon
                         sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
                       >
-                        <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
+                        <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
                       </ListItemIcon>
                       {!collapsed && <ListItemText primary={item.label} />}
                     </ListItemButton>
@@ -546,7 +618,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                   <ListItemIcon
                     sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
                   >
-                    <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
+                    <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
                   </ListItemIcon>
                   {!collapsed && <ListItemText primary={item.label} />}
                 </ListItemButton>
@@ -594,7 +666,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       alignItems: "center",
                     }}
                   >
-                    <item.Icon sx={{ fontSize: collapsed ? 38 : 32 }} />
+                    <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
                   </ListItemIcon>
                   {!collapsed && <ListItemText primary={item.label} />}
                 </ListItemButton>

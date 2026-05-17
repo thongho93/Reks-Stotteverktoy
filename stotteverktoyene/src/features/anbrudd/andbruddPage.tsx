@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Box,
   ButtonBase,
@@ -76,7 +77,18 @@ export default function AndbruddPage() {
   const ORANGE = "#FFA726";
   const orangeTheme = useMemo(() => createTheme(baseTheme, { palette: { primary: { main: ORANGE } } }), [baseTheme]);
 
-  const [tab, setTab] = useState<TabKey>("anbruddOversikt");
+  const location = useLocation();
+  const [tab, setTab] = useState<TabKey>(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+    setTab(next);
+    setHasVisited((prev) => (prev[next] ? prev : { ...prev, [next]: true }));
+  }, [location.search]);
   const [oversiktRefreshKey, setOversiktRefreshKey] = useState(0);
   const [iframeLoaded, setIframeLoaded] = useState<Record<TabKey, boolean>>({
     produktskjema: false,
