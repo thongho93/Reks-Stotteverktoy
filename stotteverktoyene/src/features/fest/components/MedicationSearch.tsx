@@ -565,6 +565,7 @@ export default function MedicationSearch({
   const [open, setOpen] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  const lastAutoPickedQueryRef = useRef("");
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const manualNameInputRef = useRef<HTMLInputElement | null>(null);
   const lastObservedClipboardDigitsRef = useRef("");
@@ -996,6 +997,20 @@ export default function MedicationSearch({
     setOpen(false);
     setHighlightedIndex(-1);
   };
+
+  // Auto-pick when a VNR search yields exactly one result
+  useEffect(() => {
+    if (results.length !== 1) return;
+    if (!open) return;
+    const digits = normalizeForSearch(deferredQuery).replace(/\s+/g, "");
+    if (!/^\d{4,}$/.test(digits)) return;
+    if (deferredQuery === lastAutoPickedQueryRef.current) return;
+    lastAutoPickedQueryRef.current = deferredQuery;
+    onPick?.(results[0]);
+    setQuery("");
+    setOpen(false);
+    setHighlightedIndex(-1);
+  }, [results, deferredQuery, open, onPick]);
 
   const normalizedQueryDigits = normalizeForSearch(deferredQuery).replace(/\s+/g, "");
   const noHitsForLikelyIdSearch =
