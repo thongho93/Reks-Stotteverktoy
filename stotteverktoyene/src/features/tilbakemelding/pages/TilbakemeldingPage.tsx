@@ -19,8 +19,6 @@ import {
   Popover,
   Paper,
   Snackbar,
-  Tab,
-  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -461,15 +459,7 @@ function isValidNoteColor(value: unknown): value is string {
   return typeof value === "string" && KEEP_CARD_COLORS.includes(value);
 }
 
-function getNoteColor(note: Pick<PrivateNote, "id" | "color">): string {
-  if (note.color && isValidNoteColor(note.color)) return note.color;
-  let hash = 0;
-  for (let i = 0; i < note.id.length; i += 1) {
-    hash = (hash << 5) - hash + note.id.charCodeAt(i);
-    hash |= 0;
-  }
-  return KEEP_CARD_COLORS[Math.abs(hash) % KEEP_CARD_COLORS.length];
-}
+
 
 function reorderByIds(items: PrivateNote[], fromId: string, toId: string): PrivateNote[] {
   const fromIndex = items.findIndex((item) => item.id === fromId);
@@ -675,7 +665,6 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
   const [draftTags, setDraftTags] = React.useState<string[]>([]);
   const [draftIsFavorite, setDraftIsFavorite] = React.useState(false);
   const [noteFormatState, setNoteFormatState] = React.useState({ bold: false, italic: false, underline: false });
-  const [noteMoreMenuAnchor, setNoteMoreMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [tagInputValue, setTagInputValue] = React.useState("");
   const [showTagInput, setShowTagInput] = React.useState(false);
   const [editorFullscreen, setEditorFullscreen] = React.useState(false);
@@ -1366,8 +1355,6 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     if (filteredNotes.some((note) => note.id === selectedNoteId)) return;
     selectNote(filteredNotes[0]);
   }, [filteredNotes, selectedNoteId, selectNote]);
-  const activeEditorColor = selectedNote ? draftColor ?? getNoteColor(selectedNote) : draftColor;
-  const hasActiveSearch = searchQuery.trim().length >= 2;
   const sharedRoutineDocRef = React.useMemo(
     () => doc(db, SHARED_ROUTINES_COLLECTION, SHARED_ROUTINES_DOC_ID),
     []
@@ -3700,8 +3687,6 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                 ) : (
                   filteredNotes.map((note) => {
                     const isSelected = note.id === selectedNoteId;
-                    const noteBackground = getNoteColor(note);
-
                     return (
                       <Paper
                         key={note.id}
