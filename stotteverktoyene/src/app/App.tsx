@@ -15,13 +15,23 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { createSvgIcon } from "@mui/material/utils";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import CalculateIcon from "@mui/icons-material/Calculate";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import CalculateIcon from "@mui/icons-material/Calculate";
-import { createSvgIcon } from "@mui/material/utils";
+import ConstructionIcon from "@mui/icons-material/Construction";
+import { RequireAuth } from "./auth/RequireAuth";
+import { logUsage, type UsagePage } from "../shared/services/usage";
+import { useAuthUser } from "./auth/useAuthUser";
+import { GlobalSearch } from "../features/commandpalette/GlobalSearch";
+import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearchHotkey";
+import RequireRekspert from "./auth/RequireRekspert";
+import { ProfileMenu } from "./auth/ProfileMenu";
+import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
 
 const InnspillIcon = createSvgIcon(
   <>
@@ -93,16 +103,12 @@ const InnkjopIcon = createSvgIcon(
   </>,
   "InnkjopIcon"
 );
-import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
-import { RequireAuth } from "./auth/RequireAuth";
-import { logUsage, type UsagePage } from "../shared/services/usage";
-import { useAuthUser } from "./auth/useAuthUser";
-import { GlobalSearch } from "../features/commandpalette/GlobalSearch";
-import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearchHotkey";
-import ConstructionIcon from "@mui/icons-material/Construction";
-import RequireRekspert from "./auth/RequireRekspert";
-import { ProfileMenu } from "./auth/ProfileMenu";
-import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
+
+function getIconFontSize(Icon: React.ElementType, collapsed: boolean): number {
+  if (Icon === InnspillIcon) return collapsed ? 34 : 29;
+  if (Icon === CalculateIcon) return collapsed ? 42 : 35;
+  return collapsed ? 38 : 32;
+}
 
 const HomePage = React.lazy(() => import("./HomePage"));
 const OMEQPage = React.lazy(() => import("../features/omeq/pages/OMEQPage"));
@@ -442,7 +448,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       <ListItemIcon
                         sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
                       >
-                        <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
+                        <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
                       </ListItemIcon>
                       {!collapsed && <ListItemText primary={item.label} />}
                     </ListItemButton>
@@ -505,7 +511,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       <ListItemIcon
                         sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
                       >
-                        <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
+                        <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
                       </ListItemIcon>
                       {!collapsed && <ListItemText primary={item.label} />}
                     </ListItemButton>
@@ -563,7 +569,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       <ListItemIcon
                         sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
                       >
-                        <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
+                        <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
                       </ListItemIcon>
                       {!collapsed && <ListItemText primary={item.label} />}
                     </ListItemButton>
@@ -618,7 +624,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                   <ListItemIcon
                     sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
                   >
-                    <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
+                    <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
                   </ListItemIcon>
                   {!collapsed && <ListItemText primary={item.label} />}
                 </ListItemButton>
@@ -666,7 +672,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                       alignItems: "center",
                     }}
                   >
-                    <item.Icon sx={{ fontSize: item.Icon === InnspillIcon ? (collapsed ? 34 : 29) : item.Icon === CalculateIcon ? (collapsed ? 42 : 35) : (collapsed ? 38 : 32) }} />
+                    <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
                   </ListItemIcon>
                   {!collapsed && <ListItemText primary={item.label} />}
                 </ListItemButton>

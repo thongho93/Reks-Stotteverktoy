@@ -83,12 +83,6 @@ export default function AndbruddPage() {
     return params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const next = params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
-    setTab(next);
-    setHasVisited((prev) => (prev[next] ? prev : { ...prev, [next]: true }));
-  }, [location.search]);
   const [oversiktRefreshKey, setOversiktRefreshKey] = useState(0);
   const [iframeLoaded, setIframeLoaded] = useState<Record<TabKey, boolean>>({
     produktskjema: false,
@@ -102,6 +96,13 @@ export default function AndbruddPage() {
     produktskjema: null,
     anbruddOversikt: null,
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+    setTab(next);
+    setHasVisited((prev) => (prev[next] ? prev : { ...prev, [next]: true }));
+  }, [location.search]);
   const produktskjemaSrc = produktskjemaEmbedUrl;
   const oversiktSrc = useMemo(
     () => withRefreshParam(sharepointEmbedUrl, oversiktRefreshKey),

@@ -459,6 +459,20 @@ function isValidNoteColor(value: unknown): value is string {
   return typeof value === "string" && KEEP_CARD_COLORS.includes(value);
 }
 
+function promptValidUrl(): string | null {
+  const url = window.prompt("Lenke URL:");
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "mailto:") {
+      return url;
+    }
+  } catch {
+    // invalid URL
+  }
+  return null;
+}
+
 
 
 function reorderByIds(items: PrivateNote[], fromId: string, toId: string): PrivateNote[] {
@@ -1331,6 +1345,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
   React.useEffect(() => {
     if (!composerExpanded) return;
+    setDraftContent("");
     const timer = window.setTimeout(() => {
       if (composerContentRef.current) {
         composerContentRef.current.innerHTML = "";
@@ -2338,6 +2353,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     <Box sx={{ width: "100%" }}>
       {!isRutinerOnly ? (
         <Box
+          role="tablist"
           sx={{
             display: "flex",
             px: 1,
@@ -2384,6 +2400,8 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
             return (
               <Box
                 key={value}
+                role="tab"
+                aria-selected={isActive}
                 component="button"
                 type="button"
                 onClick={() => setTab(value)}
@@ -3522,7 +3540,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                                   ))}
                                   <Box sx={{ width: "1px", height: 16, bgcolor: "divider", mx: 0.25 }} />
                                   <Tooltip title="Legg til lenke">
-                                    <IconButton size="small" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = window.prompt("Lenke URL:"); if (url) runComposerCommand("createLink", url); }} sx={{ width: 28, height: 28, color: "text.secondary", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}>
+                                    <IconButton size="small" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = promptValidUrl(); if (url) runComposerCommand("createLink", url); }} sx={{ width: 28, height: 28, color: "text.secondary", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}>
                                       <LinkOutlinedIcon sx={{ fontSize: 17 }} />
                                     </IconButton>
                                   </Tooltip>
@@ -3672,7 +3690,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
               <Box
                 sx={{
-                  columnCount: 3,
+                  columnCount: { xs: 1, sm: 2, md: 3, xl: 4 },
                   columnGap: "16px",
                 }}
               >
@@ -4040,7 +4058,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                         size="small"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
-                          const url = window.prompt("Lenke URL:");
+                          const url = promptValidUrl();
                           if (url) runNoteCommand("createLink", url);
                         }}
                         sx={{ width: 28, height: 28, color: "text.secondary", borderRadius: 1, "&:focus, &:focus-visible": { outline: "none" } }}
