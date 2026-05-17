@@ -1639,7 +1639,7 @@ export default function StandardTekstPage() {
             fontWeight: 550,
             lineHeight: 1.3,
             width: "100%",
-            color: theme.palette.mode === "dark" ? "rgba(165,177,198,0.85)" : "#374151",
+            color: theme.palette.mode === "dark" ? "rgba(165,177,198,0.85)" : "#111827",
             border: "1px solid",
             borderColor: theme.palette.mode === "dark" ? "rgba(165,177,198,0.14)" : "rgba(148,163,184,0.26)",
             background: theme.palette.mode === "dark" ? "rgba(14,21,33,0.4)" : "rgba(248,250,252,0.7)",

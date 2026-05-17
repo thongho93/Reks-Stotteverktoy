@@ -8,6 +8,7 @@ import {
   Typography,
 } from "@mui/material";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
+import { useTheme } from "@mui/material/styles";
 import MedicationSearch from "../../fest/components/MedicationSearch";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { formatPreparatForTemplate, formatPreparatRowText } from "../utils/preparat";
@@ -65,6 +66,7 @@ export default function PreparatPanel({
   onClear,
   onRemove,
 }: Props) {
+  const theme = useTheme();
   const hasPicked = preparatRows.some((r) => r.picked);
 
   const deriveFormuleringBase = (m: any): string => {
@@ -133,6 +135,7 @@ export default function PreparatPanel({
             inputRef={inputRef}
             autoPasteNumericClipboard={autoPasteNumericClipboard}
             resetSignal={searchResetSignal}
+            accentColor={theme.palette.mode === "dark" ? "#42C18D" : "#5CAA7E"}
             onPick={(med) => {
               const baseText = formatPreparatForTemplate(med);
               if (!baseText) return;
