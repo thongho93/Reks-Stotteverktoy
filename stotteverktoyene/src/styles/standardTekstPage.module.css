@@ -1303,13 +1303,6 @@
   border-color: rgba(92, 170, 126, 0.8) !important;
 }
 
-.page :global(.MuiButton-textPrimary) {
-  color: #4a9470 !important;
-}
-.page :global(.MuiButton-textPrimary:hover) {
-  background-color: rgba(92, 170, 126, 0.08) !important;
-}
-
 :global([data-app-theme="dark"]) .page :global(.MuiButton-containedPrimary) {
   background-color: #42C18D !important;
   box-shadow: 0 4px 12px rgba(66, 193, 141, 0.25) !important;
@@ -1330,9 +1323,3 @@
   border-color: rgba(66, 193, 141, 0.75) !important;
 }
 
-:global([data-app-theme="dark"]) .page :global(.MuiButton-textPrimary) {
-  color: #42C18D !important;
-}
-:global([data-app-theme="dark"]) .page :global(.MuiButton-textPrimary:hover) {
-  background-color: rgba(66, 193, 141, 0.1) !important;
-}
