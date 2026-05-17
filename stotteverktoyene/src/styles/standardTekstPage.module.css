@@ -1302,6 +1302,10 @@
   background-color: rgba(92, 170, 126, 0.08) !important;
   border-color: rgba(92, 170, 126, 0.8) !important;
 }
+.page :global(.MuiButton-outlinedPrimary.Mui-disabled) {
+  color: rgba(0, 0, 0, 0.26) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
 
 :global([data-app-theme="dark"]) .page :global(.MuiButton-containedPrimary) {
   background-color: #42C18D !important;
@@ -1321,5 +1325,9 @@
 :global([data-app-theme="dark"]) .page :global(.MuiButton-outlinedPrimary:hover) {
   background-color: rgba(66, 193, 141, 0.1) !important;
   border-color: rgba(66, 193, 141, 0.75) !important;
+}
+:global([data-app-theme="dark"]) .page :global(.MuiButton-outlinedPrimary.Mui-disabled) {
+  color: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 

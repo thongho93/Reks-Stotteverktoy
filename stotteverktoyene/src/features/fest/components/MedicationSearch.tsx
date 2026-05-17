@@ -586,6 +586,7 @@ export default function MedicationSearch({
     setOpen(false);
     setHighlightedIndex(-1);
     lastAutoFilledQueryRef.current = "";
+    lastAutoPickedQueryRef.current = "";
   }, [resetSignal]);
 
   useEffect(() => {
