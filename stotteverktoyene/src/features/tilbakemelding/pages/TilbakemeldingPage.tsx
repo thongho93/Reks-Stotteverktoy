@@ -1370,6 +1370,11 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     if (filteredNotes.some((note) => note.id === selectedNoteId)) return;
     selectNote(filteredNotes[0]);
   }, [filteredNotes, selectedNoteId, selectNote]);
+  React.useEffect(() => {
+    if (!searchQuery.trim()) return;
+    if (filteredNotes.length === 0) return;
+    selectNote(filteredNotes[0]);
+  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
   const sharedRoutineDocRef = React.useMemo(
     () => doc(db, SHARED_ROUTINES_COLLECTION, SHARED_ROUTINES_DOC_ID),
     []
@@ -2300,19 +2305,50 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
           return;
         }
 
-        if ((event.key === "ArrowDown" || event.key === "ArrowUp") && filteredNotes.length > 0) {
-          if (isTextInput) return;
+        const isArrow = event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "ArrowLeft" || event.key === "ArrowRight";
+        if (isArrow && filteredNotes.length > 0) {
+          const isSearchInput = document.activeElement === notesSearchInputRef.current;
+          if (isTextInput && !isSearchInput) return;
           event.preventDefault();
+          if (isSearchInput) notesSearchInputRef.current?.blur();
           const currentIndex = selectedNoteId
             ? filteredNotes.findIndex((note) => note.id === selectedNoteId)
             : -1;
-          const fallbackIndex = event.key === "ArrowDown" ? 0 : filteredNotes.length - 1;
-          const nextIndex =
-            currentIndex === -1
-              ? fallbackIndex
-              : event.key === "ArrowDown"
-                ? Math.min(currentIndex + 1, filteredNotes.length - 1)
-                : Math.max(currentIndex - 1, 0);
+
+          let nextIndex: number;
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            const fallbackIndex = event.key === "ArrowDown" ? 0 : filteredNotes.length - 1;
+            nextIndex =
+              currentIndex === -1
+                ? fallbackIndex
+                : event.key === "ArrowDown"
+                  ? Math.min(currentIndex + 1, filteredNotes.length - 1)
+                  : Math.max(currentIndex - 1, 0);
+          } else {
+            const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-note-id]"));
+            if (cards.length === 0 || currentIndex === -1) {
+              nextIndex = currentIndex === -1 ? 0 : currentIndex;
+            } else {
+              const rects = cards.map((el) => el.getBoundingClientRect());
+              const uniqueLefts = [...new Set(rects.map((r) => Math.round(r.left)))].sort((a, b) => a - b);
+              const colOf = rects.map((r) => uniqueLefts.indexOf(Math.round(r.left)));
+              const currentCol = colOf[currentIndex];
+              const targetCol =
+                event.key === "ArrowRight"
+                  ? Math.min(currentCol + 1, uniqueLefts.length - 1)
+                  : Math.max(currentCol - 1, 0);
+              if (targetCol === currentCol) {
+                nextIndex = currentIndex;
+              } else {
+                const currentTop = rects[currentIndex].top;
+                const sameCol = colOf.map((col, i) => ({ col, i })).filter((x) => x.col === targetCol);
+                nextIndex = sameCol.reduce((best, x) =>
+                  Math.abs(rects[x.i].top - currentTop) < Math.abs(rects[best.i].top - currentTop) ? x : best
+                ).i;
+              }
+            }
+          }
+
           const nextNote = filteredNotes[nextIndex];
           if (!nextNote) return;
           selectNote(nextNote);
@@ -2322,15 +2358,19 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
       if (event.key !== "Escape" || tab !== "notater") return;
       const input = notesSearchInputRef.current;
-      if (!input || document.activeElement !== input) return;
+      if (!input) return;
 
-      event.preventDefault();
       if (searchQuery.trim().length > 0) {
+        event.preventDefault();
         setSearchQuery("");
+        input.blur();
         return;
       }
 
-      input.blur();
+      if (document.activeElement === input) {
+        event.preventDefault();
+        input.blur();
+      }
     };
 
     window.addEventListener("keydown", handleRoutineSearchShortcut);
@@ -3708,6 +3748,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                     return (
                       <Paper
                         key={note.id}
+                        data-note-id={note.id}
                         variant="outlined"
                         onClick={() => {
                           selectNote(note);

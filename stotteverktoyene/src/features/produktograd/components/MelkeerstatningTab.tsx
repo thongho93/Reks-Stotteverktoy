@@ -476,7 +476,7 @@ const NEOCATE_LCP: Product = {
   age: "0–1 år",
   tagline: "Aminosyrebasert melkeerstatning for spedbarn med kumelkallergi og multimatvareallergi.",
   description: "Ernæringsmessig komplett næringsprodukt i pulverform. Hypoallergen, laktosefri og egnet som eneste næringskilde.",
-  image: "/Morsmelkerstatning/Neocate-LCP-400-g-752x960.png",
+  image: "/nutrition/Neocate-LCP-400-g-752x960.png",
   imageScale: 0.9,
   type: "Aminosyrebasert",
   badges: [
@@ -645,7 +645,177 @@ const NEOCATE_LCP: Product = {
   ],
 };
 
-const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP];
+const NEOCATE_SPOON: Product = {
+  id: "neocate-spoon",
+  name: "Neocate Spoon",
+  age: "6+ måneder",
+  tagline: "Aminosyrebasert næringstilskudd for barn med kumelkallergi og multimatvareallergi. Glutenfri. Laktosefri.",
+  description: "Aminosyrebasert næringstilskudd i pulverform. Hypoallergen. Energitetthet 1,75 kcal/ml. Egnet for barn som tilvennes fast føde. Skal ikke brukes som eneste næringskilde.",
+  image: "/nutrition/Nutricia-Neocate-Spoon.png",
+  imageScale: 1.08,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",         color: "#3B82F6", icon: "drop"   },
+    { label: "Laktosefri",              color: "#EA580C", icon: "gut"    },
+    { label: "Glutenfri",               color: "#4ADE80", icon: "shield" },
+    { label: "Halal- og koshersertifisert", color: "#D97706", icon: "star" },
+  ],
+  summary: [
+    { label: "Alder",         value: "6+ måneder" },
+    { label: "Energitetthet", value: "1,75 kcal/ml" },
+    { label: "Protein",       value: "Enkle aminosyrer" },
+    { label: "Kostfiber",     value: "Ikke tilsatt" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "0 g" },
+  ],
+  fordeler: [
+    "Hypoallergen og basert på frie aminosyrer som gir svært lav risiko for allergisk reaksjon.",
+    "Én porsjon Neocate Spoon inneholder 265 mg kalsium, som gjør det enklere å møte eldre barnets kalsiumbehov.",
+    "Egnet konsistens for skjemating – velegnet for kumelkallergiske barn som tilvennes fast føde.",
+    "Glutenfri og laktosefri elementalkost for barn med behov for fri aminosyrebasert ernæring.",
+    "Halal- og koshersertifisert.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_DROP, ICON_MILK_BOTTLE, ICON_GUT, ICON_MICROSCOPE],
+  bruksomraader: [
+    "Til kostbehandling av barn og spedbarn fra 6 måneders alder med kumelkallergi og multimatvareallergi.",
+    "Til andre indikasjoner hvor elementalkost er anbefalt.",
+    "Aminosyrene gjør at produktet er lettfordøyelig og egner seg godt til barn med sykdom i mage- og tarmkanalen.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Skal ikke brukes som eneste næringskilde.",
+    "Ikke egnet til flaske eller sondeernæring.",
+    "Neocate Spoon er et næringsmiddel til spesielle medisinske formål.",
+    "Skal brukes under medisinsk tilsyn etter nøye vurdering av all næringstilførsel.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Laktosefri",               icon: null },
+    { label: "Halal- og koshersertifisert", icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ikke eneste næringskilde", icon: null },
+  ],
+  kcalPer100ml: 175,
+  pulverPer100ml: "37 g pulver",
+  macros: [
+    { label: "Fett (36 E%)",              value: 36, color: "#7C3AED", amount: "7,0 g" },
+    { label: "Karbohydrat (57 E%)",       value: 57, color: "#F97316", amount: "24,9 g" },
+    { label: "Proteinekvivalenter (7 E%)", value: 7, color: "#3B82F6", amount: "3,0 g" },
+    { label: "Kostfiber (0 E%)",          value: 0,  color: "#22C55E", amount: "0 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",   value: "0 g"      },
+    { label: "Kalsium",   value: "265 mg"   },
+    { label: "Jern",      value: "2,4 mg"   },
+    { label: "Vitamin D", value: "1,6 µg"   },
+    { label: "Natrium",   value: "15,5 mg"  },
+    { label: "Sink",      value: "1,7 mg"   },
+    { label: "Vitamin A", value: "72,2 µg"  },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml* ferdig løsning (37 g pulver)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                  unit: "kJ",   per100gPulver: "1981",     per100mlUtblandet: "733" },
+          { label: "Energi (kcal)",                unit: "kcal", per100gPulver: "472",      per100mlUtblandet: "175" },
+          { label: "Fett (36 E%)",                 unit: "g",    per100gPulver: "18,8",     per100mlUtblandet: "7,0" },
+          { label: "– hvorav mettede fettsyrer",   unit: "g",    per100gPulver: "6,9",      per100mlUtblandet: "2,6" },
+          { label: "– enumettede fettsyrer",       unit: "g",    per100gPulver: "7,5",      per100mlUtblandet: "2,8" },
+          { label: "– flerumettede fettsyrer",     unit: "g",    per100gPulver: "3,5",      per100mlUtblandet: "1,3" },
+          { label: "– linolsyre (LA)",             unit: "g",    per100gPulver: "3,4",      per100mlUtblandet: "1,3" },
+          { label: "– α-linolensyre (ALA)",        unit: "g",    per100gPulver: "0,34",     per100mlUtblandet: "0,13" },
+          { label: "– arakidonsyre (ARA)",         unit: "mg",   per100gPulver: "–",        per100mlUtblandet: "–" },
+          { label: "– dokosaheksaensyre (DHA)",    unit: "mg",   per100gPulver: "–",        per100mlUtblandet: "–" },
+          { label: "– LCT",                        unit: "%",    per100gPulver: "96",       per100mlUtblandet: "96" },
+          { label: "– MCT",                        unit: "%",    per100gPulver: "4",        per100mlUtblandet: "4" },
+          { label: "– ratio n-6:n-3",              unit: "",     per100gPulver: "10:1",     per100mlUtblandet: "10:1" },
+          { label: "Karbohydrat (57 E%)",          unit: "g",    per100gPulver: "67,4",     per100mlUtblandet: "24,9" },
+          { label: "– hvorav sukkerarter",         unit: "g",    per100gPulver: "12,3",     per100mlUtblandet: "4,6" },
+          { label: "– laktose",                    unit: "g",    per100gPulver: "0",        per100mlUtblandet: "0" },
+          { label: "Kostfiber (0 E%)",             unit: "g",    per100gPulver: "0",        per100mlUtblandet: "0" },
+          { label: "Proteinekvivalenter (7 E%)",   unit: "g",    per100gPulver: "8,2",      per100mlUtblandet: "3,0" },
+          { label: "Salt",                         unit: "g",    per100gPulver: "0,11",     per100mlUtblandet: "0,04" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg (mmol)",     per100gPulver: "42,0 (1,8)",  per100mlUtblandet: "15,5 (0,67)" },
+          { label: "Kalium",    unit: "mg (mmol)",     per100gPulver: "<20 (<1,0)",  per100mlUtblandet: "<10 (<0,50)" },
+          { label: "Klorid",    unit: "mg (mmol)",     per100gPulver: "48 (1,4)",    per100mlUtblandet: "17,8 (0,52)" },
+          { label: "Kalsium",   unit: "mg (mmol)",     per100gPulver: "716 (17,9)",  per100mlUtblandet: "265 (6,6)" },
+          { label: "Fosfor",    unit: "mg (mmol PO₄)", per100gPulver: "377 (12,2)",  per100mlUtblandet: "139 (4,5)" },
+          { label: "Magnesium", unit: "mg (mmol)",     per100gPulver: "23,1 (0,96)", per100mlUtblandet: "8,5 (0,35)" },
+          { label: "Jern",      unit: "mg",            per100gPulver: "6,5",         per100mlUtblandet: "2,4" },
+          { label: "Sink",      unit: "mg",            per100gPulver: "4,5",         per100mlUtblandet: "1,7" },
+          { label: "Kobber",    unit: "mg",            per100gPulver: "0,34",        per100mlUtblandet: "0,13" },
+          { label: "Mangan",    unit: "mg",            per100gPulver: "0,34",        per100mlUtblandet: "0,13" },
+          { label: "Molybden",  unit: "µg",            per100gPulver: "9,7",         per100mlUtblandet: "3,6" },
+          { label: "Selen",     unit: "µg",            per100gPulver: "12,4",        per100mlUtblandet: "4,6" },
+          { label: "Krom",      unit: "µg",            per100gPulver: "11,0",        per100mlUtblandet: "4,1" },
+          { label: "Jod",       unit: "µg",            per100gPulver: "41,4",        per100mlUtblandet: "15,3" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg",         per100gPulver: "195",        per100mlUtblandet: "72,2" },
+          { label: "Vitamin D",    unit: "µg",         per100gPulver: "4,3",        per100mlUtblandet: "1,6" },
+          { label: "Vitamin E",    unit: "mg (α-TE)",  per100gPulver: "2,3",        per100mlUtblandet: "0,84" },
+          { label: "Vitamin C",    unit: "mg",         per100gPulver: "23,0",       per100mlUtblandet: "8,5" },
+          { label: "Vitamin K",    unit: "µg",         per100gPulver: "18,5",       per100mlUtblandet: "6,8" },
+          { label: "Tiamin",       unit: "mg",         per100gPulver: "0,25",       per100mlUtblandet: "0,09" },
+          { label: "Riboflavin",   unit: "mg",         per100gPulver: "0,25",       per100mlUtblandet: "0,09" },
+          { label: "Niacin",       unit: "mg (mg NE)", per100gPulver: "1,1 (3,9)", per100mlUtblandet: "0,41 (1,5)" },
+          { label: "Pantotensyre", unit: "mg",         per100gPulver: "1,4",        per100mlUtblandet: "0,52" },
+          { label: "Vitamin B6",   unit: "mg",         per100gPulver: "0,25",       per100mlUtblandet: "0,09" },
+          { label: "Folsyre",      unit: "µg",         per100gPulver: "27,5",       per100mlUtblandet: "10,2" },
+          { label: "Vitamin B12",  unit: "µg",         per100gPulver: "0,60",       per100mlUtblandet: "0,22" },
+          { label: "Biotin",       unit: "µg",         per100gPulver: "9,1",        per100mlUtblandet: "3,4" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "L-karnitin",  unit: "mg",           per100gPulver: "5,9",  per100mlUtblandet: "2,2" },
+          { label: "Kolin",       unit: "mg",           per100gPulver: "45,0", per100mlUtblandet: "16,7" },
+          { label: "Inositol",    unit: "mg",           per100gPulver: "49,0", per100mlUtblandet: "18,1" },
+          { label: "Taurin",      unit: "mg",           per100gPulver: "15,9", per100mlUtblandet: "5,9" },
+          { label: "Osmolaritet", unit: "mOsm/l",       per100gPulver: "—",    per100mlUtblandet: "—" },
+          { label: "Osmolalitet", unit: "mOsm/kg H₂O",  per100gPulver: "—",    per100mlUtblandet: "—" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Kok opp vann og avkjøl.",
+    "Bruk en nøyaktig vekt som viser vekten i gram. En strøken måleskje gir 4,6 g pulver.",
+    "Tilsett 8 måleskjeer (37 g) pulver til 60 ml vann for å oppnå 100 ml.",
+    "For spedbarn som starter med fast føde kan konsistensen til Neocate Spoon endres ved å tilsette mer eller mindre vann etter behov.",
+    "Anbefalte blandingsforhold bestemmes av lege eller klinisk ernæringsfysiolog avhengig av pasientens alder, kroppsvekt og medisinske tilstand.",
+  ],
+  dosering: "Ikke egnet til bruk som eneste næringskilde. Ikke egnet til flaske eller sondeernæring. Dosering bestemmes av lege eller klinisk ernæringsfysiolog.",
+  mixingInfo: { konsentrasjon: "37", scoopGram: "4,6" },
+  mixingTable: [
+    { skjeer: 4,  pulver: "18,5", vann: 30,  ferdig: 50,  energi: 88  },
+    { skjeer: 8,  pulver: "37,0", vann: 60,  ferdig: 100, energi: 175 },
+    { skjeer: 16, pulver: "74,0", vann: 120, ferdig: 200, energi: 350 },
+  ],
+  holdbarhet: "18 måneder fra produksjonsdato. Holdbarhetsdato på pakningen. Oppbevares tørt og svalt. Sett alltid lokket på boksen etter bruk. Må ikke oppbevares i kjøleskap. Må brukes innen en måned etter åpning.",
+  ingredienser: "Tørket glukosesirup, pregelatinisert risstivelse, raffinerte vegetabilske oljer (ikke-hydrogenert kokosolje, oliesyrerik solsikkeolje, rapsolje, solsikkeolje), aminosyrer (L-arginin-L-aspartat, L-leucin, L-lysinacetat, L-glutamin, L-prolin, L-valin, glysin, L-isoleucin, L-treonin, L-fenylalanin, L-tyrosin, L-serin, L-histidin, L-alanin, L-cystin, L-tryptofan, L-metionin), sukker, kalsiumfosfat tribasisk, emulgator (E472c), kolinbitartrat, magnesium-L-aspartat, magnesiumacetat, inositol, L-askorbinsyre, jernsulfat, taurin, sinksulfat, L-karnitin, DL-α-tokoferylacetat, kalsium-D-pantotenat, nikotinamid, mangansulfat, kobbersulfat, tiaminhydroklorid, pyridoksinhydroklorid, riboflavin, retinylacetat, kaliumjodid, kromklorid, pteroylmonoglutaminsyre, natriumselenitt, natriummolybdat, fytomenadion, D-biotin, kolekalsiferol, cyanokobalamin.",
+  smaksvarianter: "Nøytral smak.",
+  indikasjon: "Til kostbehandling av kumelkallergi, multimatvareallergi og andre indikasjoner hvor en elementalkost er anbefalt. Egnet til spedbarn og barn over 6 måneders alder. Ikke egnet til bruk som eneste næringskilde. Ikke egnet til flaske eller sondeernæring.",
+  kontraindikasjon: "Intoleranse mot én eller flere av produktets ingredienser.",
+  forsiktighetsregler: "Ikke egnet til bruk som eneste næringskilde. Gis til spedbarn i tillegg til morsmelk eller annen ernæringsmessig komplett hypoallergen morsmelkerstatning. Neocate Spoon har et høyt innhold av kalsium og jern og er en kilde til vitamin D.",
+  bestilling: [
+    { produktnavn: "Neocate Spoon", bestillingsnr: "194980", varenr: "949843", salgsenhet: "400 g boks" },
+  ],
+};
+
+const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function ProductCard({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
@@ -1120,12 +1290,16 @@ export default function MelkeerstatningTab() {
     { title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" },
   ];
   const NEOCATE_LCP_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Neocate LCP", url: "/Morsmelkerstatning/Neocate-LCP.pdf", sizeLabel: "530 KB" },
+    { title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" },
+  ];
+  const NEOCATE_SPOON_DOKUMENTER: Dokument[] = [
+    { title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" },
   ];
   const DOKUMENT_MAP: Record<string, Dokument[]> = {
     "pepticate-1": PEPTICATE_1_DOKUMENTER,
     "pepticate-plus-2": PEPTICATE_PLUS_2_DOKUMENTER,
     "neocate-lcp": NEOCATE_LCP_DOKUMENTER,
+    "neocate-spoon": NEOCATE_SPOON_DOKUMENTER,
   };
   const aktiveDokumenter = DOKUMENT_MAP[product.id] ?? [];
 
