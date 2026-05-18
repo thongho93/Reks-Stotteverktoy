@@ -476,7 +476,7 @@ const NEOCATE_LCP: Product = {
   age: "0–1 år",
   tagline: "Aminosyrebasert melkeerstatning for spedbarn med kumelkallergi og multimatvareallergi.",
   description: "Ernæringsmessig komplett næringsprodukt i pulverform. Hypoallergen, laktosefri og egnet som eneste næringskilde.",
-  image: "/Morsmelkerstatning/Neocate-LCP-400-g-752x960.png",
+  image: "/nutrition/Neocate-LCP-400-g-752x960.png",
   imageScale: 0.9,
   type: "Aminosyrebasert",
   badges: [
@@ -1120,7 +1120,7 @@ export default function MelkeerstatningTab() {
     { title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" },
   ];
   const NEOCATE_LCP_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Neocate LCP", url: "/Morsmelkerstatning/Neocate-LCP.pdf", sizeLabel: "530 KB" },
+    { title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" },
   ];
   const DOKUMENT_MAP: Record<string, Dokument[]> = {
     "pepticate-1": PEPTICATE_1_DOKUMENTER,
