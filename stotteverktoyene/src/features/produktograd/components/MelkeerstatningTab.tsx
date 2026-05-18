@@ -652,7 +652,7 @@ const NEOCATE_SPOON: Product = {
   tagline: "Aminosyrebasert næringstilskudd for barn med kumelkallergi og multimatvareallergi. Glutenfri. Laktosefri.",
   description: "Aminosyrebasert næringstilskudd i pulverform. Hypoallergen. Energitetthet 1,75 kcal/ml. Egnet for barn som tilvennes fast føde. Skal ikke brukes som eneste næringskilde.",
   image: "/nutrition/Nutricia-Neocate-Spoon.png",
-  imageScale: 0.7,
+  imageScale: 0.9,
   type: "Aminosyrebasert",
   badges: [
     { label: "Aminosyrebasert",         color: "#3B82F6", icon: "drop"   },
