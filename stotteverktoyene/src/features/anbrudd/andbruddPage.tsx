@@ -29,7 +29,7 @@ const anbruddSkjemaOpenUrl = (import.meta.env.VITE_ANBRUDD_OFFICE_FORM_URL ??
   | string
   | undefined;
 const anbruddEtikettOpenUrl = (import.meta.env.VITE_ANBRUDD_ETIKETT_OPEN_URL ??
-  "https://farmasietno-my.sharepoint.com/:x:/g/personal/jenny_kvarme_farmasiet_no/IQAyYWdzIziXQL0xo7k1HsgOAWGFnpFU8u7fYaW1J5ELpis?e=85lDkh") as
+  "ms-excel:ofe|u|https://farmasietno.sharepoint.com/:x:/s/Reseptekspedisjon827-Farmasyter/IQA-XrifJGC2QKLZlwvgJE9lAcrp1P4NQBDiMeSzKSu2lYw?e=XVGsU1") as
   | string
   | undefined;
 const anbruddOversiktOpenUrl = (import.meta.env.VITE_ANBRUDD_OVERSIKT_OPEN_URL ??
