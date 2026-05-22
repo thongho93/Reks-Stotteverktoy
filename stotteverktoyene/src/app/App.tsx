@@ -156,6 +156,31 @@ type SidebarItem = {
   color: string;
 };
 
+const MAIN_ITEMS: SidebarItem[] = [
+  { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#29A1FF" },
+  { label: "Standardtekster", path: "/standardtekster", Icon: StandardteksterIcon, color: "#4BC76A" },
+  { label: "Interaksjonssøk", path: "/interaksjoner", Icon: CompareArrowsIcon, color: "#FF5E5B" },
+  { label: "Produkt og råd", path: "/produkt-og-rad", Icon: ProduktOgRadIcon, color: "#C93586" },
+  { label: "Innkjøp og anbrudd", path: "/anbrudd", Icon: InnkjopIcon, color: "#FFA726" },
+  { label: "Notater og innspill", path: "/tilbakemelding", Icon: InnspillIcon, color: "#B648E8" },
+];
+
+const PRODUKT_SUB_ITEMS = [
+  { label: "Produkt og råd", search: "" },
+  { label: "Faglig innhold", search: "?fagdoc=" },
+  { label: "Rutiner", search: "?tab=rutiner" },
+];
+
+const ANBRUDD_SUB_ITEMS = [
+  { label: "Anbruddsoversikt", search: "" },
+  { label: "Produktskjema", search: "?tab=produktskjema" },
+];
+
+const INNSPILL_SUB_ITEMS = [
+  { label: "Mine notater", search: "" },
+  { label: "Innspill", search: "?tab=meldeskjema" },
+];
+
 function pathToUsagePage(pathname: string): UsagePage {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/omeq")) return "omeq";
@@ -232,12 +257,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const [produktOpen, setProduktOpen] = React.useState(isProduktOgRad);
   React.useEffect(() => { if (isProduktOgRad) setProduktOpen(true); }, [isProduktOgRad]);
 
-  const produktSubItems = [
-    { label: "Produkt og råd", search: "" },
-    { label: "Faglig innhold", search: "?fagdoc=" },
-    { label: "Rutiner", search: "?tab=rutiner" },
-  ];
-
   const activeSubItem = () => {
     const params = new URLSearchParams(location.search);
     if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) return 2;
@@ -249,11 +268,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const [anbruddOpen, setAnbruddOpen] = React.useState(isAnbrudd);
   React.useEffect(() => { if (isAnbrudd) setAnbruddOpen(true); }, [isAnbrudd]);
 
-  const anbruddSubItems = [
-    { label: "Anbruddsoversikt", search: "" },
-    { label: "Produktskjema", search: "?tab=produktskjema" },
-  ];
-
   const activeAnbruddSubItem = () => {
     const params = new URLSearchParams(location.search);
     return params.get("tab") === "produktskjema" ? 1 : 0;
@@ -263,11 +277,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const [innspillOpen, setInnspillOpen] = React.useState(isInnspill);
   React.useEffect(() => { if (isInnspill) setInnspillOpen(true); }, [isInnspill]);
 
-  const innspillSubItems = [
-    { label: "Mine notater", search: "" },
-    { label: "Innspill", search: "?tab=meldeskjema" },
-  ];
-
   const activeInnspillSubItem = () => {
     const params = new URLSearchParams(location.search);
     if (params.get("tab") === "meldeskjema") return 1;
@@ -276,7 +285,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
-  const navItemButtonSx = (item: SidebarItem) => ({
+  const navItemButtonSx = React.useCallback((item: SidebarItem) => ({
     justifyContent: collapsed ? "center" : "flex-start",
     px: collapsed ? 1 : 2,
     py: collapsed ? 0.85 : 0.95,
@@ -298,53 +307,12 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     "& .MuiListItemIcon-root": {
       color: item.color,
     },
-  });
+  }), [collapsed]);
 
-  const mainItems: SidebarItem[] = [
-    { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#29A1FF" },
-    {
-      label: "Standardtekster",
-      path: "/standardtekster",
-      Icon: StandardteksterIcon,
-      color: "#4BC76A",
-    },
-    {
-      label: "Interaksjonssøk",
-      path: "/interaksjoner",
-      Icon: CompareArrowsIcon,
-      color: "#FF5E5B",
-    },
-    {
-      label: "Produkt og råd",
-      path: "/produkt-og-rad",
-      Icon: ProduktOgRadIcon,
-      color: "#C93586",
-    },
-    {
-      label: "Innkjøp og anbrudd",
-      path: "/anbrudd",
-      Icon: InnkjopIcon,
-      color: "#FFA726",
-    },
-    {
-      label: "Notater og innspill",
-      path: "/tilbakemelding",
-      Icon: InnspillIcon,
-      color: "#B648E8",
-    },
-  ];
-
-  const adminItems: SidebarItem[] =
-    hasRekspertAccess
-      ? [
-          {
-            label: "Rekspert",
-            path: "/rekspert",
-            Icon: ConstructionIcon,
-            color: "#00A3D7",
-          },
-        ]
-      : [];
+  const adminItems = React.useMemo<SidebarItem[]>(
+    () => hasRekspertAccess ? [{ label: "Rekspert", path: "/rekspert", Icon: ConstructionIcon, color: "#00A3D7" }] : [],
+    [hasRekspertAccess]
+  );
 
   return (
     <Drawer
@@ -430,7 +398,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       <Divider />
 
       <List sx={{ py: 0.5 }}>
-        {mainItems.map((item, index) => (
+        {MAIN_ITEMS.map((item, index) => (
           <React.Fragment key={item.path}>
             {item.path === "/produkt-og-rad" ? (
               <>
@@ -467,7 +435,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                 {!collapsed && (
                   <Collapse in={produktOpen} timeout="auto" unmountOnExit>
                     <List disablePadding>
-                      {produktSubItems.map((sub, i) => (
+                      {PRODUKT_SUB_ITEMS.map((sub, i) => (
                         <ListItemButton
                           key={sub.label}
                           selected={isProduktOgRad && activeSubItem() === i}
@@ -530,7 +498,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                 {!collapsed && (
                   <Collapse in={anbruddOpen} timeout="auto" unmountOnExit>
                     <List disablePadding>
-                      {anbruddSubItems.map((sub, i) => (
+                      {ANBRUDD_SUB_ITEMS.map((sub, i) => (
                         <ListItemButton
                           key={sub.label}
                           selected={isAnbrudd && activeAnbruddSubItem() === i}
@@ -588,7 +556,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                 {!collapsed && (
                   <Collapse in={innspillOpen} timeout="auto" unmountOnExit>
                     <List disablePadding>
-                      {innspillSubItems.map((sub, i) => (
+                      {INNSPILL_SUB_ITEMS.map((sub, i) => (
                         <ListItemButton
                           key={sub.label}
                           selected={isInnspill && activeInnspillSubItem() === i}
@@ -630,7 +598,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                 </ListItemButton>
               </Tooltip>
             )}
-            {index < mainItems.length - 1 && (
+            {index < MAIN_ITEMS.length - 1 && (
               <Divider sx={{ mx: collapsed ? 1.5 : 2, opacity: 0.45 }} />
             )}
           </React.Fragment>
