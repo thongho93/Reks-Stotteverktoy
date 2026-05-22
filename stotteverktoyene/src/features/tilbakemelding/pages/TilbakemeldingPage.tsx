@@ -79,6 +79,8 @@ const ROUTINE_TEXT_COLOR_SWATCHES = [
   ["#85200c", "#990000", "#b45f06", "#bf9000", "#38761d", "#134f5c", "#1155cc", "#0b5394", "#351c75", "#741b47"],
   ["#5b0f00", "#660000", "#783f04", "#7f6000", "#274e13", "#0c343d", "#1c4587", "#073763", "#20124d", "#4c1130"],
 ] as const;
+const ROUTINE_TEXT_COLOR_SWATCHES_FLAT = ROUTINE_TEXT_COLOR_SWATCHES.flat();
+
 const KEEP_CARD_COLORS = [
   "#FFF8E1",
   "#E8F5E9",
@@ -3106,7 +3108,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                         }}
                       >
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(10, 22px)", gap: 0.5 }}>
-                          {ROUTINE_TEXT_COLOR_SWATCHES.flat().map((color) => (
+                          {ROUTINE_TEXT_COLOR_SWATCHES_FLAT.map((color) => (
                             <Box
                               key={color}
                               component="button"

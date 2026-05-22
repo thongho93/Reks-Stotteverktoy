@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { Box, Typography, Tabs, Tab, Chip } from "@mui/material";
 
 // ─── Badge icons ──────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ type Product = {
   bestilling: { produktnavn: string; bestillingsnr: string; varenr: string; salgsenhet: string }[];
 };
 
-function NutritionTable({ rows }: { rows: { label: string; unit: string; per100gPulver: string; per100mlUtblandet: string }[] }) {
+const NutritionTable = memo(function NutritionTable({ rows }: { rows: { label: string; unit: string; per100gPulver: string; per100mlUtblandet: string }[] }) {
   return (
     <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
       <Box component="tbody">
@@ -117,7 +117,7 @@ function NutritionTable({ rows }: { rows: { label: string; unit: string; per100g
       </Box>
     </Box>
   );
-}
+});
 
 const PEPTICATE_1: Product = {
   id: "pepticate-1",
@@ -818,7 +818,7 @@ const NEOCATE_SPOON: Product = {
 const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-function ProductCard({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
+const ProductCard = memo(function ProductCard({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
   return (
     <Box
       onClick={onClick}
@@ -833,7 +833,7 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
     >
       <Box sx={{ width: 88, flexShrink: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", pt: 0.5 }}>
         {product.image
-          ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 88, height: 88, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
+          ? <Box component="img" src={product.image} alt={product.name} loading="lazy" sx={{ width: 88, height: 88, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
           : <BottleIcon size={60} color={D.purple} />}
       </Box>
       <Box sx={{ minWidth: 0 }}>
@@ -844,7 +844,7 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
       </Box>
     </Box>
   );
-}
+});
 
 function OversiktTab({ product }: { product: Product }) {
   return (
@@ -1157,7 +1157,7 @@ function BestillingTab({ product }: { product: Product }) {
       {/* Product card */}
       <Box sx={{ display: "flex", gap: 2, p: 2, bgcolor: D.surface, border: `1px solid ${D.border}`, borderRadius: D.radiusSm, alignItems: "center" }}>
         {product.image && (
-          <Box component="img" src={product.image} alt={product.name} sx={{ width: 72, height: 72, objectFit: "contain", flexShrink: 0, transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
+          <Box component="img" src={product.image} alt={product.name} loading="lazy" sx={{ width: 72, height: 72, objectFit: "contain", flexShrink: 0, transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
         )}
         <Box>
           <Typography sx={{ fontWeight: 800, fontSize: 15, color: D.text, mb: 0.5 }}>{product.name}</Typography>
@@ -1274,34 +1274,27 @@ function CheckIcon({ size = 14, color = "#22C55E" }: { size?: number; color?: st
   );
 }
 
+// ─── Static constants (outside component to avoid recreation on every render) ──
+const TABS = ["Oversikt", "Næringsinnhold", "Tilberedning & dosering", "Ingredienser", "Bestillingsinfo", "Dokumentasjon"];
+const DOKUMENT_MAP: Record<string, Dokument[]> = {
+  "pepticate-1": [{ title: "Produktark Pepticate", url: "/dokumenter/pepticate-1-produktark.pdf", sizeLabel: "344 KB" }],
+  "pepticate-plus-2": [{ title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" }],
+  "neocate-lcp": [{ title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" }],
+  "neocate-spoon": [{ title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" }],
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MelkeerstatningTab() {
   const [selectedId, setSelectedId] = useState<string>(PRODUCTS[0].id);
   const [activeTab, setActiveTab] = useState(0);
 
   const product = PRODUCTS.find(p => p.id === selectedId) ?? PRODUCTS[0];
-
-  const TABS = ["Oversikt", "Næringsinnhold", "Tilberedning & dosering", "Ingredienser", "Bestillingsinfo", "Dokumentasjon"];
-
-  const PEPTICATE_1_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Pepticate", url: "/dokumenter/pepticate-1-produktark.pdf", sizeLabel: "344 KB" },
-  ];
-  const PEPTICATE_PLUS_2_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" },
-  ];
-  const NEOCATE_LCP_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" },
-  ];
-  const NEOCATE_SPOON_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" },
-  ];
-  const DOKUMENT_MAP: Record<string, Dokument[]> = {
-    "pepticate-1": PEPTICATE_1_DOKUMENTER,
-    "pepticate-plus-2": PEPTICATE_PLUS_2_DOKUMENTER,
-    "neocate-lcp": NEOCATE_LCP_DOKUMENTER,
-    "neocate-spoon": NEOCATE_SPOON_DOKUMENTER,
-  };
   const aktiveDokumenter = DOKUMENT_MAP[product.id] ?? [];
+
+  const handleSelectProduct = useCallback((id: string) => {
+    setSelectedId(id);
+    setActiveTab(0);
+  }, []);
 
   return (
     <Box sx={{ display: "flex", height: "100%", bgcolor: D.surface, overflow: "hidden" }}>
@@ -1317,7 +1310,7 @@ export default function MelkeerstatningTab() {
               key={p.id}
               product={p}
               selected={p.id === selectedId}
-              onClick={() => { setSelectedId(p.id); setActiveTab(0); }}
+              onClick={() => handleSelectProduct(p.id)}
             />
           ))}
         </Box>
@@ -1334,7 +1327,7 @@ export default function MelkeerstatningTab() {
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               {product.image
-                ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 170, height: 160, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
+                ? <Box component="img" src={product.image} alt={product.name} loading="eager" sx={{ width: 170, height: 160, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
                 : <BottleIcon size={64} color={D.purple} />}
             </Box>
 
