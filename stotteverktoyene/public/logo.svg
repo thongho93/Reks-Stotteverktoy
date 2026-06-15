@@ -1,12 +1,12 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="petalGradient" x1="120" y1="80" x2="392" y2="432" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F4A1C8"/>
-      <stop offset="0.45" stop-color="#D86BA8"/>
-      <stop offset="1" stop-color="#7B3FA1"/>
+      <stop offset="0" stop-color="#ECC4D6"/>
+      <stop offset="0.45" stop-color="#D293AC"/>
+      <stop offset="1" stop-color="#A5607A"/>
     </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">
-      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#C85A9C" flood-opacity="0.18"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#D293AC" flood-opacity="0.18"/>
     </filter>
   </defs>
 

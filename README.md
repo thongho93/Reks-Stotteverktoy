@@ -59,3 +59,21 @@ Mulige forbedringer fremover kan være:
 ## Status
 
 Prosjektet er under utvikling, og både funksjonalitet og innhold kan bli endret over tid.
+
+## Anbefalt branch protection for `main`
+
+Repo-innstillinger kan ikke håndheves via kode i dette prosjektet, så bruk følgende oppsett manuelt i **Settings → Branches → Add rule** med branch pattern `main`:
+
+- **Require a pull request before merging** (ingen direkte push til `main`)
+- **Require approvals**: minst **1** godkjenning
+- **Dismiss stale pull request approvals when new commits are pushed**
+- **Require review from Code Owners** (når/om CODEOWNERS brukes)
+- **Require conversation resolution before merging**
+- **Require status checks to pass before merging** (velg relevante CI-checks når de finnes)
+- **Require branches to be up to date before merging**
+- **Require linear history** (anbefalt for ryddig historikk i små team)
+- **Do not allow bypassing the above settings** (inkluder administratorer)
+- **Allow force pushes**: **av**
+- **Allow deletions**: **av**
+
+Dette gir en trygg, praktisk standard for solo/små team som bruker pull requests som eneste vei inn i `main`.

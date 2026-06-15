@@ -809,8 +809,8 @@ export default function StandardTekstSidebar({
                           zIndex: -1,
                         },
                         "&:hover": {
-                          background: `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.06)} 100%)`,
-                          borderColor: alpha(theme.palette.primary.main, 0.3),
+                          background: `linear-gradient(180deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.main, 0.06)} 100%)`,
+                          borderColor: alpha(theme.palette.success.main, 0.3),
                         },
                         "&:hover .hide-category-btn": { opacity: 1 },
                         "&.Mui-selected .hide-category-btn": { opacity: 1 },

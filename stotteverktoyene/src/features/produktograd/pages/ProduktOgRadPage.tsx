@@ -50,7 +50,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import {
   addDoc,
   collection,
@@ -291,6 +291,8 @@ export default function ProduktOgRadPage() {
   const { user } = useAuthUser();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const PINK = "#C93586";
+  const pinkTheme = useMemo(() => createTheme(theme, { palette: { primary: { main: PINK } } }), [theme]);
   const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastAutoPastedRef = useRef<string | null>(null);
@@ -961,15 +963,16 @@ export default function ProduktOgRadPage() {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100%",
-        bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FBF5F8",
-        backgroundImage: (theme) => theme.palette.mode === "dark"
-          ? "radial-gradient(circle at 8% -12%, rgba(160,40,120,0.12) 0%, rgba(160,40,120,0) 40%), radial-gradient(circle at 94% -4%, rgba(100,30,90,0.10) 0%, rgba(100,30,90,0) 34%)"
-          : "radial-gradient(circle at 8% -12%, rgba(214,89,156,0.18) 0%, rgba(214,89,156,0) 40%), radial-gradient(circle at 94% -4%, rgba(133,45,110,0.14) 0%, rgba(133,45,110,0) 34%)",
-      }}
-    >
+    <ThemeProvider theme={pinkTheme}>
+      <Box
+        sx={{
+          position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
+          bgcolor: isDark ? "#0D1117" : "#FBF5F8",
+          backgroundImage: isDark
+            ? "radial-gradient(circle at 8% -12%, rgba(160,40,120,0.12) 0%, rgba(160,40,120,0) 40%), radial-gradient(circle at 94% -4%, rgba(100,30,90,0.10) 0%, rgba(100,30,90,0) 34%)"
+            : "radial-gradient(circle at 8% -12%, rgba(214,89,156,0.18) 0%, rgba(214,89,156,0) 40%), radial-gradient(circle at 94% -4%, rgba(133,45,110,0.14) 0%, rgba(133,45,110,0) 34%)",
+        }}
+      />
       <Box
         sx={{
           px: { xs: 2, md: 4 },
@@ -2351,6 +2354,6 @@ export default function ProduktOgRadPage() {
           {copiedMessage}
         </Alert>
       </Snackbar>
-    </Box>
+    </ThemeProvider>
   );
 }

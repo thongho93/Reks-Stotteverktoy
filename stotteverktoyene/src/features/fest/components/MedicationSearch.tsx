@@ -13,6 +13,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 const SPREADSHEET_EDIT_URL =
   "https://docs.google.com/spreadsheets/d/1rBMivx3lHY4CKrFev_On__YVendKv6O7i_Zzcoy9QYg/edit?gid=1369769996#gid=1369769996";
@@ -68,6 +69,7 @@ type Props = {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   autoPasteNumericClipboard?: boolean;
   resetSignal?: string | number | null;
+  accentColor?: string;
 };
 
 const NOISE_TOKENS = new Set([
@@ -553,6 +555,7 @@ export default function MedicationSearch({
   inputRef,
   autoPasteNumericClipboard = false,
   resetSignal = null,
+  accentColor,
 }: Props) {
   const [query, setQuery] = useState("");
   const queryRef = useRef("");
@@ -564,6 +567,7 @@ export default function MedicationSearch({
   const [open, setOpen] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  const lastAutoPickedQueryRef = useRef("");
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const manualNameInputRef = useRef<HTMLInputElement | null>(null);
   const lastObservedClipboardDigitsRef = useRef("");
@@ -582,6 +586,7 @@ export default function MedicationSearch({
     setOpen(false);
     setHighlightedIndex(-1);
     lastAutoFilledQueryRef.current = "";
+    lastAutoPickedQueryRef.current = "";
   }, [resetSignal]);
 
   useEffect(() => {
@@ -996,6 +1001,20 @@ export default function MedicationSearch({
     setHighlightedIndex(-1);
   };
 
+  // Auto-pick when a VNR search yields exactly one result
+  useEffect(() => {
+    if (results.length !== 1) return;
+    if (!open) return;
+    const digits = normalizeForSearch(deferredQuery).replace(/\s+/g, "");
+    if (!/^\d{4,}$/.test(digits)) return;
+    if (deferredQuery === lastAutoPickedQueryRef.current) return;
+    lastAutoPickedQueryRef.current = deferredQuery;
+    onPick?.(results[0]);
+    setQuery("");
+    setOpen(false);
+    setHighlightedIndex(-1);
+  }, [results, deferredQuery, open, onPick]);
+
   const normalizedQueryDigits = normalizeForSearch(deferredQuery).replace(/\s+/g, "");
   const noHitsForLikelyIdSearch =
     !isLoadingData &&
@@ -1279,6 +1298,16 @@ export default function MedicationSearch({
                   onClick={() => pickResult(m)}
                   selected={index === highlightedIndex}
                   onMouseEnter={() => setHighlightedIndex(index)}
+                  sx={(theme) => {
+                    const color = accentColor ?? theme.palette.primary.main;
+                    return {
+                      "&.Mui-selected": {
+                        bgcolor: alpha(color, 0.13),
+                        "&:hover": { bgcolor: alpha(color, 0.18) },
+                      },
+                      "&:hover": { bgcolor: alpha(color, 0.07) },
+                    };
+                  }}
                 >
                   {(() => {
                     const secondaryParts = [

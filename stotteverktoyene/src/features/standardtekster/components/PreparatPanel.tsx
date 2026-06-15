@@ -2,17 +2,16 @@ import {
   Box,
   Button,
   Chip,
-  FormControlLabel,
   Paper,
   Stack,
   Tooltip,
   Typography,
 } from "@mui/material";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
+import { useTheme } from "@mui/material/styles";
 import MedicationSearch from "../../fest/components/MedicationSearch";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { formatPreparatForTemplate, formatPreparatRowText } from "../utils/preparat";
-import PinkSwitch from "./PinkSwitch";
 
 type PreparatRowId = string | number;
 
@@ -67,6 +66,7 @@ export default function PreparatPanel({
   onClear,
   onRemove,
 }: Props) {
+  const theme = useTheme();
   const hasPicked = preparatRows.some((r) => r.picked);
 
   const deriveFormuleringBase = (m: any): string => {
@@ -135,6 +135,7 @@ export default function PreparatPanel({
             inputRef={inputRef}
             autoPasteNumericClipboard={autoPasteNumericClipboard}
             resetSignal={searchResetSignal}
+            accentColor={theme.palette.mode === "dark" ? "#42C18D" : "#5CAA7E"}
             onPick={(med) => {
               const baseText = formatPreparatForTemplate(med);
               if (!baseText) return;
@@ -302,57 +303,128 @@ export default function PreparatPanel({
         </Stack>
 
         <Box className={styles.preparatToggleRow}>
-        <Tooltip title="Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.">
-          <FormControlLabel
-            sx={{ m: 0, gap: 0.75 }}
-            control={
-              <PinkSwitch
-                checked={clearOnCopy}
-                onChange={(e) => onClearOnCopyChange?.(e.target.checked)}
-              />
-            }
-            label={<Typography variant="caption">Tøm etter kopi</Typography>}
-          />
-        </Tooltip>
-
-        <Tooltip title="Når dette er på, settes produsentnavn inn i teksten (f.eks. Metformin Sandoz).">
-          <FormControlLabel
-            sx={{ m: 0, gap: 0.75 }}
-            control={
-              <PinkSwitch
-                checked={includeManufacturerInText}
-                onChange={(e) => onIncludeManufacturerInTextChange?.(e.target.checked)}
-              />
-            }
-            label={<Typography variant="caption">Produsent</Typography>}
-          />
-        </Tooltip>
-
-        <Tooltip title="Når dette er på, tas pakningsstørrelse med i teksten (f.eks. ... 60).">
-          <FormControlLabel
-            sx={{ m: 0, gap: 0.75 }}
-            control={
-              <PinkSwitch
-                checked={includePackSizeInText}
-                onChange={(e) => onIncludePackSizeInTextChange?.(e.target.checked)}
-              />
-            }
-            label={<Typography variant="caption">Pakningsstørrelse</Typography>}
-          />
-        </Tooltip>
-
-        <Tooltip title="Når feltet er aktivt, limes kopiert tall automatisk inn i søket (f.eks. 3111).">
-          <FormControlLabel
-            sx={{ m: 0, gap: 0.75 }}
-            control={
-              <PinkSwitch
-                checked={autoPasteNumericClipboard}
-                onChange={(e) => onAutoPasteNumericClipboardChange?.(e.target.checked)}
-              />
-            }
-            label={<Typography variant="caption">Auto vnr</Typography>}
-          />
-        </Tooltip>
+          {([
+            {
+              label: "Tøm etter kopi",
+              checked: clearOnCopy,
+              onChange: onClearOnCopyChange,
+              title: "Når dette er på, tømmes preparater, tallfelt og søk automatisk etter kopiering.",
+            },
+            {
+              label: "Auto vnr",
+              checked: autoPasteNumericClipboard,
+              onChange: onAutoPasteNumericClipboardChange,
+              title: "Når feltet er aktivt, limes kopiert tall automatisk inn i søket (f.eks. 3111).",
+            },
+            {
+              label: "Produsent",
+              checked: includeManufacturerInText,
+              onChange: onIncludeManufacturerInTextChange,
+              title: "Når dette er på, settes produsentnavn inn i teksten (f.eks. Metformin Sandoz).",
+            },
+            {
+              label: "Størrelse",
+              checked: includePackSizeInText,
+              onChange: onIncludePackSizeInTextChange,
+              title: "Når dette er på, tas pakningsstørrelse med i teksten (f.eks. ... 60).",
+            },
+          ] as const).map(({ label, checked, onChange, title }) => (
+            <Tooltip key={label} title={title} placement="top" arrow>
+              <Box
+                component="button"
+                type="button"
+                aria-pressed={checked}
+                onClick={() => onChange?.(!checked)}
+                sx={(theme) => ({
+                  display: "flex",
+                  alignItems: "center",
+                  width: "100%",
+                  gap: "6px",
+                  px: "10px",
+                  py: "5px",
+                  border: "1px solid",
+                  borderRadius: "999px",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  transition: "all 140ms ease",
+                  background: checked
+                    ? `linear-gradient(135deg, ${theme.palette.mode === "dark" ? "rgba(66,193,141,0.18)" : "rgba(92,170,126,0.13)"} 0%, ${theme.palette.mode === "dark" ? "rgba(66,193,141,0.10)" : "rgba(92,170,126,0.07)"} 100%)`
+                    : theme.palette.mode === "dark"
+                      ? "rgba(14,21,33,0.5)"
+                      : "rgba(255,255,255,0.8)",
+                  borderColor: checked
+                    ? theme.palette.mode === "dark"
+                      ? "rgba(66,193,141,0.45)"
+                      : "rgba(92,170,126,0.45)"
+                    : theme.palette.mode === "dark"
+                      ? "rgba(165,177,198,0.2)"
+                      : "rgba(148,163,184,0.3)",
+                  boxShadow: checked
+                    ? theme.palette.mode === "dark"
+                      ? "0 0 0 1px rgba(66,193,141,0.15) inset"
+                      : "0 0 0 1px rgba(92,170,126,0.1) inset"
+                    : "none",
+                  "&:hover": {
+                    borderColor: checked
+                      ? theme.palette.mode === "dark"
+                        ? "rgba(66,193,141,0.65)"
+                        : "rgba(92,170,126,0.65)"
+                      : theme.palette.mode === "dark"
+                        ? "rgba(165,177,198,0.38)"
+                        : "rgba(148,163,184,0.5)",
+                    background: checked
+                      ? theme.palette.mode === "dark"
+                        ? "rgba(66,193,141,0.22)"
+                        : "rgba(92,170,126,0.17)"
+                      : theme.palette.mode === "dark"
+                        ? "rgba(165,177,198,0.08)"
+                        : "rgba(148,163,184,0.08)",
+                  },
+                })}
+              >
+                <Box
+                  sx={(theme) => ({
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    transition: "all 140ms ease",
+                    background: checked
+                      ? theme.palette.mode === "dark"
+                        ? "#42C18D"
+                        : "#3da87a"
+                      : theme.palette.mode === "dark"
+                        ? "rgba(165,177,198,0.4)"
+                        : "rgba(148,163,184,0.5)",
+                    boxShadow: checked
+                      ? theme.palette.mode === "dark"
+                        ? "0 0 6px rgba(66,193,141,0.6)"
+                        : "0 0 5px rgba(92,170,126,0.5)"
+                      : "none",
+                  })}
+                />
+                <Typography
+                  variant="caption"
+                  sx={(theme) => ({
+                    fontSize: "0.8rem",
+                    fontWeight: checked ? 650 : 500,
+                    letterSpacing: "0.01em",
+                    transition: "color 140ms ease",
+                    color: checked
+                      ? theme.palette.mode === "dark"
+                        ? "#42C18D"
+                        : "#2a7a57"
+                      : theme.palette.mode === "dark"
+                        ? "rgba(165,177,198,0.75)"
+                        : "rgba(71,85,105,0.85)",
+                    lineHeight: 1,
+                  })}
+                >
+                  {label}
+                </Typography>
+              </Box>
+            </Tooltip>
+          ))}
         </Box>
 
         <Box className={styles.preparatChipsWrap}>
