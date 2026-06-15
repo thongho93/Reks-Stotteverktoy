@@ -586,9 +586,9 @@ export default function InteraksjonerPage() {
   return (
     <Box
       sx={{
-        mx: -2,
-        mt: -2,
-        minHeight: "100vh",
+        minHeight: "100%",
+        // flow-root contains the inner box's top margin so it doesn't overflow the page height.
+        display: "flow-root",
         bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FBF5F5",
         backgroundImage: (t) => t.palette.mode === "dark"
           ? "radial-gradient(circle at 6% -10%, rgba(200,60,60,0.11) 0%, rgba(200,60,60,0) 38%), radial-gradient(circle at 92% -6%, rgba(150,40,40,0.09) 0%, rgba(150,40,40,0) 32%)"

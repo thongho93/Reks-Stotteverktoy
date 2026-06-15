@@ -123,6 +123,9 @@ const normalizeSearch = (value: string): string =>
 
 const toDigits = (value: string): string => value.replace(/\D+/g, "");
 const NUMERIC_QUERY_RE = /^\d+$/;
+// Auto-paste recognition: a varenummer is pure digits (max 6), an ATC-code is L NN LL NN.
+const VNR_PASTE_RE = /^\d{1,6}$/;
+const ATC_CODE_RE = /^[A-Z][0-9]{2}[A-Z]{2}[0-9]{2}$/;
 const MAX_RENDERED_RESULTS = 120;
 const PAGE_MAX_WIDTH = 1500;
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
@@ -290,6 +293,7 @@ export default function ProduktOgRadPage() {
   const isDark = theme.palette.mode === "dark";
   const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const lastAutoPastedRef = useRef<string | null>(null);
   const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
   const fagligTitleInputRef = useRef<HTMLInputElement | null>(null);
   const textSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -642,6 +646,45 @@ export default function ProduktOgRadPage() {
     }
   };
 
+  // When the search field gains focus, auto-paste the clipboard if it looks like a
+  // varenummer (max 6 digits) or an ATC-code. A newly detected VNR/ATC-code replaces
+  // whatever is currently in the field; the same clipboard value is never re-pasted
+  // twice (so the user can clear or edit the field without it snapping back).
+  const handleSearchAutoPaste = async () => {
+    try {
+      const clip = (await navigator.clipboard.readText()).trim();
+      if (!clip) return;
+
+      let value: string | null = null;
+      if (VNR_PASTE_RE.test(clip)) value = clip;
+      else if (ATC_CODE_RE.test(clip.toUpperCase())) value = clip.toUpperCase();
+      if (!value || lastAutoPastedRef.current === value) return;
+
+      lastAutoPastedRef.current = value;
+      if (value !== query.trim()) setQuery(value);
+    } catch {
+      // Clipboard unavailable or permission denied — silently ignore.
+    }
+  };
+
+  // Keep a ref to the latest auto-paste closure so the window-focus listener
+  // (registered once) always sees the current query value.
+  const autoPasteRef = useRef(handleSearchAutoPaste);
+  autoPasteRef.current = handleSearchAutoPaste;
+
+  // While the search field is focused, returning to the window (e.g. after copying a
+  // new VNR/ATC-code in another app) does not re-fire the input's focus event. Re-check
+  // the clipboard on window focus so a freshly copied code still gets pasted/replaced.
+  useEffect(() => {
+    const onWindowFocus = () => {
+      if (activeTab !== 0) return;
+      if (document.activeElement !== searchInputRef.current) return;
+      void autoPasteRef.current();
+    };
+    window.addEventListener("focus", onWindowFocus);
+    return () => window.removeEventListener("focus", onWindowFocus);
+  }, [activeTab]);
+
   const handleCopyNumber = async (rawValue: string, label: "Vnr" | "SKU" | "ATC") => {
     const value = label === "ATC" ? rawValue?.trim() : toDigits(rawValue);
     if (!value) return;
@@ -920,9 +963,7 @@ export default function ProduktOgRadPage() {
   return (
     <Box
       sx={{
-        mx: -2,
-        mt: -2,
-        minHeight: "100vh",
+        minHeight: "100%",
         bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FBF5F8",
         backgroundImage: (theme) => theme.palette.mode === "dark"
           ? "radial-gradient(circle at 8% -12%, rgba(160,40,120,0.12) 0%, rgba(160,40,120,0) 40%), radial-gradient(circle at 94% -4%, rgba(100,30,90,0.10) 0%, rgba(100,30,90,0) 34%)"
@@ -1070,6 +1111,7 @@ export default function ProduktOgRadPage() {
                 inputRef={searchInputRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onFocus={() => void handleSearchAutoPaste()}
                 placeholder="Søk med varenummer, SKU, varenavn eller ATC-kode"
                 sx={{
                   flex: 1,

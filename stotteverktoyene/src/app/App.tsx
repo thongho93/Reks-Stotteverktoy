@@ -601,6 +601,9 @@ function Layout() {
 
   const location = useLocation();
   const isAnbruddRoute = location.pathname === "/anbrudd" || location.pathname === "/produktskjema";
+  // Full-bleed routes manage their own background edge-to-edge, so drop the main padding.
+  const isFullBleedRoute =
+    location.pathname === "/produkt-og-rad" || location.pathname === "/interaksjoner";
   const [keepAnbruddMounted, setKeepAnbruddMounted] = React.useState(isAnbruddRoute);
 
   React.useEffect(() => {
@@ -629,7 +632,7 @@ function Layout() {
     <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <GlobalSearch open={searchOpen} onClose={closeSearch} />
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-      <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <Box component="main" sx={{ flex: 1, p: isFullBleedRoute ? 0 : 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {keepAnbruddMounted && (
           <Box sx={{ display: isAnbruddRoute ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0, mx: -2, my: -2, p: 2 }}>
             <Suspense fallback={<RouteLoader />}>

@@ -2307,6 +2307,92 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                     : "rgba(248,249,251,0.9)",
               }}
             >
+              {showRoutineLabels && (
+                <Box
+                  sx={{
+                    p: 0.7,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Autocomplete<RoutineSearchOption, false, false, false>
+                    size="small"
+                    fullWidth
+                    options={routineSearchOptions}
+                    value={null}
+                    inputValue={routineSearchQuery}
+                    onInputChange={(_, nextValue, reason) => {
+                      if (reason === "reset") return;
+                      setRoutineSearchQuery(nextValue);
+                    }}
+                    onChange={(_, option) => handleSelectRoutineSearchOption(option)}
+                    open={routineSearchQuery.trim().length >= 2}
+                    filterOptions={(options) => options}
+                    getOptionLabel={(option) => option.title}
+                    noOptionsText="Ingen rutiner funnet"
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    slotProps={{
+                      paper: {
+                        sx: {
+                          mt: 0.6,
+                          borderRadius: 1.2,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          overflow: "hidden",
+                        },
+                      },
+                    }}
+                    renderOption={(props, option) => (
+                      <Box
+                        component="li"
+                        {...props}
+                        sx={{
+                          py: 0.85,
+                          px: 1,
+                          borderLeft: "3px solid",
+                          borderLeftColor:
+                            option.matchType === "title"
+                              ? "rgba(236,72,153,0.45)"
+                              : "rgba(59,130,246,0.35)",
+                        }}
+                      >
+                        <Box sx={{ minWidth: 0, width: "100%" }}>
+                          <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.2, mb: option.snippet ? 0.35 : 0 }}>
+                            {renderHighlightedText(option.title, routineSearchQuery)}
+                          </Typography>
+                          {option.snippet && (
+                            <Typography sx={{ fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.35 }}>
+                              {renderHighlightedText(option.snippet, routineSearchQuery)}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        inputRef={routineSearchInputRef}
+                        placeholder="Søk i rutiner"
+                        sx={{
+                          "& .MuiInputBase-root": {
+                            height: 34,
+                            fontSize: "0.82rem",
+                          },
+                        }}
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: (
+                            <>
+                              <SearchIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.6 }} />
+                              {params.InputProps.startAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
+                </Box>
+              )}
               <Box
                 sx={{
                   p: 0.7,
@@ -2978,83 +3064,6 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                       </Popover>
                     </Box>
 
-                    <Box sx={{ ml: { xs: 0, md: "auto" }, width: { xs: "100%", md: 360 }, maxWidth: "100%" }}>
-                      <Autocomplete<RoutineSearchOption, false, false, false>
-                        size="small"
-                        options={routineSearchOptions}
-                        value={null}
-                        inputValue={routineSearchQuery}
-                        onInputChange={(_, nextValue, reason) => {
-                          if (reason === "reset") return;
-                          setRoutineSearchQuery(nextValue);
-                        }}
-                        onChange={(_, option) => handleSelectRoutineSearchOption(option)}
-                        open={routineSearchQuery.trim().length >= 2}
-                        filterOptions={(options) => options}
-                        getOptionLabel={(option) => option.title}
-                        noOptionsText="Ingen rutiner funnet"
-                        isOptionEqualToValue={(option, value) => option.id === value.id}
-                        slotProps={{
-                          paper: {
-                            sx: {
-                              mt: 0.6,
-                              borderRadius: 1.2,
-                              border: "1px solid",
-                              borderColor: "divider",
-                              overflow: "hidden",
-                            },
-                          },
-                        }}
-                        renderOption={(props, option) => (
-                          <Box
-                            component="li"
-                            {...props}
-                            sx={{
-                              py: 0.85,
-                              px: 1,
-                              borderLeft: "3px solid",
-                              borderLeftColor:
-                                option.matchType === "title"
-                                  ? "rgba(236,72,153,0.45)"
-                                  : "rgba(59,130,246,0.35)",
-                            }}
-                          >
-                            <Box sx={{ minWidth: 0, width: "100%" }}>
-                              <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.2, mb: option.snippet ? 0.35 : 0 }}>
-                                {renderHighlightedText(option.title, routineSearchQuery)}
-                              </Typography>
-                              {option.snippet && (
-                                <Typography sx={{ fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.35 }}>
-                                  {renderHighlightedText(option.snippet, routineSearchQuery)}
-                                </Typography>
-                              )}
-                            </Box>
-                          </Box>
-                        )}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            inputRef={routineSearchInputRef}
-                            placeholder="Søk i rutiner"
-                            sx={{
-                              "& .MuiInputBase-root": {
-                                height: 34,
-                                fontSize: "0.82rem",
-                              },
-                            }}
-                            InputProps={{
-                              ...params.InputProps,
-                              startAdornment: (
-                                <>
-                                  <SearchIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.6 }} />
-                                  {params.InputProps.startAdornment}
-                                </>
-                              ),
-                            }}
-                          />
-                        )}
-                      />
-                    </Box>
                   </Box>
                   <Box sx={{ p: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     <Box sx={{ flex: 1, minHeight: 0 }}>
