@@ -10,4 +10,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  server: {
+    // Honor the port assigned by the harness (PORT env) when present; fall back to Vite's default.
+    port: process.env.PORT ? Number(process.env.PORT) : undefined,
+  },
 });
