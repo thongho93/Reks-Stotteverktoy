@@ -1,9 +1,5 @@
 # Reks Støtteverktøy
 
-## Preview Auto-Login
+## Preview / dev-server
 
-Whenever you start or use the preview, automatically log in with:
-- **E-post:** testuser2@farmasiet.no
-- **Passord:** 11223344
-
-After `preview_start`, use `preview_fill` and `preview_click` to fill the login form and submit before doing any other preview interactions.
+Bruk skillen `.claude/skills/dev-preview-login/` for å starte dev-serveren og logge inn. Den håndterer port 5173, henter credentials fra `stotteverktoyene/.env.local` (gitignored), og logger inn automatisk. Ikke hardkode passord her eller andre steder i repoet.
