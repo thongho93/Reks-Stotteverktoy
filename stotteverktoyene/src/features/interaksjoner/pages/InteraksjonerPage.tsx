@@ -178,7 +178,7 @@ export default function InteraksjonerPage() {
     return clamp(leftPx / availableWidth, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO);
   }, []);
 
-  const { user, isAdmin } = useAuthUser();
+  const { user, isAdmin, isOwner } = useAuthUser();
   const lastKnownUidRef = React.useRef<string | null>(null);
   const [historyReadyKey, setHistoryReadyKey] = React.useState<string | null>(null);
 
@@ -1497,31 +1497,33 @@ export default function InteraksjonerPage() {
                                 flexWrap: "wrap",
                               }}
                             >
-                              <Button
-                                variant="contained"
-                                onClick={handleGenerateAi}
-                                disabled={aiLoading}
-                                startIcon={
-                                  aiLoading ? (
-                                    <CircularProgress size={16} color="inherit" />
-                                  ) : (
-                                    <AutoAwesomeIcon />
-                                  )
-                                }
-                                sx={{
-                                  fontWeight: 800,
-                                  bgcolor: (t) =>
-                                    t.palette.mode === "dark" ? "rgba(200,70,70,0.7)" : "#B04442",
-                                  color: "#fff",
-                                  "&:hover": {
+                              {isOwner ? (
+                                <Button
+                                  variant="contained"
+                                  onClick={handleGenerateAi}
+                                  disabled={aiLoading}
+                                  startIcon={
+                                    aiLoading ? (
+                                      <CircularProgress size={16} color="inherit" />
+                                    ) : (
+                                      <AutoAwesomeIcon />
+                                    )
+                                  }
+                                  sx={{
+                                    fontWeight: 800,
                                     bgcolor: (t) =>
-                                      t.palette.mode === "dark" ? "rgba(200,70,70,0.9)" : "#8A3230",
-                                  },
-                                  boxShadow: "none",
-                                }}
-                              >
-                                {aiLoading ? "Genererer …" : "Generer kundetekst"}
-                              </Button>
+                                      t.palette.mode === "dark" ? "rgba(200,70,70,0.7)" : "#B04442",
+                                    color: "#fff",
+                                    "&:hover": {
+                                      bgcolor: (t) =>
+                                        t.palette.mode === "dark" ? "rgba(200,70,70,0.9)" : "#8A3230",
+                                    },
+                                    boxShadow: "none",
+                                  }}
+                                >
+                                  {aiLoading ? "Genererer …" : "Generer kundetekst"}
+                                </Button>
+                              ) : null}
 
                               {isAdmin ? (
                                 <Button
