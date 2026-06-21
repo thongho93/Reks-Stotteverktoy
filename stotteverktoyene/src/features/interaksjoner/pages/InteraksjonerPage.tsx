@@ -1,5 +1,6 @@
 import * as React from "react";
 import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { AccentSelection } from "../../../styles/AccentSelection";
 import { useLocation } from "react-router-dom";
 import {
   Alert,
@@ -675,6 +676,7 @@ export default function InteraksjonerPage() {
 
   return (
   <ThemeProvider theme={redTheme}>
+    <AccentSelection />
     <Box
       sx={{
         position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",

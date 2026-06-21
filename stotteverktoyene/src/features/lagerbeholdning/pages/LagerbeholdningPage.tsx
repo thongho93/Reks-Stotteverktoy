@@ -29,6 +29,7 @@ import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import { alpha, createTheme, ThemeProvider, useTheme } from "@mui/material/styles";
 
 import styles from "../../../styles/app.module.css";
+import { AccentSelection } from "../../../styles/AccentSelection";
 import { parseUttakInput } from "../lib/parse";
 import {
   beregnVare,
@@ -92,6 +93,7 @@ export default function LagerbeholdningPage() {
 
   return (
     <ThemeProvider theme={tealTheme}>
+      <AccentSelection />
       <Box
         sx={(theme) => ({
           position: "fixed",

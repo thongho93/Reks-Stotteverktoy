@@ -24,6 +24,7 @@ import {
   Typography,
 } from "@mui/material";
 import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { AccentSelection } from "../../../styles/AccentSelection";
 import type { FirebaseError } from "firebase/app";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -2381,6 +2382,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
   return (
     <ThemeProvider theme={purpleTheme}>
+      <AccentSelection />
       <Box
         sx={{
           position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",

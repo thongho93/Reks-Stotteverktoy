@@ -35,6 +35,7 @@ import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 
 import styles from "../../../styles/app.module.css";
+import { AccentSelection } from "../../../styles/AccentSelection";
 
 import { OMEQRow, type OMEQRowValue } from "../components/OMEQRow";
 import {
@@ -465,6 +466,7 @@ export default function OMEQPage() {
 
   return (
   <ThemeProvider theme={blueTheme}>
+    <AccentSelection />
     <Box sx={(theme) => ({
       position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
       background: theme.palette.mode === "dark"

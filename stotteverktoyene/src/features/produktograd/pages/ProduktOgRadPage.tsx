@@ -51,6 +51,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { AccentSelection } from "../../../styles/AccentSelection";
 import {
   addDoc,
   collection,
@@ -964,6 +965,7 @@ export default function ProduktOgRadPage() {
 
   return (
     <ThemeProvider theme={pinkTheme}>
+      <AccentSelection />
       <Box
         sx={{
           position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
