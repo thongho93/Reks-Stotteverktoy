@@ -38,6 +38,7 @@ import styles from "../../../styles/app.module.css";
 import { AccentSelection } from "../../../styles/AccentSelection";
 
 import { OMEQRow, type OMEQRowValue } from "../components/OMEQRow";
+import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
 import {
   buildProductIndex,
   parseMedicationInput,
@@ -153,14 +154,7 @@ export default function OMEQPage() {
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
   const lastCopiedVedtakSummaryRef = useRef<string | null>(null);
-  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem("omeq.autoPasteNumericClipboard");
-      return raw === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useAutoVnrPreference("omeq");
   const productIndex = useMemo(() => buildProductIndex(), []);
 
   const setRowById = useCallback(
@@ -259,13 +253,6 @@ export default function OMEQPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [resetAll]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("omeq.autoPasteNumericClipboard", String(autoPasteNumericClipboard));
-    } catch {
-      // ignore
-    }
-  }, [autoPasteNumericClipboard]);
 
   const showDividers = useMemo(() => rows.length > 1, [rows.length]);
 

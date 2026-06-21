@@ -43,6 +43,7 @@ import { useInteractions } from "../services/useInteractions";
 import { useStandardtekster } from "../hooks/useStandardtekster";
 import { loadMedicationItems, type Med } from "../../fest/components/MedicationSearch";
 import { useVnrAutoPaste } from "../../../shared/hooks/useVnrAutoPaste";
+import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
 import {
   matchInteractionsBySelectedTerms,
   type InteractionEntity,
@@ -216,20 +217,7 @@ export default function InteraksjonerPage() {
 
   // Auto vnr: paste/type a varenummer and resolve it to the matching substance/ATC.
   const [isSearchFocused, setIsSearchFocused] = React.useState(false);
-  const [autoPasteVnr, setAutoPasteVnr] = React.useState<boolean>(() => {
-    try {
-      return window.localStorage.getItem("interaksjoner.autoPasteNumericClipboard") === "true";
-    } catch {
-      return false;
-    }
-  });
-  React.useEffect(() => {
-    try {
-      window.localStorage.setItem("interaksjoner.autoPasteNumericClipboard", String(autoPasteVnr));
-    } catch {
-      // ignore
-    }
-  }, [autoPasteVnr]);
+  const [autoPasteVnr, setAutoPasteVnr] = useAutoVnrPreference("interaksjoner");
 
   // vnr (farmaloggNumber) → ATC, sourced from PIM/FEST medication items.
   const [medItems, setMedItems] = React.useState<Med[]>([]);
