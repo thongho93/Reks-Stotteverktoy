@@ -227,7 +227,32 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
   const navigate = useNavigate();
   const location = useLocation();
-  const currentWeekNumber = React.useMemo(() => getIsoWeekNumber(new Date()), []);
+  const [currentWeekNumber, setCurrentWeekNumber] = React.useState(() => getIsoWeekNumber(new Date()));
+
+  // Keep the week number current while the app stays open: recompute at every local
+  // midnight (it rolls over to the new ISO week at Monday 00:00), and also when the tab
+  // regains focus in case the machine slept across a week boundary.
+  React.useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const update = () => setCurrentWeekNumber(getIsoWeekNumber(new Date()));
+    const scheduleNextMidnight = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      timeoutId = setTimeout(() => {
+        update();
+        scheduleNextMidnight();
+      }, nextMidnight.getTime() - now.getTime());
+    };
+    scheduleNextMidnight();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   const isSelected = (path: string) => {
     if (path === "/omeq") return location.pathname === "/" || location.pathname === "/omeq";
