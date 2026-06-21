@@ -1096,30 +1096,17 @@ export default function MedicationSearch({
     pickResult(only);
   }, [query, results, allItems]);
 
+  // Ambient "Auto vnr": read the clipboard once on focus and on every window
+  // refocus (covers copy-in-fagsystem → alt-tab back). No polling loop.
   useEffect(() => {
     if (!autoPasteNumericClipboard) return;
     if (!isInputFocused) return;
 
-    let cancelled = false;
-    const safeAttempt = () => {
-      if (cancelled) return;
-      void maybeAutofillFromClipboard();
-    };
-
-    safeAttempt();
-    const intervalId = window.setInterval(() => {
-      safeAttempt();
-    }, 650);
-
-    const onWindowFocus = () => {
-      safeAttempt();
-    };
-
+    void maybeAutofillFromClipboard();
+    const onWindowFocus = () => void maybeAutofillFromClipboard();
     window.addEventListener("focus", onWindowFocus);
 
     return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
       window.removeEventListener("focus", onWindowFocus);
     };
   }, [autoPasteNumericClipboard, isInputFocused, maybeAutofillFromClipboard]);

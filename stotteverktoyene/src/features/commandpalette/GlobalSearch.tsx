@@ -634,7 +634,25 @@ export function GlobalSearch({ open, onClose }: Props) {
 
   const intFilteredOptions = useMemo<InteractionEntity[]>(() => {
     if (!intIndex?.entities?.length || !commandQuery.trim()) return [];
-    const q = commandQuery.trim().toLowerCase();
+    const qRaw = commandQuery.trim();
+
+    // Varenummer (typed or pasted) → resolve via med items to the matching substance/ATC.
+    if (/^\d{4,7}$/.test(qRaw) && stdMedItems.length) {
+      const needle = qRaw.replace(/^0+/, "") || "0";
+      const med = stdMedItems.find((m) => {
+        if (!m.farmaloggNumber) return false;
+        const id = String(m.farmaloggNumber).trim().replace(/^0+/, "") || "0";
+        return id === needle;
+      });
+      const atc = med?.atc ? med.atc.toUpperCase() : null;
+      if (!atc) return [];
+      const match = intIndex.entities.find(
+        (e) => e.kind !== "product" && (e.atc ?? "").toUpperCase() === atc,
+      );
+      return match ? [match] : [];
+    }
+
+    const q = qRaw.toLowerCase();
     const starts = intIndex.entities.filter((o) => o.label.toLowerCase().startsWith(q));
     const includes = intIndex.entities.filter(
       (o) =>
@@ -642,7 +660,7 @@ export function GlobalSearch({ open, onClose }: Props) {
         (o.label.toLowerCase().includes(q) || (o.atc ? o.atc.toLowerCase().includes(q) : false))
     );
     return [...starts, ...includes].slice(0, 12);
-  }, [intIndex, commandQuery]);
+  }, [intIndex, commandQuery, stdMedItems]);
 
   const intLabelByTerm = useMemo(() => {
     const map = new Map<string, string>();
@@ -949,6 +967,8 @@ export function GlobalSearch({ open, onClose }: Props) {
       } else if (entry.path === "/interaksjoner") {
         resetIntState();
         void loadIntIndex();
+        // Needed for varenummer → ATC resolution in this scope (cached after first load).
+        void loadMedicationItems().then(setStdMedItems).catch(() => {});
       } else if (entry.path === "/tilbakemelding") {
         resetTilbakemeldingState();
         void loadTilbakemeldingNotes();
