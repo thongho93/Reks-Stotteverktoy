@@ -252,9 +252,9 @@ export default function LagerbeholdningPage() {
                     <Typography variant="h6" sx={{ m: 0 }}>
                       {b.varenavn}
                     </Typography>
-                    {b.varenr && (
+                    {/^(\d{5,7})$/.test(b.varenr) ? (
                       <Chip size="small" label={`Varenr ${b.varenr}`} variant="outlined" />
-                    )}
+                    ) : null}
                   </Box>
 
                   <Box
