@@ -31,6 +31,7 @@ import { useAuthUser } from "./auth/useAuthUser";
 import { GlobalSearch } from "../features/commandpalette/GlobalSearch";
 import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearchHotkey";
 import RequireRekspert from "./auth/RequireRekspert";
+import RequireOwner from "./auth/RequireOwner";
 import { ProfileMenu } from "./auth/ProfileMenu";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
 
@@ -307,12 +308,16 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const mainItems: SidebarItem[] = [
     { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#29A1FF" },
-    {
-      label: "Lagerbeholdning",
-      path: "/lagerbeholdning",
-      Icon: Inventory2Icon,
-      color: "#0E9F8E",
-    },
+    ...(isOwner
+      ? [
+          {
+            label: "Lagerbeholdning",
+            path: "/lagerbeholdning",
+            Icon: Inventory2Icon,
+            color: "#0E9F8E",
+          } as SidebarItem,
+        ]
+      : []),
     {
       label: "Standardtekster",
       path: "/standardtekster",
@@ -800,7 +805,9 @@ function Layout() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/omeq" element={<OMEQPage />} />
-              <Route path="/lagerbeholdning" element={<LagerbeholdningPage />} />
+              <Route element={<RequireOwner />}>
+                <Route path="/lagerbeholdning" element={<LagerbeholdningPage />} />
+              </Route>
               <Route path="/standardtekster" element={<StandardTekstPage />} />
               <Route path="/interaksjoner" element={<InteraksjonerPage />} />
               <Route path="/produkt-og-rad" element={<ProduktOgRadPage />} />
