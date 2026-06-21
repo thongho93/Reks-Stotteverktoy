@@ -20,8 +20,10 @@ import {
   ListItemText,
   Tooltip,
   Snackbar,
+  CircularProgress,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
@@ -41,6 +43,8 @@ import {
   type InteractionEntity,
   type MatchResult,
 } from "../../fest/mappers/interactionsToIndex";
+import { parseInteractionPaste, parsedToEntities } from "../utils/parsePaste";
+import { generateKundetekst } from "../services/claudeService";
 
 import {
   isAvoidRelevance,
@@ -174,7 +178,7 @@ export default function InteraksjonerPage() {
     return clamp(leftPx / availableWidth, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO);
   }, []);
 
-  const { user, isAdmin } = useAuthUser();
+  const { user, isAdmin, isOwner } = useAuthUser();
   const lastKnownUidRef = React.useRef<string | null>(null);
   const [historyReadyKey, setHistoryReadyKey] = React.useState<string | null>(null);
 
@@ -243,6 +247,13 @@ export default function InteraksjonerPage() {
   const [copySnackOpen, setCopySnackOpen] = React.useState(false);
   const [copySnackMsg, setCopySnackMsg] = React.useState<string>("Tekst kopiert");
   const [standardtekstFilter, setStandardtekstFilter] = React.useState("");
+
+  // Prototype: lim-inn-søk (steg 1) + AI-generert kundetekst (steg 2)
+  const [pasteValue, setPasteValue] = React.useState("");
+  const [aiText, setAiText] = React.useState("");
+  const [aiLoading, setAiLoading] = React.useState(false);
+  const [aiError, setAiError] = React.useState<string | null>(null);
+  const [aiLatencyMs, setAiLatencyMs] = React.useState<number | null>(null);
 
   const { standardtekster, reload: reloadStandardtekster } = useStandardtekster();
 
@@ -518,6 +529,72 @@ export default function InteraksjonerPage() {
     [showCopySnack, firstName]
   );
 
+  const handlePasteSearch = React.useCallback(() => {
+    if (!index) return;
+    const parsed = parseInteractionPaste(pasteValue);
+    const entities = parsedToEntities(parsed, index);
+    if (entities.length === 0) {
+      showCopySnack("Fant ingen ATC-koder eller virkestoff i teksten");
+      return;
+    }
+    setSelected(entities);
+    setInputValue("");
+    setPasteValue("");
+    setActiveLinkedStdId(null);
+    setExpanded({});
+  }, [index, pasteValue, showCopySnack]);
+
+  const handleGenerateAi = React.useCallback(async () => {
+    if (!activeCtx?.it || !activeCtx.r) return;
+    const it = activeCtx.it;
+    const r = activeCtx.r;
+
+    const substanser = (r.matchedGroups ?? [])
+      .slice(0, 2)
+      .map((gi) => {
+        const g = it.substansgrupper?.[gi];
+        return g?.navn || g?.substanser?.[0]?.substans || "";
+      })
+      .filter(Boolean);
+
+    const linked = activeCtx.interactionId
+      ? standardtekster.filter((s) =>
+          (s.interactionIds ?? []).includes(activeCtx.interactionId!)
+        )
+      : [];
+    const styleExample = linked.length
+      ? ((linked[0] as any).text ??
+          (linked[0] as any).content ??
+          (linked[0] as any).melding ??
+          (linked[0] as any).body ??
+          (linked[0] as any).template ??
+          null)
+      : null;
+
+    setAiLoading(true);
+    setAiError(null);
+    setAiText("");
+    setAiLatencyMs(null);
+
+    const res = await generateKundetekst({
+      relevansDn: it.relevansDn,
+      substanser,
+      kliniskKonsekvens: it.kliniskKonsekvens,
+      interaksjonsmekanisme: it.interaksjonsmekanisme,
+      handtering: it.handtering,
+      styleExample,
+      firstName,
+    });
+
+    setAiLoading(false);
+    if (res.ok) {
+      setAiText(res.text);
+      setAiLatencyMs(res.latencyMs);
+    } else {
+      setAiError(res.error);
+    }
+  }, [activeCtx, standardtekster, firstName]);
+
   // Auto-run search when selected changes and at least 2 are selected
   React.useEffect(() => {
     if (!index) return;
@@ -552,6 +629,14 @@ export default function InteraksjonerPage() {
   React.useEffect(() => {
     // Reset standardtekst-filter when active interaction changes
     setStandardtekstFilter("");
+  }, [activeCtx?.interactionId]);
+
+  React.useEffect(() => {
+    // Reset AI-generert utkast når aktiv interaksjon endres
+    setAiText("");
+    setAiError(null);
+    setAiLatencyMs(null);
+    setAiLoading(false);
   }, [activeCtx?.interactionId]);
 
   React.useEffect(() => {
@@ -733,6 +818,41 @@ export default function InteraksjonerPage() {
                 />
               )}
             />
+
+            <Box>
+              <TextField
+                fullWidth
+                size="small"
+                multiline
+                minRows={2}
+                label="Eller lim inn interaksjon"
+                placeholder="F.eks. «Bør unngås Escitalopram N06A B10 Ikke-selektive monoaminreopptakshemmere N06A A»"
+                value={pasteValue}
+                onChange={(e) => setPasteValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    handlePasteSearch();
+                  }
+                }}
+              />
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handlePasteSearch}
+                  disabled={!pasteValue.trim() || !index}
+                  sx={{
+                    fontWeight: 700,
+                    color: (t) => (t.palette.mode === "dark" ? "#E08A88" : "#A03A38"),
+                    borderColor: (t) =>
+                      t.palette.mode === "dark" ? "rgba(220,90,90,0.35)" : "rgba(176,68,66,0.3)",
+                  }}
+                >
+                  Tolk og søk
+                </Button>
+              </Box>
+            </Box>
             {searchProgressLabel ? (
               <Chip
                 size="small"
@@ -1377,6 +1497,34 @@ export default function InteraksjonerPage() {
                                 flexWrap: "wrap",
                               }}
                             >
+                              {isOwner ? (
+                                <Button
+                                  variant="contained"
+                                  onClick={handleGenerateAi}
+                                  disabled={aiLoading}
+                                  startIcon={
+                                    aiLoading ? (
+                                      <CircularProgress size={16} color="inherit" />
+                                    ) : (
+                                      <AutoAwesomeIcon />
+                                    )
+                                  }
+                                  sx={{
+                                    fontWeight: 800,
+                                    bgcolor: (t) =>
+                                      t.palette.mode === "dark" ? "rgba(200,70,70,0.7)" : "#B04442",
+                                    color: "#fff",
+                                    "&:hover": {
+                                      bgcolor: (t) =>
+                                        t.palette.mode === "dark" ? "rgba(200,70,70,0.9)" : "#8A3230",
+                                    },
+                                    boxShadow: "none",
+                                  }}
+                                >
+                                  {aiLoading ? "Genererer …" : "Generer kundetekst"}
+                                </Button>
+                              ) : null}
+
                               {isAdmin ? (
                                 <Button
                                   variant="contained"
@@ -1492,6 +1640,104 @@ export default function InteraksjonerPage() {
                         ) : null}
                       </CardContent>
                     </Card>
+
+                    {aiLoading || aiText || aiError ? (
+                      <Box sx={{ width: "100%", mt: 2 }}>
+                        <Box
+                          sx={{
+                            width: "100%",
+                            p: 2,
+                            borderRadius: 2,
+                            border: "1px solid",
+                            borderColor: (t) =>
+                              t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)",
+                            bgcolor: (t) =>
+                              t.palette.mode === "dark" ? "rgba(200,70,70,0.06)" : "rgba(255,94,91,0.03)",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              mb: 1,
+                            }}
+                          >
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <AutoAwesomeIcon
+                                fontSize="small"
+                                sx={{ color: (t) => (t.palette.mode === "dark" ? "#E08A88" : "#B04442") }}
+                              />
+                              <Typography sx={{ fontWeight: 800 }} variant="h3">
+                                Generert kundetekst (utkast)
+                              </Typography>
+                            </Stack>
+                            {aiText ? (
+                              <Stack direction="row" spacing={0.5}>
+                                <Tooltip title="Generer på nytt" arrow>
+                                  <span>
+                                    <IconButton
+                                      aria-label="Generer på nytt"
+                                      size="small"
+                                      onClick={handleGenerateAi}
+                                      disabled={aiLoading}
+                                    >
+                                      <AutoAwesomeIcon fontSize="small" />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                                <Tooltip title="Kopier" arrow>
+                                  <IconButton
+                                    aria-label="Kopier generert tekst"
+                                    size="small"
+                                    onClick={() => handleCopyStandardtekst(aiText)}
+                                  >
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            ) : null}
+                          </Box>
+
+                          {aiError ? (
+                            <Alert severity="error" sx={{ mb: 1 }}>
+                              {aiError}
+                            </Alert>
+                          ) : null}
+
+                          {aiLoading && !aiText ? (
+                            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 1 }}>
+                              <CircularProgress size={18} />
+                              <Typography color="text.secondary">
+                                Genererer utkast grunnet i FEST-data …
+                              </Typography>
+                            </Stack>
+                          ) : null}
+
+                          {aiText ? (
+                            <>
+                              <TextField
+                                fullWidth
+                                multiline
+                                minRows={8}
+                                value={aiText}
+                                onChange={(e) => setAiText(e.target.value)}
+                                sx={{
+                                  bgcolor: (t) => (t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF"),
+                                  borderRadius: 1,
+                                }}
+                              />
+                              <Typography color="text.secondary" sx={{ mt: 1, fontSize: 13 }}>
+                                Utkast generert med Claude basert på FEST-feltene over – ingen kliniske
+                                fakta er lagt til av modellen. Må kvalitetssikres av farmasøyt før
+                                sending. Lim aldri inn kundeopplysninger.
+                                {aiLatencyMs != null ? ` (${(aiLatencyMs / 1000).toFixed(1)} s)` : ""}
+                              </Typography>
+                            </>
+                          ) : null}
+                        </Box>
+                      </Box>
+                    ) : null}
 
                     {it.interaksjonId ? (
                       <Box sx={{ width: "100%", mt: 2 }}>

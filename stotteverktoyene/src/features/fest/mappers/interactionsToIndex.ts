@@ -167,6 +167,20 @@ export function buildInteractionsIndex(interactions: InteractionJson[]) {
         // index by ATC, including prefixes (N, N0, N02, N02A, ...)
         if (atc) addAtcPrefixes(atc, occ);
       });
+
+      // Index the group name (e.g. "Glyseroltrinitrat", "Ikke-selektive
+      // monoaminreopptakshemmere") so it is searchable like a substance.
+      // Only added to the match index — not to the autocomplete entity list.
+      const groupNavn = (group.navn ?? "").toString().trim();
+      if (groupNavn) {
+        const navnKey = normalizeText(groupNavn);
+        addOcc(navnKey, {
+          interactionIndex,
+          groupIndex,
+          key: navnKey,
+          label: groupNavn,
+        });
+      }
     });
   });
 
