@@ -16,13 +16,21 @@ type State = {
 
 let cachedIndexPromise: Promise<InteractionIndex> | null = null;
 
-export function loadInteractionsIndex(): Promise<InteractionIndex> {
+// Single shared loader for interactions.json (~35 MB). The parsed index is cached in
+// memory so the file is fetched, parsed and indexed at most once per session — shared
+// across the Interaksjonssøk page (useInteractions) and global search (loadInteractionsIndex).
+export function loadInteractionsIndex(forceReload = false): Promise<InteractionIndex> {
+  if (forceReload) cachedIndexPromise = null;
   if (!cachedIndexPromise) {
     cachedIndexPromise = fetch("/interactions.json", {
       headers: { Accept: "application/json" },
     })
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          throw new Error(
+            `Klarte ikke å hente /interactions.json (HTTP ${res.status}). Legg filen i public/ eller sjekk path.`
+          );
+        }
         return res.json() as Promise<InteractionJson[]>;
       })
       .then((data) => buildInteractionsIndex(data))
@@ -34,8 +42,8 @@ export function loadInteractionsIndex(): Promise<InteractionIndex> {
   return cachedIndexPromise;
 }
 
-// Fetches interactions.json (recommended to place it in /public as /interactions.json)
-// and builds a fast in-memory index for the interaction search UI.
+// Builds a fast in-memory index for the interaction search UI, reusing the shared
+// cached index so the monolith is never parsed twice.
 export function useInteractions() {
   const [state, setState] = React.useState<State>({
     index: null,
@@ -43,53 +51,34 @@ export function useInteractions() {
     error: null,
   });
 
-  const reload = React.useCallback(() => {
+  const load = React.useCallback((forceReload: boolean) => {
     let isMounted = true;
-    const controller = new AbortController();
-
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    (async () => {
-      try {
-        const res = await fetch("/interactions.json", {
-          signal: controller.signal,
-          headers: { Accept: "application/json" },
-        });
-
-        if (!res.ok) {
-          throw new Error(
-            `Klarte ikke å hente /interactions.json (HTTP ${res.status}). Legg filen i public/ eller sjekk path.`
-          );
-        }
-
-        const data = (await res.json()) as InteractionJson[];
-        const index = buildInteractionsIndex(data);
-
-        if (!isMounted) return;
-        setState({ index, loading: false, error: null });
-      } catch (e: any) {
-        if (e?.name === "AbortError") return;
+    loadInteractionsIndex(forceReload)
+      .then((index) => {
+        if (isMounted) setState({ index, loading: false, error: null });
+      })
+      .catch((e: any) => {
         const msg =
           typeof e?.message === "string"
             ? e.message
             : "Ukjent feil ved lasting av interaksjonsdata.";
-
-        if (!isMounted) return;
-        setState({ index: null, loading: false, error: msg });
-      }
-    })();
+        if (isMounted) setState({ index: null, loading: false, error: msg });
+      });
 
     return () => {
       isMounted = false;
-      controller.abort();
     };
   }, []);
 
+  const reload = React.useCallback(() => load(true), [load]);
+
   // Run once on mount
   React.useEffect(() => {
-    const cleanup = reload();
+    const cleanup = load(false);
     return cleanup;
-  }, [reload]);
+  }, [load]);
 
   return {
     index: state.index,

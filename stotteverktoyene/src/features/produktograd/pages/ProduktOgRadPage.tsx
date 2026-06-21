@@ -192,7 +192,8 @@ const buildSearchBlob = (row: AdviceProductRow): AdviceProduct => {
 };
 
 const fetchAdviceRows = async (): Promise<AdviceProductRow[]> => {
-  const response = await fetch("/data/pharmacistAdviceData.json", { cache: "no-store" });
+  // Cache per Cache-Control (see public/_headers); no-store forced a 6.9 MB re-download every visit.
+  const response = await fetch("/data/pharmacistAdviceData.json", { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`Kunne ikke laste datafilen (${response.status}).`);
   }
@@ -293,7 +294,7 @@ export default function ProduktOgRadPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const PINK = "#C93586";
-  const pinkTheme = useMemo(() => createTheme(theme, { palette: { primary: { main: PINK } } }), [theme]);
+  const pinkTheme = useMemo(() => createTheme(theme, { palette: { primary: theme.palette.augmentColor({ color: { main: PINK } }) } }), [theme]);
   const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastAutoPastedRef = useRef<string | null>(null);

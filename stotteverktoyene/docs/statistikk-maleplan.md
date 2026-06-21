@@ -21,7 +21,6 @@ Disse eventene logges i appen:
 - `interaksjoner`
 - `produktskjema`
 - `anbrudd`
-- `teamschat`
 - `tilbakemelding`
 - `profil`
 - `rekspert`

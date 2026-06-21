@@ -24,6 +24,7 @@ import StandardTekstSidebar from "../components/StandardTekstSidebar";
 import StandardTekstContent from "../components/StandardTekstContent";
 import { standardTeksterApi } from "../services/standardTeksterApi";
 import { useAuthUser } from "../../../app/auth/Auth";
+import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -790,25 +791,7 @@ export default function StandardTekstPage() {
     }
   }, [includePackSizeInPreparatText]);
 
-  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem("standardtekster.autoPasteNumericClipboard");
-      return raw === "true";
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "standardtekster.autoPasteNumericClipboard",
-        String(autoPasteNumericClipboard),
-      );
-    } catch {
-      // ignore
-    }
-  }, [autoPasteNumericClipboard]);
+  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useAutoVnrPreference("standardtekster");
 
   const reformatPickedRows = useCallback(
     (includeManufacturer: boolean, includePackSize: boolean) => {

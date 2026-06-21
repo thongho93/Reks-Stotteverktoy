@@ -174,8 +174,6 @@ function pathToUsagePage(pathname: string): UsagePage {
   if (pathname.startsWith("/tilbakemelding")) return "tilbakemelding";
   if (pathname.startsWith("/anbrudd")) return "anbrudd";
   if (pathname.startsWith("/rekspert")) return "rekspert";
-  if (pathname.startsWith("/intern-chat")) return "teamschat";
-  if (pathname.startsWith("/teams-chat")) return "teamschat";
   return "other";
 }
 
@@ -844,8 +842,6 @@ function Layout() {
               <Route element={<RequireRekspert />}>
                 <Route path="/rekspert" element={<RekspertPage />} />
               </Route>
-              <Route path="/intern-chat" element={<Navigate to="/omeq" replace />} />
-              <Route path="/teams-chat" element={<Navigate to="/omeq" replace />} />
               <Route path="*" element={<Navigate to="/omeq" replace />} />
             </Routes>
           </Suspense>

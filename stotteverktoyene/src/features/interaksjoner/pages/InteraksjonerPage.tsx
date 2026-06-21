@@ -22,6 +22,8 @@ import {
   Tooltip,
   Snackbar,
   CircularProgress,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
@@ -39,6 +41,9 @@ import {
 } from "../components/CreateStandardtekstDialog";
 import { useInteractions } from "../services/useInteractions";
 import { useStandardtekster } from "../hooks/useStandardtekster";
+import { loadMedicationItems, type Med } from "../../fest/components/MedicationSearch";
+import { useVnrAutoPaste } from "../../../shared/hooks/useVnrAutoPaste";
+import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
 import {
   matchInteractionsBySelectedTerms,
   type InteractionEntity,
@@ -140,7 +145,7 @@ type HistoryItem = {
 export default function InteraksjonerPage() {
   const RED = "#FF5E5B";
   const baseTheme = useTheme();
-  const redTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: { main: RED } } }), [baseTheme]);
+  const redTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: RED } }) } }), [baseTheme]);
 
   const { index, loading, error, reload } = useInteractions();
   const location = useLocation();
@@ -209,6 +214,71 @@ export default function InteraksjonerPage() {
   const [selected, setSelected] = React.useState<InteractionEntity[]>([]);
   const [inputValue, setInputValue] = React.useState("");
   const [pendingActiveInteractionIndex, setPendingActiveInteractionIndex] = React.useState<number | null>(null);
+
+  // Auto vnr: paste/type a varenummer and resolve it to the matching substance/ATC.
+  const [isSearchFocused, setIsSearchFocused] = React.useState(false);
+  const [autoPasteVnr, setAutoPasteVnr] = useAutoVnrPreference("interaksjoner");
+
+  // vnr (farmaloggNumber) → ATC, sourced from PIM/FEST medication items.
+  const [medItems, setMedItems] = React.useState<Med[]>([]);
+  React.useEffect(() => {
+    let alive = true;
+    loadMedicationItems()
+      .then((items) => {
+        if (alive) setMedItems(items);
+      })
+      .catch(() => {
+        /* vnr-oppslag er valgfritt; ignorer lastefeil */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const vnrToAtc = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of medItems) {
+      if (!m.farmaloggNumber || !m.atc) continue;
+      const norm = String(m.farmaloggNumber).trim().replace(/^0+/, "") || "0";
+      if (!map.has(norm)) map.set(norm, m.atc);
+    }
+    return map;
+  }, [medItems]);
+
+  // Resolve a varenummer to the matching (non-product) entity in the index, or null.
+  const resolveVnrEntity = React.useCallback(
+    (digits: string): InteractionEntity | null => {
+      const norm = digits.replace(/^0+/, "") || "0";
+      const atc = vnrToAtc.get(norm);
+      if (!atc) return null;
+      const up = atc.toUpperCase();
+      const match = (index?.entities ?? []).find(
+        (e) => e.kind !== "product" && (e.atc ?? "").toUpperCase() === up,
+      );
+      return match ?? null;
+    },
+    [vnrToAtc, index],
+  );
+
+  const applyVnr = React.useCallback(
+    (digits: string) => {
+      const match = resolveVnrEntity(digits);
+      if (!match) return;
+      setSelected((prev) => {
+        const id = getEntityId(match);
+        if (prev.some((p) => getEntityId(p) === id)) return prev;
+        return [...prev, match];
+      });
+      setInputValue("");
+    },
+    [resolveVnrEntity, getEntityId],
+  );
+
+  const { onPaste: onVnrPaste } = useVnrAutoPaste({
+    enabled: autoPasteVnr,
+    isFocused: isSearchFocused,
+    onVnr: applyVnr,
+  });
 
   // Pre-fill search when navigated from the global command palette
   React.useEffect(() => {
@@ -747,6 +817,12 @@ export default function InteraksjonerPage() {
                 const normalized = normalizeAtcInput(v);
                 setInputValue(normalized);
 
+                // Varenummer (typed or pasted): resolve to the matching substance/ATC.
+                if (/^\d{4,7}$/.test(normalized.trim())) {
+                  applyVnr(normalized.trim());
+                  return;
+                }
+
                 const q = normalized.trim().toUpperCase();
                 // Auto-velg kun ved eksakt 7-tegns ATC. Ved kortere prefix (f.eks. C09AA)
                 // skal vi la dropdownen være åpen slik at bruker kan velge riktig kode.
@@ -810,6 +886,9 @@ export default function InteraksjonerPage() {
                   }
                   autoFocus
                   inputRef={searchInputRef}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  onPaste={onVnrPaste}
                   onKeyDown={(e) => {
                     if (e.key === "Backspace" && inputValue.trim().length === 0) {
                       // Prevent MUI Autocomplete from deleting the last selected option
@@ -820,6 +899,20 @@ export default function InteraksjonerPage() {
                 />
               )}
             />
+
+            <Tooltip title="Når feltet er aktivt, slås kopiert varenummer automatisk opp og legges til i søket.">
+              <FormControlLabel
+                sx={{ m: 0, mt: 0.5 }}
+                control={
+                  <Switch
+                    size="small"
+                    checked={autoPasteVnr}
+                    onChange={(e) => setAutoPasteVnr(e.target.checked)}
+                  />
+                }
+                label={<Typography variant="caption">Auto vnr</Typography>}
+              />
+            </Tooltip>
 
             <Box>
               <TextField

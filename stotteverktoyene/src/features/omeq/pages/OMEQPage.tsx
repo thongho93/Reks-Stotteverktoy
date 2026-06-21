@@ -38,6 +38,7 @@ import styles from "../../../styles/app.module.css";
 import { AccentSelection } from "../../../styles/AccentSelection";
 
 import { OMEQRow, type OMEQRowValue } from "../components/OMEQRow";
+import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
 import {
   buildProductIndex,
   parseMedicationInput,
@@ -153,14 +154,7 @@ export default function OMEQPage() {
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
   const lastCopiedVedtakSummaryRef = useRef<string | null>(null);
-  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem("omeq.autoPasteNumericClipboard");
-      return raw === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useAutoVnrPreference("omeq");
   const productIndex = useMemo(() => buildProductIndex(), []);
 
   const setRowById = useCallback(
@@ -259,13 +253,6 @@ export default function OMEQPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [resetAll]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("omeq.autoPasteNumericClipboard", String(autoPasteNumericClipboard));
-    } catch {
-      // ignore
-    }
-  }, [autoPasteNumericClipboard]);
 
   const showDividers = useMemo(() => rows.length > 1, [rows.length]);
 
@@ -283,8 +270,8 @@ export default function OMEQPage() {
         const dailyDose = Number(raw.replace(",", "."));
         if (!Number.isFinite(dailyDose)) return acc;
 
-        // Hard limit to prevent mg-mistake (user should type units/day, not mg).
-        if (dailyDose > 20) return acc;
+        // Block if over-limit and user has not explicitly confirmed the high value.
+        if (dailyDose > 20 && !r.confirmedHighDose) return acc;
 
         const result = calculateOMEQ({
           product: parsed.product ?? null,
@@ -462,7 +449,13 @@ export default function OMEQPage() {
 
   const BLUE = "#29A1FF";
   const baseTheme = useTheme();
-  const blueTheme = useMemo(() => createTheme(baseTheme, { palette: { primary: { main: BLUE } } }), [baseTheme]);
+  const blueTheme = useMemo(
+    () =>
+      createTheme(baseTheme, {
+        palette: { primary: baseTheme.palette.augmentColor({ color: { main: BLUE } }) },
+      }),
+    [baseTheme],
+  );
 
   return (
   <ThemeProvider theme={blueTheme}>
