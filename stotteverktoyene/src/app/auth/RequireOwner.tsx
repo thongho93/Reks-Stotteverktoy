@@ -1,5 +1,8 @@
+import { Box, CircularProgress } from "@mui/material";
 import { Navigate, Outlet } from "react-router-dom";
 import type { ReactNode } from "react";
+
+import styles from "../../styles/standardTekstPage.module.css";
 import { useAuthUser } from "./useAuthUser";
 
 interface RequireOwnerProps {
@@ -11,11 +14,15 @@ interface RequireOwnerProps {
  * Andre roller (admin, rekspert, bruker) sendes til forsiden.
  */
 export default function RequireOwner({ children }: RequireOwnerProps) {
-  const { loading, isOwner, isApproved } = useAuthUser() as any;
+  const { loading, isOwner, isApproved } = useAuthUser();
 
   // Vent til auth + rolle er ferdig oppløst.
   if (loading) {
-    return null;
+    return (
+      <Box className={styles.authLoadingWrap}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   if (isApproved === false) {
