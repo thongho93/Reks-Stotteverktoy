@@ -1,5 +1,6 @@
 import * as React from "react";
 import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { AccentSelection } from "../../../styles/AccentSelection";
 import { useLocation } from "react-router-dom";
 import {
   Alert,
@@ -563,12 +564,12 @@ export default function InteraksjonerPage() {
         )
       : [];
     const styleExample = linked.length
-      ? ((linked[0] as any).text ??
-          (linked[0] as any).content ??
-          (linked[0] as any).melding ??
-          (linked[0] as any).body ??
-          (linked[0] as any).template ??
-          null)
+      ? (() => {
+          const doc = linked[0] as Record<string, unknown>;
+          const candidates = [doc.text, doc.content, doc.melding, doc.body, doc.template];
+          const first = candidates.find((v) => typeof v === "string" && v.trim().length > 0);
+          return typeof first === "string" ? first : null;
+        })()
       : null;
 
     setAiLoading(true);
@@ -675,6 +676,7 @@ export default function InteraksjonerPage() {
 
   return (
   <ThemeProvider theme={redTheme}>
+    <AccentSelection />
     <Box
       sx={{
         position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",

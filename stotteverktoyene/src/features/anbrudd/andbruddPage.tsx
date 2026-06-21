@@ -10,6 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { AccentSelection } from "../../styles/AccentSelection";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
 type TabKey = "produktskjema" | "anbruddOversikt";
@@ -216,6 +217,7 @@ export default function AndbruddPage() {
 
   return (
     <ThemeProvider theme={orangeTheme}>
+      <AccentSelection />
       <Box
         sx={{
           position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",

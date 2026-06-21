@@ -4,6 +4,7 @@ import { auth, db } from "../../firebase/firebase";
 export type UsagePage =
   | "home"
   | "omeq"
+  | "lagerbeholdning"
   | "standardtekster"
   | "interaksjoner"
   | "produktograd"

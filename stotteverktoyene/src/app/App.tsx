@@ -18,6 +18,7 @@ import { alpha } from "@mui/material/styles";
 import { createSvgIcon } from "@mui/material/utils";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import CalculateIcon from "@mui/icons-material/Calculate";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
@@ -30,6 +31,7 @@ import { useAuthUser } from "./auth/useAuthUser";
 import { GlobalSearch } from "../features/commandpalette/GlobalSearch";
 import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearchHotkey";
 import RequireRekspert from "./auth/RequireRekspert";
+import RequireOwner from "./auth/RequireOwner";
 import { ProfileMenu } from "./auth/ProfileMenu";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
 
@@ -112,6 +114,9 @@ function getIconFontSize(Icon: React.ElementType, collapsed: boolean): number {
 
 const HomePage = React.lazy(() => import("./HomePage"));
 const OMEQPage = React.lazy(() => import("../features/omeq/pages/OMEQPage"));
+const LagerbeholdningPage = React.lazy(
+  () => import("../features/lagerbeholdning/pages/LagerbeholdningPage")
+);
 const StandardTekstPage = React.lazy(
   () => import("../features/standardtekster/pages/StandardTekstPage")
 );
@@ -159,6 +164,7 @@ type SidebarItem = {
 function pathToUsagePage(pathname: string): UsagePage {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/omeq")) return "omeq";
+  if (pathname.startsWith("/lagerbeholdning")) return "lagerbeholdning";
   if (pathname.startsWith("/standardtekster")) return "standardtekster";
   if (pathname.startsWith("/interaksjoner")) return "interaksjoner";
   if (pathname.startsWith("/produkt-og-rad")) return "produktograd";
@@ -327,6 +333,16 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
   const mainItems: SidebarItem[] = [
     { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#29A1FF" },
+    ...(isOwner
+      ? [
+          {
+            label: "Lagerbeholdning",
+            path: "/lagerbeholdning",
+            Icon: Inventory2Icon,
+            color: "#0E9F8E",
+          } as SidebarItem,
+        ]
+      : []),
     {
       label: "Standardtekster",
       path: "/standardtekster",
@@ -814,6 +830,9 @@ function Layout() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/omeq" element={<OMEQPage />} />
+              <Route element={<RequireOwner />}>
+                <Route path="/lagerbeholdning" element={<LagerbeholdningPage />} />
+              </Route>
               <Route path="/standardtekster" element={<StandardTekstPage />} />
               <Route path="/interaksjoner" element={<InteraksjonerPage />} />
               <Route path="/produkt-og-rad" element={<ProduktOgRadPage />} />
