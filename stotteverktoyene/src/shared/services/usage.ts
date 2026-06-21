@@ -13,7 +13,6 @@ export type UsagePage =
   | "produktskjema"
   | "tilbakemelding"
   | "anbrudd"
-  | "teamschat"
   | "rekspert"
   | "other";
 
