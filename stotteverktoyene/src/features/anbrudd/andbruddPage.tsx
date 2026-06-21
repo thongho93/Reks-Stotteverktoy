@@ -76,7 +76,7 @@ export default function AndbruddPage() {
   const baseTheme = useTheme();
   const isDark = baseTheme.palette.mode === "dark";
   const ORANGE = "#FFA726";
-  const orangeTheme = useMemo(() => createTheme(baseTheme, { palette: { primary: { main: ORANGE } } }), [baseTheme]);
+  const orangeTheme = useMemo(() => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: ORANGE } }) } }), [baseTheme]);
 
   const location = useLocation();
   const [tab, setTab] = useState<TabKey>(() => {

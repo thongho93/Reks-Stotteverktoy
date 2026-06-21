@@ -140,7 +140,7 @@ type HistoryItem = {
 export default function InteraksjonerPage() {
   const RED = "#FF5E5B";
   const baseTheme = useTheme();
-  const redTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: { main: RED } } }), [baseTheme]);
+  const redTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: RED } }) } }), [baseTheme]);
 
   const { index, loading, error, reload } = useInteractions();
   const location = useLocation();

@@ -132,6 +132,12 @@ export const OMEQRow = ({
   const isOverLimitConfirmed = doseOverLimit && !!value.confirmedHighDose;
   const isBlockedByOverLimit = doseOverLimit && !isOverLimitConfirmed;
 
+  useEffect(() => {
+    if (!isBlockedByOverLimit) return;
+    const id = setTimeout(() => setShowOverLimitDialog(true), 500);
+    return () => clearTimeout(id);
+  }, [isBlockedByOverLimit, value.doseText]);
+
   // Use this value everywhere in calculations so we stop computing when the input is clearly wrong.
   const effectiveDailyDose = useMemo(() => {
     if (isBlockedByOverLimit) return null;

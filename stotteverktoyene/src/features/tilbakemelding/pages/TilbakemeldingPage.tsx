@@ -625,7 +625,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
   const baseTheme = useTheme();
   const isDark = baseTheme.palette.mode === "dark";
   const PURPLE = "#B648E8";
-  const purpleTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: { main: PURPLE } } }), [baseTheme]);
+  const purpleTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: PURPLE } }) } }), [baseTheme]);
   const location = useLocation();
   const routeState = React.useMemo(
     () => ((location.state as TilbakemeldingRouteState | null) ?? null),

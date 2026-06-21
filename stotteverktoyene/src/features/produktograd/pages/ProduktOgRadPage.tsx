@@ -294,7 +294,7 @@ export default function ProduktOgRadPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const PINK = "#C93586";
-  const pinkTheme = useMemo(() => createTheme(theme, { palette: { primary: { main: PINK } } }), [theme]);
+  const pinkTheme = useMemo(() => createTheme(theme, { palette: { primary: theme.palette.augmentColor({ color: { main: PINK } }) } }), [theme]);
   const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastAutoPastedRef = useRef<string | null>(null);

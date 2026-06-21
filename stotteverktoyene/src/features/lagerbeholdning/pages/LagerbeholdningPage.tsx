@@ -53,7 +53,7 @@ const formatTall = (n: number): string => {
 export default function LagerbeholdningPage() {
   const baseTheme = useTheme();
   const tealTheme = useMemo(
-    () => createTheme(baseTheme, { palette: { primary: { main: TEAL } } }),
+    () => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: TEAL } }) } }),
     [baseTheme],
   );
 
