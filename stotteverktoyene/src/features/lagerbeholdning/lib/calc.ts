@@ -46,11 +46,7 @@ export const addDays = (d: Date, days: number): Date => {
 /** Grupperer uttak per varenummer (faller tilbake på varenavn når varenr mangler). */
 export const groupByVare = (uttak: ParsedUttak[]): Map<string, ParsedUttak[]> => {
   const map = new Map<string, ParsedUttak[]>();
-  for (const u of uttak) {
-    const key = u.varenr ?? u.varenavn.trim() ?? "ukjent";
-    const arr = map.get(key) ?? [];
-    arr.push(u);
-    map.set(key, arr);
+    const key = (u.varenr ?? u.varenavn).trim() || "ukjent";
   }
   return map;
 };
