@@ -507,7 +507,9 @@ const buildMedicationItems = (festRaw: any[], pimRaw: any[], hvRaw: any[]): Med[
 };
 
 const fetchJsonArray = async <T,>(url: string): Promise<T[]> => {
-  const response = await fetch(url, { cache: "no-store" });
+  // Let the browser cache per Cache-Control (see public/_headers). These data files
+  // change only on deploy, so no-store just forced a redundant multi-MB re-download.
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`Klarte ikke å hente ${url} (${response.status}).`);
   }

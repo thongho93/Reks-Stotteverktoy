@@ -192,7 +192,8 @@ const buildSearchBlob = (row: AdviceProductRow): AdviceProduct => {
 };
 
 const fetchAdviceRows = async (): Promise<AdviceProductRow[]> => {
-  const response = await fetch("/data/pharmacistAdviceData.json", { cache: "no-store" });
+  // Cache per Cache-Control (see public/_headers); no-store forced a 6.9 MB re-download every visit.
+  const response = await fetch("/data/pharmacistAdviceData.json", { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`Kunne ikke laste datafilen (${response.status}).`);
   }

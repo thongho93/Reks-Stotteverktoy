@@ -56,16 +56,31 @@ function mapEventToField(event: UsageEventType): string {
   }
 }
 
+// Cache the firstName lookup per uid for the session. Without this, every logUsage
+// event (page_view, menu_click, …) triggered a fresh Firestore getDoc — dozens of
+// redundant reads per session. The name is effectively static within a session.
+const firstNameCache = new Map<string, Promise<string | undefined>>();
+
 async function getFirstName(uid: string): Promise<string | undefined> {
-  try {
-    const snap = await getDoc(doc(db, "users", uid));
-    if (!snap.exists()) return undefined;
-    const data = snap.data() as any;
-    const name = typeof data.firstName === "string" ? data.firstName.trim() : "";
-    return name || undefined;
-  } catch {
-    return undefined;
-  }
+  const cached = firstNameCache.get(uid);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    try {
+      const snap = await getDoc(doc(db, "users", uid));
+      if (!snap.exists()) return undefined;
+      const data = snap.data() as any;
+      const name = typeof data.firstName === "string" ? data.firstName.trim() : "";
+      return name || undefined;
+    } catch {
+      // Don't cache failures — allow a retry on the next event.
+      firstNameCache.delete(uid);
+      return undefined;
+    }
+  })();
+
+  firstNameCache.set(uid, promise);
+  return promise;
 }
 
 export type UsageEventMetadata = {
