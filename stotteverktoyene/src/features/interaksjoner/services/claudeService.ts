@@ -99,6 +99,11 @@ function buildUserText(p: GenerateKundetekstParams): string {
 
 let cachedClient: Anthropic | null = null;
 function getClient(): Anthropic {
+  if (!import.meta.env.DEV) {
+    throw new Error(
+      "Claude API-klienten er kun ment for lokal dev. Flytt kallet bak en server/proxy før produksjon."
+    );
+  }
   if (cachedClient) return cachedClient;
   const apiKey = (import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined)?.trim();
   if (!apiKey) {
