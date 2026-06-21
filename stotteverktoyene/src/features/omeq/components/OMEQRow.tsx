@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Box, InputAdornment, TextField, Tooltip, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  InputAdornment,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 
 import styles from "../../../styles/app.module.css";
@@ -13,6 +26,7 @@ import { calculateOMEQ } from "../lib/calc";
 export interface OMEQRowValue {
   medicationText: string;
   doseText: string;
+  confirmedHighDose?: boolean;
 }
 
 interface Props {
@@ -99,6 +113,7 @@ export const OMEQRow = ({
   }, [parsed.product, isPatch]);
 
   const [isDoseFocused, setIsDoseFocused] = useState(false);
+  const [showOverLimitDialog, setShowOverLimitDialog] = useState(false);
   const MAX_UNITS_PER_DAY = 20;
 
   const dailyDose = useMemo(() => {
@@ -114,11 +129,14 @@ export const OMEQRow = ({
     return dailyDose > MAX_UNITS_PER_DAY;
   }, [isPatch, dailyDose]);
 
+  const isOverLimitConfirmed = doseOverLimit && !!value.confirmedHighDose;
+  const isBlockedByOverLimit = doseOverLimit && !isOverLimitConfirmed;
+
   // Use this value everywhere in calculations so we stop computing when the input is clearly wrong.
   const effectiveDailyDose = useMemo(() => {
-    if (doseOverLimit) return null;
+    if (isBlockedByOverLimit) return null;
     return dailyDose;
-  }, [doseOverLimit, dailyDose]);
+  }, [isBlockedByOverLimit, dailyDose]);
 
   const strengthMg = useMemo(() => {
     const s = parsed.strength;
@@ -219,9 +237,8 @@ export const OMEQRow = ({
   }, [isPatch, matchedOpioid?.helpText, result.reason]);
 
   const doseLooksLikeMg = useMemo(() => {
-    // Reuse this name for styling/error state: anything over limit is most likely mg.
-    return doseOverLimit;
-  }, [doseOverLimit]);
+    return isBlockedByOverLimit;
+  }, [isBlockedByOverLimit]);
 
   const doseHelperText = useMemo(() => {
     if (isPatch) return "";
@@ -235,7 +252,7 @@ export const OMEQRow = ({
     if (!raw)
       return isMixture ? `${mlHintText}` : "Skriv antall tablett/kapsel/dose per døgn (ikke mg).";
 
-    if (doseOverLimit) return mgWarningText;
+    if (isBlockedByOverLimit) return mgWarningText;
 
     // When user has typed a value but we can't compute mg yet.
     if (dailyDose == null || strengthMg == null)
@@ -256,7 +273,7 @@ export const OMEQRow = ({
     dailyDose,
     strengthMg,
     substanceText,
-    doseOverLimit,
+    isBlockedByOverLimit,
   ]);
 
   return (
@@ -350,7 +367,9 @@ export const OMEQRow = ({
               label={isMixture ? "Antall ml per døgn" : "Antall per døgn"}
               inputRef={doseInputRef}
               value={value.doseText}
-              onChange={(e) => onChange({ ...value, doseText: e.target.value })}
+              onChange={(e) => {
+                onChange({ ...value, doseText: e.target.value, confirmedHighDose: false });
+              }}
               inputProps={{
                 inputMode: "decimal",
                 "aria-label": "Antall per døgn",
@@ -363,7 +382,10 @@ export const OMEQRow = ({
               // Keep helperText empty to avoid truncation; tooltip shows the full guidance when active.
               helperText={""}
               onFocus={() => setIsDoseFocused(true)}
-              onBlur={() => setIsDoseFocused(false)}
+              onBlur={() => {
+                setIsDoseFocused(false);
+                if (isBlockedByOverLimit) setShowOverLimitDialog(true);
+              }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -487,6 +509,40 @@ export const OMEQRow = ({
           {statusText}
         </Typography>
       )}
+
+      <Dialog
+        open={showOverLimitDialog}
+        onClose={() => setShowOverLimitDialog(false)}
+        aria-labelledby="over-limit-dialog-title"
+      >
+        <DialogTitle id="over-limit-dialog-title">Høyt antall registrert</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Du har lagt inn <strong>{dailyDose} {isMixture ? "ml" : "stk"}/døgn</strong>.{" "}
+            {isMixture
+              ? "Det ser ut som du har skrevet mg. Skriv antall ml per døgn, ikke mg."
+              : "Det ser ut som du har skrevet mg. Skriv antall tablett/kapsel/dose per døgn, ikke mg."}
+            <br />
+            <br />
+            Vil du likevel bekrefte at dette er riktig antall?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowOverLimitDialog(false)} color="inherit">
+            Endre antall
+          </Button>
+          <Button
+            onClick={() => {
+              onChange({ ...value, confirmedHighDose: true });
+              setShowOverLimitDialog(false);
+            }}
+            color="primary"
+            variant="contained"
+          >
+            Bekreft {dailyDose} {isMixture ? "ml" : "stk"}/døgn
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

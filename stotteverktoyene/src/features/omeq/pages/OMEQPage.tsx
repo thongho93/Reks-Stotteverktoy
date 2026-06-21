@@ -283,8 +283,8 @@ export default function OMEQPage() {
         const dailyDose = Number(raw.replace(",", "."));
         if (!Number.isFinite(dailyDose)) return acc;
 
-        // Hard limit to prevent mg-mistake (user should type units/day, not mg).
-        if (dailyDose > 20) return acc;
+        // Block if over-limit and user has not explicitly confirmed the high value.
+        if (dailyDose > 20 && !r.confirmedHighDose) return acc;
 
         const result = calculateOMEQ({
           product: parsed.product ?? null,
