@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -10,6 +10,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  MenuItem,
   Paper,
   Stack,
   Table,
@@ -19,6 +20,8 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -39,6 +42,11 @@ import {
   toDateInputValue,
   type VareBeregning,
 } from "../lib/calc";
+import {
+  buildVirkestoffResolver,
+  type FestMed,
+  type VirkestoffResolver,
+} from "../lib/festVirkestoff";
 
 const TEAL = "#0E9F8E";
 
@@ -48,6 +56,30 @@ const EKSEMPEL = `489 d. 17.02.2025 169052 Pinex brusetab 500 mg 20 STK\t5\t100 
 const formatTall = (n: number): string => {
   const rounded = Math.round(n * 100) / 100;
   return String(rounded).replace(".", ",");
+};
+
+// Doseringsperioder. Ukentlig/månedlig/intervall-dosering regnes om til et
+// gjennomsnittlig dagsforbruk (antall ÷ dager i perioden) som beregningen bruker.
+// "egendefinert" lar brukeren oppgi et fritt intervall i dager (hver N. dag).
+const PERIODER = [
+  { value: "dag", label: "per dag", dager: 1 },
+  { value: "uke", label: "per uke", dager: 7 },
+  { value: "2uker", label: "per 2 uker", dager: 14 },
+  { value: "4uker", label: "per 4 uker", dager: 28 },
+  { value: "maaned", label: "per måned", dager: 30 },
+  { value: "egendefinert", label: "Egendefinert…", dager: null },
+] as const;
+
+type PeriodeValue = (typeof PERIODER)[number]["value"];
+
+// Antall dager i valgt periode. Returnerer null hvis egendefinert intervall ikke
+// er oppgitt/gyldig, slik at beregningen lar være å regne ut dagsforbruk.
+const periodeDager = (value: string, egendager: string): number | null => {
+  if (value === "egendefinert") {
+    const n = Number(egendager.trim().replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return PERIODER.find((p) => p.value === value)?.dager ?? 1;
 };
 
 export default function LagerbeholdningPage() {
@@ -62,6 +94,10 @@ export default function LagerbeholdningPage() {
     toDateInputValue(new Date()),
   );
   const [doseByVare, setDoseByVare] = useState<Record<string, string>>({});
+  const [periodeByVare, setPeriodeByVare] = useState<Record<string, PeriodeValue>>({});
+  const [egendagerByVare, setEgendagerByVare] = useState<Record<string, string>>({});
+  const [doseEnhetByVare, setDoseEnhetByVare] = useState<Record<string, "ml" | "mg">>({});
+  const [styrkeByVare, setStyrkeByVare] = useState<Record<string, string>>({});
   const [showHelp, setShowHelp] = useState(false);
   const [openHistorikk, setOpenHistorikk] = useState<Record<string, boolean>>({});
 
@@ -70,23 +106,60 @@ export default function LagerbeholdningPage() {
     [referansedatoInput],
   );
 
+  // FEST-katalogen lastes lazy (≈2,5 MB) og brukes til å gruppere uttak på
+  // virkestoff. Til den er klar grupperes det per varenummer som fallback.
+  const [resolver, setResolver] = useState<VirkestoffResolver | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    import("../../fest/meds.json")
+      .then((mod) => {
+        if (cancelled) return;
+        const meds = ((mod as { default?: FestMed[] }).default ?? mod) as FestMed[];
+        setResolver(() => buildVirkestoffResolver(meds));
+      })
+      .catch(() => {
+        /* Fallback til varenr-gruppering hvis katalogen ikke kan lastes. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const uttak = useMemo(() => parseUttakInput(input), [input]);
-  const grupper = useMemo(() => groupByVare(uttak), [uttak]);
+  const grupper = useMemo(() => groupByVare(uttak, resolver), [uttak, resolver]);
 
   const beregninger = useMemo<VareBeregning[]>(() => {
     const result: VareBeregning[] = [];
-    for (const [key, liste] of grupper.entries()) {
+    for (const [key, gruppe] of grupper.entries()) {
       const raw = doseByVare[key]?.trim().replace(",", ".");
-      const dose = raw ? Number(raw) : null;
-      const dagligForbruk = dose != null && Number.isFinite(dose) ? dose : null;
-      result.push(beregnVare(key, liste, referansedato, dagligForbruk));
+      const doseNum = raw ? Number(raw) : null;
+      const dose = doseNum != null && Number.isFinite(doseNum) ? doseNum : null;
+
+      const styrkeRaw = styrkeByVare[key]?.trim().replace(",", ".");
+      const styrkeNum = styrkeRaw ? Number(styrkeRaw) : null;
+      const styrkeOverride = styrkeNum != null && Number.isFinite(styrkeNum) ? styrkeNum : null;
+
+      const dager = periodeDager(periodeByVare[key] ?? "dag", egendagerByVare[key] ?? "");
+
+      result.push(
+        beregnVare(key, gruppe, referansedato, {
+          dose,
+          doseEnhet: doseEnhetByVare[key] ?? "ml",
+          styrkeOverride,
+          periodeDager: dager ?? 0,
+        }),
+      );
     }
     return result.sort((a, b) => a.varenavn.localeCompare(b.varenavn, "nb"));
-  }, [grupper, doseByVare, referansedato]);
+  }, [grupper, doseByVare, periodeByVare, egendagerByVare, doseEnhetByVare, styrkeByVare, referansedato]);
 
   const resetAll = useCallback(() => {
     setInput("");
     setDoseByVare({});
+    setPeriodeByVare({});
+    setEgendagerByVare({});
+    setDoseEnhetByVare({});
+    setStyrkeByVare({});
     setOpenHistorikk({});
     setReferansedatoInput(toDateInputValue(new Date()));
   }, []);
@@ -149,8 +222,8 @@ export default function LagerbeholdningPage() {
               <List dense disablePadding>
                 {[
                   "Lim inn uttakshistorikken – én linje per uttak (dager, dato, varenr, varenavn, pakker, mengde).",
-                  "Flere varer kan limes inn samtidig – de grupperes automatisk på varenummer.",
-                  "Oppgi dagsforbruk (enheter/dag) per vare for å regne ut beholdning og dekning.",
+                  "Flere varer kan limes inn samtidig – preparater med samme virkestoff, styrke og form slås sammen (ulike merkenavn og pakningsstørrelser teller som ett).",
+                  "Oppgi dosering per preparat – velg om det er per dag, uke eller måned (f.eks. 1 per uke). Ukentlig/månedlig dosering regnes om til et gjennomsnittlig dagsforbruk.",
                   "Beholdning = totalt hentet − dagsforbruk × dager siden første uttak.",
                   "«Dekket til» = referansedato + dager igjen.",
                 ].map((text) => (
@@ -219,7 +292,15 @@ export default function LagerbeholdningPage() {
 
           <Stack spacing={2} sx={{ mt: beregninger.length ? 2 : 0 }}>
             {beregninger.map((b) => {
-              const key = b.varenr;
+              const key = b.key;
+              const doseEnhet = b.erFlytende ? doseEnhetByVare[key] ?? "ml" : "ml";
+              const mgModus = b.erFlytende && doseEnhet === "mg";
+              const styrkeVisning =
+                styrkeByVare[key] ?? (b.styrkeMgPerMl != null ? formatTall(b.styrkeMgPerMl) : "");
+              const periode = periodeByVare[key] ?? "dag";
+              const erEgendefinert = periode === "egendefinert";
+              const visDagsrate =
+                b.dagligForbruk != null && (mgModus || periode !== "dag");
               const harBeholdning = b.beholdning != null;
               const tom = harBeholdning && (b.beholdning as number) <= 0;
               const accent = !harBeholdning
@@ -247,17 +328,43 @@ export default function LagerbeholdningPage() {
                       alignItems: "center",
                       gap: 1,
                       flexWrap: "wrap",
-                      mb: 1.5,
+                      mb: b.merged ? 1 : 1.5,
                     }}
                   >
                     <Inventory2OutlinedIcon sx={{ color: accent }} />
                     <Typography variant="h6" sx={{ m: 0 }}>
                       {b.varenavn}
                     </Typography>
-                    {/^(\d{5,7})$/.test(b.varenr) ? (
+                    {b.atc ? (
+                      <Chip size="small" label={`ATC ${b.atc}`} variant="outlined" />
+                    ) : null}
+                    {!b.merged && /^(\d{5,7})$/.test(b.varenr) ? (
                       <Chip size="small" label={`Varenr ${b.varenr}`} variant="outlined" />
                     ) : null}
                   </Box>
+
+                  {b.merged ? (
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", mb: 1.5 }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Slått sammen ({b.members.length} preparater):
+                      </Typography>
+                      {b.members.map((m) => (
+                        <Chip
+                          key={m.varenr || m.varenavn}
+                          size="small"
+                          variant="outlined"
+                          label={
+                            /^(\d{5,7})$/.test(m.varenr)
+                              ? `${m.varenavn} · ${m.varenr}`
+                              : m.varenavn
+                          }
+                          sx={{ maxWidth: "100%" }}
+                        />
+                      ))}
+                    </Box>
+                  ) : null}
 
                   <Box
                     sx={{
@@ -280,24 +387,115 @@ export default function LagerbeholdningPage() {
                     />
                   </Box>
 
-                  <TextField
-                    label="Dagsforbruk"
-                    placeholder="f.eks. 1"
-                    value={doseByVare[key] ?? ""}
-                    onChange={(e) =>
-                      setDoseByVare((prev) => ({ ...prev, [key]: e.target.value }))
-                    }
-                    size="small"
-                    inputProps={{ inputMode: "decimal" }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          {b.enhet ? `${b.enhet}/dag` : "enheter/dag"}
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ width: 220, mb: 1.5 }}
-                  />
+                  <Box sx={{ mb: 1.5 }}>
+                    {b.erFlytende && (
+                      <ToggleButtonGroup
+                        size="small"
+                        exclusive
+                        value={doseEnhet}
+                        onChange={(_e, val) => {
+                          if (!val) return;
+                          setDoseEnhetByVare((prev) => ({ ...prev, [key]: val as "ml" | "mg" }));
+                        }}
+                        sx={{ mb: 1, "& .MuiToggleButton-root": { textTransform: "none", py: 0.25 } }}
+                      >
+                        <ToggleButton value="ml">Dose i ml</ToggleButton>
+                        <ToggleButton value="mg">Dose i mg</ToggleButton>
+                      </ToggleButtonGroup>
+                    )}
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                      {mgModus && (
+                        <TextField
+                          label="Styrke"
+                          placeholder="f.eks. 10"
+                          value={styrkeVisning}
+                          onChange={(e) =>
+                            setStyrkeByVare((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          size="small"
+                          inputProps={{ inputMode: "decimal" }}
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">mg/ml</InputAdornment>,
+                          }}
+                          helperText={
+                            b.styrkeMgPerMl != null && styrkeByVare[key] == null
+                              ? "Hentet fra preparatnavn"
+                              : " "
+                          }
+                          sx={{ width: 150 }}
+                        />
+                      )}
+                      <TextField
+                        label="Dosering"
+                        placeholder="f.eks. 1"
+                        value={doseByVare[key] ?? ""}
+                        onChange={(e) =>
+                          setDoseByVare((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        size="small"
+                        inputProps={{ inputMode: "decimal" }}
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              {mgModus ? "mg" : b.enhet ? b.enhet : "enheter"}
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ width: 160 }}
+                      />
+                      <TextField
+                        select
+                        label="Periode"
+                        value={periode}
+                        onChange={(e) =>
+                          setPeriodeByVare((prev) => ({
+                            ...prev,
+                            [key]: e.target.value as PeriodeValue,
+                          }))
+                        }
+                        size="small"
+                        sx={{ width: 160 }}
+                      >
+                        {PERIODER.map((p) => (
+                          <MenuItem key={p.value} value={p.value}>
+                            {p.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                      {erEgendefinert && (
+                        <TextField
+                          label="Intervall"
+                          placeholder="f.eks. 3"
+                          value={egendagerByVare[key] ?? ""}
+                          onChange={(e) =>
+                            setEgendagerByVare((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          size="small"
+                          inputProps={{ inputMode: "numeric" }}
+                          InputProps={{
+                            startAdornment: <InputAdornment position="start">hver</InputAdornment>,
+                            endAdornment: <InputAdornment position="end">. dag</InputAdornment>,
+                          }}
+                          sx={{ width: 150 }}
+                        />
+                      )}
+                    </Stack>
+                    {visDagsrate && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                        = {formatTall(b.dagligForbruk as number)} {b.enhet ? b.enhet : "enheter"}/dag i snitt
+                      </Typography>
+                    )}
+                    {mgModus && styrkeVisning.trim() === "" && (
+                      <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: "block" }}>
+                        Oppgi styrke (mg/ml) for å regne om dosen.
+                      </Typography>
+                    )}
+                    {erEgendefinert && (egendagerByVare[key] ?? "").trim() === "" && (
+                      <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: "block" }}>
+                        Oppgi intervall i dager (hver N. dag).
+                      </Typography>
+                    )}
+                  </Box>
 
                   {harBeholdning ? (
                     <Box
