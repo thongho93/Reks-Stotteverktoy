@@ -81,24 +81,104 @@ export const addDays = (d: Date, days: number): Date => {
   return base;
 };
 
+// Form-ord vi kjenner igjen i preparatnavn. Lengre/mer spesifikke først så de ikke
+// skygges av kortere (\b sørger likevel for ordgrenser). Brukes i navnesignaturen
+// for å skille f.eks. tabletter fra mikstur og depottab fra vanlig tab.
+const FORM_ORD = [
+  "depottab", "depotkaps", "depotgran", "depotplaster",
+  "smeltetab", "brusetab", "brusegran", "tyggetab", "sugetab",
+  "resoribl", "vagitab", "disperg",
+  "tabl", "tab", "kapsel", "kaps",
+  "mikstur", "mikst", "dråper", "dråp", "draaper",
+  "stikkpille", "stikkp", "supp",
+  "krem", "salve", "gel", "liniment", "linim",
+  "injeksjon", "inj", "infusjon",
+  "pulver", "pulv", "granulat", "gran",
+  "nesespray", "øyedråper", "øredråper", "plaster", "spray",
+  "oppløsning", "oppl", "konsentrat",
+];
+
+// Styrke i navnet, normalisert: "20 mg" → "20mg", "10 mg/ml" → "10mg/1ml",
+// "250 mg/5 ml" → "250mg/5ml". Returnerer null når ingen styrke finnes.
+const extractStyrke = (text: string): string | null => {
+  const m = text.match(
+    /(\d+(?:[.,]\d+)?)\s*(mikrogram|mikrog|mcg|mg|g|mmol|ie|%)\b(?:\s*\/\s*(\d+(?:[.,]\d+)?)?\s*ml\b)?/i,
+  );
+  if (!m) return null;
+  const tall = m[1].replace(",", ".");
+  const enhet = m[2].toLowerCase();
+  if (m[0].includes("/")) {
+    const ml = m[3] ? m[3].replace(",", ".") : "1";
+    return `${tall}${enhet}/${ml}ml`;
+  }
+  return `${tall}${enhet}`;
+};
+
+/**
+ * Navnebasert virkestoff-signatur: `ledende navneord | form | styrke`, f.eks.
+ * "Fluoxetin Sandoz disperg tab 20 mg" → "fluoxetin|disperg tab|20mg". Brukes som
+ * fallback når FEST ikke kjenner preparatet, slik at samme virkestoff i samme
+ * styrke og form slås sammen på tvers av merkenavn – mens ulike styrker (10 mg vs
+ * 20 mg) holdes adskilt. Returnerer null når styrke mangler (da grupperes det ikke
+ * på navn, men på varenummer).
+ */
+export const varenavnSignatur = (varenavn: string): string | null => {
+  const navn = varenavn.toLowerCase().trim();
+  if (!navn) return null;
+
+  const styrke = extractStyrke(navn);
+  if (!styrke) return null;
+
+  const ledende = (navn.split(/\s+/)[0] ?? "").replace(/[^a-zæøå]/g, "");
+  if (!ledende) return null;
+
+  const former = FORM_ORD.filter((ord) => new RegExp(`\\b${ord}\\b`).test(navn))
+    .sort()
+    .join(" ");
+
+  return `${ledende}|${former}|${styrke}`;
+};
+
 /**
  * Grupperer uttak. Når en `resolver` er gitt, slås preparater med samme
  * virkestoff + styrke + form sammen (på tvers av merkenavn og pakningsstørrelse).
- * Uttak som ikke finnes i FEST faller tilbake på gruppering per varenummer.
+ *
+ * Preparater FEST ikke kjenner igjen (ulike merkenavn/varenummer av en generika
+ * finnes ikke alltid i katalogen) grupperes på en navnebasert signatur
+ * (`varenavnSignatur`). Signaturen kobles mot en FEST-gruppe når en "søsken"-vare
+ * med samme signatur ble gjenkjent, ellers danner den sin egen gruppe. Slik antas
+ * samme virkestoff selv om navn og varenummer ser ulike ut – men ulike styrker
+ * (f.eks. 10 mg vs 20 mg) slås aldri sammen. Uten styrke i navnet faller varen
+ * tilbake på gruppering per varenummer.
  */
 export const groupByVare = (
   uttak: ParsedUttak[],
   resolver?: VirkestoffResolver | null,
 ): Map<string, UttakGruppe> => {
+  // Pass 1: kjør FEST-oppslag for alle, og lær hvilken FEST-gruppe en gitt
+  // navnesignatur tilhører (fra varer som FAKTISK ble gjenkjent).
+  const matches = uttak.map((u) => (resolver ? resolver(u.varenavn) : null));
+  const signaturTilGruppe = new Map<string, string>();
+  uttak.forEach((u, i) => {
+    const match = matches[i];
+    if (!match) return;
+    const sig = varenavnSignatur(u.varenavn);
+    if (sig && !signaturTilGruppe.has(sig)) signaturTilGruppe.set(sig, match.groupKey);
+  });
+
+  // Pass 2: tildel gruppenøkkel. FEST-treff styrer; ellers brukes signaturen
+  // (knyttet til en FEST-gruppe når en søsken-vare ble gjenkjent), så varenummer.
   const map = new Map<string, UttakGruppe>();
-  for (const u of uttak) {
-    const match = resolver ? resolver(u.varenavn) : null;
-    const key = match ? match.groupKey : u.varenr?.trim() || u.varenavn?.trim() || "ukjent";
+  uttak.forEach((u, i) => {
+    const match = matches[i];
+    const sig = match ? null : varenavnSignatur(u.varenavn);
+    const fraNavn = match?.groupKey ?? (sig ? signaturTilGruppe.get(sig) ?? sig : null);
+    const key = fraNavn || u.varenr?.trim() || u.varenavn?.trim() || "ukjent";
     const entry = map.get(key) ?? { uttak: [], match };
     entry.uttak.push(u);
     if (!entry.match && match) entry.match = match;
     map.set(key, entry);
-  }
+  });
   return map;
 };
 
