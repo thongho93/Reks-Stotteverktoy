@@ -172,10 +172,30 @@
   gap: 4px;
   padding: 8px 16px;
   border-radius: 14px;
-  background: rgba(0, 0, 0, 0.04);
   min-width: 130px;
   height: 72px;
   white-space: nowrap;
+}
+
+.totalOmeqBox {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Vedtak-boksen skal tydelig se redigerbar ut (i motsetning til Total OMEQ,
+   som kun viser en beregnet verdi) – hvit bunn, stiplet ramme og hover/fokus.
+   Fokus-/hover-farge settes via sx (siden sin egen temafarge), ikke her,
+   siden --app-accent er den globale (rosa) aksenten og ikke matcher f.eks.
+   OMEQ-sidens lokale blå tema. */
+.vedtakOmeqBox {
+  background: var(--app-surface-1, #fff);
+  border: 1.5px dashed var(--app-border-strong, rgba(0, 0, 0, 0.24));
+  cursor: text;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vedtakOmeqEditIcon {
+  font-size: 0.85rem !important;
+  color: var(--app-text-muted, rgba(0, 0, 0, 0.5));
 }
 
 /* Wrapper to center Total OMEQ above action buttons */
@@ -203,9 +223,12 @@
   background: var(--app-surface-3);
 }
 
-:global([data-app-theme="dark"]) .totalOmeqBox,
-:global([data-app-theme="dark"]) .vedtakOmeqBox {
+:global([data-app-theme="dark"]) .totalOmeqBox {
   background: var(--app-muted-fill);
+}
+
+:global([data-app-theme="dark"]) .vedtakOmeqBox {
+  background: var(--app-surface-3);
 }
 
 :global([data-app-theme="dark"]) .totalOmeqLabel {

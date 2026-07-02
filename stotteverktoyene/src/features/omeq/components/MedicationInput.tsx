@@ -386,6 +386,13 @@ export const MedicationInput = ({
                 params.inputProps?.onFocus?.(e);
               },
               onPaste: (e) => {
+                // Når det som limes inn er et rent varenummer, håndterer vi det selv
+                // (applyVnrDigits resolver til preparatnavn). Da må vi hindre nettleserens
+                // native paste – ellers legges de rå sifrene på slutten av et allerede
+                // utfylt felt, f.eks. "Norspan ... (24765)" + "24765" → "...(24765)24765".
+                if (getNumericClipboardValue(e.clipboardData?.getData("text") ?? "")) {
+                  e.preventDefault();
+                }
                 onVnrPaste(e);
                 // @ts-expect-error: MUI inputProps typing doesn't always include onPaste
                 params.inputProps?.onPaste?.(e);
