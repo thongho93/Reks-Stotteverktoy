@@ -30,6 +30,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
@@ -39,6 +40,7 @@ import { AccentSelection } from "../../../styles/AccentSelection";
 
 import { OMEQRow, type OMEQRowValue } from "../components/OMEQRow";
 import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
+import { useVnrAutoPaste } from "../../../shared/hooks/useVnrAutoPaste";
 import {
   buildProductIndex,
   parseMedicationInput,
@@ -56,7 +58,9 @@ type OmeqPrefillState = {
 const OMEQ_STANDARDTEKST_TITLE = "OMEQ overstiger vedtak";
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
-const stripProductNumberSuffix = (value: string) => value.replace(/\s*\(\d+\)\s*$/g, "").trim();
+// Fjern et etterfølgende varenummer i navnet. Håndterer også det dobla tilfellet
+// "Norspan ... (24765)24765" (rå-vnr limt inn etter et allerede utfylt navn).
+const stripProductNumberSuffix = (value: string) => value.replace(/\s*\(\d+\)\d*\s*$/g, "").trim();
 const normalizeMedicationIdentityText = (value: string) =>
   value.toLowerCase().replace(/\s+/g, " ").trim();
 const normalizeStrengthIdentity = (
@@ -143,6 +147,12 @@ const normalizeVedtakText = (value: string) => {
   return trimmed;
 };
 
+// Klippebord-innhold som er (kun) et tall, f.eks. "67" eller "67,5"/"67.5".
+const extractVedtakNumber = (text: string): string => {
+  const compact = String(text ?? "").trim();
+  return /^-?\d+(?:[.,]\d+)?$/.test(compact) ? compact : "";
+};
+
 export default function OMEQPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -155,7 +165,16 @@ export default function OMEQPage() {
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
   const lastCopiedVedtakSummaryRef = useRef<string | null>(null);
   const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useAutoVnrPreference("omeq");
+  const [isVedtakFocused, setIsVedtakFocused] = useState(false);
+  const vedtakInputRef = useRef<HTMLInputElement | null>(null);
   const productIndex = useMemo(() => buildProductIndex(), []);
+
+  useVnrAutoPaste({
+    enabled: autoPasteNumericClipboard,
+    isFocused: isVedtakFocused,
+    onVnr: setVedtakOmeq,
+    extract: extractVedtakNumber,
+  });
 
   const setRowById = useCallback(
     (id: string, next: OMEQRowValue) => {
@@ -728,20 +747,39 @@ export default function OMEQPage() {
                         ? <CheckCircleIcon className={styles.omeqCheckOk} />
                         : <CancelIcon className={styles.omeqCheckFail} />
                     )}
-                    <Box className={styles.vedtakOmeqBox}>
-                      <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
-                        OMEQ vedtak
-                      </Typography>
-                      <TextField
-                        variant="standard"
-                        value={vedtakOmeq}
-                        onChange={(e) => setVedtakOmeq(e.target.value)}
-                        placeholder="0"
-                        inputProps={{ inputMode: "decimal", style: { textAlign: "center", fontWeight: 700, fontSize: "1.25rem" } }}
-                        InputProps={{ disableUnderline: true }}
-                        sx={{ width: 72 }}
-                      />
-                    </Box>
+                    <Tooltip title="Skriv eller lim inn OMEQ fra vedtaket">
+                      <Box
+                        className={styles.vedtakOmeqBox}
+                        onClick={() => vedtakInputRef.current?.focus()}
+                        sx={(theme) => ({
+                          borderColor: isVedtakFocused ? theme.palette.primary.main : undefined,
+                          borderStyle: isVedtakFocused ? "solid" : undefined,
+                          boxShadow: isVedtakFocused
+                            ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.16)}`
+                            : "none",
+                          "&:hover": { borderColor: theme.palette.primary.main },
+                        })}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Typography variant="subtitle2" className={styles.totalOmeqLabel}>
+                            OMEQ vedtak
+                          </Typography>
+                          <EditOutlinedIcon className={styles.vedtakOmeqEditIcon} />
+                        </Box>
+                        <TextField
+                          variant="standard"
+                          value={vedtakOmeq}
+                          onChange={(e) => setVedtakOmeq(e.target.value)}
+                          onFocus={() => setIsVedtakFocused(true)}
+                          onBlur={() => setIsVedtakFocused(false)}
+                          placeholder="0"
+                          inputProps={{ inputMode: "decimal", style: { textAlign: "center", fontWeight: 700, fontSize: "1.25rem" } }}
+                          InputProps={{ disableUnderline: true }}
+                          inputRef={vedtakInputRef}
+                          sx={{ width: 72 }}
+                        />
+                      </Box>
+                    </Tooltip>
                   </Box>
 
                   <Paper

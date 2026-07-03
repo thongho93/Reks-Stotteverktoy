@@ -5,6 +5,7 @@ import {
   Chip,
   Collapse,
   Container,
+  FormControlLabel,
   InputAdornment,
   List,
   ListItem,
@@ -13,6 +14,7 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -22,6 +24,7 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -47,6 +50,8 @@ import {
   type FestMed,
   type VirkestoffResolver,
 } from "../lib/festVirkestoff";
+import { useVnrAutoPaste } from "../../../shared/hooks/useVnrAutoPaste";
+import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
 
 const TEAL = "#0E9F8E";
 
@@ -100,6 +105,33 @@ export default function LagerbeholdningPage() {
   const [styrkeByVare, setStyrkeByVare] = useState<Record<string, string>>({});
   const [showHelp, setShowHelp] = useState(false);
   const [openHistorikk, setOpenHistorikk] = useState<Record<string, boolean>>({});
+
+  // Auto-lim inn: kopier uttakshistorikk i fagsystemet og alt-tab tilbake – blokken
+  // limes automatisk inn når feltet er aktivt, uten manuell Ctrl+V.
+  const [isUttakFocused, setIsUttakFocused] = useState(false);
+  const [autoPasteUttak, setAutoPasteUttak] = useAutoVnrPreference("lagerbeholdning");
+
+  // Godtar kun tekst som faktisk inneholder minst én tolkbar uttakslinje, slik at
+  // urelatert utklippstavleinnhold ikke limes inn ved et uhell.
+  const extractUttakBlock = useCallback((text: string): string => {
+    const trimmed = text.trim();
+    if (!trimmed || parseUttakInput(trimmed).length === 0) return "";
+    return trimmed;
+  }, []);
+
+  const appendUttak = useCallback((text: string) => {
+    setInput((prev) => {
+      if (!text || prev.includes(text)) return prev;
+      return prev.trim() ? `${prev.trim()}\n${text}` : text;
+    });
+  }, []);
+
+  useVnrAutoPaste({
+    enabled: autoPasteUttak,
+    isFocused: isUttakFocused,
+    onVnr: appendUttak,
+    extract: extractUttakBlock,
+  });
 
   const referansedato = useMemo(
     () => fromDateInputValue(referansedatoInput) ?? new Date(),
@@ -164,6 +196,17 @@ export default function LagerbeholdningPage() {
     setReferansedatoInput(toDateInputValue(new Date()));
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if ((e as any).isComposing) return;
+      e.preventDefault();
+      resetAll();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [resetAll]);
+
   return (
     <ThemeProvider theme={tealTheme}>
       <AccentSelection />
@@ -194,15 +237,21 @@ export default function LagerbeholdningPage() {
             Beregning av lagerbeholdning
           </Typography>
 
-          <Button
-            variant="text"
-            size="small"
-            onClick={() => setShowHelp((v) => !v)}
-            endIcon={showHelp ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            sx={{ textTransform: "none", borderRadius: 2 }}
-          >
-            {showHelp ? "Skjul bruksanvisning" : "Vis bruksanvisning"}
-          </Button>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap" }}>
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+              <strong>Nullstill</strong>: Escape
+            </Typography>
+
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => setShowHelp((v) => !v)}
+              endIcon={showHelp ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+            >
+              {showHelp ? "Skjul bruksanvisning" : "Vis bruksanvisning"}
+            </Button>
+          </Box>
         </Box>
 
         <Paper elevation={3} className={styles.appCard}>
@@ -242,16 +291,32 @@ export default function LagerbeholdningPage() {
           </Collapse>
 
           <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ mb: 1 }}>
-            <TextField
-              label="Uttakshistorikk"
-              placeholder={EKSEMPEL}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              multiline
-              minRows={5}
-              fullWidth
-              sx={{ flex: 1 }}
-            />
+            <Box sx={{ flex: 1 }}>
+              <TextField
+                label="Uttakshistorikk"
+                placeholder={EKSEMPEL}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onFocus={() => setIsUttakFocused(true)}
+                onBlur={() => setIsUttakFocused(false)}
+                multiline
+                minRows={5}
+                fullWidth
+              />
+              <Tooltip title="Når feltet er aktivt, limes kopiert uttakshistorikk automatisk inn.">
+                <FormControlLabel
+                  sx={{ m: 0, mt: 0.5 }}
+                  control={
+                    <Switch
+                      size="small"
+                      checked={autoPasteUttak}
+                      onChange={(e) => setAutoPasteUttak(e.target.checked)}
+                    />
+                  }
+                  label={<Typography variant="caption">Auto-lim inn</Typography>}
+                />
+              </Tooltip>
+            </Box>
             <Stack spacing={1.5} sx={{ width: { xs: "100%", md: 240 } }}>
               <TextField
                 label="Referansedato (i dag)"
