@@ -29,13 +29,18 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {
   formatPreparatRowText,
+  getAltGroupCount,
   getTallTokenIndices,
   migrateLegacyClockTallTokens,
+  replaceAltGroups,
   replaceNextPreparatToken,
   replaceKlokkeslettDagTokens,
+  replacePakkeTokens,
   replaceTallTokenByIndex,
+  templateHasAltToken,
   templateHasDatoMndToken,
   templateHasDatoToken,
   templateHasKlokkeslettDagToken,
@@ -470,6 +475,8 @@ export default function StandardTekstPage() {
     [selected?.content],
   );
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
+  // Valgt segment-indeks per alternativ-gruppe-forekomst (null/manglende = ikke valgt).
+  const [altByIndex, setAltByIndex] = useState<Record<number, number | null>>({});
   const [clockTime, setClockTime] = useState<string>(DEFAULT_CLOCK_TALL_TIME);
   const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
     getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME),
@@ -996,6 +1003,7 @@ export default function StandardTekstPage() {
       nextTallValues[1] = pending.totalOmeq;
       if (pending.vedtakOmeq) nextTallValues[0] = pending.vedtakOmeq;
       setTallByIndex(nextTallValues);
+      setAltByIndex({});
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
       setClockCustomMode(true);
@@ -1029,6 +1037,7 @@ export default function StandardTekstPage() {
         }
       }
       setTallByIndex(nextTall);
+      setAltByIndex({});
 
       if (pendingPalette.formuleringValues) {
         const nextF: Record<number, string> = { 0: "" };
@@ -1053,6 +1062,7 @@ export default function StandardTekstPage() {
       setVirkestoffByKey({});
       setFormuleringByPreparatKey({});
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
+      setAltByIndex({});
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
       setClockCustomMode(true);
@@ -1687,6 +1697,19 @@ export default function StandardTekstPage() {
       return false;
     }
 
+    // Krev at hver alternativ-gruppe ({{seg1 / seg2}}) er valgt, ellers kan de
+    // ubrukte alternativene ende opp i teksten som sendes til kunde.
+    if (templateHasAltToken(selectedContent)) {
+      const altCount = getAltGroupCount(selectedContent);
+      const hasUnselected = Array.from({ length: altCount }, (_, i) => i).some(
+        (i) => altByIndex[i] == null,
+      );
+      if (hasUnselected) {
+        setErrorLocal("Velg alternativ før du kopierer teksten.");
+        return false;
+      }
+    }
+
     if (templateHasVirkestoffToken(selectedContent) && !resolvedVirkestoff) {
       setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
       return false;
@@ -1724,6 +1747,10 @@ export default function StandardTekstPage() {
       firstName,
       picked: pickedPreparats,
     });
+
+    // Løs opp alternativ-grupper FØR de andre tokenene erstattes – et valgt
+    // segment kan selv inneholde f.eks. DATO/PREPARAT1/TALL som må resolves videre.
+    text = replaceAltGroups(text, (idx) => altByIndex[idx] ?? null);
 
     // Ensure PREPARAT tokens are actually resolved in the copied text.
     // Preview replaces them in the renderer, but clipboard needs real text.
@@ -1764,6 +1791,10 @@ export default function StandardTekstPage() {
     if (templateHasKlokkeslettDagToken(selectedContent)) {
       text = replaceKlokkeslettDagTokens(text, formatClockTallValue(clockTime, clockDay));
     }
+
+    // PAKKE → "pakke"/"pakker" ut fra nærmeste foranstående TALL.
+    // Må skje FØR TALL-tokenene erstattes med selve tallene.
+    text = replacePakkeTokens(text, (idx) => (tallByIndex[idx] ?? "").trim());
 
     // Replace each TALL token individually (TALL, TALL1, TALL2…)
     if (templateHasTallToken(selectedContent)) {
@@ -1824,6 +1855,7 @@ export default function StandardTekstPage() {
         } else {
           setTallByIndex({ 0: "" });
         }
+        setAltByIndex({});
         setClockTime(DEFAULT_CLOCK_TALL_TIME);
         setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
         setClockCustomMode(true);
@@ -1954,11 +1986,6 @@ export default function StandardTekstPage() {
 
   return (
     <Box className={styles.page}>
-      {errorToShow && (
-        <Alert severity="error" className={styles.error}>
-          {errorToShow}
-        </Alert>
-      )}
       <Collapse in={showGuide} unmountOnExit>
         <Paper className={styles.guidePaper}>
           <Typography variant="h6" className={styles.guideTitle}>
@@ -2165,9 +2192,10 @@ export default function StandardTekstPage() {
               />
             </Box>
 
+            {/* TALL fylles nå inline i teksten (se onTallChange i previewNode),
+                så det egne Tall-panelet er fjernet herfra. */}
             {selected &&
-              (templateHasTallToken(activeTemplateContent) ||
-                templateHasKlokkeslettDagToken(activeTemplateContent) ||
+              (templateHasKlokkeslettDagToken(activeTemplateContent) ||
                 templateHasDatoToken(activeTemplateContent) ||
                 templateHasDatoMndToken(activeTemplateContent) ||
                 templateHasFormuleringTokens(activeTemplateContent)) && (
@@ -2185,79 +2213,6 @@ export default function StandardTekstPage() {
                     alignItems: "start",
                   }}
                 >
-                  {templateHasTallToken(activeTemplateContent) && (
-                    <Paper
-                      className={styles.inputControlCard}
-                      elevation={0}
-                      sx={{
-                        p: 1,
-                      }}
-                    >
-                      {(() => {
-                        const tallIndices = getTallTokenIndices(activeTemplateContent);
-                        const tallColumnsOnSm =
-                          tallIndices.length > 1
-                            ? "repeat(2, minmax(120px, 170px))"
-                            : "minmax(120px, 170px)";
-
-                        return (
-                          <>
-                            <Box
-                              sx={{
-                                display: "grid",
-                                gap: 0.75,
-                                gridTemplateColumns: {
-                                  xs: "1fr",
-                                  sm: tallColumnsOnSm,
-                                },
-                                alignItems: "start",
-                                alignContent: "start",
-                                gridAutoRows: "min-content",
-                              }}
-                            >
-                              {tallIndices.map((idx) => {
-                                const v = tallByIndex[idx] ?? "";
-                                const tokenLabel = getTallFieldLabel(activeTemplateContent, idx);
-                                const invalid = !isTallValueValid(v);
-
-                                return (
-                                  <TextField
-                                    key={idx}
-                                    label={tokenLabel}
-                                    value={v}
-                                    onChange={(e) => {
-                                      const nextValue = e.target.value.replace(/[^\d.,]/g, "");
-                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
-
-                                      if (
-                                        errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten") ||
-                                        errorLocal?.startsWith("Tallfelt må inneholde kun tall")
-                                      ) {
-                                        setErrorLocal(null);
-                                      }
-                                    }}
-                                    size="small"
-                                    type="text"
-                                    error={invalid}
-                                    helperText={invalid ? "Kun tall (f.eks. 1, 2, 2,5)" : undefined}
-                                    slotProps={{
-                                      htmlInput: {
-                                        inputMode: "decimal",
-                                      },
-                                    }}
-                                    onWheel={(e) => {
-                                      (e.target as HTMLInputElement).blur();
-                                    }}
-                                  />
-                                );
-                              })}
-                            </Box>
-                          </>
-                        );
-                      })()}
-                    </Paper>
-                  )}
-
                   {templateHasKlokkeslettDagToken(activeTemplateContent) && (
                     <Paper
                       className={`${styles.inputControlCard} ${styles.timeDateCard}`}
@@ -2554,6 +2509,26 @@ export default function StandardTekstPage() {
                 formuleringOccurrenceValues: buildUnnumberedFormuleringOccurrenceValues(
                   activeTemplateContent,
                 ),
+                onTallChange: (idx, value) => {
+                  const nextValue = value.replace(/[^\d.,]/g, "");
+                  setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+                  if (
+                    errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten") ||
+                    errorLocal?.startsWith("Tallfelt må inneholde kun tall")
+                  ) {
+                    setErrorLocal(null);
+                  }
+                },
+                altSelections: (() => {
+                  const count = getAltGroupCount(activeTemplateContent);
+                  return Array.from({ length: count }, (_, i) => altByIndex[i] ?? null);
+                })(),
+                onAltSelect: (occurrenceIdx, segmentIdx) => {
+                  setAltByIndex((prev) => ({ ...prev, [occurrenceIdx]: segmentIdx }));
+                  if (errorLocal?.startsWith("Velg alternativ før du kopierer teksten")) {
+                    setErrorLocal(null);
+                  }
+                },
               },
             )}
             editorTools={
@@ -2635,9 +2610,10 @@ export default function StandardTekstPage() {
       </Dialog>
       <Snackbar
         open={copied}
-        autoHideDuration={1500}
+        autoHideDuration={800}
         onClose={() => setCopied(false)}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        disableWindowBlurListener
       >
         <Alert
           onClose={() => setCopied(false)}
@@ -2656,6 +2632,39 @@ export default function StandardTekstPage() {
           }}
         >
           Standardtekst kopiert
+        </Alert>
+      </Snackbar>
+
+      {/* Feil vises som boble nederst til høyre. Valideringsmeldinger (errorLocal)
+          auto-forsvinner; en datalastfeil (error) blir stående til den lukkes. */}
+      <Snackbar
+        open={Boolean(errorToShow)}
+        autoHideDuration={errorLocal ? 1600 : null}
+        onClose={(_e, reason) => {
+          if (reason === "clickaway") return;
+          setErrorLocal(null);
+        }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        disableWindowBlurListener
+      >
+        <Alert
+          onClose={() => setErrorLocal(null)}
+          severity="error"
+          variant="filled"
+          icon={<ErrorOutlineIcon fontSize="inherit" />}
+          sx={{
+            borderRadius: 3,
+            px: 2,
+            py: 0.75,
+            alignItems: "center",
+            maxWidth: 360,
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 14px 34px rgba(2,6,18,0.56)"
+                : "0 10px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          {errorToShow}
         </Alert>
       </Snackbar>
     </Box>

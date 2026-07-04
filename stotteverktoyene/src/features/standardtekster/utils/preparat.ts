@@ -508,6 +508,93 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   return text.replace(re, safeValue);
 }
 
+export function templateHasPakkeToken(text: string): boolean {
+  return /\{\{\s*PAKKE\s*\}\}|\bPAKKE\b/i.test(text ?? "");
+}
+
+// "pakke" ved nøyaktig 1, ellers "pakker" (også ved tomt/ugyldig tall).
+export function pakkeWordForValue(value: string): string {
+  const n = Number((value ?? "").trim().replace(",", "."));
+  return Number.isFinite(n) && n === 1 ? "pakke" : "pakker";
+}
+
+// Erstatt PAKKE-tokens med "pakke"/"pakker" ut fra NÆRMESTE foranstående TALL-token.
+// Må kjøres FØR TALL-tokenene selv erstattes med tall (den leser token-posisjonene).
+export function replacePakkeTokens(
+  text: string,
+  getTallValue: (index: number) => string,
+): string {
+  if (!text) return text;
+  const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b|\{\{\s*PAKKE\s*\}\}|\bPAKKE\b/gi;
+  let lastTallIdx: number | null = null;
+  return text.replace(re, (match, braceIdx, plainIdx) => {
+    if (/PAKKE/i.test(match)) {
+      const val = lastTallIdx != null ? getTallValue(lastTallIdx) : "";
+      return pakkeWordForValue(val);
+    }
+    const raw = (braceIdx ?? plainIdx ?? "").trim();
+    lastTallIdx = raw ? Number(raw) : 0;
+    return match; // behold TALL-tokenet – det erstattes i eget steg
+  });
+}
+
+// Alternativ-gruppe: {{alternativ 1 / alternativ 2 / alternativ 3}}. Kun tekst som
+// eksplisitt er pakket inn i {{ }} og inneholder "/" telles – vanlig "/" ellers i
+// malen (f.eks. "og/eller") berøres ikke.
+const ALT_GROUP_RE = () => /\{\{([^{}]*\/[^{}]*)\}\}/g;
+
+const splitAltSegments = (inner: string): string[] =>
+  inner
+    .split("/")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+export function templateHasAltToken(text: string): boolean {
+  if (!text) return false;
+  const re = ALT_GROUP_RE();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (splitAltSegments(m[1]).length >= 2) return true;
+  }
+  return false;
+}
+
+/** Antall alternativ-grupper i malen, i rekkefølgen de forekommer. */
+export function getAltGroupCount(text: string): number {
+  if (!text) return 0;
+  const re = ALT_GROUP_RE();
+  let count = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (splitAltSegments(m[1]).length >= 2) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Erstatt hver alternativ-gruppe med det valgte alternativet (rå tekst, kan
+ * fortsatt inneholde andre tokens som DATO/PREPARAT1 – de resolves i egne steg).
+ * `getSelected(occurrenceIndex)` returnerer valgt segment-indeks, eller null hvis
+ * ikke valgt ennå (da beholdes gruppen uendret – kopiering skal være blokkert før
+ * dette kan skje).
+ */
+export function replaceAltGroups(
+  text: string,
+  getSelected: (occurrenceIndex: number) => number | null,
+): string {
+  if (!text) return text;
+  const re = ALT_GROUP_RE();
+  let occurrence = -1;
+  return text.replace(re, (match, inner: string) => {
+    const segments = splitAltSegments(inner);
+    if (segments.length < 2) return match;
+    occurrence += 1;
+    const selected = getSelected(occurrence);
+    if (selected == null || !segments[selected]) return match;
+    return segments[selected];
+  });
+}
+
 export function templateHasKlokkeslettDagToken(text: string): boolean {
   return /\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/i.test(text ?? "");
 }
@@ -842,6 +929,7 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
 
   { label: "TALL", insert: "TALL", help: "Første tall", group: "TALL" },
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
+  { label: "PAKKE", insert: "PAKKE", help: "Skriver «pakke»/«pakker» ut fra tallet foran", group: "TALL" },
 
   { label: "VAREN(E)", insert: "VAREN(E)", group: "VARE" },
   { label: "MEDISIN(ENE)", insert: "MEDISIN(ENE)", help: "Setter inn medisinen (1 preparat) eller medisinene (flere preparater)", group: "VARE" },

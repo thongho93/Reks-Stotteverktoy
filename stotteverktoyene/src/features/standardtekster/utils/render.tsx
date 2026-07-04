@@ -1,5 +1,8 @@
+import type { ChangeEvent, KeyboardEvent, MouseEvent, WheelEvent } from "react";
 import { Box } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
+
+import { pakkeWordForValue } from "./preparat";
 
 export function renderContentWithPreparatHighlight(
   text: string,
@@ -14,6 +17,12 @@ export function renderContentWithPreparatHighlight(
     formuleringValue?: string;
     formuleringValues?: string[];
     formuleringOccurrenceValues?: string[];
+    /** Når satt gjøres TALL-tokens til inline redigerbare input-felter i teksten. */
+    onTallChange?: (idx: number, value: string) => void;
+    /** Valgt segment-indeks per alternativ-gruppe-forekomst (null = ikke valgt ennå). */
+    altSelections?: Array<number | null>;
+    /** Kalles med (forekomst, segment) når bruker velger; (forekomst, null) for å angre valget. */
+    onAltSelect?: (occurrenceIndex: number, segmentIndex: number | null) => void;
   }
 ) {
   let formuleringOccurrenceIdx = 0;
@@ -72,6 +81,76 @@ export function renderContentWithPreparatHighlight(
     color: (theme: Theme) => (theme.palette.mode === "dark" ? "#D6F4FF" : "#075985"),
     borderColor: (theme: Theme) =>
       theme.palette.mode === "dark" ? "rgba(56, 189, 248, 0.82)" : "rgba(2, 132, 199, 0.5)",
+  } as const;
+
+  // Inline redigerbart TALL-felt: samme blå token-utseende som placeholderTallSx,
+  // men som et faktisk input. Stiplet kant når tomt, heltrukket når utfylt.
+  const inlineTallInputSx = (filled: boolean) =>
+    ({
+      ...placeholderTallSx,
+      borderStyle: filled ? "solid" : "dashed",
+      font: "inherit",
+      fontSize: "0.9em",
+      fontWeight: 650,
+      textAlign: "center",
+      minWidth: "2.6em",
+      appearance: "none",
+      outline: "none",
+      cursor: "text",
+      "&:focus": {
+        borderStyle: "solid",
+        boxShadow: (theme: Theme) =>
+          `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(56,189,248,0.5)" : "rgba(2,132,199,0.35)"}`,
+      },
+      "&::placeholder": {
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        letterSpacing: "0.025em",
+        opacity: 0.85,
+      },
+    }) as const;
+
+  // PAKKE er avledet (ikke redigerbar): viser "pakke"/"pakker" ut fra tallet foran.
+  // Nøytral grå pille – heltrukket når tallet er kjent, stiplet ellers.
+  const pakkeSx = (known: boolean) =>
+    ({
+      ...(known ? tokenSx : tokenPlaceholderSx),
+      bgcolor: (theme: Theme) =>
+        theme.palette.mode === "dark" ? "rgba(100, 116, 139, 0.4)" : "rgba(100, 116, 139, 0.16)",
+      color: (theme: Theme) => (theme.palette.mode === "dark" ? "#E2E8F0" : "#334155"),
+      borderColor: (theme: Theme) =>
+        theme.palette.mode === "dark" ? "rgba(148, 163, 184, 0.7)" : "rgba(100, 116, 139, 0.45)",
+    }) as const;
+
+  // Alternativ-gruppe: ett klikkbart segment per alternativ før valg (stiplet,
+  // lilla), én heltrukket "valgt"-pille etter valg (klikkbar for å velge om igjen).
+  const altChoiceSx = {
+    ...tokenPlaceholderSx,
+    cursor: "pointer",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(109, 40, 217, 0.42)" : "rgba(139, 92, 246, 0.16)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#E9D8FD" : "#5B21B6"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(196, 181, 253, 0.8)" : "rgba(124, 58, 237, 0.5)",
+    "&:hover": {
+      bgcolor: (theme: Theme) =>
+        theme.palette.mode === "dark" ? "rgba(109, 40, 217, 0.6)" : "rgba(139, 92, 246, 0.28)",
+    },
+  } as const;
+
+  const altPickedSx = {
+    ...tokenSx,
+    cursor: "pointer",
+    fontWeight: 650,
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(109, 40, 217, 0.55)" : "rgba(139, 92, 246, 0.22)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#F3E8FF" : "#5B21B6"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(196, 181, 253, 0.85)" : "rgba(124, 58, 237, 0.55)",
+    "&:hover": {
+      bgcolor: (theme: Theme) =>
+        theme.palette.mode === "dark" ? "rgba(109, 40, 217, 0.72)" : "rgba(139, 92, 246, 0.34)",
+    },
   } as const;
 
   const placeholderDatoSx = {
@@ -188,28 +267,153 @@ export function renderContentWithPreparatHighlight(
   const renderTokensInText = (t: string) => {
     if (!t) return t;
 
-    // Match both legacy {{...}} and plain tokens (no braces)
+    // Match both legacy {{...}} and plain tokens (no braces), samt alternativ-
+    // grupper {{seg1 / seg2 / ...}} (sjekkes først – tokens under inneholder aldri "/").
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{\s*(?:TALL\d*|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
+      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{\s*(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
     );
     if (parts.length <= 1) return t;
+
+    // Nærmeste foranstående TALL-verdi – styrer PAKKE-tokenets entall/flertall.
+    let lastTallValue = "";
+    // Forekomst-teller for alternativ-grupper, i rekkefølgen de dukker opp i teksten.
+    let altOccurrenceIdx = 0;
 
     return (
       <>
         {parts.map((part, i) => {
+          // Alternativ-gruppe: {{seg1 / seg2 / seg3}}. Sjekkes før TALL/PAKKE/osv.
+          const altGroupMatch = part.match(/^\{\{([^{}]*\/[^{}]*)\}\}$/);
+          if (altGroupMatch) {
+            const segments = altGroupMatch[1]
+              .split("/")
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+            if (segments.length >= 2) {
+              const occurrenceIdx = altOccurrenceIdx;
+              altOccurrenceIdx += 1;
+              const selected = opts?.altSelections?.[occurrenceIdx] ?? null;
+              const onAltSelect = opts?.onAltSelect;
+
+              if (!onAltSelect) {
+                // Ingen interaksjon koblet inn – vis rå gruppe uendret.
+                return <span key={i}>{part}</span>;
+              }
+
+              if (selected != null && segments[selected] != null) {
+                return (
+                  <Box
+                    key={i}
+                    component="span"
+                    role="button"
+                    tabIndex={0}
+                    title="Klikk for å velge et annet alternativ"
+                    sx={altPickedSx}
+                    onClick={(e: MouseEvent) => {
+                      e.stopPropagation();
+                      onAltSelect(occurrenceIdx, null);
+                    }}
+                    onKeyDown={(e: KeyboardEvent) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onAltSelect(occurrenceIdx, null);
+                      }
+                    }}
+                  >
+                    {renderTokensInText(segments[selected])}
+                  </Box>
+                );
+              }
+
+              return (
+                <Box
+                  key={i}
+                  component="span"
+                  sx={{ display: "inline-flex", flexWrap: "wrap", gap: 0.4, verticalAlign: "middle" }}
+                >
+                  {segments.map((seg, si) => (
+                    <Box
+                      key={si}
+                      component="span"
+                      role="button"
+                      tabIndex={0}
+                      title="Klikk for å velge dette alternativet"
+                      sx={altChoiceSx}
+                      onClick={(e: MouseEvent) => {
+                        e.stopPropagation();
+                        onAltSelect(occurrenceIdx, si);
+                      }}
+                      onKeyDown={(e: KeyboardEvent) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAltSelect(occurrenceIdx, si);
+                        }
+                      }}
+                    >
+                      {seg}
+                    </Box>
+                  ))}
+                </Box>
+              );
+            }
+          }
+
           // TALL / {{TALL}} / TALL1 / {{TALL1}} ...
           const tallMatch = part.match(/^(?:\{\{\s*)?TALL(\d*)(?:\s*\}\})?$/i);
           if (tallMatch) {
             const rawIdx = (tallMatch[1] ?? "").trim();
             const idx = rawIdx ? Number(rawIdx) : 0;
 
-            const v = (opts?.tallValues?.[idx] ?? "").trim();
+            const rawValue = opts?.tallValues?.[idx] ?? "";
+            const v = rawValue.trim();
+            lastTallValue = rawValue;
             const tokenLabel = idx === 0 ? "TALL" : `TALL${idx}`;
+
+            if (opts?.onTallChange) {
+              const onTallChange = opts.onTallChange;
+              return (
+                <Box
+                  key={i}
+                  component="input"
+                  type="text"
+                  inputMode="decimal"
+                  value={rawValue}
+                  placeholder={tokenLabel}
+                  size={Math.max(rawValue.length, tokenLabel.length, 2)}
+                  aria-label={tokenLabel}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    onTallChange(idx, e.target.value)
+                  }
+                  // Ikke la klikk/markering i feltet trigge klikk-for-kopi på kortet.
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
+                  onMouseDown={(e: MouseEvent) => e.stopPropagation()}
+                  onWheel={(e: WheelEvent<HTMLInputElement>) => e.currentTarget.blur()}
+                  sx={inlineTallInputSx(Boolean(v))}
+                />
+              );
+            }
+
             const label = v || tokenLabel;
 
             return (
               <Box key={i} component="span" sx={placeholderTallSx}>
+                {label}
+              </Box>
+            );
+          }
+
+          // PAKKE / {{PAKKE}} – avledet av nærmeste foranstående TALL-verdi.
+          const pakkeMatch = part.match(/^(?:\{\{\s*)?PAKKE(?:\s*\}\})?$/i);
+          if (pakkeMatch) {
+            const known = lastTallValue.trim() !== "";
+            const label = known ? pakkeWordForValue(lastTallValue) : "pakke(r)";
+
+            return (
+              <Box key={i} component="span" sx={pakkeSx(known)}>
                 {label}
               </Box>
             );
