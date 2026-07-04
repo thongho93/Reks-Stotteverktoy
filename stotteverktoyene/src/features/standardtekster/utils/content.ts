@@ -96,3 +96,8 @@ export const buildPreviewContent = ({ template, firstName, picked }: BuildArgs):
 
 export const templateUsesPreparat1 = (template: string): boolean =>
   hasPreparat2Token(template ?? "");
+
+// True hvis malen inneholder et PREPARAT-token (PREPARAT / PREPARAT1 / PREPARAT2),
+// enten som rå-token eller {{ }}. Brukes til å kreve utfylt preparat før kopiering.
+export const templateHasPreparatToken = (template: string): boolean =>
+  /\{\{\s*PREPARAT\d*\s*\}\}|\bPREPARAT\d*\b/.test(template ?? "");

@@ -42,7 +42,7 @@ import {
   templateHasTallToken,
   usePreparatRows,
 } from "../utils/preparat";
-import { buildPreviewContent, templateUsesPreparat1 } from "../utils/content";
+import { buildPreviewContent, templateHasPreparatToken, templateUsesPreparat1 } from "../utils/content";
 import { renderContentWithPreparatHighlight } from "../utils/render";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { useStandardTekster } from "../hooks/useStandardTekster";
@@ -1680,6 +1680,13 @@ export default function StandardTekstPage() {
       }
     }
 
+    // Krev utfylt preparat når malen har PREPARAT-token. Uten dette har det skjedd
+    // at tekst med råtokenet "PREPARAT1" ble kopiert og sendt til kunde.
+    if (templateHasPreparatToken(selectedContent) && pickedPreparats.length === 0) {
+      setErrorLocal("Velg preparat før du kopierer teksten.");
+      return false;
+    }
+
     if (templateHasVirkestoffToken(selectedContent) && !resolvedVirkestoff) {
       setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
       return false;
@@ -2065,6 +2072,11 @@ export default function StandardTekstPage() {
                   const rowData = typeof pick === "string" ? undefined : pick.rowData;
 
                   addPickedPreparat(text, key, rowData);
+
+                  // PREPARAT-kravet er nå oppfylt – fjern «Velg preparat»-meldingen.
+                  if (errorLocal?.startsWith("Velg preparat før")) {
+                    setErrorLocal(null);
+                  }
 
                   // Hvis pick har virkestoff (FEST har vanligvis dette), lagre det for VIRKESTOFF-tokenet
                   if (typeof pick !== "string") {
