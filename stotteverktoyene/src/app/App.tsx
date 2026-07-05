@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { createSvgIcon } from "@mui/material/utils";
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -34,6 +34,7 @@ import RequireRekspert from "./auth/RequireRekspert";
 import RequireOwner from "./auth/RequireOwner";
 import { ProfileMenu } from "./auth/ProfileMenu";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
+import { NavigationGuardProvider, useGuardedNavigate } from "../shared/hooks/useNavigationGuard";
 
 const InnspillIcon = createSvgIcon(
   <>
@@ -223,7 +224,10 @@ function RouteLoader() {
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { isOwner, isRekspert, role } = useAuthUser() as any;
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
-  const navigate = useNavigate();
+  // useGuardedNavigate: hvis en side (f.eks. standardtekster) har registrert en
+  // sperre (ulagrede endringer), avbrytes navigasjonen og siden viser selv en
+  // bekreftelsesdialog i stedet for at vi navigerer bort.
+  const navigate = useGuardedNavigate();
   const location = useLocation();
   const [currentWeekNumber, setCurrentWeekNumber] = React.useState(() => getIsoWeekNumber(new Date()));
 
@@ -811,43 +815,45 @@ function Layout() {
   const { open: searchOpen, closeSearch } = useGlobalSearchHotkey();
 
   return (
-    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-      <GlobalSearch open={searchOpen} onClose={closeSearch} />
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-      <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {keepAnbruddMounted && (
-          <Box sx={{ display: isAnbruddRoute ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0, mx: -2, my: -2, p: 2 }}>
+    <NavigationGuardProvider>
+      <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+        <GlobalSearch open={searchOpen} onClose={closeSearch} />
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+        <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {keepAnbruddMounted && (
+            <Box sx={{ display: isAnbruddRoute ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0, mx: -2, my: -2, p: 2 }}>
+              <Suspense fallback={<RouteLoader />}>
+                <AndbruddPage />
+              </Suspense>
+            </Box>
+          )}
+
+          <Box sx={{ display: isAnbruddRoute ? "none" : "block", flex: 1, overflowY: "auto" }}>
             <Suspense fallback={<RouteLoader />}>
-              <AndbruddPage />
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/omeq" element={<OMEQPage />} />
+                <Route element={<RequireOwner />}>
+                  <Route path="/lagerbeholdning" element={<LagerbeholdningPage />} />
+                </Route>
+                <Route path="/standardtekster" element={<StandardTekstPage />} />
+                <Route path="/interaksjoner" element={<InteraksjonerPage />} />
+                <Route path="/produkt-og-rad" element={<ProduktOgRadPage />} />
+                <Route path="/profil" element={<ProfilePage />} />
+                <Route path="/statistikk" element={<StatistikkPage />} />
+                <Route path="/produktskjema" element={<Navigate to="/anbrudd" replace />} />
+                <Route path="/anbrudd" element={null} />
+                <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
+                <Route element={<RequireRekspert />}>
+                  <Route path="/rekspert" element={<RekspertPage />} />
+                </Route>
+                <Route path="*" element={<Navigate to="/omeq" replace />} />
+              </Routes>
             </Suspense>
           </Box>
-        )}
-
-        <Box sx={{ display: isAnbruddRoute ? "none" : "block", flex: 1, overflowY: "auto" }}>
-          <Suspense fallback={<RouteLoader />}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/omeq" element={<OMEQPage />} />
-              <Route element={<RequireOwner />}>
-                <Route path="/lagerbeholdning" element={<LagerbeholdningPage />} />
-              </Route>
-              <Route path="/standardtekster" element={<StandardTekstPage />} />
-              <Route path="/interaksjoner" element={<InteraksjonerPage />} />
-              <Route path="/produkt-og-rad" element={<ProduktOgRadPage />} />
-              <Route path="/profil" element={<ProfilePage />} />
-              <Route path="/statistikk" element={<StatistikkPage />} />
-              <Route path="/produktskjema" element={<Navigate to="/anbrudd" replace />} />
-              <Route path="/anbrudd" element={null} />
-              <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
-              <Route element={<RequireRekspert />}>
-                <Route path="/rekspert" element={<RekspertPage />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/omeq" replace />} />
-            </Routes>
-          </Suspense>
         </Box>
       </Box>
-    </Box>
+    </NavigationGuardProvider>
   );
 }
 

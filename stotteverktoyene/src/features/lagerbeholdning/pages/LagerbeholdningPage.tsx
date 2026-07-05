@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -90,7 +90,26 @@ const periodeDager = (value: string, egendager: string): number | null => {
 export default function LagerbeholdningPage() {
   const baseTheme = useTheme();
   const tealTheme = useMemo(
-    () => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: TEAL } }) } }),
+    () =>
+      createTheme(baseTheme, {
+        palette: { primary: baseTheme.palette.augmentColor({ color: { main: TEAL } }) },
+        components: {
+          // Basistemaet hardkoder rosa hover/fokus på OutlinedInput. Overstyr til
+          // sidens teal så feltene matcher resten av lagerbeholdning-siden.
+          MuiOutlinedInput: {
+            styleOverrides: {
+              root: {
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: alpha(TEAL, 0.6),
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: TEAL,
+                },
+              },
+            },
+          },
+        },
+      }),
     [baseTheme],
   );
 
@@ -119,11 +138,18 @@ export default function LagerbeholdningPage() {
     return trimmed;
   }, []);
 
+  // Etter en innliming flyttes fokus til første doseringsfelt, så neste steg
+  // (oppgi dosering) er klart uten ekstra klikk. Settes ved innliming, utføres
+  // i en effekt når resultatkortene (og dermed dose-inputene) er rendret.
+  const doseInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const pendingDoseFocusRef = useRef(false);
+
   const appendUttak = useCallback((text: string) => {
     setInput((prev) => {
       if (!text || prev.includes(text)) return prev;
       return prev.trim() ? `${prev.trim()}\n${text}` : text;
     });
+    pendingDoseFocusRef.current = true;
   }, []);
 
   useVnrAutoPaste({
@@ -184,6 +210,17 @@ export default function LagerbeholdningPage() {
     }
     return result.sort((a, b) => a.varenavn.localeCompare(b.varenavn, "nb"));
   }, [grupper, doseByVare, periodeByVare, egendagerByVare, doseEnhetByVare, styrkeByVare, referansedato]);
+
+  // Når en innliming nettopp skjedde og det finnes minst ett resultat, flytt
+  // fokus til første doseringsfelt (dose-inputene rendres først nå).
+  useEffect(() => {
+    if (!pendingDoseFocusRef.current || beregninger.length === 0) return;
+    const el = doseInputRefs.current[beregninger[0].key];
+    if (el) {
+      el.focus();
+      pendingDoseFocusRef.current = false;
+    }
+  }, [beregninger]);
 
   const resetAll = useCallback(() => {
     setInput("");
@@ -297,6 +334,9 @@ export default function LagerbeholdningPage() {
                 placeholder={EKSEMPEL}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onPaste={() => {
+                  pendingDoseFocusRef.current = true;
+                }}
                 onFocus={() => setIsUttakFocused(true)}
                 onBlur={() => setIsUttakFocused(false)}
                 multiline
@@ -497,6 +537,9 @@ export default function LagerbeholdningPage() {
                         onChange={(e) =>
                           setDoseByVare((prev) => ({ ...prev, [key]: e.target.value }))
                         }
+                        inputRef={(el: HTMLInputElement | null) => {
+                          doseInputRefs.current[key] = el;
+                        }}
                         size="small"
                         inputProps={{ inputMode: "decimal" }}
                         InputProps={{

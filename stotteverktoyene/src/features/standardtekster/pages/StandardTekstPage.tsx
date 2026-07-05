@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Autocomplete,
@@ -29,20 +29,25 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {
   formatPreparatRowText,
+  getAltGroupCount,
   getTallTokenIndices,
   migrateLegacyClockTallTokens,
+  replaceAltGroups,
   replaceNextPreparatToken,
   replaceKlokkeslettDagTokens,
+  replacePakkeTokens,
   replaceTallTokenByIndex,
+  templateHasAltToken,
   templateHasDatoMndToken,
   templateHasDatoToken,
   templateHasKlokkeslettDagToken,
   templateHasTallToken,
   usePreparatRows,
 } from "../utils/preparat";
-import { buildPreviewContent, templateUsesPreparat1 } from "../utils/content";
+import { buildPreviewContent, templateHasPreparatToken, templateUsesPreparat1 } from "../utils/content";
 import { renderContentWithPreparatHighlight } from "../utils/render";
 import styles from "../../../styles/standardTekstPage.module.css";
 import { useStandardTekster } from "../hooks/useStandardTekster";
@@ -52,6 +57,7 @@ import PinkSwitch from "../components/PinkSwitch";
 import { deleteStandardTekst } from "../utils/deleteStandardTekst";
 import type { StandardTekstFollowUp } from "../types";
 import { logUsage } from "../../../shared/services/usage";
+import { useNavigationGuard } from "../../../shared/hooks/useNavigationGuard";
 
 type OMEQStandardtekstPrefill = {
   requestId: number;
@@ -258,6 +264,8 @@ function parseOmeqStandardtekstPrefill(value: unknown): OMEQStandardtekstPrefill
 
 export default function StandardTekstPage() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { setGuard } = useNavigationGuard();
   const {
     items,
     setItems,
@@ -348,6 +356,19 @@ export default function StandardTekstPage() {
   const lockBeforeEdit = Boolean(
     canManageStandardTekster && selected && !isEditing && selected.title === "Ny standardtekst",
   );
+
+  // Gjenkjenner en "Ny standardtekst" som ble opprettet (createEmpty gjør en ekte
+  // Firestore-skriving med det samme, se createNewStandardTekst) men aldri lagret
+  // med reelt innhold – basert på PERSISTERT form, ikke en sesjon-lokal variabel.
+  // Dette fanger også opp allerede eksisterende foreldreløse utkast (fra før denne
+  // sperren fantes), og overlever sideoppdatering siden det ikke er sesjon-avhengig.
+  const isEmptyNewDraftItem = useCallback(
+    (item: { title: string; content?: string | null; category?: string | null } | null | undefined): boolean =>
+      Boolean(item && item.title === "Ny standardtekst" && !(item.content ?? "").trim() && !(item.category ?? "").trim()),
+    [],
+  );
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaveActionBusy, setLeaveActionBusy] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -470,6 +491,8 @@ export default function StandardTekstPage() {
     [selected?.content],
   );
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
+  // Valgt segment-indeks per alternativ-gruppe-forekomst (null/manglende = ikke valgt).
+  const [altByIndex, setAltByIndex] = useState<Record<number, number | null>>({});
   const [clockTime, setClockTime] = useState<string>(DEFAULT_CLOCK_TALL_TIME);
   const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
     getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME),
@@ -996,6 +1019,7 @@ export default function StandardTekstPage() {
       nextTallValues[1] = pending.totalOmeq;
       if (pending.vedtakOmeq) nextTallValues[0] = pending.vedtakOmeq;
       setTallByIndex(nextTallValues);
+      setAltByIndex({});
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
       setClockCustomMode(true);
@@ -1029,6 +1053,7 @@ export default function StandardTekstPage() {
         }
       }
       setTallByIndex(nextTall);
+      setAltByIndex({});
 
       if (pendingPalette.formuleringValues) {
         const nextF: Record<number, string> = { 0: "" };
@@ -1053,6 +1078,7 @@ export default function StandardTekstPage() {
       setVirkestoffByKey({});
       setFormuleringByPreparatKey({});
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
+      setAltByIndex({});
       setClockTime(DEFAULT_CLOCK_TALL_TIME);
       setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
       setClockCustomMode(true);
@@ -1187,9 +1213,13 @@ export default function StandardTekstPage() {
     setIsEditing(false);
   };
 
-  const saveEdit = async () => {
-    if (!canManageStandardTekster) return;
-    if (!selected) return;
+  const saveEdit = async (): Promise<boolean> => {
+    if (!canManageStandardTekster) return false;
+    if (!selected) return false;
+    if (!draftContent.trim()) {
+      setErrorLocal("Standardteksten kan ikke lagres uten innhold.");
+      return false;
+    }
     setSaving(true);
     setErrorLocal(null);
     try {
@@ -1246,9 +1276,11 @@ export default function StandardTekstPage() {
       setEditingFollowUpId(null);
 
       setIsEditing(false);
+      return true;
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved lagring";
       setErrorLocal(message);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1256,7 +1288,19 @@ export default function StandardTekstPage() {
 
   const createNewStandardTekst = async () => {
     if (!canManageStandardTekster) return;
+    // Ikke la et nytt, ulagret utkast bli overskrevet/forlatt stille hvis brukeren
+    // trykker "Ny standardtekst" igjen mens det forrige fortsatt ikke er lagret.
+    if (isEmptyNewDraftItem(selected)) {
+      pendingActionRef.current = () => {
+        void createNewStandardTekstInner();
+      };
+      setLeaveConfirmOpen(true);
+      return;
+    }
+    await createNewStandardTekstInner();
+  };
 
+  const createNewStandardTekstInner = async () => {
     setCreating(true);
     setErrorLocal(null);
 
@@ -1483,6 +1527,7 @@ export default function StandardTekstPage() {
   };
 
   const openFollowUp = (id: string) => {
+    if (guardSelect(id)) return;
     preserveInputsOnNextSelectRef.current = true;
     setSelectedId(id);
   };
@@ -1680,6 +1725,26 @@ export default function StandardTekstPage() {
       }
     }
 
+    // Krev utfylt preparat når malen har PREPARAT-token. Uten dette har det skjedd
+    // at tekst med råtokenet "PREPARAT1" ble kopiert og sendt til kunde.
+    if (templateHasPreparatToken(selectedContent) && pickedPreparats.length === 0) {
+      setErrorLocal("Velg preparat før du kopierer teksten.");
+      return false;
+    }
+
+    // Krev at hver alternativ-gruppe ({{seg1 / seg2}}) er valgt, ellers kan de
+    // ubrukte alternativene ende opp i teksten som sendes til kunde.
+    if (templateHasAltToken(selectedContent)) {
+      const altCount = getAltGroupCount(selectedContent);
+      const hasUnselected = Array.from({ length: altCount }, (_, i) => i).some(
+        (i) => altByIndex[i] == null,
+      );
+      if (hasUnselected) {
+        setErrorLocal("Velg alternativ før du kopierer teksten.");
+        return false;
+      }
+    }
+
     if (templateHasVirkestoffToken(selectedContent) && !resolvedVirkestoff) {
       setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
       return false;
@@ -1717,6 +1782,10 @@ export default function StandardTekstPage() {
       firstName,
       picked: pickedPreparats,
     });
+
+    // Løs opp alternativ-grupper FØR de andre tokenene erstattes – et valgt
+    // segment kan selv inneholde f.eks. DATO/PREPARAT1/TALL som må resolves videre.
+    text = replaceAltGroups(text, (idx) => altByIndex[idx] ?? null);
 
     // Ensure PREPARAT tokens are actually resolved in the copied text.
     // Preview replaces them in the renderer, but clipboard needs real text.
@@ -1757,6 +1826,10 @@ export default function StandardTekstPage() {
     if (templateHasKlokkeslettDagToken(selectedContent)) {
       text = replaceKlokkeslettDagTokens(text, formatClockTallValue(clockTime, clockDay));
     }
+
+    // PAKKE → "pakke"/"pakker" ut fra nærmeste foranstående TALL.
+    // Må skje FØR TALL-tokenene erstattes med selve tallene.
+    text = replacePakkeTokens(text, (idx) => (tallByIndex[idx] ?? "").trim());
 
     // Replace each TALL token individually (TALL, TALL1, TALL2…)
     if (templateHasTallToken(selectedContent)) {
@@ -1817,6 +1890,7 @@ export default function StandardTekstPage() {
         } else {
           setTallByIndex({ 0: "" });
         }
+        setAltByIndex({});
         setClockTime(DEFAULT_CLOCK_TALL_TIME);
         setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
         setClockCustomMode(true);
@@ -1945,13 +2019,104 @@ export default function StandardTekstPage() {
     });
   };
 
+  // Hindrer at en "Ny standardtekst" som ble opprettet (createEmpty gjør en ekte
+  // Firestore-skriving med det samme, se createNewStandardTekst) men aldri lagret,
+  // blir liggende for alltid hvis brukeren forlater den uten å lagre eller slette –
+  // enten ved å navigere til en annen side i appen, ELLER ved å bytte til en annen
+  // standardtekst i listen (som ikke går via router, bare setSelectedId direkte).
+  // `pendingActionRef` holder handlingen som skal utføres når dialogen er besvart.
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  const guardLeave = useCallback(
+    (targetPath: string): boolean => {
+      if (!isEmptyNewDraftItem(selected)) return false;
+      pendingActionRef.current = () => navigate(targetPath);
+      setLeaveConfirmOpen(true);
+      return true;
+    },
+    [selected, isEmptyNewDraftItem, navigate],
+  );
+
+  // Kalles før vi bytter til en annen standardtekst i sidebar-listen/søket.
+  // Returnerer true hvis byttet ble stanset (dialog vist i stedet).
+  const guardSelect = useCallback(
+    (targetId: string): boolean => {
+      if (!isEmptyNewDraftItem(selected)) return false;
+      if (targetId === selected?.id) return false;
+      pendingActionRef.current = () => setSelectedId(targetId);
+      setLeaveConfirmOpen(true);
+      return true;
+    },
+    [selected, isEmptyNewDraftItem, setSelectedId],
+  );
+
+  useEffect(() => {
+    setGuard(guardLeave);
+    return () => setGuard(null);
+  }, [guardLeave, setGuard]);
+
+  // Sikkerhetsnett for faner som lukkes/lastes på nytt e.l. – kan ikke vise egen
+  // dialog her (nettlesere ignorerer egendefinert tekst), men gir en generisk
+  // "vil du forlate siden?"-advarsel fra nettleseren.
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!isEmptyNewDraftItem(selectedRef.current)) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+    // isEmptyNewDraftItem is a useCallback with stable ([]) deps; selected is read
+    // via selectedRef above so this listener never needs to be re-attached.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleContinueWriting = () => {
+    setLeaveConfirmOpen(false);
+    pendingActionRef.current = null;
+  };
+
+  const handleDeleteAndLeave = async () => {
+    const idToDelete = selected?.id;
+    setLeaveActionBusy(true);
+    try {
+      if (idToDelete) {
+        await standardTeksterApi.remove(idToDelete);
+        setItems((prev) => prev.filter((it) => it.id !== idToDelete));
+      }
+      setLeaveConfirmOpen(false);
+      setIsEditing(false);
+      const runPendingAction = pendingActionRef.current;
+      pendingActionRef.current = null;
+      runPendingAction?.();
+    } catch (e) {
+      setErrorLocal(e instanceof Error ? e.message : "Kunne ikke slette standardteksten");
+    } finally {
+      setLeaveActionBusy(false);
+    }
+  };
+
+  const handleSaveAndLeave = async () => {
+    setLeaveActionBusy(true);
+    try {
+      const ok = await saveEdit();
+      if (!ok) return;
+      setLeaveConfirmOpen(false);
+      const runPendingAction = pendingActionRef.current;
+      pendingActionRef.current = null;
+      runPendingAction?.();
+    } finally {
+      setLeaveActionBusy(false);
+    }
+  };
+
   return (
     <Box className={styles.page}>
-      {errorToShow && (
-        <Alert severity="error" className={styles.error}>
-          {errorToShow}
-        </Alert>
-      )}
       <Collapse in={showGuide} unmountOnExit>
         <Paper className={styles.guidePaper}>
           <Typography variant="h6" className={styles.guideTitle}>
@@ -1993,7 +2158,10 @@ export default function StandardTekstPage() {
             filtered={filtered}
             onToggleActive={toggleStandardTekstActive}
             selectedId={selectedId}
-            setSelectedId={(id) => setSelectedId(id)}
+            setSelectedId={(id) => {
+              if (guardSelect(id)) return;
+              setSelectedId(id);
+            }}
             searchInputRef={standardTekstSearchInputRef}
           />
         </Box>
@@ -2065,6 +2233,11 @@ export default function StandardTekstPage() {
                   const rowData = typeof pick === "string" ? undefined : pick.rowData;
 
                   addPickedPreparat(text, key, rowData);
+
+                  // PREPARAT-kravet er nå oppfylt – fjern «Velg preparat»-meldingen.
+                  if (errorLocal?.startsWith("Velg preparat før")) {
+                    setErrorLocal(null);
+                  }
 
                   // Hvis pick har virkestoff (FEST har vanligvis dette), lagre det for VIRKESTOFF-tokenet
                   if (typeof pick !== "string") {
@@ -2153,9 +2326,10 @@ export default function StandardTekstPage() {
               />
             </Box>
 
+            {/* TALL fylles nå inline i teksten (se onTallChange i previewNode),
+                så det egne Tall-panelet er fjernet herfra. */}
             {selected &&
-              (templateHasTallToken(activeTemplateContent) ||
-                templateHasKlokkeslettDagToken(activeTemplateContent) ||
+              (templateHasKlokkeslettDagToken(activeTemplateContent) ||
                 templateHasDatoToken(activeTemplateContent) ||
                 templateHasDatoMndToken(activeTemplateContent) ||
                 templateHasFormuleringTokens(activeTemplateContent)) && (
@@ -2173,79 +2347,6 @@ export default function StandardTekstPage() {
                     alignItems: "start",
                   }}
                 >
-                  {templateHasTallToken(activeTemplateContent) && (
-                    <Paper
-                      className={styles.inputControlCard}
-                      elevation={0}
-                      sx={{
-                        p: 1,
-                      }}
-                    >
-                      {(() => {
-                        const tallIndices = getTallTokenIndices(activeTemplateContent);
-                        const tallColumnsOnSm =
-                          tallIndices.length > 1
-                            ? "repeat(2, minmax(120px, 170px))"
-                            : "minmax(120px, 170px)";
-
-                        return (
-                          <>
-                            <Box
-                              sx={{
-                                display: "grid",
-                                gap: 0.75,
-                                gridTemplateColumns: {
-                                  xs: "1fr",
-                                  sm: tallColumnsOnSm,
-                                },
-                                alignItems: "start",
-                                alignContent: "start",
-                                gridAutoRows: "min-content",
-                              }}
-                            >
-                              {tallIndices.map((idx) => {
-                                const v = tallByIndex[idx] ?? "";
-                                const tokenLabel = getTallFieldLabel(activeTemplateContent, idx);
-                                const invalid = !isTallValueValid(v);
-
-                                return (
-                                  <TextField
-                                    key={idx}
-                                    label={tokenLabel}
-                                    value={v}
-                                    onChange={(e) => {
-                                      const nextValue = e.target.value.replace(/[^\d.,]/g, "");
-                                      setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
-
-                                      if (
-                                        errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten") ||
-                                        errorLocal?.startsWith("Tallfelt må inneholde kun tall")
-                                      ) {
-                                        setErrorLocal(null);
-                                      }
-                                    }}
-                                    size="small"
-                                    type="text"
-                                    error={invalid}
-                                    helperText={invalid ? "Kun tall (f.eks. 1, 2, 2,5)" : undefined}
-                                    slotProps={{
-                                      htmlInput: {
-                                        inputMode: "decimal",
-                                      },
-                                    }}
-                                    onWheel={(e) => {
-                                      (e.target as HTMLInputElement).blur();
-                                    }}
-                                  />
-                                );
-                              })}
-                            </Box>
-                          </>
-                        );
-                      })()}
-                    </Paper>
-                  )}
-
                   {templateHasKlokkeslettDagToken(activeTemplateContent) && (
                     <Paper
                       className={`${styles.inputControlCard} ${styles.timeDateCard}`}
@@ -2542,6 +2643,26 @@ export default function StandardTekstPage() {
                 formuleringOccurrenceValues: buildUnnumberedFormuleringOccurrenceValues(
                   activeTemplateContent,
                 ),
+                onTallChange: (idx, value) => {
+                  const nextValue = value.replace(/[^\d.,]/g, "");
+                  setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));
+                  if (
+                    errorLocal?.startsWith("Fyll inn feltet før du kopierer teksten") ||
+                    errorLocal?.startsWith("Tallfelt må inneholde kun tall")
+                  ) {
+                    setErrorLocal(null);
+                  }
+                },
+                altSelections: (() => {
+                  const count = getAltGroupCount(activeTemplateContent);
+                  return Array.from({ length: count }, (_, i) => altByIndex[i] ?? null);
+                })(),
+                onAltSelect: (occurrenceIdx, segmentIdx) => {
+                  setAltByIndex((prev) => ({ ...prev, [occurrenceIdx]: segmentIdx }));
+                  if (errorLocal?.startsWith("Velg alternativ før du kopierer teksten")) {
+                    setErrorLocal(null);
+                  }
+                },
               },
             )}
             editorTools={
@@ -2621,11 +2742,34 @@ export default function StandardTekstPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <Dialog open={leaveConfirmOpen} onClose={handleContinueWriting}>
+        <DialogTitle>Du har en ulagret standardtekst</DialogTitle>
+        <DialogContent>
+          Den nye standardteksten er ikke lagret ennå. Lagre den, fortsett å skrive, eller slett
+          den før du forlater siden.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleContinueWriting} disabled={leaveActionBusy}>
+            Fortsett å skrive
+          </Button>
+          <Button onClick={handleDeleteAndLeave} color="error" disabled={leaveActionBusy}>
+            {leaveActionBusy ? "Sletter..." : "Slett"}
+          </Button>
+          <Button
+            onClick={handleSaveAndLeave}
+            variant="contained"
+            disabled={leaveActionBusy || !draftContent.trim()}
+          >
+            {leaveActionBusy ? "Lagrer..." : "Lagre"}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
         open={copied}
-        autoHideDuration={1500}
+        autoHideDuration={800}
         onClose={() => setCopied(false)}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        disableWindowBlurListener
       >
         <Alert
           onClose={() => setCopied(false)}
@@ -2644,6 +2788,39 @@ export default function StandardTekstPage() {
           }}
         >
           Standardtekst kopiert
+        </Alert>
+      </Snackbar>
+
+      {/* Feil vises som boble nederst til høyre. Valideringsmeldinger (errorLocal)
+          auto-forsvinner; en datalastfeil (error) blir stående til den lukkes. */}
+      <Snackbar
+        open={Boolean(errorToShow)}
+        autoHideDuration={errorLocal ? 1600 : null}
+        onClose={(_e, reason) => {
+          if (reason === "clickaway") return;
+          setErrorLocal(null);
+        }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        disableWindowBlurListener
+      >
+        <Alert
+          onClose={() => setErrorLocal(null)}
+          severity="error"
+          variant="filled"
+          icon={<ErrorOutlineIcon fontSize="inherit" />}
+          sx={{
+            borderRadius: 3,
+            px: 2,
+            py: 0.75,
+            alignItems: "center",
+            maxWidth: 360,
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 14px 34px rgba(2,6,18,0.56)"
+                : "0 10px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          {errorToShow}
         </Alert>
       </Snackbar>
     </Box>
