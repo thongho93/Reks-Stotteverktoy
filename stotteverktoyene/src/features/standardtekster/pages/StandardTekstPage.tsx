@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Autocomplete,
@@ -57,6 +57,7 @@ import PinkSwitch from "../components/PinkSwitch";
 import { deleteStandardTekst } from "../utils/deleteStandardTekst";
 import type { StandardTekstFollowUp } from "../types";
 import { logUsage } from "../../../shared/services/usage";
+import { useNavigationGuard } from "../../../shared/hooks/useNavigationGuard";
 
 type OMEQStandardtekstPrefill = {
   requestId: number;
@@ -263,6 +264,8 @@ function parseOmeqStandardtekstPrefill(value: unknown): OMEQStandardtekstPrefill
 
 export default function StandardTekstPage() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { setGuard } = useNavigationGuard();
   const {
     items,
     setItems,
@@ -353,6 +356,19 @@ export default function StandardTekstPage() {
   const lockBeforeEdit = Boolean(
     canManageStandardTekster && selected && !isEditing && selected.title === "Ny standardtekst",
   );
+
+  // Gjenkjenner en "Ny standardtekst" som ble opprettet (createEmpty gjør en ekte
+  // Firestore-skriving med det samme, se createNewStandardTekst) men aldri lagret
+  // med reelt innhold – basert på PERSISTERT form, ikke en sesjon-lokal variabel.
+  // Dette fanger også opp allerede eksisterende foreldreløse utkast (fra før denne
+  // sperren fantes), og overlever sideoppdatering siden det ikke er sesjon-avhengig.
+  const isEmptyNewDraftItem = useCallback(
+    (item: { title: string; content?: string | null; category?: string | null } | null | undefined): boolean =>
+      Boolean(item && item.title === "Ny standardtekst" && !(item.content ?? "").trim() && !(item.category ?? "").trim()),
+    [],
+  );
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaveActionBusy, setLeaveActionBusy] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1197,9 +1213,13 @@ export default function StandardTekstPage() {
     setIsEditing(false);
   };
 
-  const saveEdit = async () => {
-    if (!canManageStandardTekster) return;
-    if (!selected) return;
+  const saveEdit = async (): Promise<boolean> => {
+    if (!canManageStandardTekster) return false;
+    if (!selected) return false;
+    if (!draftContent.trim()) {
+      setErrorLocal("Standardteksten kan ikke lagres uten innhold.");
+      return false;
+    }
     setSaving(true);
     setErrorLocal(null);
     try {
@@ -1256,9 +1276,11 @@ export default function StandardTekstPage() {
       setEditingFollowUpId(null);
 
       setIsEditing(false);
+      return true;
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ukjent feil ved lagring";
       setErrorLocal(message);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1266,7 +1288,19 @@ export default function StandardTekstPage() {
 
   const createNewStandardTekst = async () => {
     if (!canManageStandardTekster) return;
+    // Ikke la et nytt, ulagret utkast bli overskrevet/forlatt stille hvis brukeren
+    // trykker "Ny standardtekst" igjen mens det forrige fortsatt ikke er lagret.
+    if (isEmptyNewDraftItem(selected)) {
+      pendingActionRef.current = () => {
+        void createNewStandardTekstInner();
+      };
+      setLeaveConfirmOpen(true);
+      return;
+    }
+    await createNewStandardTekstInner();
+  };
 
+  const createNewStandardTekstInner = async () => {
     setCreating(true);
     setErrorLocal(null);
 
@@ -1493,6 +1527,7 @@ export default function StandardTekstPage() {
   };
 
   const openFollowUp = (id: string) => {
+    if (guardSelect(id)) return;
     preserveInputsOnNextSelectRef.current = true;
     setSelectedId(id);
   };
@@ -1984,6 +2019,102 @@ export default function StandardTekstPage() {
     });
   };
 
+  // Hindrer at en "Ny standardtekst" som ble opprettet (createEmpty gjør en ekte
+  // Firestore-skriving med det samme, se createNewStandardTekst) men aldri lagret,
+  // blir liggende for alltid hvis brukeren forlater den uten å lagre eller slette –
+  // enten ved å navigere til en annen side i appen, ELLER ved å bytte til en annen
+  // standardtekst i listen (som ikke går via router, bare setSelectedId direkte).
+  // `pendingActionRef` holder handlingen som skal utføres når dialogen er besvart.
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  const guardLeave = useCallback(
+    (targetPath: string): boolean => {
+      if (!isEmptyNewDraftItem(selected)) return false;
+      pendingActionRef.current = () => navigate(targetPath);
+      setLeaveConfirmOpen(true);
+      return true;
+    },
+    [selected, isEmptyNewDraftItem, navigate],
+  );
+
+  // Kalles før vi bytter til en annen standardtekst i sidebar-listen/søket.
+  // Returnerer true hvis byttet ble stanset (dialog vist i stedet).
+  const guardSelect = useCallback(
+    (targetId: string): boolean => {
+      if (!isEmptyNewDraftItem(selected)) return false;
+      if (targetId === selected?.id) return false;
+      pendingActionRef.current = () => setSelectedId(targetId);
+      setLeaveConfirmOpen(true);
+      return true;
+    },
+    [selected, isEmptyNewDraftItem, setSelectedId],
+  );
+
+  useEffect(() => {
+    setGuard(guardLeave);
+    return () => setGuard(null);
+  }, [guardLeave, setGuard]);
+
+  // Sikkerhetsnett for faner som lukkes/lastes på nytt e.l. – kan ikke vise egen
+  // dialog her (nettlesere ignorerer egendefinert tekst), men gir en generisk
+  // "vil du forlate siden?"-advarsel fra nettleseren.
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!isEmptyNewDraftItem(selectedRef.current)) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+    // isEmptyNewDraftItem is a useCallback with stable ([]) deps; selected is read
+    // via selectedRef above so this listener never needs to be re-attached.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleContinueWriting = () => {
+    setLeaveConfirmOpen(false);
+    pendingActionRef.current = null;
+  };
+
+  const handleDeleteAndLeave = async () => {
+    const idToDelete = selected?.id;
+    setLeaveActionBusy(true);
+    try {
+      if (idToDelete) {
+        await standardTeksterApi.remove(idToDelete);
+        setItems((prev) => prev.filter((it) => it.id !== idToDelete));
+      }
+      setLeaveConfirmOpen(false);
+      setIsEditing(false);
+      const runPendingAction = pendingActionRef.current;
+      pendingActionRef.current = null;
+      runPendingAction?.();
+    } catch (e) {
+      setErrorLocal(e instanceof Error ? e.message : "Kunne ikke slette standardteksten");
+    } finally {
+      setLeaveActionBusy(false);
+    }
+  };
+
+  const handleSaveAndLeave = async () => {
+    setLeaveActionBusy(true);
+    try {
+      const ok = await saveEdit();
+      if (!ok) return;
+      setLeaveConfirmOpen(false);
+      const runPendingAction = pendingActionRef.current;
+      pendingActionRef.current = null;
+      runPendingAction?.();
+    } finally {
+      setLeaveActionBusy(false);
+    }
+  };
+
   return (
     <Box className={styles.page}>
       <Collapse in={showGuide} unmountOnExit>
@@ -2027,7 +2158,10 @@ export default function StandardTekstPage() {
             filtered={filtered}
             onToggleActive={toggleStandardTekstActive}
             selectedId={selectedId}
-            setSelectedId={(id) => setSelectedId(id)}
+            setSelectedId={(id) => {
+              if (guardSelect(id)) return;
+              setSelectedId(id);
+            }}
             searchInputRef={standardTekstSearchInputRef}
           />
         </Box>
@@ -2605,6 +2739,28 @@ export default function StandardTekstPage() {
           </Button>
           <Button onClick={confirmDelete} color="error" variant="contained" disabled={deleting}>
             {deleting ? "Sletter..." : "Slett"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={leaveConfirmOpen} onClose={handleContinueWriting}>
+        <DialogTitle>Du har en ulagret standardtekst</DialogTitle>
+        <DialogContent>
+          Den nye standardteksten er ikke lagret ennå. Lagre den, fortsett å skrive, eller slett
+          den før du forlater siden.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleContinueWriting} disabled={leaveActionBusy}>
+            Fortsett å skrive
+          </Button>
+          <Button onClick={handleDeleteAndLeave} color="error" disabled={leaveActionBusy}>
+            {leaveActionBusy ? "Sletter..." : "Slett"}
+          </Button>
+          <Button
+            onClick={handleSaveAndLeave}
+            variant="contained"
+            disabled={leaveActionBusy || !draftContent.trim()}
+          >
+            {leaveActionBusy ? "Lagrer..." : "Lagre"}
           </Button>
         </DialogActions>
       </Dialog>

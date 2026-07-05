@@ -25,7 +25,7 @@ import KeyboardReturnRoundedIcon from "@mui/icons-material/KeyboardReturnRounded
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { useNavigate } from "react-router-dom";
+import { useGuardedNavigate } from "../../shared/hooks/useNavigationGuard";
 import { useAuthUser } from "../../app/auth/useAuthUser";
 import { readCachedOrFetchStandardTekster } from "../standardtekster/hooks/useStandardTekster";
 import type { StandardTekst } from "../standardtekster/types";
@@ -385,7 +385,7 @@ export function GlobalSearch({ open, onClose }: Props) {
   const activeItemRef = useRef<HTMLDivElement>(null);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingClickEntryRef = useRef<SearchEntry | null>(null);
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
   const { user, isOwner, isRekspert, role } = useAuthUser() as any;
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
   const hasOwnerAccess = Boolean(isOwner) || role === "owner";
