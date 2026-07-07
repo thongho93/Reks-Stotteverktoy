@@ -33,11 +33,14 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {
   formatPreparatRowText,
   getAltGroupCount,
+  getOptionalGroupCount,
   getTallTokenIndices,
   migrateLegacyClockTallTokens,
   replaceAltGroups,
+  replaceOptionalGroups,
   replaceNextPreparatToken,
   replaceKlokkeslettDagTokens,
+  stripKlokkenPrefixBeforeToken,
   replacePakkeTokens,
   replaceTallTokenByIndex,
   templateHasAltToken,
@@ -103,9 +106,13 @@ function parsePalettePrefill(value: unknown): PalettePrefill | null {
 }
 
 type ClockTallDay = "today" | "tomorrow" | "sunday";
-const CLOCK_TALL_OPTIONS = ["11:00", "14:00", "15:00"] as const;
+const CLOCK_TALL_OPTIONS = ["11:00", "12:00", "13:00", "14:00", "15:00"] as const;
 const DEFAULT_CLOCK_TALL_TIME = "11:00";
 const CUSTOM_CLOCK_VALUE = "__custom__";
+// Fraseverdi (ikke et klokkeslett): rendres som "i løpet av dagen" og fjerner
+// «(innen) klokken» rett foran tokenet, slik at setningen leser naturlig.
+const DURING_DAY_VALUE = "during-day";
+const DURING_DAY_LABEL = "i løpet av dagen";
 
 function sanitizeFarmasoytSignature(text: string): string {
   if (!text) return text;
@@ -124,6 +131,9 @@ function normalizeTemplateContent(text: string): string {
 function formatClockTallValue(time: string, day: ClockTallDay): string {
   const trimmedTime = (time ?? "").trim();
   if (!trimmedTime) return "";
+
+  // Fraseverdi ("i løpet av dagen") er ikke et klokkeslett og har ingen dag-del.
+  if (trimmedTime === DURING_DAY_VALUE) return DURING_DAY_LABEL;
 
   const match = trimmedTime.match(/^(\d{1,2}):(\d{2})$/);
   const displayTime =
@@ -146,6 +156,16 @@ function getAutomaticClockTallDay(time: string, now = new Date()): ClockTallDay 
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   return selectedMinutes > currentMinutes ? "today" : "tomorrow";
+}
+
+// Tidsavhengig standardvalg for klokkeslett-tokenet: før kl. 11 foreslås kl. 11,
+// fra kl. 11 til 13 foreslås kl. 14, og etter kl. 13 foreslås "i løpet av dagen".
+// Nullstilles naturlig etter midnatt siden det beregnes ut fra nåværende time.
+function getAutomaticClockTallTime(now = new Date()): string {
+  const hour = now.getHours();
+  if (hour < 11) return "11:00";
+  if (hour < 13) return "14:00";
+  return DURING_DAY_VALUE;
 }
 
 function buildInitialTallValues(template: string): Record<number, string> {
@@ -468,8 +488,8 @@ export default function StandardTekstPage() {
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
-      setClockTime(DEFAULT_CLOCK_TALL_TIME);
-      setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+      setClockTime(getAutomaticClockTallTime());
+      setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
       setClockCustomMode(true);
 
       // Reset date input
@@ -493,9 +513,11 @@ export default function StandardTekstPage() {
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
   // Valgt segment-indeks per alternativ-gruppe-forekomst (null/manglende = ikke valgt).
   const [altByIndex, setAltByIndex] = useState<Record<number, number | null>>({});
-  const [clockTime, setClockTime] = useState<string>(DEFAULT_CLOCK_TALL_TIME);
+  // true per valgfri-setning-forekomst ({{...}}) som er valgt bort før kopiering.
+  const [optionalRemovedByIndex, setOptionalRemovedByIndex] = useState<Record<number, boolean>>({});
+  const [clockTime, setClockTime] = useState<string>(() => getAutomaticClockTallTime());
   const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
-    getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME),
+    getAutomaticClockTallDay(getAutomaticClockTallTime()),
   );
   const [clockCustomMode, setClockCustomMode] = useState<boolean>(true);
   const [datoInput, setDatoInput] = useState<string>("");
@@ -968,8 +990,15 @@ export default function StandardTekstPage() {
 
     // Do NOT replace VIRKESTOFF in previewContent; leave the token for renderer.
 
+    // I frasemodus ("i løpet av dagen") fjernes «(innen) klokken» foran tokenet
+    // også i forhåndsvisningen, så den matcher den kopierte teksten. Selve tokenet
+    // beholdes og vises som chip.
+    if (clockTime === DURING_DAY_VALUE && templateHasKlokkeslettDagToken(templateContent)) {
+      next = stripKlokkenPrefixBeforeToken(next);
+    }
+
     return next;
-  }, [selected, firstName, pickedPreparats, activeTemplateContent]);
+  }, [selected, firstName, pickedPreparats, activeTemplateContent, clockTime]);
 
   // Når valgt tekst endres, sync draft og avslutt redigering
   useEffect(() => {
@@ -1020,8 +1049,9 @@ export default function StandardTekstPage() {
       if (pending.vedtakOmeq) nextTallValues[0] = pending.vedtakOmeq;
       setTallByIndex(nextTallValues);
       setAltByIndex({});
-      setClockTime(DEFAULT_CLOCK_TALL_TIME);
-      setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+      setOptionalRemovedByIndex({});
+      setClockTime(getAutomaticClockTallTime());
+      setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
       setClockCustomMode(true);
       setDatoInput("");
       setErrorLocal(null);
@@ -1054,6 +1084,7 @@ export default function StandardTekstPage() {
       }
       setTallByIndex(nextTall);
       setAltByIndex({});
+      setOptionalRemovedByIndex({});
 
       if (pendingPalette.formuleringValues) {
         const nextF: Record<number, string> = { 0: "" };
@@ -1079,8 +1110,9 @@ export default function StandardTekstPage() {
       setFormuleringByPreparatKey({});
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setAltByIndex({});
-      setClockTime(DEFAULT_CLOCK_TALL_TIME);
-      setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+      setOptionalRemovedByIndex({});
+      setClockTime(getAutomaticClockTallTime());
+      setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
       setClockCustomMode(true);
       setDatoInput("");
       const fIndices = getFormuleringTokenIndices(activeTemplateContent);
@@ -1787,6 +1819,9 @@ export default function StandardTekstPage() {
     // segment kan selv inneholde f.eks. DATO/PREPARAT1/TALL som må resolves videre.
     text = replaceAltGroups(text, (idx) => altByIndex[idx] ?? null);
 
+    // Fjern bortvalgte valgfrie setninger ({{...}}) og pakk ut resten.
+    text = replaceOptionalGroups(text, (idx) => Boolean(optionalRemovedByIndex[idx]));
+
     // Ensure PREPARAT tokens are actually resolved in the copied text.
     // Preview replaces them in the renderer, but clipboard needs real text.
     if (pickedPreparats.length) {
@@ -1891,8 +1926,9 @@ export default function StandardTekstPage() {
           setTallByIndex({ 0: "" });
         }
         setAltByIndex({});
-        setClockTime(DEFAULT_CLOCK_TALL_TIME);
-        setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+        setOptionalRemovedByIndex({});
+        setClockTime(getAutomaticClockTallTime());
+        setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
         setClockCustomMode(true);
 
         setSearch("");
@@ -1937,8 +1973,10 @@ export default function StandardTekstPage() {
           } else {
             setTallByIndex({ 0: "" });
           }
-          setClockTime(DEFAULT_CLOCK_TALL_TIME);
-          setClockDay(getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
+          setAltByIndex({});
+          setOptionalRemovedByIndex({});
+          setClockTime(getAutomaticClockTallTime());
+          setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
           setClockCustomMode(true);
 
           setSearch("");
@@ -2357,11 +2395,22 @@ export default function StandardTekstPage() {
                       }}
                     >
                       {(() => {
-                        const selectedClockTime = CLOCK_TALL_OPTIONS.includes(
-                          clockTime as (typeof CLOCK_TALL_OPTIONS)[number],
-                        )
-                          ? clockTime
-                          : "";
+                        const isPhraseTime = clockTime === DURING_DAY_VALUE;
+                        const selectedClockTime = isPhraseTime
+                          ? DURING_DAY_VALUE
+                          : CLOCK_TALL_OPTIONS.includes(
+                                clockTime as (typeof CLOCK_TALL_OPTIONS)[number],
+                              )
+                            ? clockTime
+                            : "";
+                        // "I løpet av dagen" er en frase uten dag. Dag-feltet
+                        // skjules derfor i frasemodus, men "Eget klokkeslett" vises
+                        // fortsatt slik at man kan skrive inn et klokkeslett manuelt
+                        // (som da forlater frasemodus).
+                        const showDay = !isPhraseTime;
+                        const showCustom = clockCustomMode || isPhraseTime;
+                        const visibleFields = 1 + (showDay ? 1 : 0) + (showCustom ? 1 : 0);
+                        const columnCount = Math.max(visibleFields, 1);
 
                         return (
                           <Box
@@ -2371,9 +2420,7 @@ export default function StandardTekstPage() {
                               gridTemplateColumns: {
                                 xs: "1fr",
                                 sm: "repeat(2, minmax(0, 1fr))",
-                                md: clockCustomMode
-                                  ? "repeat(3, minmax(0, 1fr))"
-                                  : "repeat(2, minmax(0, 1fr))",
+                                md: `repeat(${columnCount}, minmax(0, 1fr))`,
                               },
                               alignItems: "start",
                               justifyContent: "stretch",
@@ -2386,9 +2433,16 @@ export default function StandardTekstPage() {
                               sx={{ width: "100%", minWidth: 0 }}
                               value={selectedClockTime}
                               onChange={(e) => {
-                                if (e.target.value === CUSTOM_CLOCK_VALUE) {
+                                if (e.target.value === DURING_DAY_VALUE) {
+                                  // Behold clockCustomMode så "Eget klokkeslett" fortsatt vises
+                                  // og et klokkeslett kan skrives inn manuelt.
                                   setClockCustomMode(true);
-                                  if (!clockTime) setClockTime(DEFAULT_CLOCK_TALL_TIME);
+                                  setClockTime(DURING_DAY_VALUE);
+                                } else if (e.target.value === CUSTOM_CLOCK_VALUE) {
+                                  setClockCustomMode(true);
+                                  if (!clockTime || clockTime === DURING_DAY_VALUE) {
+                                    setClockTime(DEFAULT_CLOCK_TALL_TIME);
+                                  }
                                   setClockDay((prev) => prev ?? getAutomaticClockTallDay(DEFAULT_CLOCK_TALL_TIME));
                                 } else {
                                   setClockCustomMode(true);
@@ -2409,33 +2463,38 @@ export default function StandardTekstPage() {
                                   kl. {time.slice(0, 2)}
                                 </MenuItem>
                               ))}
+                              <MenuItem value={DURING_DAY_VALUE}>I løpet av dagen</MenuItem>
                             </TextField>
 
-                            <TextField
-                              select
-                              label="Dag"
-                              size="small"
-                              sx={{ width: "100%", minWidth: 0 }}
-                              value={clockDay}
-                              onChange={(e) => {
-                                setClockDay(e.target.value as ClockTallDay);
-                                if (errorLocal?.startsWith("Velg klokkeslett")) {
-                                  setErrorLocal(null);
-                                }
-                              }}
-                            >
-                              <MenuItem value="today">I dag</MenuItem>
-                              <MenuItem value="tomorrow">I morgen</MenuItem>
-                              <MenuItem value="sunday">Søndag</MenuItem>
-                            </TextField>
+                            {showDay && (
+                              <TextField
+                                select
+                                label="Dag"
+                                size="small"
+                                sx={{ width: "100%", minWidth: 0 }}
+                                value={clockDay}
+                                onChange={(e) => {
+                                  setClockDay(e.target.value as ClockTallDay);
+                                  if (errorLocal?.startsWith("Velg klokkeslett")) {
+                                    setErrorLocal(null);
+                                  }
+                                }}
+                              >
+                                <MenuItem value="today">I dag</MenuItem>
+                                <MenuItem value="tomorrow">I morgen</MenuItem>
+                                <MenuItem value="sunday">Søndag</MenuItem>
+                              </TextField>
+                            )}
 
-                            {clockCustomMode && (
+                            {showCustom && (
                               <TextField
                                 label="Eget klokkeslett"
                                 type="time"
                                 size="small"
                                 sx={{ width: "100%", minWidth: 0 }}
-                                value={clockTime}
+                                // I frasemodus er feltet tomt til man skriver inn et
+                                // klokkeslett; da forlates frasemodus automatisk.
+                                value={isPhraseTime ? "" : clockTime}
                                 onChange={(e) => {
                                   const nextTime = e.target.value;
                                   setClockCustomMode(true);
@@ -2662,6 +2721,13 @@ export default function StandardTekstPage() {
                   if (errorLocal?.startsWith("Velg alternativ før du kopierer teksten")) {
                     setErrorLocal(null);
                   }
+                },
+                optionalRemoved: (() => {
+                  const count = getOptionalGroupCount(activeTemplateContent);
+                  return Array.from({ length: count }, (_, i) => Boolean(optionalRemovedByIndex[i]));
+                })(),
+                onOptionalToggle: (occurrenceIdx) => {
+                  setOptionalRemovedByIndex((prev) => ({ ...prev, [occurrenceIdx]: !prev[occurrenceIdx] }));
                 },
               },
             )}
