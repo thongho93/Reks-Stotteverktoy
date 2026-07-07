@@ -595,13 +595,91 @@ export function replaceAltGroups(
   });
 }
 
+// Reserverte token-navn som også kan stå i {{ }} (f.eks. {{TALL}}). Disse skal
+// IKKE tolkes som valgfri setning eller alternativ-gruppe.
+const RESERVED_BRACE_TOKEN_RE =
+  /^(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|PREPARAT\d*|DEN_DE|VAREN\(E\)|MEDISIN\(ENE\)|XX)$/i;
+
+export function isReservedBraceToken(inner: string): boolean {
+  return RESERVED_BRACE_TOKEN_RE.test((inner ?? "").trim());
+}
+
+// Valgfri setning: {{setning uten skråstrek}}. Tas med som standard, men kan
+// velges bort i forhåndsvisningen før kopiering. Grupper MED "/" er
+// alternativ-grupper (se over), og kjente tokens i {{ }} er heller ikke valgfrie.
+const OPTIONAL_GROUP_RE = () => /\{\{([^{}/]+)\}\}/g;
+
+/** Antall valgfrie setninger i malen, i rekkefølgen de forekommer. */
+export function getOptionalGroupCount(text: string): number {
+  if (!text) return 0;
+  const re = OPTIONAL_GROUP_RE();
+  let count = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (!isReservedBraceToken(m[1]) && m[1].trim()) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Fjern bortvalgte valgfrie setninger og pakk ut resten (uten {{ }}). Rydder
+ * opp doble mellomrom som oppstår der en setning ble fjernet midt i en linje.
+ */
+export function replaceOptionalGroups(
+  text: string,
+  isRemoved: (occurrenceIndex: number) => boolean,
+): string {
+  if (!text) return text;
+  let occurrence = -1;
+  let removedAny = false;
+  let result = text.replace(/\{\{([^{}/]+)\}\}( ?)/g, (match, inner: string, trailing: string) => {
+    if (isReservedBraceToken(inner) || !inner.trim()) return match;
+    occurrence += 1;
+    if (isRemoved(occurrence)) {
+      removedAny = true;
+      return "";
+    }
+    return inner.trim() + trailing;
+  });
+  if (removedAny) {
+    result = result.replace(/ {2,}/g, " ").replace(/ +$/gm, "");
+  }
+  return result;
+}
+
 export function templateHasKlokkeslettDagToken(text: string): boolean {
   return /\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/i.test(text ?? "");
 }
 
+// For forhåndsvisning i frasemodus ("i løpet av dagen"): fjern «(innen) klokken/kl.»
+// rett foran tokenet, men BEHOLD selve tokenet så det fortsatt vises som chip.
+// Speiler prefiks-fjerningen i replaceKlokkeslettDagTokens slik at preview og
+// kopiert tekst blir like.
+export function stripKlokkenPrefixBeforeToken(text: string): string {
+  if (!text) return text;
+  return text.replace(
+    /\b(?:innen\s+)?(?:klokken|klokka|kl\.?)\s+(\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b)/gi,
+    "$1",
+  );
+}
+
 export function replaceKlokkeslettDagTokens(text: string, value: string): string {
   if (!text) return text;
-  return text.replace(/\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/gi, value ?? "");
+  const v = value ?? "";
+  const tokenRe = /\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b/gi;
+
+  // Frasemodus (verdien starter ikke med et siffer, f.eks. "i løpet av dagen"):
+  // fjern «(innen) klokken/kl.» rett foran tokenet så setningen leser naturlig
+  // («... ber vi om tilbakemelding i løpet av dagen.»). Vanlige klokkeslett
+  // ("14 i dag") starter med siffer og beholder «innen klokken» uendret.
+  const isPhrase = v.trim().length > 0 && !/^\d/.test(v.trim());
+  if (isPhrase) {
+    const withPrefix =
+      /\b(?:innen\s+)?(?:klokken|klokka|kl\.?)\s+(?:\{\{\s*KLOKKESLETT_DAG\s*\}\}|\bKLOKKESLETT_DAG\b)/gi;
+    return text.replace(withPrefix, v).replace(tokenRe, v);
+  }
+
+  return text.replace(tokenRe, v);
 }
 
 export function migrateLegacyClockTallTokens(text: string): string {
@@ -930,6 +1008,12 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "TALL", insert: "TALL", help: "Første tall", group: "TALL" },
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
   { label: "PAKKE", insert: "PAKKE", help: "Skriver «pakke»/«pakker» ut fra tallet foran", group: "TALL" },
+  {
+    label: "VALGFRI SETNING",
+    insert: "{{Denne setningen kan velges bort.}}",
+    help: "Setning i {{ }} kan velges bort før kopiering",
+    group: "ANNET",
+  },
 
   { label: "VAREN(E)", insert: "VAREN(E)", group: "VARE" },
   { label: "MEDISIN(ENE)", insert: "MEDISIN(ENE)", help: "Setter inn medisinen (1 preparat) eller medisinene (flere preparater)", group: "VARE" },

@@ -2,7 +2,7 @@ import type { ChangeEvent, KeyboardEvent, MouseEvent, WheelEvent } from "react";
 import { Box } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
 
-import { pakkeWordForValue } from "./preparat";
+import { isReservedBraceToken, pakkeWordForValue } from "./preparat";
 
 export function renderContentWithPreparatHighlight(
   text: string,
@@ -23,9 +23,18 @@ export function renderContentWithPreparatHighlight(
     altSelections?: Array<number | null>;
     /** Kalles med (forekomst, segment) når bruker velger; (forekomst, null) for å angre valget. */
     onAltSelect?: (occurrenceIndex: number, segmentIndex: number | null) => void;
+    /** true per valgfri-setning-forekomst som er valgt bort (default: tas med). */
+    optionalRemoved?: boolean[];
+    /** Kalles med forekomst-indeks når bruker klikker en valgfri setning av/på. */
+    onOptionalToggle?: (occurrenceIndex: number) => void;
   }
 ) {
   let formuleringOccurrenceIdx = 0;
+  // Forekomst-tellere for alternativ-grupper og valgfrie setninger. Ligger på
+  // ytre nivå (som formuleringOccurrenceIdx) så indeksene teller riktig videre
+  // på tvers av tekstdelene som PREPARAT-splittingen deler brødteksten i.
+  let altOccurrenceIdx = 0;
+  let optionalOccurrenceIdx = 0;
 
   const tokenSx = {
     display: "inline-flex",
@@ -153,6 +162,48 @@ export function renderContentWithPreparatHighlight(
     },
   } as const;
 
+  // Valgfri setning ({{...}} uten "/"): tas med som standard. Prikket
+  // understrek + ✕ viser at den kan velges bort; bortvalgt = gjennomstreket.
+  const optionalIncludedSx = {
+    display: "inline",
+    cursor: "pointer",
+    borderRadius: "4px",
+    textDecorationLine: "underline",
+    textDecorationStyle: "dotted",
+    textUnderlineOffset: "3px",
+    textDecorationColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(148, 163, 184, 0.75)" : "rgba(100, 116, 139, 0.6)",
+    "&:hover": {
+      bgcolor: (theme: Theme) =>
+        theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.16)" : "rgba(239, 68, 68, 0.08)",
+    },
+  } as const;
+
+  const optionalRemovedSx = {
+    display: "inline",
+    cursor: "pointer",
+    borderRadius: "4px",
+    color: "text.disabled",
+    opacity: 0.7,
+    textDecorationLine: "line-through",
+    textDecorationThickness: "2px",
+    textDecorationColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(248, 113, 113, 0.85)" : "rgba(220, 38, 38, 0.6)",
+    "&:hover": {
+      bgcolor: (theme: Theme) =>
+        theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.16)" : "rgba(16, 185, 129, 0.1)",
+    },
+  } as const;
+
+  const optionalMarkSx = {
+    fontSize: "0.72em",
+    fontWeight: 700,
+    ml: 0.4,
+    verticalAlign: "super",
+    color: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(248, 113, 113, 0.9)" : "rgba(220, 38, 38, 0.7)",
+  } as const;
+
   const placeholderDatoSx = {
     ...tokenPlaceholderSx,
     bgcolor: (theme: Theme) =>
@@ -271,14 +322,12 @@ export function renderContentWithPreparatHighlight(
     // grupper {{seg1 / seg2 / ...}} (sjekkes først – tokens under inneholder aldri "/").
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{\s*(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\s*\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
+      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
     );
     if (parts.length <= 1) return t;
 
     // Nærmeste foranstående TALL-verdi – styrer PAKKE-tokenets entall/flertall.
     let lastTallValue = "";
-    // Forekomst-teller for alternativ-grupper, i rekkefølgen de dukker opp i teksten.
-    let altOccurrenceIdx = 0;
 
     return (
       <>
@@ -507,6 +556,54 @@ export function renderContentWithPreparatHighlight(
             return (
               <Box key={i} component="span" sx={placeholderDatoSx}>
                 {label}
+              </Box>
+            );
+          }
+
+          // Valgfri setning: {{setning uten skråstrek}} – tas med som standard,
+          // klikk for å velge bort / ta med igjen. Sjekkes ETTER token-branchene
+          // over, så {{TALL}} o.l. aldri havner her.
+          const optionalMatch = part.match(/^\{\{([^{}/]+)\}\}$/);
+          if (optionalMatch && !isReservedBraceToken(optionalMatch[1]) && optionalMatch[1].trim()) {
+            const inner = optionalMatch[1].trim();
+            const occurrenceIdx = optionalOccurrenceIdx;
+            optionalOccurrenceIdx += 1;
+            const onOptionalToggle = opts?.onOptionalToggle;
+
+            if (!onOptionalToggle) {
+              // Ingen interaksjon koblet inn (f.eks. i lister) – vis som vanlig tekst.
+              return <span key={i}>{renderTokensInText(inner)}</span>;
+            }
+
+            const removed = Boolean(opts?.optionalRemoved?.[occurrenceIdx]);
+            return (
+              <Box
+                key={i}
+                component="span"
+                role="button"
+                tabIndex={0}
+                title={
+                  removed
+                    ? "Valgt bort – klikk for å ta med setningen igjen"
+                    : "Klikk for å velge bort denne setningen før kopiering"
+                }
+                sx={removed ? optionalRemovedSx : optionalIncludedSx}
+                onClick={(e: MouseEvent) => {
+                  e.stopPropagation();
+                  onOptionalToggle(occurrenceIdx);
+                }}
+                onKeyDown={(e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOptionalToggle(occurrenceIdx);
+                  }
+                }}
+              >
+                {removed ? inner : renderTokensInText(inner)}
+                <Box component="span" sx={optionalMarkSx}>
+                  {removed ? "+" : "✕"}
+                </Box>
               </Box>
             );
           }

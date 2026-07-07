@@ -1,0 +1,461 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Sett denne til din owner uid (document-id i /owners)
+    function ownerUid() {
+      return "uFRgce8mJjaVeDjqyJZ0wsiLqNo2";
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isOwnerRole() {
+      return isSignedIn()
+        && request.auth.uid == ownerUid()
+        && exists(/databases/$(database)/documents/owners/$(request.auth.uid));
+    }
+
+    function isAdminRole() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Admin inkluderer Owner
+    function isAdmin() {
+      return isAdminRole() || isOwnerRole();
+    }
+
+    function isApprovedUser(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid))
+        && get(/databases/$(database)/documents/users/$(uid)).data.approved != false;
+    }
+
+    // Owner/admin regnes som "tillatte" chat-brukere selv uten users/{uid}
+    function isPrivilegedUser(uid) {
+      return uid == ownerUid()
+        || exists(/databases/$(database)/documents/admins/$(uid));
+    }
+
+    function isAllowedChatUser(uid) {
+      return isApprovedUser(uid) || isPrivilegedUser(uid);
+    }
+
+    // Aktivt medlem = innlogget + godkjent bruker eller admin/owner
+    function isActiveMember() {
+      return isSignedIn() && isAllowedChatUser(request.auth.uid);
+    }
+
+    // Rekspert: sjekk i owners/{OWNER_UID}.roles[uid] == "rekspert"
+    function isRekspertRole() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/owners/$(ownerUid()))
+        && get(/databases/$(database)/documents/owners/$(ownerUid()))
+          .data.roles[request.auth.uid] == "rekspert";
+    }
+
+    // Private notes validators
+    function validPrivateNoteMode() {
+      return !("noteMode" in request.resource.data)
+        || request.resource.data.noteMode == "text"
+        || request.resource.data.noteMode == "checklist";
+    }
+
+    function validPrivateNoteCommon() {
+      return request.resource.data.title is string
+        && request.resource.data.content is string
+        && request.resource.data.updatedAt is timestamp
+        && validPrivateNoteMode()
+        && (
+          !("checklistItems" in request.resource.data)
+          || request.resource.data.checklistItems is list
+        )
+        && (
+          !("color" in request.resource.data)
+          || request.resource.data.color == null
+          || request.resource.data.color is string
+        )
+        && (
+          !("tags" in request.resource.data)
+          || request.resource.data.tags is list
+        )
+        && (
+          !("isFavorite" in request.resource.data)
+          || request.resource.data.isFavorite is bool
+        );
+    }
+
+    // Faglig innhold validators
+    function validFagligDocumentBase() {
+      return request.resource.data.keys().hasOnly([
+          "title",
+          "kind",
+          "content",
+          "pdfUrl",
+          "storagePath",
+          "parentId",
+          "emoji",
+          "createdAt",
+          "updatedAt",
+          "createdAtMs",
+          "updatedAtMs",
+          "createdByUid",
+          "updatedByUid"
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.kind is string
+        && (request.resource.data.kind == "text" || request.resource.data.kind == "pdf")
+        && request.resource.data.content is string
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.createdAtMs is int
+        && request.resource.data.updatedAtMs is int
+        && (
+          !("parentId" in request.resource.data)
+          || request.resource.data.parentId == null
+          || request.resource.data.parentId is string
+        )
+        && (
+          !("emoji" in request.resource.data)
+          || request.resource.data.emoji == null
+          || request.resource.data.emoji is string
+        )
+        && (
+          !("createdByUid" in request.resource.data)
+          || request.resource.data.createdByUid is string
+        )
+        && (
+          !("updatedByUid" in request.resource.data)
+          || request.resource.data.updatedByUid is string
+        );
+    }
+
+    function validFagligDocumentKindSpecific() {
+      return (
+          request.resource.data.kind == "text"
+          && (
+            !("pdfUrl" in request.resource.data)
+            || request.resource.data.pdfUrl == null
+            || request.resource.data.pdfUrl == ""
+          )
+          && (
+            !("storagePath" in request.resource.data)
+            || request.resource.data.storagePath == null
+            || request.resource.data.storagePath == ""
+          )
+        )
+        || (
+          request.resource.data.kind == "pdf"
+          && request.resource.data.pdfUrl is string
+          && request.resource.data.pdfUrl.size() > 0
+          && request.resource.data.pdfUrl.matches("^https?://.+")
+          && (
+            !("storagePath" in request.resource.data)
+            || request.resource.data.storagePath == null
+            || request.resource.data.storagePath is string
+          )
+        );
+    }
+
+    function validFagligDocumentData() {
+      return validFagligDocumentBase() && validFagligDocumentKindSpecific();
+    }
+
+    // Chat validators
+    function validChatCreate() {
+      return request.resource.data.keys().hasOnly([
+          "type",
+          "memberIds",
+          "memberNames",
+          "memberEmails",
+          "createdAt",
+          "updatedAt",
+          "lastMessageText",
+          "lastMessageSenderUid"
+        ])
+        && request.resource.data.type == "dm"
+        && request.resource.data.memberIds is list
+        && request.resource.data.memberIds.size() == 2
+        && request.resource.data.memberIds[0] is string
+        && request.resource.data.memberIds[1] is string
+        && request.resource.data.memberIds[0] != request.resource.data.memberIds[1]
+        && request.auth.uid in request.resource.data.memberIds
+        && isAllowedChatUser(request.resource.data.memberIds[0])
+        && isAllowedChatUser(request.resource.data.memberIds[1])
+        && request.resource.data.memberNames is map
+        && request.resource.data.memberEmails is map
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.lastMessageText is string
+        && (
+          !("lastMessageSenderUid" in request.resource.data)
+          || request.resource.data.lastMessageSenderUid == null
+          || request.resource.data.lastMessageSenderUid is string
+        );
+    }
+
+    function validChatUpdate() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          "updatedAt",
+          "lastMessageText",
+          "lastMessageSenderUid",
+          "memberNames",
+          "memberEmails"
+        ])
+        && request.resource.data.memberIds == resource.data.memberIds
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt is timestamp
+        && (!("lastMessageText" in request.resource.data) || request.resource.data.lastMessageText is string)
+        && (
+          !("lastMessageSenderUid" in request.resource.data)
+          || request.resource.data.lastMessageSenderUid == null
+          || request.resource.data.lastMessageSenderUid is string
+        )
+        && request.resource.data.memberNames is map
+        && request.resource.data.memberEmails is map;
+    }
+
+    function validMessageCreate() {
+      return request.resource.data.keys().hasOnly([
+          "text",
+          "senderUid",
+          "senderName",
+          "senderEmail",
+          "createdAt"
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 4000
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderName is string
+        && request.resource.data.senderName.size() > 0
+        && request.resource.data.createdAt is timestamp
+        && (
+          !("senderEmail" in request.resource.data)
+          || request.resource.data.senderEmail is string
+        );
+    }
+
+    // Public read
+    match /Standardtekster/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Owners
+    match /owners/{uid} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isOwner(uid) && isOwnerRole();
+    }
+
+    // Admins
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if isOwnerRole();
+    }
+
+    // Users
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin() || isSignedIn();
+
+      allow create: if isOwner(uid);
+
+      allow update: if
+        isOwner(uid)
+        || (
+          isAdmin()
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            "approved",
+            "approvedAt",
+            "approvedBy"
+          ])
+        );
+
+      allow delete: if isAdmin();
+
+      match /preferences/{docId} {
+        allow read, create, update: if isOwner(uid);
+        allow delete: if isAdmin();
+      }
+
+      match /standardtekstUsage/{standardtekstId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid);
+        allow delete: if false;
+      }
+
+      match /privateNotes/{noteId} {
+        allow read: if isOwner(uid);
+
+        allow create: if isOwner(uid)
+          && request.resource.data.keys().hasOnly([
+            "title",
+            "content",
+            "noteMode",
+            "checklistItems",
+            "color",
+            "tags",
+            "isFavorite",
+            "createdAt",
+            "updatedAt"
+          ])
+          && validPrivateNoteCommon()
+          && request.resource.data.createdAt is timestamp;
+
+        allow update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly([
+            "title",
+            "content",
+            "noteMode",
+            "checklistItems",
+            "color",
+            "tags",
+            "isFavorite",
+            "createdAt",
+            "updatedAt"
+          ])
+          && validPrivateNoteCommon()
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            "title",
+            "content",
+            "noteMode",
+            "checklistItems",
+            "color",
+            "tags",
+            "isFavorite",
+            "updatedAt"
+          ]);
+
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // Faglig innhold (tekst + innebygd dokumentlenke) — delt for alle aktive medlemmer
+    match /fagligDocuments/{docId} {
+      allow read: if isActiveMember();
+
+      allow create: if isActiveMember()
+        && validFagligDocumentData()
+        && (
+          !("createdByUid" in request.resource.data)
+          || request.resource.data.createdByUid == request.auth.uid
+        )
+        && (
+          !("updatedByUid" in request.resource.data)
+          || request.resource.data.updatedByUid == request.auth.uid
+        );
+
+      allow update: if isActiveMember()
+        && validFagligDocumentData()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdAtMs == resource.data.createdAtMs
+        && (
+          !("createdByUid" in request.resource.data)
+          || request.resource.data.createdByUid == resource.data.createdByUid
+        )
+        && (
+          !("updatedByUid" in request.resource.data)
+          || request.resource.data.updatedByUid == request.auth.uid
+        )
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          "title",
+          "content",
+          "pdfUrl",
+          "storagePath",
+          "parentId",
+          "emoji",
+          "updatedAt",
+          "updatedAtMs",
+          "updatedByUid"
+        ]);
+
+      allow delete: if isActiveMember();
+    }
+
+    // Delt rutiner for alle innloggede
+    match /sharedRoutines/{docId} {
+      allow read: if isSignedIn() && docId == "global";
+      allow create, update: if isSignedIn() && docId == "global";
+      allow delete: if false;
+    }
+
+    // Intern chat
+    match /internalChats/{chatId} {
+      function isMemberOfChat() {
+        return isSignedIn()
+          && resource.data.memberIds is list
+          && request.auth.uid in resource.data.memberIds;
+      }
+
+      allow get: if isMemberOfChat();
+      allow list: if isSignedIn();
+      allow create: if isActiveMember() && validChatCreate();
+      allow update: if isMemberOfChat() && validChatUpdate();
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function isMemberViaParent() {
+          return isSignedIn()
+            && exists(/databases/$(database)/documents/internalChats/$(chatId))
+            && get(/databases/$(database)/documents/internalChats/$(chatId)).data.memberIds is list
+            && request.auth.uid in get(/databases/$(database)/documents/internalChats/$(chatId)).data.memberIds;
+        }
+
+        allow read: if isMemberViaParent();
+        allow create: if isMemberViaParent() && validMessageCreate();
+        allow update, delete: if false;
+      }
+    }
+
+    // Usage
+    match /usage_daily/{dateKey} {
+      allow read: if isAdmin();
+      allow write: if false;
+
+      match /standardtekster/{standardtekstId} {
+        allow read: if isAdmin();
+        allow create, update: if isSignedIn()
+          && request.resource.data.keys().hasOnly(["opens", "updatedAt"])
+          && (!("opens" in request.resource.data) || request.resource.data.opens is int)
+          && (!("updatedAt" in request.resource.data) || request.resource.data.updatedAt is timestamp);
+        allow delete: if false;
+      }
+
+      match /users/{uid} {
+        allow read: if isAdmin() || isOwner(uid);
+        allow create, update: if isOwner(uid);
+        allow delete: if false;
+
+        match /standardtekster/{standardtekstId} {
+          allow read: if isAdmin();
+          allow create, update: if isOwner(uid)
+            && request.resource.data.keys().hasOnly(["opens", "updatedAt"])
+            && (!("opens" in request.resource.data) || request.resource.data.opens is int)
+            && (!("updatedAt" in request.resource.data) || request.resource.data.updatedAt is timestamp);
+          allow delete: if false;
+        }
+      }
+
+      match /totals/{docId} {
+        allow read: if isAdmin();
+        allow create, update: if isSignedIn() && docId == "global";
+        allow delete: if false;
+      }
+    }
+
+    // Beskyttet collection for rekspert
+    match /rekspert_routes/{docId} {
+      allow read: if isRekspertRole() || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
