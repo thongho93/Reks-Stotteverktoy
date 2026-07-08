@@ -71,6 +71,31 @@ type OMEQStandardtekstPrefill = {
 };
 const OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:omeqPrefill";
 
+// Overføring fra Lagerbeholdning ("Har fått nok til.."): matcher malen på tittel
+// (som OMEQ) og fyller ett preparat + DATO-tokenet med måned/år.
+type LagerStandardtekstPrefill = {
+  requestId: number;
+  templateTitle: string;
+  preparat: string;
+  preparatKey: string;
+  datoInput: string;
+};
+const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
+
+function parseLagerPrefill(value: unknown): LagerStandardtekstPrefill | null {
+  if (!value || typeof value !== "object") return null;
+  const c = value as Partial<LagerStandardtekstPrefill>;
+  if (typeof c.templateTitle !== "string" || !c.templateTitle.trim()) return null;
+  if (typeof c.preparat !== "string" || !c.preparat.trim()) return null;
+  return {
+    requestId: typeof c.requestId === "number" ? c.requestId : 0,
+    templateTitle: c.templateTitle.trim(),
+    preparat: c.preparat.trim(),
+    preparatKey: (typeof c.preparatKey === "string" && c.preparatKey.trim()) || c.preparat.trim(),
+    datoInput: typeof c.datoInput === "string" ? c.datoInput.trim() : "",
+  };
+}
+
 type PalettePrefill = {
   templateId: string;
   preparatList?: Array<{ text: string; key: string }>;
@@ -320,6 +345,21 @@ export default function StandardTekstPage() {
     }
   }, [location.state]);
 
+  const lagerPrefill = useMemo<LagerStandardtekstPrefill | null>(() => {
+    const fromLocation = parseLagerPrefill(
+      (location.state as { lagerPrefill?: unknown } | null)?.lagerPrefill,
+    );
+    if (fromLocation) return fromLocation;
+
+    try {
+      const raw = sessionStorage.getItem(LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY);
+      if (!raw) return null;
+      return parseLagerPrefill(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }, [location.state]);
+
   const clearedInitialSelectionRef = useRef(false);
   const appliedOmeqPrefillRequestIdRef = useRef<number | null>(null);
   const [pendingOmeqPrefill, setPendingOmeqPrefill] = useState<OMEQStandardtekstPrefill | null>(null);
@@ -328,6 +368,10 @@ export default function StandardTekstPage() {
   const appliedPalettePrefillIdRef = useRef<string | null>(null);
   const [pendingPalettePrefill, setPendingPalettePrefill] = useState<PalettePrefill | null>(null);
   const protectedPaletteSelectedIdRef = useRef<string | null>(null);
+
+  const appliedLagerPrefillRequestIdRef = useRef<number | null>(null);
+  const [pendingLagerPrefill, setPendingLagerPrefill] = useState<LagerStandardtekstPrefill | null>(null);
+  const protectedLagerSelectedIdRef = useRef<string | null>(null);
 
   // Start with no selected template after initial load (so the user actively selects one)
   useEffect(() => {
@@ -1044,9 +1088,14 @@ export default function StandardTekstPage() {
     const pendingPalette = pendingPalettePrefill;
     const shouldApplyPalettePrefill =
       Boolean(pendingPalette && selected) && selected!.id === pendingPalette!.templateId;
+    const pendingLager = pendingLagerPrefill;
+    const shouldApplyLagerPrefill =
+      Boolean(pendingLager && selected) &&
+      selected!.title.trim().toLowerCase() === pendingLager!.templateTitle.trim().toLowerCase();
     const shouldProtectCurrentSelection =
       (Boolean(protectedOmeqSelectedIdRef.current) && protectedOmeqSelectedIdRef.current === selectedId) ||
-      (Boolean(protectedPaletteSelectedIdRef.current) && protectedPaletteSelectedIdRef.current === selectedId);
+      (Boolean(protectedPaletteSelectedIdRef.current) && protectedPaletteSelectedIdRef.current === selectedId) ||
+      (Boolean(protectedLagerSelectedIdRef.current) && protectedLagerSelectedIdRef.current === selectedId);
 
     setIsEditing(shouldAutoEditNew);
     setDraftTitle(selected?.title ?? "");
@@ -1091,6 +1140,29 @@ export default function StandardTekstPage() {
 
       try {
         sessionStorage.removeItem(OMEQ_STANDARDTEKST_PREFILL_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    } else if (shouldApplyLagerPrefill && selected && pendingLager) {
+      resetPreparatRows();
+      setVirkestoffByKey({});
+      setFormuleringByPreparatKey({});
+
+      addPickedPreparat(pendingLager.preparat, pendingLager.preparatKey);
+
+      setTallByIndex(buildInitialTallValues(normalizeTemplateContent(selected.content)));
+      setAltByIndex({});
+      setOptionalRemovedByIndex({});
+      resetClockToAutomatic();
+      // Måned/år (MM.YYYY) fra "dekket til" → DATO-tokenet rendres som "desember 2026".
+      setDatoInput(pendingLager.datoInput);
+      setErrorLocal(null);
+      protectedLagerSelectedIdRef.current = selected.id;
+      setPendingLagerPrefill(null);
+      appliedLagerPrefillRequestIdRef.current = pendingLager.requestId;
+
+      try {
+        sessionStorage.removeItem(LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY);
       } catch {
         // ignore
       }
@@ -1171,6 +1243,7 @@ export default function StandardTekstPage() {
     canManageStandardTekster,
     pendingOmeqPrefill,
     pendingPalettePrefill,
+    pendingLagerPrefill,
     resetPreparatRows,
     selected,
     selectedId,
@@ -1193,6 +1266,12 @@ export default function StandardTekstPage() {
     if (!protectedPaletteSelectedIdRef.current) return;
     if (protectedPaletteSelectedIdRef.current === selectedId) return;
     protectedPaletteSelectedIdRef.current = null;
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!protectedLagerSelectedIdRef.current) return;
+    if (protectedLagerSelectedIdRef.current === selectedId) return;
+    protectedLagerSelectedIdRef.current = null;
   }, [selectedId]);
 
   // Auto-focus standardtekst search on first load when no template is selected
@@ -1222,6 +1301,24 @@ export default function StandardTekstPage() {
       setSelectedId(target.id);
     }
   }, [items, omeqPrefill, selected, selectedId, setSelectedId]);
+
+  // Overføring fra Lagerbeholdning: match malen på tittel og velg den.
+  useEffect(() => {
+    if (!lagerPrefill) return;
+    if (appliedLagerPrefillRequestIdRef.current === lagerPrefill.requestId) return;
+    if (items.length === 0) return;
+
+    const normalizedTargetTitle = lagerPrefill.templateTitle.trim().toLowerCase();
+    const target = items.find((item) => item.title.trim().toLowerCase() === normalizedTargetTitle);
+    if (!target) return;
+
+    setPendingLagerPrefill(lagerPrefill);
+
+    if (selectedId !== target.id) {
+      preserveInputsOnNextSelectRef.current = true;
+      setSelectedId(target.id);
+    }
+  }, [items, lagerPrefill, selected, selectedId, setSelectedId]);
 
   // Detect palette prefill from global search and queue it
   useEffect(() => {

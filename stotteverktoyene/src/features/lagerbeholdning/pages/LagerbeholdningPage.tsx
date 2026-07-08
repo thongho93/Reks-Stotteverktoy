@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Collapse,
   Container,
   FormControlLabel,
@@ -52,8 +54,26 @@ import {
 } from "../lib/festVirkestoff";
 import { useVnrAutoPaste } from "../../../shared/hooks/useVnrAutoPaste";
 import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
+import { loadMedicationItems } from "../../fest/components/MedicationSearch";
+import { formatPreparatForTemplate } from "../../standardtekster/utils/preparat";
 
 const TEAL = "#0E9F8E";
+
+// Overføring til standardteksten "Hyppig uttak - Har fått nok til..": tittelen
+// brukes til å matche malen, og nøkkelen deles med StandardTekstPage via
+// sessionStorage (samme mønster som OMEQ → standardtekst).
+const HAR_FATT_NOK_TITLE = "Hyppig uttak - Har fått nok til..";
+const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
+// Terskel (dager igjen) for å tilby overføring – samme som grønn fargekode.
+const HAR_FATT_NOK_MIN_DAGER = 45;
+
+// Måned + år fra "dekket til" som MM.YYYY, som DATO-tokenet rendrer som
+// f.eks. "desember 2026".
+const datoMndFromDate = (d: Date | null): string => {
+  if (!d) return "";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${mm}.${d.getFullYear()}`;
+};
 
 const EKSEMPEL = `489 d. 17.02.2025 169052 Pinex brusetab 500 mg 20 STK\t5\t100 STK
 26 d. 22.01.2025 169052 Pinex brusetab 500 mg 20 STK\t1\t20 STK`;
@@ -113,10 +133,15 @@ export default function LagerbeholdningPage() {
     [baseTheme],
   );
 
+  const navigate = useNavigate();
+
   const [input, setInput] = useState("");
   const [referansedatoInput, setReferansedatoInput] = useState(() =>
     toDateInputValue(new Date()),
   );
+  // Nøkkel til beregningen vi holder på å åpne standardtekst for (viser spinner
+  // på riktig knapp mens preparat-katalogen slås opp).
+  const [openingStandardtekstKey, setOpeningStandardtekstKey] = useState<string | null>(null);
   const [doseByVare, setDoseByVare] = useState<Record<string, string>>({});
   const [periodeByVare, setPeriodeByVare] = useState<Record<string, PeriodeValue>>({});
   const [egendagerByVare, setEgendagerByVare] = useState<Record<string, string>>({});
@@ -233,6 +258,52 @@ export default function LagerbeholdningPage() {
     setOpenHistorikk({});
     setReferansedatoInput(toDateInputValue(new Date()));
   }, []);
+
+  // Åpner standardteksten "Hyppig uttak - Har fått nok til.." med preparat og
+  // måned (fra "dekket til") forhåndsutfylt. Preparatet slås opp på varenummer i
+  // samme katalog som preparatsøket i Standardtekster; faller tilbake på navnet
+  // fra lagerbeholdning hvis vnr ikke finnes i katalogen.
+  const openHarFattNok = useCallback(
+    async (b: VareBeregning) => {
+      setOpeningStandardtekstKey(b.key);
+
+      let preparatText = (b.varenavn ?? "").trim();
+      try {
+        const meds = await loadMedicationItems();
+        const vnr = (b.varenr ?? "").replace(/\D/g, "");
+        if (vnr) {
+          const hit = meds.find(
+            (m) => String(m.farmaloggNumber ?? "").replace(/\D/g, "") === vnr,
+          );
+          const formatted = hit ? formatPreparatForTemplate(hit) : "";
+          if (formatted) preparatText = formatted;
+        }
+      } catch {
+        // Katalogen kunne ikke lastes – behold lagerbeholdning-navnet.
+      }
+
+      const payload = {
+        requestId: Date.now(),
+        templateTitle: HAR_FATT_NOK_TITLE,
+        preparat: preparatText,
+        preparatKey: (b.varenr ?? "").trim() || preparatText,
+        datoInput: datoMndFromDate(b.dekketTil),
+      };
+
+      try {
+        sessionStorage.setItem(
+          LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY,
+          JSON.stringify(payload),
+        );
+      } catch {
+        // ignore
+      }
+
+      setOpeningStandardtekstKey(null);
+      navigate("/standardtekster", { state: { lagerPrefill: payload } });
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -655,6 +726,31 @@ export default function LagerbeholdningPage() {
                     <Typography variant="body2" color="text.secondary">
                       Oppgi dagsforbruk for å regne ut beholdning, dager igjen og dekning.
                     </Typography>
+                  )}
+
+                  {harBeholdning && !tom && (b.dagerIgjen as number) >= HAR_FATT_NOK_MIN_DAGER && (
+                    <Box sx={{ mt: 1.5 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => openHarFattNok(b)}
+                        disabled={openingStandardtekstKey === b.key}
+                        startIcon={
+                          openingStandardtekstKey === b.key ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : undefined
+                        }
+                        sx={{
+                          textTransform: "none",
+                          borderRadius: 2,
+                          borderColor: alpha(accent, 0.5),
+                          color: accent,
+                          "&:hover": { borderColor: accent },
+                        }}
+                      >
+                        Åpne standardtekst «Har fått nok til…»
+                      </Button>
+                    </Box>
                   )}
 
                   <Box sx={{ mt: 1 }}>
