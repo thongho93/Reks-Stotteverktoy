@@ -143,6 +143,7 @@ export default function LagerbeholdningPage() {
   // i en effekt når resultatkortene (og dermed dose-inputene) er rendret.
   const doseInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const pendingDoseFocusRef = useRef(false);
+  const uttakInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const appendUttak = useCallback((text: string) => {
     setInput((prev) => {
@@ -235,8 +236,20 @@ export default function LagerbeholdningPage() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
       if ((e as any).isComposing) return;
+
+      // Ctrl+S (Windows) / Cmd+S (Mac) -> fokuser Uttakshistorikk-feltet.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        const el = uttakInputRef.current;
+        if (el) {
+          el.focus();
+          el.select();
+        }
+        return;
+      }
+
+      if (e.key !== "Escape") return;
       e.preventDefault();
       resetAll();
     };
@@ -276,7 +289,7 @@ export default function LagerbeholdningPage() {
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap" }}>
             <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-              <strong>Nullstill</strong>: Escape
+              <strong>Uttakshistorikk</strong>: Ctrl + S · <strong>Nullstill</strong>: Escape
             </Typography>
 
             <Button
@@ -332,6 +345,7 @@ export default function LagerbeholdningPage() {
               <TextField
                 label="Uttakshistorikk"
                 placeholder={EKSEMPEL}
+                inputRef={uttakInputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onPaste={() => {
@@ -408,11 +422,13 @@ export default function LagerbeholdningPage() {
                 b.dagligForbruk != null && (mgModus || periode !== "dag");
               const harBeholdning = b.beholdning != null;
               const tom = harBeholdning && (b.beholdning as number) <= 0;
+              // Fargekoding etter dager igjen: grønn ≥ 45, gul 10–44, rød < 10
+              // (tom beholdning er alltid rød).
               const accent = !harBeholdning
                 ? TEAL
-                : tom
+                : tom || (b.dagerIgjen as number) < 10
                   ? "#FF5E5B"
-                  : (b.dagerIgjen as number) <= 14
+                  : (b.dagerIgjen as number) < 45
                     ? "#FFA726"
                     : "#4BC76A";
 
