@@ -488,9 +488,7 @@ export default function StandardTekstPage() {
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
-      setClockTime(getAutomaticClockTallTime());
-      setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
-      setClockCustomMode(true);
+      resetClockToAutomatic();
 
       // Reset date input
       setDatoInput("");
@@ -520,9 +518,43 @@ export default function StandardTekstPage() {
     getAutomaticClockTallDay(getAutomaticClockTallTime()),
   );
   const [clockCustomMode, setClockCustomMode] = useState<boolean>(true);
+  // true så lenge klokkeslettet fortsatt følger det tidsavhengige auto-forslaget.
+  // Settes false så snart brukeren selv velger et klokkeslett/dag, slik at et bevisst
+  // valg aldri overstyres av den løpende oppdateringen under.
+  const [clockAutoManaged, setClockAutoManaged] = useState<boolean>(true);
   const [datoInput, setDatoInput] = useState<string>("");
   const [formuleringByIndex, setFormuleringByIndex] = useState<Record<number, string>>({ 0: "" });
   const [formuleringByPreparatKey, setFormuleringByPreparatKey] = useState<Record<string, string>>({});
+
+  // Setter klokkeslettet til det tidsavhengige auto-forslaget og re-aktiverer
+  // auto-styring. Brukes ved nullstilling, malbytte og etter kopiering.
+  const resetClockToAutomatic = useCallback(() => {
+    const auto = getAutomaticClockTallTime();
+    setClockTime(auto);
+    setClockDay(getAutomaticClockTallDay(auto));
+    setClockCustomMode(true);
+    setClockAutoManaged(true);
+  }, []);
+
+  // Løpende oppdatering: så lenge brukeren ikke har valgt klokkeslett selv, følger
+  // defaulten klokka. F.eks. bytter et vindu som ble åpnet før kl. 13 automatisk til
+  // "i løpet av dagen" når klokka passerer 13, uten at siden må lastes på nytt.
+  useEffect(() => {
+    if (!clockAutoManaged) return;
+    const sync = () => {
+      const auto = getAutomaticClockTallTime();
+      // Begge settere no-op-er hvis verdien er uendret (React bail-out), så dette
+      // gir kun ny render når klokka faktisk har passert en terskel.
+      setClockTime((prev) => (prev === auto ? prev : auto));
+      setClockDay((prev) => {
+        const next = getAutomaticClockTallDay(auto);
+        return prev === next ? prev : next;
+      });
+    };
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [clockAutoManaged]);
+
   const templateHasVirkestoffToken = (template: string) => /\bVIRKESTOFF\b/.test(template ?? "");
   const templateHasFormuleringTokens = (template: string) =>
     /\{\{\s*FORMULERING\d*\s*\}\}|\bFORMULERING\d*\b/i.test(template ?? "");
@@ -1050,9 +1082,7 @@ export default function StandardTekstPage() {
       setTallByIndex(nextTallValues);
       setAltByIndex({});
       setOptionalRemovedByIndex({});
-      setClockTime(getAutomaticClockTallTime());
-      setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
-      setClockCustomMode(true);
+      resetClockToAutomatic();
       setDatoInput("");
       setErrorLocal(null);
       protectedOmeqSelectedIdRef.current = selected.id;
@@ -1098,6 +1128,8 @@ export default function StandardTekstPage() {
       setClockTime(clockTimeToUse);
       setClockDay(pendingPalette.clockDay ?? getAutomaticClockTallDay(clockTimeToUse));
       setClockCustomMode(true);
+      // Gjenopprettet, lagret klokkeslett er et bevisst valg – ikke auto-styrt.
+      setClockAutoManaged(false);
       setDatoInput(pendingPalette.datoInput ?? "");
       setErrorLocal(null);
 
@@ -1111,9 +1143,7 @@ export default function StandardTekstPage() {
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setAltByIndex({});
       setOptionalRemovedByIndex({});
-      setClockTime(getAutomaticClockTallTime());
-      setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
-      setClockCustomMode(true);
+      resetClockToAutomatic();
       setDatoInput("");
       const fIndices = getFormuleringTokenIndices(activeTemplateContent);
       if (fIndices.length) {
@@ -1927,9 +1957,7 @@ export default function StandardTekstPage() {
         }
         setAltByIndex({});
         setOptionalRemovedByIndex({});
-        setClockTime(getAutomaticClockTallTime());
-        setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
-        setClockCustomMode(true);
+        resetClockToAutomatic();
 
         setSearch("");
         setDatoInput("");
@@ -1975,9 +2003,7 @@ export default function StandardTekstPage() {
           }
           setAltByIndex({});
           setOptionalRemovedByIndex({});
-          setClockTime(getAutomaticClockTallTime());
-          setClockDay(getAutomaticClockTallDay(getAutomaticClockTallTime()));
-          setClockCustomMode(true);
+          resetClockToAutomatic();
 
           setSearch("");
           setDatoInput("");
@@ -2433,6 +2459,8 @@ export default function StandardTekstPage() {
                               sx={{ width: "100%", minWidth: 0 }}
                               value={selectedClockTime}
                               onChange={(e) => {
+                                // Bevisst valg: slå av løpende auto-oppdatering.
+                                setClockAutoManaged(false);
                                 if (e.target.value === DURING_DAY_VALUE) {
                                   // Behold clockCustomMode så "Eget klokkeslett" fortsatt vises
                                   // og et klokkeslett kan skrives inn manuelt.
@@ -2474,6 +2502,7 @@ export default function StandardTekstPage() {
                                 sx={{ width: "100%", minWidth: 0 }}
                                 value={clockDay}
                                 onChange={(e) => {
+                                  setClockAutoManaged(false);
                                   setClockDay(e.target.value as ClockTallDay);
                                   if (errorLocal?.startsWith("Velg klokkeslett")) {
                                     setErrorLocal(null);
@@ -2497,6 +2526,7 @@ export default function StandardTekstPage() {
                                 value={isPhraseTime ? "" : clockTime}
                                 onChange={(e) => {
                                   const nextTime = e.target.value;
+                                  setClockAutoManaged(false);
                                   setClockCustomMode(true);
                                   setClockTime(nextTime);
                                   if (nextTime) setClockDay(getAutomaticClockTallDay(nextTime));
