@@ -148,9 +148,11 @@ const normalizeVedtakText = (value: string) => {
 };
 
 // Klippebord-innhold som er (kun) et tall, f.eks. "67" eller "67,5"/"67.5".
+// Maks 3 siffer i heltallsdelen (vedtak-OMEQ er aldri firesifret), slik at
+// f.eks. et kopiert varenummer (5-7 siffer) ikke ved en feil fylles inn her.
 const extractVedtakNumber = (text: string): string => {
   const compact = String(text ?? "").trim();
-  return /^-?\d+(?:[.,]\d+)?$/.test(compact) ? compact : "";
+  return /^-?\d{1,3}(?:[.,]\d+)?$/.test(compact) ? compact : "";
 };
 
 export default function OMEQPage() {
@@ -368,7 +370,9 @@ export default function OMEQPage() {
   }, []);
 
   useEffect(() => {
-    if (!vedtakIsOk) {
+    // Ikke auto-kopier før Total OMEQ faktisk er regnet ut (totalOmeq er 0 når
+    // ingen preparatrader er fylt ut) — begge felt må være på plass.
+    if (totalOmeq <= 0 || !vedtakIsOk) {
       lastCopiedVedtakSummaryRef.current = null;
       return;
     }
@@ -380,7 +384,7 @@ export default function OMEQPage() {
       }
       setCopyToastMessage(ok ? "Kopiert til utklippstavle" : "Kunne ikke kopiere automatisk");
     });
-  }, [vedtakIsOk, totalOmeqText, debouncedVedtakOmeq, copyVedtakSummary]);
+  }, [totalOmeq, vedtakIsOk, totalOmeqText, debouncedVedtakOmeq, copyVedtakSummary]);
 
   const canOpenOmeqStandardtekst =
     selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
