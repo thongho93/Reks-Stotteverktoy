@@ -178,3 +178,20 @@ export function parsedToEntities(
 
   return result;
 }
+
+// Sant hvis teksten inneholder minst én ATC-kode eller et gjenkjent virkestoff-/
+// gruppenavn. Brukes til å avgjøre om innhold på utklippstavlen faktisk ligner en
+// interaksjon (så vi ikke auto-limer inn tilfeldig tekst). Uten indeks kan vi kun
+// bekrefte ATC-koder.
+export function interactionPasteHasKnownContent(
+  input: string,
+  index: InteractionIndex | null | undefined,
+): boolean {
+  const parsed = parseInteractionPaste(input);
+  if (parsed.some((p) => p.atc)) return true;
+  if (!index) return false;
+  return parsed.some((p) => {
+    const words = (p.name ?? "").split(/\s+/).filter(Boolean);
+    return greedyResolveNames(words, index).length > 0;
+  });
+}
