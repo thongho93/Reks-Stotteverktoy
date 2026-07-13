@@ -49,7 +49,11 @@ import {
   type InteractionEntity,
   type MatchResult,
 } from "../../fest/mappers/interactionsToIndex";
-import { parseInteractionPaste, parsedToEntities } from "../utils/parsePaste";
+import {
+  interactionPasteHasKnownContent,
+  parseInteractionPaste,
+  parsedToEntities,
+} from "../utils/parsePaste";
 import { generateKundetekst } from "../services/claudeService";
 
 import {
@@ -321,6 +325,19 @@ export default function InteraksjonerPage() {
 
   // Prototype: lim-inn-søk (steg 1) + AI-generert kundetekst (steg 2)
   const [pasteValue, setPasteValue] = React.useState("");
+  const [isPasteFocused, setIsPasteFocused] = React.useState(false);
+
+  // Auto-lim inn i "Eller lim inn interaksjon": når feltet er aktivt og
+  // utklippstavlen inneholder ATC-koder eller et gjenkjent virkestoffnavn,
+  // fylles teksten inn automatisk (samme "Auto vnr"-toggle). Tilfeldig tekst
+  // og rene varenumre ignoreres – de sistnevnte håndteres av søkefeltet over.
+  useVnrAutoPaste({
+    enabled: autoPasteVnr,
+    isFocused: isPasteFocused,
+    onVnr: (text) => setPasteValue(text),
+    extract: (text) =>
+      interactionPasteHasKnownContent(text, index) ? text.trim() : "",
+  });
   const [aiText, setAiText] = React.useState("");
   const [aiLoading, setAiLoading] = React.useState(false);
   const [aiError, setAiError] = React.useState<string | null>(null);
@@ -924,6 +941,8 @@ export default function InteraksjonerPage() {
                 placeholder="F.eks. «Bør unngås Escitalopram N06A B10 Ikke-selektive monoaminreopptakshemmere N06A A»"
                 value={pasteValue}
                 onChange={(e) => setPasteValue(e.target.value)}
+                onFocus={() => setIsPasteFocused(true)}
+                onBlur={() => setIsPasteFocused(false)}
                 onKeyDown={(e) => {
                   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                     e.preventDefault();
