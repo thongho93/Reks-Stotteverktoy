@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
+  Checkbox,
   Collapse,
   Container,
   Divider,
@@ -166,6 +167,9 @@ export default function OMEQPage() {
   const [showInfoTable, setShowInfoTable] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
   const lastCopiedVedtakSummaryRef = useRef<string | null>(null);
+  // Når avhaket legges en ekstra linje til i auto-kopien om at oppgitt lege er
+  // kundens fastlege / jobber ved fastlegens kontor.
+  const [erFastlege, setErFastlege] = useState(false);
   const [autoPasteNumericClipboard, setAutoPasteNumericClipboard] = useAutoVnrPreference("omeq");
   const [isVedtakFocused, setIsVedtakFocused] = useState(false);
   const vedtakInputRef = useRef<HTMLInputElement | null>(null);
@@ -254,6 +258,7 @@ export default function OMEQPage() {
     setVedtakOmeq("");
     setDebouncedVedtakOmeq("");
     setCopyToastMessage(null);
+    setErFastlege(false);
     lastCopiedVedtakSummaryRef.current = null;
   }, []);
 
@@ -370,13 +375,15 @@ export default function OMEQPage() {
   }, []);
 
   useEffect(() => {
-    // Ikke auto-kopier før Total OMEQ faktisk er regnet ut (totalOmeq er 0 når
-    // ingen preparatrader er fylt ut) — begge felt må være på plass.
-    if (totalOmeq <= 0 || !vedtakIsOk) {
+    // Auto-kopier kun når Total OMEQ er regnet ut (> 0), vedtaket dekker, OG
+    // fastlege-boksen er avhaket. Uten avhaking skjer ingen auto-kopi.
+    if (totalOmeq <= 0 || !vedtakIsOk || !erFastlege) {
       lastCopiedVedtakSummaryRef.current = null;
       return;
     }
-    const text = `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${debouncedVedtakOmeq} mg`;
+    const text =
+      `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${debouncedVedtakOmeq} mg` +
+      "\nOppgitt lege er kundens fastlege eller jobber ved fastlegens kontor.";
     if (lastCopiedVedtakSummaryRef.current === text) return;
     void copyVedtakSummary(text).then((ok) => {
       if (ok) {
@@ -384,7 +391,7 @@ export default function OMEQPage() {
       }
       setCopyToastMessage(ok ? "Kopiert til utklippstavle" : "Kunne ikke kopiere automatisk");
     });
-  }, [totalOmeq, vedtakIsOk, totalOmeqText, debouncedVedtakOmeq, copyVedtakSummary]);
+  }, [totalOmeq, vedtakIsOk, totalOmeqText, debouncedVedtakOmeq, erFastlege, copyVedtakSummary]);
 
   const canOpenOmeqStandardtekst =
     selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
@@ -785,6 +792,42 @@ export default function OMEQPage() {
                       </Box>
                     </Tooltip>
                   </Box>
+
+                  <Paper
+                    variant="outlined"
+                    sx={(theme) => ({
+                      width: "100%",
+                      borderRadius: 2,
+                      transition: "border-color .15s ease, background-color .15s ease",
+                      borderColor: erFastlege
+                        ? theme.palette.primary.main
+                        : alpha(theme.palette.text.primary, 0.15),
+                      backgroundColor: erFastlege
+                        ? alpha(theme.palette.primary.main, 0.08)
+                        : "transparent",
+                      "&:hover": { borderColor: theme.palette.primary.main },
+                    })}
+                  >
+                    <FormControlLabel
+                      sx={{ m: 0, width: "100%", alignItems: "center", px: 1.25, py: 0.5 }}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={erFastlege}
+                          onChange={(e) => setErFastlege(e.target.checked)}
+                          sx={{ py: 0.25, pl: 0.25, pr: 1 }}
+                        />
+                      }
+                      label={
+                        <Typography
+                          variant="body2"
+                          sx={{ color: erFastlege ? "text.primary" : "text.secondary", lineHeight: 1.35 }}
+                        >
+                          Oppgitt lege er kundens fastlege eller jobber ved fastlegens kontor
+                        </Typography>
+                      }
+                    />
+                  </Paper>
 
                   <Paper
                     variant="outlined"
