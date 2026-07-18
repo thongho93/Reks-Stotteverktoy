@@ -15,7 +15,8 @@
     "fest:meds": "tsx scripts/extractFestMeds.ts",
     "pim:sync": "tsx scripts/extractPimProducts.ts",
     "hv:sync": "tsx scripts/syncHvProductsFromCsv.ts",
-    "raad:sync": "node scripts/extractPharmacistAdvice.mjs"
+    "raad:sync": "node scripts/extractPharmacistAdvice.mjs",
+    "interaksjon:prune": "node scripts/pruneInteractions.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",
