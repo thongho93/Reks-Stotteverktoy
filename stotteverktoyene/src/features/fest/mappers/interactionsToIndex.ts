@@ -1,8 +1,11 @@
 // Builds a fast lookup index for FEST interaction data (interactions.json)
 // Goal: autocomplete + quick matching without scanning the whole JSON each time.
-import meds from "../meds.json";
+//
+// meds.json (~2,3 MB) importeres dynamisk inne i buildInteractionsIndex slik at
+// den holdes ute av oppstart-bundelen — den lastes først når interaksjonsindeksen
+// faktisk bygges (Interaksjonssøk / globalsøk), ikke ved app-oppstart.
 
-export type InteractionIndex = ReturnType<typeof buildInteractionsIndex>;
+export type InteractionIndex = Awaited<ReturnType<typeof buildInteractionsIndex>>;
 
 export type InteractionJson = {
   oppfId?: string | null;
@@ -82,7 +85,7 @@ function uniqPush<T>(arr: T[], seen: Set<string>, key: string, value: T) {
   arr.push(value);
 }
 
-export function buildInteractionsIndex(interactions: InteractionJson[]) {
+export async function buildInteractionsIndex(interactions: InteractionJson[]) {
   // termIndex maps BOTH name keys and ATC codes to occurrences.
   // - name key: normalizeText(substans)
   // - atc key:  normalizeAtc(code)
@@ -206,6 +209,7 @@ export function buildInteractionsIndex(interactions: InteractionJson[]) {
     return false;
   };
 
+  const meds = (await import("../meds.json")).default;
   const medicationRows = Array.isArray(meds) ? (meds as Array<Record<string, unknown>>) : [];
 
   medicationRows.forEach((med) => {
