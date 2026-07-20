@@ -8,6 +8,7 @@ import {
   Collapse,
   Container,
   FormControlLabel,
+  IconButton,
   InputAdornment,
   List,
   ListItem,
@@ -30,6 +31,8 @@ import {
   Typography,
 } from "@mui/material";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
@@ -85,24 +88,69 @@ const formatTall = (n: number): string => {
 
 // Doseringsperioder. Ukentlig/månedlig/intervall-dosering regnes om til et
 // gjennomsnittlig dagsforbruk (antall ÷ dager i perioden) som beregningen bruker.
-// "egendefinert" lar brukeren oppgi et fritt intervall i dager (hver N. dag).
+// "egendefinert" lar brukeren oppgi et fritt intervall (hver N. dag/uke/måned).
 const PERIODER = [
   { value: "dag", label: "per dag", dager: 1 },
   { value: "uke", label: "per uke", dager: 7 },
   { value: "2uker", label: "per 2 uker", dager: 14 },
   { value: "4uker", label: "per 4 uker", dager: 28 },
   { value: "maaned", label: "per måned", dager: 30 },
+  { value: "varierende", label: "Varierende…", dager: null },
   { value: "egendefinert", label: "Egendefinert…", dager: null },
 ] as const;
 
 type PeriodeValue = (typeof PERIODER)[number]["value"];
 
+// Grunnperiode for varierende dosering: brukeren bygger flere linjer
+// «N enheter × M dager i <uken/måneden>». Summen deles på grunnperiodens dager
+// for å få snitt-dagsforbruk.
+const VARIERENDE_GRUNN = [
+  { value: "uke", selectLabel: "per uke", iLabel: "uken", dager: 7 },
+  { value: "maaned", selectLabel: "per måned", iLabel: "måneden", dager: 30 },
+] as const;
+
+type VarierendeGrunn = (typeof VARIERENDE_GRUNN)[number]["value"];
+
+type DoseLinje = { antall: string; dager: string };
+
+// Sum av «antall × dager» over gyldige linjer, eller null hvis ingen gyldige.
+const sumVarierendeDoser = (linjer: DoseLinje[]): number | null => {
+  let sum = 0;
+  let harGyldig = false;
+  for (const l of linjer) {
+    const a = Number((l.antall ?? "").trim().replace(",", "."));
+    const d = Number((l.dager ?? "").trim().replace(",", "."));
+    if (Number.isFinite(a) && a > 0 && Number.isFinite(d) && d > 0) {
+      sum += a * d;
+      harGyldig = true;
+    }
+  }
+  return harGyldig ? sum : null;
+};
+
+// Enhet for det egendefinerte intervallet: brukeren oppgir "hver N. <enhet>", og
+// hver enhet tilsvarer et antall dager. Slik slipper man å regne om selv (f.eks.
+// 2 uker = 14 dager eller 2 måneder = 60 dager).
+const EGEN_ENHETER = [
+  { value: "dag", label: "dag", dager: 1 },
+  { value: "uke", label: "uke", dager: 7 },
+  { value: "maaned", label: "måned", dager: 30 },
+] as const;
+
+type EgenEnhet = (typeof EGEN_ENHETER)[number]["value"];
+
 // Antall dager i valgt periode. Returnerer null hvis egendefinert intervall ikke
 // er oppgitt/gyldig, slik at beregningen lar være å regne ut dagsforbruk.
-const periodeDager = (value: string, egendager: string): number | null => {
+const periodeDager = (
+  value: string,
+  egendager: string,
+  egenEnhet: EgenEnhet = "dag",
+): number | null => {
   if (value === "egendefinert") {
     const n = Number(egendager.trim().replace(",", "."));
-    return Number.isFinite(n) && n > 0 ? n : null;
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const enhetDager = EGEN_ENHETER.find((e) => e.value === egenEnhet)?.dager ?? 1;
+    return n * enhetDager;
   }
   return PERIODER.find((p) => p.value === value)?.dager ?? 1;
 };
@@ -145,6 +193,10 @@ export default function LagerbeholdningPage() {
   const [doseByVare, setDoseByVare] = useState<Record<string, string>>({});
   const [periodeByVare, setPeriodeByVare] = useState<Record<string, PeriodeValue>>({});
   const [egendagerByVare, setEgendagerByVare] = useState<Record<string, string>>({});
+  const [egenEnhetByVare, setEgenEnhetByVare] = useState<Record<string, EgenEnhet>>({});
+  // Varierende dosering: liste av «antall × dager»-linjer + valgt grunnperiode.
+  const [doseLinjerByVare, setDoseLinjerByVare] = useState<Record<string, DoseLinje[]>>({});
+  const [varierendeGrunnByVare, setVarierendeGrunnByVare] = useState<Record<string, VarierendeGrunn>>({});
   const [doseEnhetByVare, setDoseEnhetByVare] = useState<Record<string, "ml" | "mg">>({});
   const [styrkeByVare, setStyrkeByVare] = useState<Record<string, string>>({});
   const [showHelp, setShowHelp] = useState(false);
@@ -215,15 +267,27 @@ export default function LagerbeholdningPage() {
   const beregninger = useMemo<VareBeregning[]>(() => {
     const result: VareBeregning[] = [];
     for (const [key, gruppe] of grupper.entries()) {
-      const raw = doseByVare[key]?.trim().replace(",", ".");
-      const doseNum = raw ? Number(raw) : null;
-      const dose = doseNum != null && Number.isFinite(doseNum) ? doseNum : null;
+      const periode = periodeByVare[key] ?? "dag";
 
       const styrkeRaw = styrkeByVare[key]?.trim().replace(",", ".");
       const styrkeNum = styrkeRaw ? Number(styrkeRaw) : null;
       const styrkeOverride = styrkeNum != null && Number.isFinite(styrkeNum) ? styrkeNum : null;
 
-      const dager = periodeDager(periodeByVare[key] ?? "dag", egendagerByVare[key] ?? "");
+      let dose: number | null;
+      let dager: number | null;
+
+      if (periode === "varierende") {
+        // Sum av alle dose-linjer over grunnperioden → snitt-dagsforbruk via
+        // beregnVare (dose = ukes-/måneds-sum, periodeDager = grunnperiodens dager).
+        const grunn = varierendeGrunnByVare[key] ?? "uke";
+        dager = VARIERENDE_GRUNN.find((g) => g.value === grunn)?.dager ?? 7;
+        dose = sumVarierendeDoser(doseLinjerByVare[key] ?? []);
+      } else {
+        const raw = doseByVare[key]?.trim().replace(",", ".");
+        const doseNum = raw ? Number(raw) : null;
+        dose = doseNum != null && Number.isFinite(doseNum) ? doseNum : null;
+        dager = periodeDager(periode, egendagerByVare[key] ?? "", egenEnhetByVare[key] ?? "dag");
+      }
 
       result.push(
         beregnVare(key, gruppe, referansedato, {
@@ -235,7 +299,7 @@ export default function LagerbeholdningPage() {
       );
     }
     return result.sort((a, b) => a.varenavn.localeCompare(b.varenavn, "nb"));
-  }, [grupper, doseByVare, periodeByVare, egendagerByVare, doseEnhetByVare, styrkeByVare, referansedato]);
+  }, [grupper, doseByVare, periodeByVare, egendagerByVare, egenEnhetByVare, doseLinjerByVare, varierendeGrunnByVare, doseEnhetByVare, styrkeByVare, referansedato]);
 
   // Når en innliming nettopp skjedde og det finnes minst ett resultat, flytt
   // fokus til første doseringsfelt (dose-inputene rendres først nå).
@@ -253,6 +317,9 @@ export default function LagerbeholdningPage() {
     setDoseByVare({});
     setPeriodeByVare({});
     setEgendagerByVare({});
+    setEgenEnhetByVare({});
+    setDoseLinjerByVare({});
+    setVarierendeGrunnByVare({});
     setDoseEnhetByVare({});
     setStyrkeByVare({});
     setOpenHistorikk({});
@@ -489,6 +556,11 @@ export default function LagerbeholdningPage() {
                 styrkeByVare[key] ?? (b.styrkeMgPerMl != null ? formatTall(b.styrkeMgPerMl) : "");
               const periode = periodeByVare[key] ?? "dag";
               const erEgendefinert = periode === "egendefinert";
+              const erVarierende = periode === "varierende";
+              const varierendeLinjer = doseLinjerByVare[key] ?? [{ antall: "", dager: "" }];
+              const varierendeGrunn = varierendeGrunnByVare[key] ?? "uke";
+              const varierendeGrunnInfo =
+                VARIERENDE_GRUNN.find((g) => g.value === varierendeGrunn) ?? VARIERENDE_GRUNN[0];
               const visDagsrate =
                 b.dagligForbruk != null && (mgModus || periode !== "dag");
               const harBeholdning = b.beholdning != null;
@@ -617,27 +689,29 @@ export default function LagerbeholdningPage() {
                           sx={{ width: 150 }}
                         />
                       )}
-                      <TextField
-                        label="Dosering"
-                        placeholder="f.eks. 1"
-                        value={doseByVare[key] ?? ""}
-                        onChange={(e) =>
-                          setDoseByVare((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        inputRef={(el: HTMLInputElement | null) => {
-                          doseInputRefs.current[key] = el;
-                        }}
-                        size="small"
-                        inputProps={{ inputMode: "decimal" }}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              {mgModus ? "mg" : b.enhet ? b.enhet : "enheter"}
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{ width: 160 }}
-                      />
+                      {!erVarierende && (
+                        <TextField
+                          label="Dosering"
+                          placeholder="f.eks. 1"
+                          value={doseByVare[key] ?? ""}
+                          onChange={(e) =>
+                            setDoseByVare((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          inputRef={(el: HTMLInputElement | null) => {
+                            doseInputRefs.current[key] = el;
+                          }}
+                          size="small"
+                          inputProps={{ inputMode: "decimal" }}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                {mgModus ? "mg" : b.enhet ? b.enhet : "enheter"}
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ width: 160 }}
+                        />
+                      )}
                       <TextField
                         select
                         label="Periode"
@@ -658,23 +732,160 @@ export default function LagerbeholdningPage() {
                         ))}
                       </TextField>
                       {erEgendefinert && (
+                        <>
+                          <TextField
+                            label="Intervall"
+                            placeholder="f.eks. 3"
+                            value={egendagerByVare[key] ?? ""}
+                            onChange={(e) =>
+                              setEgendagerByVare((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                            size="small"
+                            inputProps={{ inputMode: "numeric" }}
+                            InputProps={{
+                              startAdornment: <InputAdornment position="start">hver</InputAdornment>,
+                              endAdornment: <InputAdornment position="end">.</InputAdornment>,
+                            }}
+                            sx={{ width: 110 }}
+                          />
+                          <TextField
+                            select
+                            label="Enhet"
+                            value={egenEnhetByVare[key] ?? "dag"}
+                            onChange={(e) =>
+                              setEgenEnhetByVare((prev) => ({
+                                ...prev,
+                                [key]: e.target.value as EgenEnhet,
+                              }))
+                            }
+                            size="small"
+                            sx={{ width: 120 }}
+                          >
+                            {EGEN_ENHETER.map((enh) => (
+                              <MenuItem key={enh.value} value={enh.value}>
+                                {enh.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </>
+                      )}
+                      {erVarierende && (
                         <TextField
-                          label="Intervall"
-                          placeholder="f.eks. 3"
-                          value={egendagerByVare[key] ?? ""}
+                          select
+                          label="Grunnperiode"
+                          value={varierendeGrunn}
                           onChange={(e) =>
-                            setEgendagerByVare((prev) => ({ ...prev, [key]: e.target.value }))
+                            setVarierendeGrunnByVare((prev) => ({
+                              ...prev,
+                              [key]: e.target.value as VarierendeGrunn,
+                            }))
                           }
                           size="small"
-                          inputProps={{ inputMode: "numeric" }}
-                          InputProps={{
-                            startAdornment: <InputAdornment position="start">hver</InputAdornment>,
-                            endAdornment: <InputAdornment position="end">. dag</InputAdornment>,
-                          }}
                           sx={{ width: 150 }}
-                        />
+                        >
+                          {VARIERENDE_GRUNN.map((g) => (
+                            <MenuItem key={g.value} value={g.value}>
+                              {g.selectLabel}
+                            </MenuItem>
+                          ))}
+                        </TextField>
                       )}
                     </Stack>
+
+                    {erVarierende && (
+                      <Box sx={{ mt: 1.25 }}>
+                        <Stack spacing={1}>
+                          {varierendeLinjer.map((linje, i) => (
+                            <Stack
+                              key={i}
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                              sx={{ flexWrap: "wrap", gap: 1 }}
+                            >
+                              <TextField
+                                label="Antall"
+                                placeholder="f.eks. 1"
+                                value={linje.antall}
+                                onChange={(e) =>
+                                  setDoseLinjerByVare((prev) => {
+                                    const next = [...(prev[key] ?? [{ antall: "", dager: "" }])];
+                                    next[i] = { ...next[i], antall: e.target.value };
+                                    return { ...prev, [key]: next };
+                                  })
+                                }
+                                size="small"
+                                inputProps={{ inputMode: "decimal" }}
+                                InputProps={{
+                                  endAdornment: (
+                                    <InputAdornment position="end">
+                                      {mgModus ? "mg" : b.enhet ? b.enhet : "enheter"}
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                sx={{ width: 150 }}
+                              />
+                              <Typography variant="body2" color="text.secondary">
+                                ×
+                              </Typography>
+                              <TextField
+                                label="Dager"
+                                placeholder="f.eks. 5"
+                                value={linje.dager}
+                                onChange={(e) =>
+                                  setDoseLinjerByVare((prev) => {
+                                    const next = [...(prev[key] ?? [{ antall: "", dager: "" }])];
+                                    next[i] = { ...next[i], dager: e.target.value };
+                                    return { ...prev, [key]: next };
+                                  })
+                                }
+                                size="small"
+                                inputProps={{ inputMode: "numeric" }}
+                                InputProps={{
+                                  endAdornment: (
+                                    <InputAdornment position="end">
+                                      dager i {varierendeGrunnInfo.iLabel}
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                sx={{ width: 210 }}
+                              />
+                              <Tooltip title="Fjern linje">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Fjern doseringslinje"
+                                    disabled={varierendeLinjer.length <= 1}
+                                    onClick={() =>
+                                      setDoseLinjerByVare((prev) => {
+                                        const cur = prev[key] ?? [{ antall: "", dager: "" }];
+                                        const next = cur.filter((_, idx) => idx !== i);
+                                        return { ...prev, [key]: next.length ? next : [{ antall: "", dager: "" }] };
+                                      })
+                                    }
+                                  >
+                                    <CloseIcon fontSize="small" />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </Stack>
+                          ))}
+                        </Stack>
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={() =>
+                            setDoseLinjerByVare((prev) => ({
+                              ...prev,
+                              [key]: [...(prev[key] ?? [{ antall: "", dager: "" }]), { antall: "", dager: "" }],
+                            }))
+                          }
+                          sx={{ textTransform: "none", mt: 0.5 }}
+                        >
+                          Legg til dosering
+                        </Button>
+                      </Box>
+                    )}
                     {visDagsrate && (
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
                         = {formatTall(b.dagligForbruk as number)} {b.enhet ? b.enhet : "enheter"}/dag i snitt
@@ -687,7 +898,12 @@ export default function LagerbeholdningPage() {
                     )}
                     {erEgendefinert && (egendagerByVare[key] ?? "").trim() === "" && (
                       <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: "block" }}>
-                        Oppgi intervall i dager (hver N. dag).
+                        Oppgi intervall (hver N. dag/uke/måned).
+                      </Typography>
+                    )}
+                    {erVarierende && sumVarierendeDoser(varierendeLinjer) == null && (
+                      <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: "block" }}>
+                        Oppgi minst én doseringslinje (antall × dager i {varierendeGrunnInfo.iLabel}).
                       </Typography>
                     )}
                   </Box>
