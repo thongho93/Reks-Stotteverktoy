@@ -88,6 +88,35 @@ function normalizeForMatch(value: string): string {
   return cleanMatchTerm(value).toLowerCase();
 }
 
+// Ord som ikke er virkestoffnavn og ikke skal telle/merkes.
+const SUBSTANCE_STOPWORDS = new Set([
+  "og", "med", "mot", "eller", "samt", "pluss", "for", "ved",
+]);
+
+// Normaliserer et virkestoffnavn til en språk-uavhengig form, slik at engelsk/
+// latinsk og norsk skrivemåte gjenkjennes som det samme. Konservative, høy-
+// sikkerhets-regler (bryter f.eks. ikke "paracetamol"):
+//   ph → f   (phenidat → fenidat)
+//   th → t   (methyl → metyl)
+//   -ine → -in, -ate → -at, -ide → -id  (suffikser: codeine→kodein-mønster)
+// Eksempel: "metylphenidate" og "metylfenidat" gir begge "metylfenidat".
+function normalizeSubstanceName(word: string): string {
+  let s = word.toLowerCase().replace(/[^a-zøæå]/g, "");
+  s = s.replace(/th/g, "t").replace(/ph/g, "f");
+  if (s.endsWith("ine")) s = `${s.slice(0, -3)}in`;
+  else if (s.endsWith("ate")) s = `${s.slice(0, -3)}at`;
+  else if (s.endsWith("ide")) s = `${s.slice(0, -3)}id`;
+  return s;
+}
+
+// Del en tekst i ord (unicode-bokstaver). Beholder kun ord som kan være
+// virkestoff-/gruppenavn (≥ 4 tegn, ikke stoppord).
+function substanceWords(value: string): string[] {
+  return (cleanMatchTerm(value).match(/\p{L}+/gu) ?? []).filter(
+    (w) => w.length >= 4 && !SUBSTANCE_STOPWORDS.has(w.toLowerCase()),
+  );
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -331,10 +360,16 @@ export default function InteraksjonerPage() {
   // utklippstavlen inneholder ATC-koder eller et gjenkjent virkestoffnavn,
   // fylles teksten inn automatisk (samme "Auto vnr"-toggle). Tilfeldig tekst
   // og rene varenumre ignoreres – de sistnevnte håndteres av søkefeltet over.
+  // Armes ved innliming/auto-lim → auto-kjør "Tolk og søk" (se effekt lenger nede).
+  const autoTolkRef = React.useRef(false);
+
   useVnrAutoPaste({
     enabled: autoPasteVnr,
     isFocused: isPasteFocused,
-    onVnr: (text) => setPasteValue(text),
+    onVnr: (text) => {
+      setPasteValue(text);
+      autoTolkRef.current = true;
+    },
     extract: (text) =>
       interactionPasteHasKnownContent(text, index) ? text.trim() : "",
   });
@@ -617,20 +652,35 @@ export default function InteraksjonerPage() {
     [showCopySnack, firstName]
   );
 
-  const handlePasteSearch = React.useCallback(() => {
-    if (!index) return;
-    const parsed = parseInteractionPaste(pasteValue);
-    const entities = parsedToEntities(parsed, index);
-    if (entities.length === 0) {
-      showCopySnack("Fant ingen ATC-koder eller virkestoff i teksten");
-      return;
-    }
-    setSelected(entities);
-    setInputValue("");
-    setPasteValue("");
-    setActiveLinkedStdId(null);
-    setExpanded({});
-  }, [index, pasteValue, showCopySnack]);
+  const handlePasteSearch = React.useCallback(
+    (override?: string) => {
+      if (!index) return;
+      const src = typeof override === "string" ? override : pasteValue;
+      const parsed = parseInteractionPaste(src);
+      const entities = parsedToEntities(parsed, index);
+      if (entities.length === 0) {
+        showCopySnack("Fant ingen ATC-koder eller virkestoff i teksten");
+        return;
+      }
+      setSelected(entities);
+      setInputValue("");
+      setPasteValue("");
+      setActiveLinkedStdId(null);
+      setExpanded({});
+    },
+    [index, pasteValue, showCopySnack],
+  );
+
+  // Auto-tolk: når lim-inn-feltet får gjenkjent innhold (via innliming eller
+  // ambient auto-lim), kjøres "Tolk og søk" automatisk. Armes ved paste/auto-lim
+  // (autoTolkRef) og utføres når indeksen er klar – ikke ved vanlig tasting.
+  React.useEffect(() => {
+    if (!autoTolkRef.current) return;
+    if (!index) return; // vent på at interaksjonsindeksen er lastet
+    autoTolkRef.current = false;
+    if (!interactionPasteHasKnownContent(pasteValue, index)) return;
+    handlePasteSearch(pasteValue);
+  }, [pasteValue, index, handlePasteSearch]);
 
   const handleGenerateAi = React.useCallback(async () => {
     if (!activeCtx?.it || !activeCtx.r) return;
@@ -941,6 +991,11 @@ export default function InteraksjonerPage() {
                 placeholder="F.eks. «Bør unngås Escitalopram N06A B10 Ikke-selektive monoaminreopptakshemmere N06A A»"
                 value={pasteValue}
                 onChange={(e) => setPasteValue(e.target.value)}
+                onPaste={() => {
+                  // Manuell innliming: arm auto-tolk. onChange oppdaterer pasteValue
+                  // rett etter, og effekten kjører søket hvis innholdet gjenkjennes.
+                  autoTolkRef.current = true;
+                }}
                 onFocus={() => setIsPasteFocused(true)}
                 onBlur={() => setIsPasteFocused(false)}
                 onKeyDown={(e) => {
@@ -954,7 +1009,7 @@ export default function InteraksjonerPage() {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={handlePasteSearch}
+                  onClick={() => handlePasteSearch()}
                   disabled={!pasteValue.trim() || !index}
                   sx={{
                     fontWeight: 700,
@@ -1476,6 +1531,13 @@ export default function InteraksjonerPage() {
                         )
                       );
 
+                // Kandidat-ord fra søketermene, normalisert språk-uavhengig.
+                // «Kodein og paracetamol» → {kodein, paracetamol}; håndterer også
+                // engelsk↔norsk (metylphenidate = metylfenidat).
+                const candidateNorms = new Set(
+                  matchTerms.flatMap(substanceWords).map(normalizeSubstanceName).filter(Boolean),
+                );
+
                 const linkedWithScore = linkedStandardtekster.map((s) => {
                   const title = normalizeStandardtekstTitle(s);
                   const copyText =
@@ -1485,27 +1547,27 @@ export default function InteraksjonerPage() {
                     (s as any).body ??
                     (s as any).template ??
                     "";
-                  const titleNorm = normalizeForMatch(title);
-                  const bodyNorm = normalizeForMatch(copyText);
-                  const matchedTerms: string[] = [];
-                  let score = 0;
 
-                  for (const term of matchTerms) {
-                    const normTerm = normalizeForMatch(term);
-                    if (!normTerm) continue;
-
-                    if (titleNorm.includes(normTerm)) {
-                      score += 12;
-                      matchedTerms.push(term);
-                      continue;
-                    }
-                    if (bodyNorm.includes(normTerm)) {
-                      score += 5;
-                      matchedTerms.push(term);
+                  // Ord-nivå match: merk hvert ord i tittelen hvis den normaliserte
+                  // formen finnes blant kandidatordene (også kryss-språk).
+                  const matchedTitleWords: string[] = [];
+                  const matchedNorms = new Set<string>();
+                  for (const w of substanceWords(title)) {
+                    const n = normalizeSubstanceName(w);
+                    if (candidateNorms.has(n)) {
+                      matchedTitleWords.push(w);
+                      matchedNorms.add(n);
                     }
                   }
+                  // Body-treff (uten tittel-treff) surfacer relevante tekster lavere.
+                  for (const w of substanceWords(copyText)) {
+                    const n = normalizeSubstanceName(w);
+                    if (candidateNorms.has(n)) matchedNorms.add(n);
+                  }
 
-                  if (matchedTerms.length > 0 && matchedTerms.length === matchTerms.length) {
+                  let score = matchedTitleWords.length * 12;
+                  score += (matchedNorms.size - new Set(matchedTitleWords.map(normalizeSubstanceName)).size) * 5;
+                  if (candidateNorms.size > 0 && matchedNorms.size === candidateNorms.size) {
                     score += 10;
                   }
 
@@ -1514,7 +1576,7 @@ export default function InteraksjonerPage() {
                     title,
                     copyText,
                     score,
-                    matchedTerms: Array.from(new Set(matchedTerms)),
+                    matchedTerms: Array.from(new Set(matchedTitleWords)),
                   };
                 });
 
