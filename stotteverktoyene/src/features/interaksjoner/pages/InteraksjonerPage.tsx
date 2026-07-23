@@ -84,10 +84,6 @@ function cleanMatchTerm(value: string): string {
     .trim();
 }
 
-function normalizeForMatch(value: string): string {
-  return cleanMatchTerm(value).toLowerCase();
-}
-
 // Ord som ikke er virkestoffnavn og ikke skal telle/merkes.
 const SUBSTANCE_STOPWORDS = new Set([
   "og", "med", "mot", "eller", "samt", "pluss", "for", "ved",
