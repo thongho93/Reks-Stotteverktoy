@@ -1001,6 +1001,7 @@ export default function LagerbeholdningPage() {
                         { title: HAR_FATT_NOK_TITLE, label: "Åpne standardtekst «Har fått nok til…»", medDato: true },
                         { title: OVER_3_MND_TITLE, label: "Åpne standardtekst «Over 3 mnds bruk, nedjustere?»", medDato: false },
                       ].map(({ title, label, medDato }) => {
+                        const busyAny = Boolean(openingStandardtekstKey?.startsWith(`${key}::`));
                         const busy = openingStandardtekstKey === `${key}::${title}`;
                         return (
                           <Button
@@ -1008,7 +1009,7 @@ export default function LagerbeholdningPage() {
                             variant="outlined"
                             size="small"
                             onClick={() => openStandardtekst(b, title, medDato)}
-                            disabled={busy}
+                            disabled={busyAny}
                             startIcon={
                               busy ? <CircularProgress size={16} color="inherit" /> : undefined
                             }
