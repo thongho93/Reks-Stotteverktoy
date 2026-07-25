@@ -17,6 +17,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import { createSvgIcon } from "@mui/material/utils";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import AppUpdater from "./AppUpdater";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -853,6 +854,7 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
+      <AppUpdater />
       <Suspense fallback={<RouteLoader />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

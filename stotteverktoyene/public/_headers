@@ -1,6 +1,10 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Versjonsmarkør for oppdagelse av nye deploys – må aldri caches.
+/version.json
+  Cache-Control: no-cache, no-store, must-revalidate
+
 /interactions.json
   Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
