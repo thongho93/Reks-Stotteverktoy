@@ -62,10 +62,11 @@ import { formatPreparatForTemplate } from "../../standardtekster/utils/preparat"
 
 const TEAL = "#0E9F8E";
 
-// Overføring til standardteksten "Hyppig uttak - Har fått nok til..": tittelen
-// brukes til å matche malen, og nøkkelen deles med StandardTekstPage via
-// sessionStorage (samme mønster som OMEQ → standardtekst).
+// Overføring til standardtekster: tittelen brukes til å matche malen, og nøkkelen
+// deles med StandardTekstPage via sessionStorage (samme mønster som OMEQ →
+// standardtekst). Ved nok dekning (≥ terskel) tilbys begge disse malene.
 const HAR_FATT_NOK_TITLE = "Hyppig uttak - Har fått nok til..";
+const OVER_3_MND_TITLE = "Over 3 mnds bruk, nedjustere?";
 const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
 // Terskel (dager igjen) for å tilby overføring – samme som grønn fargekode.
 const HAR_FATT_NOK_MIN_DAGER = 45;
@@ -96,10 +97,14 @@ const PERIODER = [
   { value: "4uker", label: "per 4 uker", dager: 28 },
   { value: "maaned", label: "per måned", dager: 30 },
   { value: "varierende", label: "Varierende…", dager: null },
-  { value: "egendefinert", label: "Egendefinert…", dager: null },
+  { value: "egendefinert", label: "Annet intervall…", dager: null },
 ] as const;
 
 type PeriodeValue = (typeof PERIODER)[number]["value"];
+
+// Intervallene som vises i «Fast dose»-nedtrekket. «varierende» er nå et eget
+// dosering-modusvalg (egen toggle), ikke et punkt i intervall-lista.
+const FAST_PERIODER = PERIODER.filter((p) => p.value !== "varierende");
 
 // Grunnperiode for varierende dosering: brukeren bygger flere linjer
 // «N enheter × M dager i <uken/måneden>». Summen deles på grunnperiodens dager
@@ -187,8 +192,9 @@ export default function LagerbeholdningPage() {
   const [referansedatoInput, setReferansedatoInput] = useState(() =>
     toDateInputValue(new Date()),
   );
-  // Nøkkel til beregningen vi holder på å åpne standardtekst for (viser spinner
-  // på riktig knapp mens preparat-katalogen slås opp).
+  // Hvilken knapp vi holder på å åpne standardtekst for (viser spinner på riktig
+  // knapp mens preparat-katalogen slås opp). Nøkkel = `${b.key}::${maltittel}`
+  // slik at kun den klikkede knappen spinner når et kort har flere maler.
   const [openingStandardtekstKey, setOpeningStandardtekstKey] = useState<string | null>(null);
   const [doseByVare, setDoseByVare] = useState<Record<string, string>>({});
   const [periodeByVare, setPeriodeByVare] = useState<Record<string, PeriodeValue>>({});
@@ -326,13 +332,14 @@ export default function LagerbeholdningPage() {
     setReferansedatoInput(toDateInputValue(new Date()));
   }, []);
 
-  // Åpner standardteksten "Hyppig uttak - Har fått nok til.." med preparat og
-  // måned (fra "dekket til") forhåndsutfylt. Preparatet slås opp på varenummer i
-  // samme katalog som preparatsøket i Standardtekster; faller tilbake på navnet
-  // fra lagerbeholdning hvis vnr ikke finnes i katalogen.
-  const openHarFattNok = useCallback(
-    async (b: VareBeregning) => {
-      setOpeningStandardtekstKey(b.key);
+  // Åpner en standardtekst (matchet på tittel) med preparat forhåndsutfylt.
+  // Preparatet slås opp på varenummer i samme katalog som preparatsøket i
+  // Standardtekster; faller tilbake på navnet fra lagerbeholdning hvis vnr ikke
+  // finnes i katalogen. `medDato` styrer om måneden fra "dekket til" sendes med
+  // (kun relevant for "Har fått nok til.." som har et DATO-token).
+  const openStandardtekst = useCallback(
+    async (b: VareBeregning, templateTitle: string, medDato: boolean) => {
+      setOpeningStandardtekstKey(`${b.key}::${templateTitle}`);
 
       let preparatText = (b.varenavn ?? "").trim();
       try {
@@ -351,10 +358,10 @@ export default function LagerbeholdningPage() {
 
       const payload = {
         requestId: Date.now(),
-        templateTitle: HAR_FATT_NOK_TITLE,
+        templateTitle,
         preparat: preparatText,
         preparatKey: (b.varenr ?? "").trim() || preparatText,
-        datoInput: datoMndFromDate(b.dekketTil),
+        datoInput: medDato ? datoMndFromDate(b.dekketTil) : "",
       };
 
       try {
@@ -460,7 +467,8 @@ export default function LagerbeholdningPage() {
                 {[
                   "Lim inn uttakshistorikken – én linje per uttak (dager, dato, varenr, varenavn, pakker, mengde).",
                   "Flere varer kan limes inn samtidig – preparater med samme virkestoff, styrke og form slås sammen (ulike merkenavn og pakningsstørrelser teller som ett).",
-                  "Oppgi dosering per preparat – velg om det er per dag, uke eller måned (f.eks. 1 per uke). Ukentlig/månedlig dosering regnes om til et gjennomsnittlig dagsforbruk.",
+                  "Oppgi dosering per preparat. Velg «Fast dose» for lik mengde med jevne mellomrom (f.eks. 1 per uke), eller «Annet intervall…» for skjeve intervaller (f.eks. hver 3. dag).",
+                  "Velg «Varierende dose» når mengden endrer seg gjennom uka eller måneden (f.eks. Marevan) – da legger du inn én linje per dosenivå. Alt regnes om til et gjennomsnittlig dagsforbruk.",
                   "Beholdning = totalt hentet − dagsforbruk × dager siden første uttak.",
                   "«Dekket til» = referansedato + dager igjen.",
                 ].map((text) => (
@@ -667,8 +675,43 @@ export default function LagerbeholdningPage() {
                         <ToggleButton value="mg">Dose i mg</ToggleButton>
                       </ToggleButtonGroup>
                     )}
-                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-                      {mgModus && (
+
+                    {/* Dosering-modus: gjør de to prinsipielt ulike inntastingene
+                        tydelige – fast dose vs. varierende dose gjennom perioden. */}
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mb: 0.5 }}
+                    >
+                      Hvordan doseres preparatet?
+                    </Typography>
+                    <ToggleButtonGroup
+                      size="small"
+                      exclusive
+                      value={erVarierende ? "varierende" : "fast"}
+                      onChange={(_e, val) => {
+                        if (!val) return;
+                        setPeriodeByVare((prev) => ({
+                          ...prev,
+                          [key]: val === "varierende" ? "varierende" : "dag",
+                        }));
+                      }}
+                      sx={{ mb: 1, "& .MuiToggleButton-root": { textTransform: "none", py: 0.25 } }}
+                    >
+                      <ToggleButton value="fast">
+                        <Tooltip title="Samme mengde med jevne mellomrom – f.eks. 1 tablett hver dag eller 2 per uke.">
+                          <span>Fast dose</span>
+                        </Tooltip>
+                      </ToggleButton>
+                      <ToggleButton value="varierende">
+                        <Tooltip title="Ulik mengde gjennom uka eller måneden – f.eks. Marevan 1 tablett 5 dager + ½ tablett 2 dager i uka.">
+                          <span>Varierende dose</span>
+                        </Tooltip>
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+
+                    {mgModus && (
+                      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, mb: 1 }}>
                         <TextField
                           label="Styrke"
                           placeholder="f.eks. 10"
@@ -688,10 +731,13 @@ export default function LagerbeholdningPage() {
                           }
                           sx={{ width: 150 }}
                         />
-                      )}
-                      {!erVarierende && (
+                      </Stack>
+                    )}
+
+                    {!erVarierende ? (
+                      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
                         <TextField
-                          label="Dosering"
+                          label="Dose"
                           placeholder="f.eks. 1"
                           value={doseByVare[key] ?? ""}
                           onChange={(e) =>
@@ -711,65 +757,70 @@ export default function LagerbeholdningPage() {
                           }}
                           sx={{ width: 160 }}
                         />
-                      )}
-                      <TextField
-                        select
-                        label="Periode"
-                        value={periode}
-                        onChange={(e) =>
-                          setPeriodeByVare((prev) => ({
-                            ...prev,
-                            [key]: e.target.value as PeriodeValue,
-                          }))
-                        }
-                        size="small"
-                        sx={{ width: 160 }}
-                      >
-                        {PERIODER.map((p) => (
-                          <MenuItem key={p.value} value={p.value}>
-                            {p.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                      {erEgendefinert && (
-                        <>
-                          <TextField
-                            label="Intervall"
-                            placeholder="f.eks. 3"
-                            value={egendagerByVare[key] ?? ""}
-                            onChange={(e) =>
-                              setEgendagerByVare((prev) => ({ ...prev, [key]: e.target.value }))
-                            }
-                            size="small"
-                            inputProps={{ inputMode: "numeric" }}
-                            InputProps={{
-                              startAdornment: <InputAdornment position="start">hver</InputAdornment>,
-                              endAdornment: <InputAdornment position="end">.</InputAdornment>,
-                            }}
-                            sx={{ width: 110 }}
-                          />
-                          <TextField
-                            select
-                            label="Enhet"
-                            value={egenEnhetByVare[key] ?? "dag"}
-                            onChange={(e) =>
-                              setEgenEnhetByVare((prev) => ({
-                                ...prev,
-                                [key]: e.target.value as EgenEnhet,
-                              }))
-                            }
-                            size="small"
-                            sx={{ width: 120 }}
-                          >
-                            {EGEN_ENHETER.map((enh) => (
-                              <MenuItem key={enh.value} value={enh.value}>
-                                {enh.label}
-                              </MenuItem>
-                            ))}
-                          </TextField>
-                        </>
-                      )}
-                      {erVarierende && (
+                        <TextField
+                          select
+                          label="Intervall"
+                          value={periode}
+                          onChange={(e) =>
+                            setPeriodeByVare((prev) => ({
+                              ...prev,
+                              [key]: e.target.value as PeriodeValue,
+                            }))
+                          }
+                          size="small"
+                          sx={{ width: 170 }}
+                        >
+                          {FAST_PERIODER.map((p) => (
+                            <MenuItem key={p.value} value={p.value}>
+                              {p.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                        {erEgendefinert && (
+                          <>
+                            <TextField
+                              label="Hvor ofte"
+                              placeholder="f.eks. 3"
+                              value={egendagerByVare[key] ?? ""}
+                              onChange={(e) =>
+                                setEgendagerByVare((prev) => ({ ...prev, [key]: e.target.value }))
+                              }
+                              size="small"
+                              inputProps={{ inputMode: "numeric" }}
+                              InputProps={{
+                                startAdornment: <InputAdornment position="start">hver</InputAdornment>,
+                                endAdornment: <InputAdornment position="end">.</InputAdornment>,
+                              }}
+                              sx={{ width: 110 }}
+                            />
+                            <TextField
+                              select
+                              label="Enhet"
+                              value={egenEnhetByVare[key] ?? "dag"}
+                              onChange={(e) =>
+                                setEgenEnhetByVare((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value as EgenEnhet,
+                                }))
+                              }
+                              size="small"
+                              sx={{ width: 120 }}
+                            >
+                              {EGEN_ENHETER.map((enh) => (
+                                <MenuItem key={enh.value} value={enh.value}>
+                                  {enh.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </>
+                        )}
+                      </Stack>
+                    ) : (
+                      <Box sx={{ mt: 0.25 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Legg til én linje per dosenivå. Summen fordeles jevnt over{" "}
+                          {varierendeGrunnInfo.iLabel} og regnes om til snitt-dagsforbruk.
+                        </Typography>
                         <TextField
                           select
                           label="Grunnperiode"
@@ -781,7 +832,7 @@ export default function LagerbeholdningPage() {
                             }))
                           }
                           size="small"
-                          sx={{ width: 150 }}
+                          sx={{ width: 150, mb: 1 }}
                         >
                           {VARIERENDE_GRUNN.map((g) => (
                             <MenuItem key={g.value} value={g.value}>
@@ -789,11 +840,11 @@ export default function LagerbeholdningPage() {
                             </MenuItem>
                           ))}
                         </TextField>
-                      )}
-                    </Stack>
+                      </Box>
+                    )}
 
                     {erVarierende && (
-                      <Box sx={{ mt: 1.25 }}>
+                      <Box sx={{ mt: 0.5 }}>
                         <Stack spacing={1}>
                           {varierendeLinjer.map((linje, i) => (
                             <Stack
@@ -945,28 +996,35 @@ export default function LagerbeholdningPage() {
                   )}
 
                   {harBeholdning && !tom && (b.dagerIgjen as number) >= HAR_FATT_NOK_MIN_DAGER && (
-                    <Box sx={{ mt: 1.5 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => openHarFattNok(b)}
-                        disabled={openingStandardtekstKey === b.key}
-                        startIcon={
-                          openingStandardtekstKey === b.key ? (
-                            <CircularProgress size={16} color="inherit" />
-                          ) : undefined
-                        }
-                        sx={{
-                          textTransform: "none",
-                          borderRadius: 2,
-                          borderColor: alpha(accent, 0.5),
-                          color: accent,
-                          "&:hover": { borderColor: accent },
-                        }}
-                      >
-                        Åpne standardtekst «Har fått nok til…»
-                      </Button>
-                    </Box>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", gap: 1 }}>
+                      {[
+                        { title: HAR_FATT_NOK_TITLE, label: "Åpne standardtekst «Har fått nok til…»", medDato: true },
+                        { title: OVER_3_MND_TITLE, label: "Åpne standardtekst «Over 3 mnds bruk, nedjustere?»", medDato: false },
+                      ].map(({ title, label, medDato }) => {
+                        const busy = openingStandardtekstKey === `${key}::${title}`;
+                        return (
+                          <Button
+                            key={title}
+                            variant="outlined"
+                            size="small"
+                            onClick={() => openStandardtekst(b, title, medDato)}
+                            disabled={busy}
+                            startIcon={
+                              busy ? <CircularProgress size={16} color="inherit" /> : undefined
+                            }
+                            sx={{
+                              textTransform: "none",
+                              borderRadius: 2,
+                              borderColor: alpha(accent, 0.5),
+                              color: accent,
+                              "&:hover": { borderColor: accent },
+                            }}
+                          >
+                            {label}
+                          </Button>
+                        );
+                      })}
+                    </Stack>
                   )}
 
                   <Box sx={{ mt: 1 }}>
