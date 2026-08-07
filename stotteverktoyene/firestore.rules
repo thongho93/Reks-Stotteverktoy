@@ -424,8 +424,9 @@ service cloud.firestore {
       match /standardtekster/{standardtekstId} {
         allow read: if isAdmin();
         allow create, update: if isSignedIn()
-          && request.resource.data.keys().hasOnly(["opens", "updatedAt"])
+          && request.resource.data.keys().hasOnly(["opens", "copies", "updatedAt"])
           && (!("opens" in request.resource.data) || request.resource.data.opens is int)
+          && (!("copies" in request.resource.data) || request.resource.data.copies is int)
           && (!("updatedAt" in request.resource.data) || request.resource.data.updatedAt is timestamp);
         allow delete: if false;
       }
@@ -438,8 +439,9 @@ service cloud.firestore {
         match /standardtekster/{standardtekstId} {
           allow read: if isAdmin();
           allow create, update: if isOwner(uid)
-            && request.resource.data.keys().hasOnly(["opens", "updatedAt"])
+            && request.resource.data.keys().hasOnly(["opens", "copies", "updatedAt"])
             && (!("opens" in request.resource.data) || request.resource.data.opens is int)
+            && (!("copies" in request.resource.data) || request.resource.data.copies is int)
             && (!("updatedAt" in request.resource.data) || request.resource.data.updatedAt is timestamp);
           allow delete: if false;
         }

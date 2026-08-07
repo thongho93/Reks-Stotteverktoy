@@ -195,15 +195,23 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
     totalsCounters[`menuClicksByPage.${data.targetPage}`] = increment(1);
   }
 
-  const standardtekstRef =
-    event === "standardtekst_open" && standardtekstId
-      ? doc(db, "usage_daily", dateKey, "standardtekster", standardtekstId)
+  // Per-tekst-tellere. Åpninger og kopieringer holdes i separate felt slik at
+  // rangeringen kan bruke kopi som "faktisk brukt"-signal, mens åpning bare
+  // forteller at teksten ble sett på.
+  const perTextId =
+    standardtekstId && (event === "standardtekst_open" || event === "standardtekst_copy")
+      ? standardtekstId
       : null;
 
-  const standardtekstUserRef =
-    event === "standardtekst_open" && standardtekstId
-      ? doc(db, "usage_daily", dateKey, "users", user.uid, "standardtekster", standardtekstId)
-      : null;
+  const perTextField = event === "standardtekst_copy" ? "copies" : "opens";
+
+  const standardtekstRef = perTextId
+    ? doc(db, "usage_daily", dateKey, "standardtekster", perTextId)
+    : null;
+
+  const standardtekstUserRef = perTextId
+    ? doc(db, "usage_daily", dateKey, "users", user.uid, "standardtekster", perTextId)
+    : null;
 
   try {
     await Promise.all([
@@ -233,7 +241,7 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
             setDoc(
               standardtekstRef,
               {
-                opens: increment(1),
+                [perTextField]: increment(1),
                 updatedAt: serverTimestamp(),
               },
               { merge: true }
@@ -245,7 +253,7 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
             setDoc(
               standardtekstUserRef,
               {
-                opens: increment(1),
+                [perTextField]: increment(1),
                 updatedAt: serverTimestamp(),
               },
               { merge: true }
