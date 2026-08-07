@@ -60,10 +60,17 @@ function asCount(value: unknown): number {
 /**
  * Summerer kopieringer per standardtekst over alle datoene i perioden.
  * Ett Firestore-kall per dato – maks 31 for månedsvisning.
+ *
+ * Samlingen inneholder også tekster som bare er åpnet. De filtreres bort i
+ * spørringen, så vi ikke betaler for dokumentlesinger vi forkaster.
  */
 async function fetchCopiesByText(dateKeys: string[]): Promise<Map<string, number>> {
   const snapshots = await Promise.all(
-    dateKeys.map((dateKey) => getDocs(collection(db, "usage_daily", dateKey, "standardtekster")))
+    dateKeys.map((dateKey) =>
+      getDocs(
+        query(collection(db, "usage_daily", dateKey, "standardtekster"), where("copies", ">", 0))
+      )
+    )
   );
 
   const totals = new Map<string, number>();
@@ -165,6 +172,10 @@ export default function StandardtekstStatistikkPage() {
   }, [allRows, category, search, showUnused]);
 
   const totals = React.useMemo(() => {
+    // Kopieringer summeres over alle rader, inkludert slettede tekster – de er
+    // faktisk bruk og vises i listen. Dekning måles derimot mot biblioteket, så
+    // der teller vi bare tekster som fortsatt finnes. Ellers kunne "tekster i
+    // bruk" overstige biblioteket og dekningen bomme over 100 %.
     const totalCopies = allRows.reduce((sum, row) => sum + row.copies, 0);
     const usedCount = allRows.filter((row) => !row.isDeleted && row.copies > 0).length;
     const libraryCount = library.length;
