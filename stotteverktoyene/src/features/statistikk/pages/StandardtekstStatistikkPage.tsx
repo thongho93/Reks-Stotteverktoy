@@ -101,7 +101,15 @@ export default function StandardtekstStatistikkPage() {
   const range = React.useMemo(() => getRangeForAnchor(anchor, viewMode), [anchor, viewMode]);
   const dateKeys = React.useMemo(() => listDateKeys(range.from, range.to), [range]);
 
+  // Perioden kan byttes mens en henting er underveis. Uten denne vakten kunne et
+  // tregt svar for forrige periode landet etter et raskt svar for den nye, og
+  // etterlatt tallene i utakt med etiketten. Bare den nyeste får skrive state.
+  const latestRequestRef = React.useRef(0);
+
   const load = React.useCallback(async () => {
+    const requestId = ++latestRequestRef.current;
+    const isStale = () => requestId !== latestRequestRef.current;
+
     setIsLoading(true);
     setError(null);
 
@@ -111,9 +119,13 @@ export default function StandardtekstStatistikkPage() {
         fetchCopiesByText(dateKeys),
       ]);
 
+      if (isStale()) return;
+
       setLibrary(texts);
       setCopiesByText(totals);
     } catch (err) {
+      if (isStale()) return;
+
       const message = err instanceof Error ? err.message : String(err);
       setError(
         message.toLowerCase().includes("permission")
@@ -121,7 +133,8 @@ export default function StandardtekstStatistikkPage() {
           : `Kunne ikke hente statistikk: ${message}`
       );
     } finally {
-      setIsLoading(false);
+      // La spinneren stå hvis en nyere henting har overtatt – den slår den av.
+      if (!isStale()) setIsLoading(false);
     }
   }, [dateKeys]);
 
