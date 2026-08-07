@@ -166,7 +166,7 @@ export default function StandardtekstStatistikkPage() {
 
   const totals = React.useMemo(() => {
     const totalCopies = allRows.reduce((sum, row) => sum + row.copies, 0);
-    const usedCount = allRows.filter((row) => row.copies > 0).length;
+    const usedCount = allRows.filter((row) => !row.isDeleted && row.copies > 0).length;
     const libraryCount = library.length;
     const top = allRows.find((row) => row.copies > 0);
 
@@ -174,7 +174,7 @@ export default function StandardtekstStatistikkPage() {
       totalCopies,
       usedCount,
       libraryCount,
-      unusedCount: Math.max(0, libraryCount - allRows.filter((r) => !r.isDeleted && r.copies > 0).length),
+      unusedCount: Math.max(0, libraryCount - usedCount),
       coverage: libraryCount > 0 ? Math.round((usedCount / libraryCount) * 100) : 0,
       topTitle: top?.title ?? "–",
       topCopies: top?.copies ?? 0,
