@@ -142,7 +142,6 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
   const field = mapEventToField(event);
 
   const userRef = doc(db, "usage_daily", dateKey, "users", user.uid);
-  const totalsRef = doc(db, "usage_daily", dateKey, "totals", "all");
 
   const standardtekstId = data?.standardtekstId;
 
@@ -150,9 +149,6 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
 
   const meta: Record<string, unknown> = {};
   const userCounters: Record<string, unknown> = {
-    [`eventCounts.${event}`]: increment(1),
-  };
-  const totalsCounters: Record<string, unknown> = {
     [`eventCounts.${event}`]: increment(1),
   };
 
@@ -176,23 +172,19 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
 
   if (event === "page_view" && data?.page) {
     userCounters[`pageViewsByPage.${data.page}`] = increment(1);
-    totalsCounters[`pageViewsByPage.${data.page}`] = increment(1);
 
     const normalizedPath = normalizeUsagePath(data.pagePath ?? "/");
     const pathKey = usagePathToCounterKey(normalizedPath);
     userCounters[`pageViewsByPath.${pathKey}`] = increment(1);
-    totalsCounters[`pageViewsByPath.${pathKey}`] = increment(1);
     meta[`pathLabels.${pathKey}`] = normalizedPath;
   }
 
   if (isNewSession) {
     userCounters.sessions = increment(1);
-    totalsCounters.sessions = increment(1);
   }
 
   if (event === "menu_click" && data?.targetPage) {
     userCounters[`menuClicksByPage.${data.targetPage}`] = increment(1);
-    totalsCounters[`menuClicksByPage.${data.targetPage}`] = increment(1);
   }
 
   // Per-tekst-tellere. Åpninger og kopieringer holdes i separate felt slik at
@@ -223,15 +215,6 @@ export async function logUsage(event: UsageEventType, data?: UsageEventMetadata)
           [field]: increment(1),
           ...userCounters,
           ...meta,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      ),
-      setDoc(
-        totalsRef,
-        {
-          [field]: increment(1),
-          ...totalsCounters,
           updatedAt: serverTimestamp(),
         },
         { merge: true }

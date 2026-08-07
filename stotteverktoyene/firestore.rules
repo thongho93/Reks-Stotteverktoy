@@ -447,10 +447,12 @@ service cloud.firestore {
         }
       }
 
+      // Utgått: ingenting skriver hit lenger. Lesing beholdt for eventuelle
+      // gamle dokumenter; skriving er stengt slik at regelen ikke gir inntrykk
+      // av at aggregatet vedlikeholdes.
       match /totals/{docId} {
         allow read: if isAdmin();
-        allow create, update: if isSignedIn() && docId == "global";
-        allow delete: if false;
+        allow write: if false;
       }
     }
 
