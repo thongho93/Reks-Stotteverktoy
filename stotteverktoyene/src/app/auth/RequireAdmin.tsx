@@ -26,7 +26,7 @@ export default function RequireAdmin({ children }: RequireAdminProps) {
     );
   }
 
-  if (isApproved === false) {
+  if (!isAdmin && isApproved === false) {
     return <Navigate to="/pending-approval" replace />;
   }
 
