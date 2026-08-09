@@ -509,7 +509,10 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
 }
 
 export function templateHasPakkeToken(text: string): boolean {
-  return /\{\{\s*PAKKE\s*\}\}|\bPAKKE\b/i.test(text ?? "");
+  // Case-sensitivt: kun store bokstaver PAKKE er et token. Det vanlige norske
+  // ordet «pakke»/«pakker» i vanlig brødtekst skal IKKE tolkes som token –
+  // samme regel som visningen (render.tsx) og øvrige tokens (DATO m.fl.).
+  return /\{\{\s*PAKKE\s*\}\}|\bPAKKE\b/.test(text ?? "");
 }
 
 // "pakke" ved nøyaktig 1, ellers "pakker" (også ved tomt/ugyldig tall).
@@ -525,7 +528,11 @@ export function replacePakkeTokens(
   getTallValue: (index: number) => string,
 ): string {
   if (!text) return text;
-  const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b|\{\{\s*PAKKE\s*\}\}|\bPAKKE\b/gi;
+  // Case-sensitivt (ingen /i): kun store bokstaver TALL/PAKKE er tokens. Ellers
+  // ville det vanlige ordet «pakke» i brødteksten blitt tolket som et PAKKE-token
+  // og pluralisert til «pakker» ved kopiering – i strid med visningen (render.tsx
+  // splitter også case-sensitivt) og øvrige tokens (DATO erstattes med \bDATO\b/g).
+  const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b|\{\{\s*PAKKE\s*\}\}|\bPAKKE\b/g;
   let lastTallIdx: number | null = null;
   return text.replace(re, (match, braceIdx, plainIdx) => {
     if (/PAKKE/i.test(match)) {
