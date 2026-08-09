@@ -26,12 +26,14 @@ import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ConstructionIcon from "@mui/icons-material/Construction";
+import LeaderboardRoundedIcon from "@mui/icons-material/LeaderboardRounded";
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
 import { GlobalSearch } from "../features/commandpalette/GlobalSearch";
 import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearchHotkey";
 import RequireRekspert from "./auth/RequireRekspert";
+import RequireAdmin from "./auth/RequireAdmin";
 import { ProfileMenu } from "./auth/ProfileMenu";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
 import { NavigationGuardProvider, useGuardedNavigate } from "../shared/hooks/useNavigationGuard";
@@ -136,6 +138,9 @@ const TilbakemeldingPage = React.lazy(
   () => import("../features/tilbakemelding/pages/TilbakemeldingPage")
 );
 const RekspertPage = React.lazy(() => import("../features/rekspert/RekspertPage"));
+const StandardtekstStatistikkPage = React.lazy(
+  () => import("../features/statistikk/pages/StandardtekstStatistikkPage")
+);
 const LoginPage = React.lazy(() =>
   import("./auth/LoginPage").then((module) => ({ default: module.LoginPage }))
 );
@@ -222,8 +227,10 @@ function RouteLoader() {
 }
 
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const { isOwner, isRekspert, role } = useAuthUser() as any;
+  const { isOwner, isAdmin, isRekspert, role } = useAuthUser();
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
+  // Tekststatistikk leser usage_daily, som firestore.rules kun åpner for isAdmin().
+  const hasAdminAccess = Boolean(isAdmin) || Boolean(isOwner);
   // useGuardedNavigate: hvis en side (f.eks. standardtekster) har registrert en
   // sperre (ulagrede endringer), avbrytes navigasjonen og siden viser selv en
   // bekreftelsesdialog i stedet for at vi navigerer bort.
@@ -373,17 +380,28 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     },
   ];
 
-  const adminItems: SidebarItem[] =
-    hasRekspertAccess
+  const adminItems: SidebarItem[] = [
+    ...(hasRekspertAccess
       ? [
           {
             label: "Rekspert",
             path: "/rekspert",
             Icon: ConstructionIcon,
             color: "#00A3D7",
-          },
+          } satisfies SidebarItem,
         ]
-      : [];
+      : []),
+    ...(hasAdminAccess
+      ? [
+          {
+            label: "Tekststatistikk",
+            path: "/rekspert/tekststatistikk",
+            Icon: LeaderboardRoundedIcon,
+            color: "#7C5CFF",
+          } satisfies SidebarItem,
+        ]
+      : []),
+  ];
 
   return (
     <Drawer
@@ -840,6 +858,12 @@ function Layout() {
                 <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
                 <Route element={<RequireRekspert />}>
                   <Route path="/rekspert" element={<RekspertPage />} />
+                </Route>
+                <Route element={<RequireAdmin />}>
+                  <Route
+                    path="/rekspert/tekststatistikk"
+                    element={<StandardtekstStatistikkPage />}
+                  />
                 </Route>
                 <Route path="*" element={<Navigate to="/omeq" replace />} />
               </Routes>
