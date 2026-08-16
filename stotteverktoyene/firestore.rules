@@ -456,6 +456,58 @@ service cloud.firestore {
       }
     }
 
+    // Innspill fra brukerne. Alle aktive medlemmer kan sende inn og lese sine
+    // egne (for å følge status og svar). Kun eier ser alt og kan endre/slette.
+    match /feedbacks/{feedbackId} {
+      function validFeedbackCreate() {
+        return request.resource.data.keys().hasOnly([
+            "message",
+            "category",
+            "pagePath",
+            "status",
+            "ownerReply",
+            "createdByUid",
+            "createdByName",
+            "createdByEmail",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0
+          && request.resource.data.message.size() <= 2000
+          && request.resource.data.category in ["bug", "feature"]
+          && request.resource.data.pagePath is string
+          && request.resource.data.status == "ikke_behandlet"
+          && request.resource.data.ownerReply == ""
+          && request.resource.data.createdByUid == request.auth.uid
+          && request.resource.data.createdByName is string
+          && request.resource.data.createdByEmail is string
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.updatedAt is timestamp;
+      }
+
+      function validFeedbackOwnerUpdate() {
+        return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            "status",
+            "ownerReply",
+            "updatedAt"
+          ])
+          && request.resource.data.status in ["ikke_behandlet", "under_behandling", "ferdig_behandlet"]
+          && request.resource.data.ownerReply is string
+          && request.resource.data.ownerReply.size() <= 2000
+          && request.resource.data.updatedAt is timestamp;
+      }
+
+      // get: eier eller den som meldte inn.
+      allow get: if isOwnerRole() || (isSignedIn() && resource.data.createdByUid == request.auth.uid);
+      // list: eier kan hente alt; andre må spørre med where("createdByUid","==",egen uid).
+      allow list: if isOwnerRole() || (isSignedIn() && resource.data.createdByUid == request.auth.uid);
+
+      allow create: if isActiveMember() && validFeedbackCreate();
+      allow update: if isOwnerRole() && validFeedbackOwnerUpdate();
+      allow delete: if isOwnerRole();
+    }
+
     // Beskyttet collection for rekspert
     match /rekspert_routes/{docId} {
       allow read: if isRekspertRole() || isAdmin();
