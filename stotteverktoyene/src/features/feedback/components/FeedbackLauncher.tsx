@@ -27,8 +27,7 @@ export default function FeedbackLauncher() {
         sx={{
           position: "fixed",
           right: 0,
-          top: "50%",
-          transform: "translateY(-50%)",
+          bottom: "48px",
           zIndex: (theme) => theme.zIndex.drawer + 2,
           display: "flex",
           alignItems: "center",

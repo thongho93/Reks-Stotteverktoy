@@ -205,7 +205,7 @@ const ALL_ENTRIES: SearchEntry[] = [
   },
   {
     id: "feedbacks",
-    label: "Feedbacks",
+    label: "Innspill (alle)",
     path: "/rekspert/feedbacks",
     Icon: FeedbackRoundedIcon,
     color: "#B648E8",

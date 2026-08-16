@@ -157,7 +157,7 @@ export default function FeedbackPage() {
         >
           <Box sx={{ mb: 2 }}>
             <Typography variant="h2" gutterBottom={false}>
-              Feedbacks
+              Innspill
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 0.5 }}>
               Innspill fra brukerne – status og svar vises til den som meldte inn

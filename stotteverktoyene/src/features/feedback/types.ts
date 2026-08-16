@@ -5,7 +5,7 @@ export const FEEDBACK_CATEGORIES = [
 
 /**
  * Statusløpet brukeren ser på sitt eget innspill. Eier styrer verdien fra
- * Feedbacks-siden; brukeren ser den samme etiketten på /innspill.
+ * eiersiden; brukeren ser den samme etiketten på /innspill.
  */
 export const FEEDBACK_STATUSES = [
   { value: "ikke_behandlet", label: "Ikke behandlet" },

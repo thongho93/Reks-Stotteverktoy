@@ -397,7 +397,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     ...(isOwner
       ? [
           {
-            label: "Feedbacks",
+            label: "Innspill",
             path: "/rekspert/feedbacks",
             Icon: FeedbackRoundedIcon,
             color: "#B648E8",
