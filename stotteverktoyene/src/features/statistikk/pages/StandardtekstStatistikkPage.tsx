@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   Alert,
   Box,
+  Button,
   Chip,
   IconButton,
   InputAdornment,
@@ -20,7 +21,7 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 
 import { db } from "../../../firebase/firebase";
 import { standardTeksterApi } from "../../standardtekster/services/standardTeksterApi";
@@ -29,6 +30,7 @@ import {
   addDays,
   canNavigateForward,
   endOfMonth,
+  formatNorDate,
   formatPeriodLabel,
   getRangeForAnchor,
   listDateKeys,
@@ -42,14 +44,41 @@ const numberFormat = new Intl.NumberFormat("nb-NO");
 
 const ALL_CATEGORIES = "__alle__";
 
+/**
+ * Kopigrad (kopieringer ÷ åpninger) er bare et signal når teksten faktisk er
+ * åpnet noen ganger. Uten en terskel ville én åpning som ble kopiert gitt
+ * 100 % og toppet lista foran tekster med reell bruk.
+ */
+const MIN_OPENS_FOR_COPY_RATE = 5;
+
+type SortMode = "copies-desc" | "copies-asc" | "copy-rate" | "updated" | "title";
+
+const SORT_OPTIONS: { value: SortMode; label: string; hint: string }[] = [
+  { value: "copies-desc", label: "Mest kopiert", hint: "Hva brukes mest" },
+  { value: "copies-asc", label: "Minst kopiert", hint: "Kandidater for opprydding" },
+  {
+    value: "copy-rate",
+    label: "Lavest kopigrad",
+    hint: `Åpnes, men kopieres sjelden – fra ${MIN_OPENS_FOR_COPY_RATE} åpninger`,
+  },
+  { value: "updated", label: "Sist endret", hint: "Blir nye tekster tatt i bruk?" },
+  { value: "title", label: "Tittel A–Å", hint: "Finn en bestemt tekst" },
+];
+
 type RankedRow = {
   id: string;
   title: string;
   category?: string;
   copies: number;
+  opens: number;
+  /** Kopieringer ÷ åpninger i prosent. null når teksten er åpnet for få ganger til at tallet betyr noe. */
+  copyRate: number | null;
+  updatedAt: Date | null;
   /** Teksten finnes i usage-loggen, men ikke lenger i Standardtekster-biblioteket. */
   isDeleted: boolean;
 };
+
+type TextUsage = { copies: number; opens: number };
 
 function asCount(value: unknown): number {
   const n = Number(value ?? 0);
@@ -57,29 +86,67 @@ function asCount(value: unknown): number {
   return Math.floor(n);
 }
 
+function compareRows(a: RankedRow, b: RankedRow, mode: SortMode): number {
+  const byTitle = () => a.title.localeCompare(b.title, "nb");
+
+  switch (mode) {
+    case "copies-asc":
+      return a.copies - b.copies || byTitle();
+
+    case "copy-rate": {
+      // Tekster under åpningsterskelen har ingen meningsfull kopigrad. De skyves
+      // bakerst i stedet for å filtreres bort, så lista fortsatt viser helheten.
+      if (a.copyRate == null || b.copyRate == null) {
+        if (a.copyRate == null && b.copyRate == null) return b.opens - a.opens || byTitle();
+        return a.copyRate == null ? 1 : -1;
+      }
+      // Flest åpninger først ved lik grad – der er problemet størst i praksis.
+      return a.copyRate - b.copyRate || b.opens - a.opens || byTitle();
+    }
+
+    case "updated": {
+      const at = a.updatedAt?.getTime() ?? -Infinity;
+      const bt = b.updatedAt?.getTime() ?? -Infinity;
+      return bt - at || byTitle();
+    }
+
+    case "title":
+      return byTitle();
+
+    case "copies-desc":
+    default:
+      return b.copies - a.copies || byTitle();
+  }
+}
+
 /**
- * Summerer kopieringer per standardtekst over alle datoene i perioden.
- * Ett Firestore-kall per dato – maks 31 for månedsvisning.
+ * Summerer kopieringer og åpninger per standardtekst over alle datoene i
+ * perioden. Ett Firestore-kall per dato – maks 31 for månedsvisning.
  *
- * Samlingen inneholder også tekster som bare er åpnet. De filtreres bort i
- * spørringen, så vi ikke betaler for dokumentlesinger vi forkaster.
+ * Hele samlingen leses, ikke bare dokumenter med kopieringer: en tekst som blir
+ * åpnet uten å bli kopiert er nettopp det kopigrad-sorteringen skal finne.
  */
-async function fetchCopiesByText(dateKeys: string[]): Promise<Map<string, number>> {
+async function fetchUsageByText(dateKeys: string[]): Promise<Map<string, TextUsage>> {
   const snapshots = await Promise.all(
-    dateKeys.map((dateKey) =>
-      getDocs(
-        query(collection(db, "usage_daily", dateKey, "standardtekster"), where("copies", ">", 0))
-      )
-    )
+    dateKeys.map((dateKey) => getDocs(collection(db, "usage_daily", dateKey, "standardtekster")))
   );
 
-  const totals = new Map<string, number>();
+  const totals = new Map<string, TextUsage>();
 
   for (const snap of snapshots) {
     for (const docSnap of snap.docs) {
-      const copies = asCount((docSnap.data() as Record<string, unknown>).copies);
-      if (!copies) continue;
-      totals.set(docSnap.id, (totals.get(docSnap.id) ?? 0) + copies);
+      const data = docSnap.data() as Record<string, unknown>;
+      const copies = asCount(data.copies);
+      const opens = asCount(data.opens);
+      if (!copies && !opens) continue;
+
+      const prev = totals.get(docSnap.id);
+      if (prev) {
+        prev.copies += copies;
+        prev.opens += opens;
+      } else {
+        totals.set(docSnap.id, { copies, opens });
+      }
     }
   }
 
@@ -92,9 +159,10 @@ export default function StandardtekstStatistikkPage() {
   const [search, setSearch] = React.useState("");
   const [category, setCategory] = React.useState<string>(ALL_CATEGORIES);
   const [showUnused, setShowUnused] = React.useState(false);
+  const [sortMode, setSortMode] = React.useState<SortMode>("copies-desc");
 
   const [library, setLibrary] = React.useState<StandardTekst[]>([]);
-  const [copiesByText, setCopiesByText] = React.useState<Map<string, number>>(new Map());
+  const [usageByText, setUsageByText] = React.useState<Map<string, TextUsage>>(new Map());
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -116,13 +184,13 @@ export default function StandardtekstStatistikkPage() {
     try {
       const [texts, totals] = await Promise.all([
         standardTeksterApi.fetchAll(),
-        fetchCopiesByText(dateKeys),
+        fetchUsageByText(dateKeys),
       ]);
 
       if (isStale()) return;
 
       setLibrary(texts);
-      setCopiesByText(totals);
+      setUsageByText(totals);
     } catch (err) {
       if (isStale()) return;
 
@@ -151,38 +219,44 @@ export default function StandardtekstStatistikkPage() {
     return [...set].sort((a, b) => a.localeCompare(b, "nb"));
   }, [library]);
 
-  /** Hele biblioteket sammenstilt med kopieringstallene, høyest først. */
+  /** Hele biblioteket sammenstilt med bruksstallene, mest kopiert først. */
   const allRows = React.useMemo<RankedRow[]>(() => {
+    const toRow = (usage: TextUsage | undefined) => {
+      const copies = usage?.copies ?? 0;
+      const opens = usage?.opens ?? 0;
+      return {
+        copies,
+        opens,
+        copyRate: opens >= MIN_OPENS_FOR_COPY_RATE ? (copies / opens) * 100 : null,
+      };
+    };
+
     const rows: RankedRow[] = library.map((text) => ({
       id: text.id,
       title: text.title,
       category: text.category?.trim() || undefined,
-      copies: copiesByText.get(text.id) ?? 0,
+      updatedAt: text.updatedAt ?? null,
       isDeleted: false,
+      ...toRow(usageByText.get(text.id)),
     }));
 
     // Tekster som er slettet fra biblioteket, men som har bruk i perioden.
     const knownIds = new Set(library.map((text) => text.id));
-    for (const [id, copies] of copiesByText) {
+    for (const [id, usage] of usageByText) {
       if (knownIds.has(id)) continue;
-      rows.push({ id, title: "Slettet standardtekst", copies, isDeleted: true });
+      rows.push({
+        id,
+        title: "Slettet standardtekst",
+        updatedAt: null,
+        isDeleted: true,
+        ...toRow(usage),
+      });
     }
 
-    return rows.sort(
-      (a, b) => b.copies - a.copies || a.title.localeCompare(b.title, "nb")
-    );
-  }, [library, copiesByText]);
-
-  const filteredRows = React.useMemo(() => {
-    const needle = search.trim().toLowerCase();
-
-    return allRows.filter((row) => {
-      if (category !== ALL_CATEGORIES && row.category !== category) return false;
-      if (!showUnused && row.copies === 0) return false;
-      if (needle && !row.title.toLowerCase().includes(needle)) return false;
-      return true;
-    });
-  }, [allRows, category, search, showUnused]);
+    // Basissorteringen holdes på kopieringer slik at "mest brukt"-KPI-en kan
+    // lese første rad uansett hvilken sortering brukeren har valgt i lista.
+    return rows.sort((a, b) => compareRows(a, b, "copies-desc"));
+  }, [library, usageByText]);
 
   const totals = React.useMemo(() => {
     // Kopieringer summeres over alle rader, inkludert slettede tekster – de er
@@ -205,7 +279,35 @@ export default function StandardtekstStatistikkPage() {
     };
   }, [allRows, library.length]);
 
+  // Uten kopieringer i perioden ville "skjul ubrukte" tømt hele lista og fått
+  // biblioteket til å se tomt ut. Da viser vi alt, uavhengig av knappen.
+  const noCopiesInPeriod = !isLoading && !error && totals.totalCopies === 0;
+  const showUnusedEffective = showUnused || noCopiesInPeriod;
+
+  const filteredRows = React.useMemo(() => {
+    const needle = search.trim().toLowerCase();
+
+    return allRows
+      .filter((row) => {
+        if (category !== ALL_CATEGORIES && row.category !== category) return false;
+        if (needle && !row.title.toLowerCase().includes(needle)) return false;
+
+        if (!showUnusedEffective) {
+          // I kopigrad-modus er en tekst uten åpninger den ubrukte – en tekst med
+          // mange åpninger og null kopieringer er tvert imot hele poenget.
+          const isUnused = sortMode === "copy-rate" ? row.opens === 0 : row.copies === 0;
+          if (isUnused) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => compareRows(a, b, sortMode));
+  }, [allRows, category, search, showUnusedEffective, sortMode]);
+
   const maxCopies = filteredRows.length > 0 ? Math.max(...filteredRows.map((r) => r.copies)) : 0;
+  const hasHiddenUnused =
+    !showUnusedEffective &&
+    allRows.some((row) => (sortMode === "copy-rate" ? row.opens === 0 : row.copies === 0));
 
   const kpiCards = [
     {
@@ -280,7 +382,7 @@ export default function StandardtekstStatistikkPage() {
                 Tekststatistikk
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                Hvilke standardtekster som faktisk blir kopiert – rangert fra mest til minst brukt
+                Hvilke standardtekster som faktisk blir kopiert – og hvilke som bare blir åpnet
               </Typography>
             </Box>
 
@@ -393,15 +495,53 @@ export default function StandardtekstStatistikkPage() {
                   ))}
                 </TextField>
 
-                <ToggleButton
+                <TextField
                   size="small"
-                  value="unused"
-                  selected={showUnused}
-                  onChange={() => setShowUnused((v) => !v)}
-                  sx={{ whiteSpace: "nowrap", px: 1.5 }}
+                  select
+                  label="Sorter etter"
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value as SortMode)}
+                  sx={{ minWidth: 190 }}
+                  SelectProps={{
+                    // Uten dette ville hjelpeteksten i menyen også vises i selve feltet.
+                    renderValue: (value) =>
+                      SORT_OPTIONS.find((option) => option.value === value)?.label ?? "",
+                  }}
                 >
-                  Vis ubrukte
-                </ToggleButton>
+                  {SORT_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      <Box>
+                        <Typography variant="body2">{option.label}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.hint}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <Tooltip
+                  title={
+                    noCopiesInPeriod
+                      ? "Ingen kopieringer i perioden – hele biblioteket vises"
+                      : sortMode === "copy-rate"
+                        ? "Ta med tekster som aldri ble åpnet"
+                        : "Ta med tekster som aldri ble kopiert"
+                  }
+                >
+                  <Box component="span" sx={{ display: "inline-flex" }}>
+                    <ToggleButton
+                      size="small"
+                      value="unused"
+                      selected={showUnusedEffective}
+                      disabled={noCopiesInPeriod}
+                      onChange={() => setShowUnused((v) => !v)}
+                      sx={{ whiteSpace: "nowrap", px: 1.5 }}
+                    >
+                      Vis ubrukte
+                    </ToggleButton>
+                  </Box>
+                </Tooltip>
               </Stack>
             </Paper>
 
@@ -455,10 +595,19 @@ export default function StandardtekstStatistikkPage() {
                   ))}
                 </Box>
 
-                {!isLoading && totals.totalCopies === 0 && (
+                {noCopiesInPeriod && (
                   <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-                    Ingen kopieringer er logget i denne perioden. Kopiering per tekst begynner å
-                    telles først når denne versjonen er i bruk – historikk fra før finnes ikke.
+                    Ingen kopieringer er logget i denne perioden, så hele biblioteket vises.
+                    Kopiering per tekst begynner å telles først når denne versjonen er i bruk –
+                    historikk fra før finnes ikke.
+                  </Alert>
+                )}
+
+                {sortMode === "copy-rate" && (
+                  <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                    Kopigrad = kopieringer ÷ åpninger, for tekster med minst{" "}
+                    {MIN_OPENS_FOR_COPY_RATE} åpninger. Åpninger ble logget før kopieringer, så
+                    perioder fra før kopiering per tekst begynte å telles gir kunstig lav kopigrad.
                   </Alert>
                 )}
 
@@ -483,14 +632,52 @@ export default function StandardtekstStatistikkPage() {
                       <Typography variant="body2" color="text.secondary">
                         Ingen tekster å vise med gjeldende filtre.
                       </Typography>
+                      {hasHiddenUnused && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setShowUnused(true)}
+                          sx={{ mt: 1.5 }}
+                        >
+                          Vis ubrukte tekster
+                        </Button>
+                      )}
                     </Box>
                   ) : (
                     <Box>
                       {filteredRows.map((row, index) => {
                         const share =
                           totals.totalCopies > 0 ? (row.copies / totals.totalCopies) * 100 : 0;
-                        const barWidth = maxCopies > 0 ? (row.copies / maxCopies) * 100 : 0;
-                        const isTop = index === 0 && row.copies > 0;
+
+                        // Tallkolonnen og stolpen viser det kriteriet lista er
+                        // sortert på – ellers ser rekkefølgen tilfeldig ut.
+                        const isRateMode = sortMode === "copy-rate";
+                        const barWidth = isRateMode
+                          ? (row.copyRate ?? 0)
+                          : maxCopies > 0
+                            ? (row.copies / maxCopies) * 100
+                            : 0;
+
+                        const value = isRateMode
+                          ? row.copyRate != null
+                            ? `${Math.round(row.copyRate)} %`
+                            : "–"
+                          : numberFormat.format(row.copies);
+
+                        const caption = isRateMode
+                          ? `${numberFormat.format(row.copies)} av ${numberFormat.format(row.opens)}`
+                          : sortMode === "updated"
+                            ? row.updatedAt
+                              ? formatNorDate(row.updatedAt)
+                              : "Ukjent dato"
+                            : share >= 0.1
+                              ? `${share.toFixed(1)} %`
+                              : "–";
+
+                        // Førsteplassen utheves bare når lista faktisk rangerer
+                        // etter mest brukt. Ellers ville "minst kopiert" fått en
+                        // vinnermarkering på den svakeste teksten.
+                        const isTop = index === 0 && sortMode === "copies-desc" && row.copies > 0;
 
                         return (
                           <Box
@@ -586,12 +773,16 @@ export default function StandardtekstStatistikkPage() {
                               </Box>
                             </Box>
 
-                            <Box sx={{ textAlign: "right", flexShrink: 0, minWidth: 76 }}>
+                            <Box sx={{ textAlign: "right", flexShrink: 0, minWidth: 88 }}>
                               <Typography variant="body2" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                                {numberFormat.format(row.copies)}
+                                {value}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {share >= 0.1 ? `${share.toFixed(1)} %` : "–"}
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ whiteSpace: "nowrap" }}
+                              >
+                                {caption}
                               </Typography>
                             </Box>
                           </Box>
