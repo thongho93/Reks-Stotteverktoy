@@ -27,7 +27,6 @@ import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import { AccentSelection } from "../../../styles/AccentSelection";
 import type { FirebaseError } from "firebase/app";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import CheckBoxOutlinedIcon from "@mui/icons-material/CheckBoxOutlined";
@@ -58,10 +57,6 @@ import { db } from "../../../firebase/firebase";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../../produktograd/queryKeys";
 
-const MELDESKJEMA_EMBED_URL =
-  "https://docs.google.com/forms/d/e/1FAIpQLScKadKrBcIT-8a9CgD4QFfCjXsERjolCZbhojJU8jFhy8V6ZA/viewform?embedded=true";
-const MELDESKJEMA_RESPONSES_URL =
-  "https://docs.google.com/forms/d/1dQq_pvU1lXf295odpYPWXs0_zX693iLbKxSFfNS3sAQ/edit#responses";
 const SHARED_ROUTINES_COLLECTION = "sharedRoutines";
 const SHARED_ROUTINES_DOC_ID = "global";
 const ROUTINE_TEXT_STYLE_OPTIONS = [
@@ -113,8 +108,10 @@ type PrivateNote = {
   isFavorite: boolean;
 };
 
+type TilbakemeldingTab = "rutiner" | "notater";
+
 type TilbakemeldingRouteState = {
-  initialTab?: "meldeskjema" | "rutiner" | "notater";
+  initialTab?: TilbakemeldingTab;
   noteSearchQuery?: string;
   selectedNoteId?: string | null;
 };
@@ -634,38 +631,28 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
   const initialRouteState = React.useMemo(() => {
     if (isRutinerOnly) {
       if (typeof window === "undefined") {
-        return { initialTab: "rutiner" as "meldeskjema" | "rutiner" | "notater", routineDocId: null as string | null };
+        return { initialTab: "rutiner" as TilbakemeldingTab, routineDocId: null as string | null };
       }
       const params = new URLSearchParams(window.location.search);
       const routineDocId = (params.get(ROUTINE_DOC_QUERY_KEY) ?? "").trim() || null;
-      return { initialTab: "rutiner" as "meldeskjema" | "rutiner" | "notater", routineDocId };
+      return { initialTab: "rutiner" as TilbakemeldingTab, routineDocId };
     }
 
     const stateTab = routeState?.initialTab;
-    if (stateTab === "meldeskjema" || stateTab === "rutiner" || stateTab === "notater") {
+    if (stateTab === "rutiner" || stateTab === "notater") {
       return { initialTab: stateTab, routineDocId: null as string | null };
     }
-    if (typeof window === "undefined") {
-      return { initialTab: "notater" as "meldeskjema" | "rutiner" | "notater", routineDocId: null as string | null };
-    }
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get(ROUTINE_TAB_QUERY_KEY);
-    const routineDocId = null;
-    const initialTab: "meldeskjema" | "rutiner" | "notater" =
-      tabParam === "meldeskjema" || tabParam === "notater"
-        ? tabParam
-        : "notater";
-    return { initialTab, routineDocId };
+    return { initialTab: "notater" as TilbakemeldingTab, routineDocId: null as string | null };
   }, [isRutinerOnly, routeState]);
 
-  const { user, isOwner, firstName } = useAuthUser();
-  const [tab, setTab] = React.useState<"meldeskjema" | "rutiner" | "notater">(initialRouteState.initialTab);
+  const { user, firstName } = useAuthUser();
+  const [tab, setTab] = React.useState<TilbakemeldingTab>(initialRouteState.initialTab);
 
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (!params.has(ROUTINE_TAB_QUERY_KEY)) return;
     const tabParam = params.get(ROUTINE_TAB_QUERY_KEY);
-    if (tabParam === "meldeskjema" || tabParam === "rutiner" || tabParam === "notater") {
+    if (tabParam === "rutiner" || tabParam === "notater") {
       setTab(tabParam);
     }
   }, [location.search]);
@@ -899,7 +886,7 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
 
   React.useEffect(() => {
     if (!routeState) return;
-    if (routeState.initialTab === "meldeskjema" || routeState.initialTab === "rutiner" || routeState.initialTab === "notater") {
+    if (routeState.initialTab === "rutiner" || routeState.initialTab === "notater") {
       setTab(routeState.initialTab);
     }
     if (typeof routeState.noteSearchQuery === "string") {
@@ -2395,25 +2382,22 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
     <Box sx={{ width: "100%" }}>
       {!isRutinerOnly ? (
         <Box
-          role="tablist"
           sx={{
             display: "flex",
-            px: 1,
+            alignItems: "center",
+            gap: 1,
+            px: 3,
             pt: 0.25,
-            pb: 0,
-            gap: 0,
+            pb: 1,
             bgcolor: "background.paper",
             borderRadius: "4px 4px 0 0",
             borderBottom: "1px solid",
             borderColor: "divider",
+            fontSize: "1.25rem",
+            fontWeight: 600,
+            color: "#B07FD4",
           }}
         >
-          {(
-            [
-              {
-                value: "notater",
-                label: "Mine notater",
-                icon: (
                   <Box component="svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" sx={{ width: 26, height: 26, flexShrink: 0 }}>
                     <path d="M26 6C26.5523 6 27 6.44772 27 7V11C27 11.5523 26.5523 12 26 12C25.4477 12 25 11.5523 25 11V10H19.0001L19.0001 8H25V7C25 6.44772 25.4477 6 26 6Z" fill="currentColor"/>
                     <path d="M16 6C15.4477 6 15 6.44772 15 7V8H13C11.3431 8 10 9.34315 10 11V35C10 36.6569 11.3431 38 13 38H30C31.6569 38 33 36.6569 33 35V11C33 9.34315 31.6569 8 30 8H29.0001V10H30C30.5523 10 31 10.4477 31 11V35C31 35.5523 30.5523 36 30 36H13C12.4477 36 12 35.5523 12 35V11C12 10.4477 12.4477 10 13 10H15V11C15 11.5523 15.4477 12 16 12C16.5523 12 17 11.5523 17 11V7C17 6.44772 16.5523 6 16 6Z" fill="currentColor"/>
@@ -2423,108 +2407,11 @@ export default function TilbakemeldingPage({ variant = "default" }: Tilbakemeldi
                     <path d="M13 40C10.2386 40 8 37.7614 8 35V10H6V35C6 38.866 9.13401 42 13 42H30V40H13Z" fill="currentColor"/>
                     <path fillRule="evenodd" clipRule="evenodd" d="M36 13C36 11.3431 37.3431 10 39 10C40.6569 10 42 11.3431 42 13V33.3028L39 37.8028L36 33.3028V13ZM39 12C38.4477 12 38 12.4477 38 13V15H40V13C40 12.4477 39.5523 12 39 12ZM39 34.1972L40 32.6972V17H38V32.6972L39 34.1972Z" fill="currentColor"/>
                   </Box>
-                ),
-              },
-              {
-                value: "meldeskjema",
-                label: "Innspill",
-                icon: (
-                  <Box component="svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" sx={{ width: 26, height: 26, flexShrink: 0 }}>
-                    <g transform="matrix(0.96 0 0 0.96 24 24)">
-                      <path transform="translate(-25, -25)" d="M 11.5 2 C 9.5788117 2 8 3.5788117 8 5.5 L 8 44.5 C 8 46.421188 9.5788117 48 11.5 48 L 38.5 48 C 40.421188 48 42 46.421188 42 44.5 L 42 14.585938 L 29.414062 2 L 11.5 2 z M 11.5 4 L 28 4 L 28 12.5 C 28 14.421188 29.578812 16 31.5 16 L 40 16 L 40 44.5 C 40 45.340812 39.340812 46 38.5 46 L 11.5 46 C 10.659188 46 10 45.340812 10 44.5 L 10 5.5 C 10 4.6591883 10.659188 4 11.5 4 z M 30 5.4140625 L 38.585938 14 L 31.5 14 C 30.659188 14 30 13.340812 30 12.5 L 30 5.4140625 z M 18.5 24.5 C 17.67157287525381 24.5 17 25.17157287525381 17 26 C 17 26.82842712474619 17.67157287525381 27.5 18.5 27.5 C 19.32842712474619 27.5 20 26.82842712474619 20 26 C 20 25.17157287525381 19.32842712474619 24.5 18.5 24.5 z M 22 25 L 22 27 L 33 27 L 33 25 L 22 25 z M 18.5 29.5 C 17.67157287525381 29.5 17 30.17157287525381 17 31 C 17 31.82842712474619 17.67157287525381 32.5 18.5 32.5 C 19.32842712474619 32.5 20 31.82842712474619 20 31 C 20 30.17157287525381 19.32842712474619 29.5 18.5 29.5 z M 22 30 L 22 32 L 33 32 L 33 30 L 22 30 z M 18.5 34.5 C 17.67157287525381 34.5 17 35.17157287525381 17 36 C 17 36.82842712474619 17.67157287525381 37.5 18.5 37.5 C 19.32842712474619 37.5 20 36.82842712474619 20 36 C 20 35.17157287525381 19.32842712474619 34.5 18.5 34.5 z M 22 35 L 22 37 L 33 37 L 33 35 L 22 35 z" fill="currentColor" strokeLinecap="round"/>
-                    </g>
-                  </Box>
-                ),
-              },
-            ] as { value: "notater" | "meldeskjema"; label: string; icon: React.ReactNode }[]
-          ).map(({ value, label, icon }) => {
-            const isActive = tab === value;
-            return (
-              <Box
-                key={value}
-                role="tab"
-                aria-selected={isActive}
-                component="button"
-                type="button"
-                onClick={() => setTab(value)}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  px: 2,
-                  py: 1,
-                  borderRadius: 0,
-                  border: "none",
-                  outline: "none",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  bgcolor: "transparent",
-                  boxShadow: "none",
-                  "&:focus, &:focus-visible": { outline: "none" },
-                  fontSize: "1.25rem",
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? "#B07FD4" : "text.secondary",
-                  transition: "color 0.15s ease",
-                  "&:hover": {
-                    bgcolor: "transparent",
-                    color: isActive ? "#B07FD4" : "text.primary",
-                  },
-                }}
-              >
-                {icon}
-                {label}
-              </Box>
-            );
-          })}
+          Mine notater
         </Box>
       ) : null}
 
-      {tab === "meldeskjema" ? (
-        <>
-          {isOwner && (
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 1.5,
-                mb: 1.5,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 1,
-                flexWrap: "wrap",
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                Kun eier kan åpne innsendinger og se svaroversikt.
-              </Typography>
-              <Button
-                variant="outlined"
-                href={MELDESKJEMA_RESPONSES_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                startIcon={<OpenInNewIcon />}
-              >
-                Åpne svar
-              </Button>
-            </Paper>
-          )}
-          <Paper
-            sx={{
-              height: { xs: isOwner ? "calc(100vh - 390px)" : "calc(100vh - 310px)", md: isOwner ? "calc(100vh - 360px)" : "calc(100vh - 280px)" },
-              minHeight: 520,
-              overflow: "hidden",
-              borderRadius: isOwner ? undefined : "0 0 4px 4px",
-            }}
-          >
-            <Box
-              component="iframe"
-              src={MELDESKJEMA_EMBED_URL}
-              title="Meldeskjema for REKS+"
-              sx={{ width: "100%", height: "100%", border: 0 }}
-            />
-          </Paper>
-        </>
-      ) : tab === "rutiner" ? (
+      {tab === "rutiner" ? (
         <Paper
           sx={{
             minHeight: 520,
