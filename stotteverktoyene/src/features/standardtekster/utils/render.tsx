@@ -19,6 +19,9 @@ export function renderContentWithPreparatHighlight(
     formuleringOccurrenceValues?: string[];
     /** Når satt gjøres TALL-tokens til inline redigerbare input-felter i teksten. */
     onTallChange?: (idx: number, value: string) => void;
+    doseringValues?: string[];
+    /** Når satt gjøres DOSERING-tokens til inline redigerbare fritekstfelter i teksten. */
+    onDoseringChange?: (idx: number, value: string) => void;
     /** Valgt segment-indeks per alternativ-gruppe-forekomst (null = ikke valgt ennå). */
     altSelections?: Array<number | null>;
     /** Kalles med (forekomst, segment) når bruker velger; (forekomst, null) for å angre valget. */
@@ -110,6 +113,41 @@ export function renderContentWithPreparatHighlight(
         borderStyle: "solid",
         boxShadow: (theme: Theme) =>
           `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(56,189,248,0.5)" : "rgba(2,132,199,0.35)"}`,
+      },
+      "&::placeholder": {
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        letterSpacing: "0.025em",
+        opacity: 0.85,
+      },
+    }) as const;
+
+  // DOSERING er fritekst, og skiller seg visuelt fra det blå TALL-feltet med en
+  // teal pille. Feltet er bredt siden doseringer er lengre enn tall.
+  const placeholderDoseringSx = {
+    ...tokenPlaceholderSx,
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(13, 148, 136, 0.45)" : "rgba(20, 184, 166, 0.16)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#CCFBF1" : "#115E59"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(45, 212, 191, 0.8)" : "rgba(13, 148, 136, 0.5)",
+  } as const;
+
+  const inlineDoseringInputSx = (filled: boolean) =>
+    ({
+      ...placeholderDoseringSx,
+      borderStyle: filled ? "solid" : "dashed",
+      font: "inherit",
+      fontSize: "0.9em",
+      fontWeight: 650,
+      minWidth: "9em",
+      appearance: "none",
+      outline: "none",
+      cursor: "text",
+      "&:focus": {
+        borderStyle: "solid",
+        boxShadow: (theme: Theme) =>
+          `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(45,212,191,0.5)" : "rgba(13,148,136,0.35)"}`,
       },
       "&::placeholder": {
         fontFamily:
@@ -322,7 +360,7 @@ export function renderContentWithPreparatHighlight(
     // grupper {{seg1 / seg2 / ...}} (sjekkes først – tokens under inneholder aldri "/").
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
+      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*)\b)/g
     );
     if (parts.length <= 1) return t;
 
@@ -451,6 +489,44 @@ export function renderContentWithPreparatHighlight(
             return (
               <Box key={i} component="span" sx={placeholderTallSx}>
                 {label}
+              </Box>
+            );
+          }
+
+          // DOSERING / {{DOSERING}} / DOSERING1 ... – fritekst, ingen tallvalidering.
+          const doseringMatch = part.match(/^(?:\{\{\s*)?DOSERING(\d*)(?:\s*\}\})?$/i);
+          if (doseringMatch) {
+            const rawIdx = (doseringMatch[1] ?? "").trim();
+            const idx = rawIdx ? Number(rawIdx) : 0;
+
+            const rawValue = opts?.doseringValues?.[idx] ?? "";
+            const tokenLabel = idx === 0 ? "DOSERING" : `DOSERING${idx}`;
+
+            if (opts?.onDoseringChange) {
+              const onDoseringChange = opts.onDoseringChange;
+              return (
+                <Box
+                  key={i}
+                  component="input"
+                  type="text"
+                  value={rawValue}
+                  placeholder={tokenLabel}
+                  size={Math.max(rawValue.length, tokenLabel.length, 2)}
+                  aria-label={tokenLabel}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    onDoseringChange(idx, e.target.value)
+                  }
+                  // Ikke la klikk/markering i feltet trigge klikk-for-kopi på kortet.
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
+                  onMouseDown={(e: MouseEvent) => e.stopPropagation()}
+                  sx={inlineDoseringInputSx(Boolean(rawValue.trim()))}
+                />
+              );
+            }
+
+            return (
+              <Box key={i} component="span" sx={placeholderDoseringSx}>
+                {rawValue.trim() || tokenLabel}
               </Box>
             );
           }

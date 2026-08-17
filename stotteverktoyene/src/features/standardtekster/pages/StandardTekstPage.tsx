@@ -33,10 +33,12 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {
   formatPreparatRowText,
   getAltGroupCount,
+  getDoseringTokenIndices,
   getOptionalGroupCount,
   getTallTokenIndices,
   migrateLegacyClockTallTokens,
   replaceAltGroups,
+  replaceDoseringTokenByIndex,
   replaceOptionalGroups,
   replaceNextPreparatToken,
   replaceKlokkeslettDagTokens,
@@ -46,6 +48,7 @@ import {
   templateHasAltToken,
   templateHasDatoMndToken,
   templateHasDatoToken,
+  templateHasDoseringToken,
   templateHasKlokkeslettDagToken,
   templateHasTallToken,
   usePreparatRows,
@@ -532,6 +535,7 @@ export default function StandardTekstPage() {
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
+      setDoseringByIndex({ 0: "" });
       resetClockToAutomatic();
 
       // Reset date input
@@ -553,10 +557,25 @@ export default function StandardTekstPage() {
     [selected?.content],
   );
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
+  const [doseringByIndex, setDoseringByIndex] = useState<Record<number, string>>({ 0: "" });
   // Valgt segment-indeks per alternativ-gruppe-forekomst (null/manglende = ikke valgt).
   const [altByIndex, setAltByIndex] = useState<Record<number, number | null>>({});
   // true per valgfri-setning-forekomst ({{...}}) som er valgt bort før kopiering.
   const [optionalRemovedByIndex, setOptionalRemovedByIndex] = useState<Record<number, boolean>>({});
+
+  // Malen slik den faktisk blir seende ut ved kopiering: valgte alternativer satt
+  // inn, bortvalgte {{setninger}} fjernet. Validering og forekomsttelling må se
+  // denne og ikke rå-malen. Tokens inne i en bortvalgt setning eller i et
+  // alternativ brukeren ikke valgte forsvinner ved kopiering, og skal derfor
+  // heller ikke kreves utfylt – ellers blir kopiering blokkert av et felt som
+  // ikke lenger finnes i skjemaet.
+  //
+  // Merk: uvalgte alternativ-grupper står igjen som {{a / b}}, og brukes til å
+  // avgjøre om kopiering skal blokkeres.
+  const effectiveTemplateContent = useMemo(() => {
+    const afterAlt = replaceAltGroups(activeTemplateContent, (idx) => altByIndex[idx] ?? null);
+    return replaceOptionalGroups(afterAlt, (idx) => Boolean(optionalRemovedByIndex[idx]));
+  }, [activeTemplateContent, altByIndex, optionalRemovedByIndex]);
   const [clockTime, setClockTime] = useState<string>(() => getAutomaticClockTallTime());
   const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
     getAutomaticClockTallDay(getAutomaticClockTallTime()),
@@ -1131,6 +1150,7 @@ export default function StandardTekstPage() {
       setTallByIndex(nextTallValues);
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      setDoseringByIndex({ 0: "" });
       resetClockToAutomatic();
       setDatoInput("");
       setErrorLocal(null);
@@ -1153,6 +1173,7 @@ export default function StandardTekstPage() {
       setTallByIndex(buildInitialTallValues(normalizeTemplateContent(selected.content)));
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      setDoseringByIndex({ 0: "" });
       resetClockToAutomatic();
       // Måned/år (MM.YYYY) fra "dekket til" → DATO-tokenet rendres som "desember 2026".
       setDatoInput(pendingLager.datoInput);
@@ -1187,6 +1208,7 @@ export default function StandardTekstPage() {
       setTallByIndex(nextTall);
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      setDoseringByIndex({ 0: "" });
 
       if (pendingPalette.formuleringValues) {
         const nextF: Record<number, string> = { 0: "" };
@@ -1215,6 +1237,7 @@ export default function StandardTekstPage() {
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      setDoseringByIndex({ 0: "" });
       resetClockToAutomatic();
       setDatoInput("");
       const fIndices = getFormuleringTokenIndices(activeTemplateContent);
@@ -1850,6 +1873,11 @@ export default function StandardTekstPage() {
     if (!selected) return false;
     if (isEditing) return false;
     const selectedContent = activeTemplateContent;
+    // All validering under kjører mot den effektive malen, ikke rå-malen: det som
+    // ikke havner i kopiert tekst skal ikke kreves utfylt. Garantien består – alt
+    // som faktisk overlever inn i teksten blir fortsatt krevd, så råtokens kan
+    // ikke nå kunden.
+    const validationContent = effectiveTemplateContent;
 
     // If the user has marked (selected) text, do NOT auto-copy the full template.
     // This keeps normal text selection + Ctrl/Cmd+C working.
@@ -1859,24 +1887,35 @@ export default function StandardTekstPage() {
     }
 
     // Prevent copying if the template requires a number and it hasn't been filled in.
-    if (templateHasTallToken(selectedContent)) {
-      const indices = getTallTokenIndices(selectedContent);
+    if (templateHasTallToken(validationContent)) {
+      const indices = getTallTokenIndices(validationContent);
       const missing = indices.filter((i) => !(tallByIndex[i] ?? "").trim());
       if (missing.length) {
-        const label = missing.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
+        const label = missing.map((i) => getTallFieldLabel(validationContent, i)).join(", ");
         setErrorLocal(`Fyll inn feltet før du kopierer teksten: ${label}.`);
         return false;
       }
 
       const invalid = indices.filter((i) => !isTallValueValid(tallByIndex[i] ?? ""));
       if (invalid.length) {
-        const label = invalid.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
+        const label = invalid.map((i) => getTallFieldLabel(validationContent, i)).join(", ");
         setErrorLocal(`Tallfelt må inneholde kun tall: ${label}.`);
         return false;
       }
     }
 
-    if (templateHasKlokkeslettDagToken(selectedContent)) {
+    // DOSERING er fritekst, så det eneste kravet er at feltet ikke står tomt.
+    if (templateHasDoseringToken(validationContent)) {
+      const indices = getDoseringTokenIndices(validationContent);
+      const missing = indices.filter((i) => !(doseringByIndex[i] ?? "").trim());
+      if (missing.length) {
+        const label = missing.map((i) => (i === 0 ? "DOSERING" : `DOSERING${i}`)).join(", ");
+        setErrorLocal(`Fyll inn dosering før du kopierer teksten: ${label}.`);
+        return false;
+      }
+    }
+
+    if (templateHasKlokkeslettDagToken(validationContent)) {
       const clockLabel = formatClockTallValue(clockTime, clockDay).trim();
       if (!clockLabel) {
         setErrorLocal("Velg klokkeslett før du kopierer teksten.");
@@ -1886,45 +1925,41 @@ export default function StandardTekstPage() {
 
     // Krev utfylt preparat når malen har PREPARAT-token. Uten dette har det skjedd
     // at tekst med råtokenet "PREPARAT1" ble kopiert og sendt til kunde.
-    if (templateHasPreparatToken(selectedContent) && pickedPreparats.length === 0) {
+    if (templateHasPreparatToken(validationContent) && pickedPreparats.length === 0) {
       setErrorLocal("Velg preparat før du kopierer teksten.");
       return false;
     }
 
     // Krev at hver alternativ-gruppe ({{seg1 / seg2}}) er valgt, ellers kan de
-    // ubrukte alternativene ende opp i teksten som sendes til kunde.
-    if (templateHasAltToken(selectedContent)) {
-      const altCount = getAltGroupCount(selectedContent);
-      const hasUnselected = Array.from({ length: altCount }, (_, i) => i).some(
-        (i) => altByIndex[i] == null,
-      );
-      if (hasUnselected) {
-        setErrorLocal("Velg alternativ før du kopierer teksten.");
-        return false;
-      }
+    // ubrukte alternativene ende opp i teksten som sendes til kunde. replaceAltGroups
+    // bytter ut de valgte gruppene, så står det fortsatt en gruppe igjen i den
+    // effektive malen er den uvalgt.
+    if (templateHasAltToken(validationContent)) {
+      setErrorLocal("Velg alternativ før du kopierer teksten.");
+      return false;
     }
 
-    if (templateHasVirkestoffToken(selectedContent) && !resolvedVirkestoff) {
+    if (templateHasVirkestoffToken(validationContent) && !resolvedVirkestoff) {
       setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
       return false;
     }
-    if (templateHasFormuleringTokens(selectedContent)) {
-      const indices = getFormuleringTokenIndices(selectedContent);
+    if (templateHasFormuleringTokens(validationContent)) {
+      const indices = getFormuleringTokenIndices(validationContent);
       const missingLabels = new Set<string>();
 
       for (const idx of indices.filter((i) => i > 0)) {
-        if (!resolveFormuleringTokenValue(idx, selectedContent)) {
+        if (!resolveFormuleringTokenValue(idx, validationContent)) {
           missingLabels.add(`FORMULERING${idx}`);
         }
       }
 
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(validationContent);
       if (hasUnnumberedToken) {
-        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(validationContent);
         if (!occurrenceValues.length || occurrenceValues.some((value) => !value.trim())) {
           missingLabels.add("FORMULERING");
         }
-      } else if (indices.includes(0) && !resolveFormuleringTokenValue(0, selectedContent)) {
+      } else if (indices.includes(0) && !resolveFormuleringTokenValue(0, validationContent)) {
         missingLabels.add("FORMULERING");
       }
 
@@ -2008,29 +2043,42 @@ export default function StandardTekstPage() {
     }
 
     // Replace FORMULERING tokens (free text) by index (FORMULERING, FORMULERING1, ...)
-    if (templateHasFormuleringTokens(selectedContent)) {
-      const indices = getFormuleringTokenIndices(selectedContent);
+    if (templateHasFormuleringTokens(validationContent)) {
+      const indices = getFormuleringTokenIndices(validationContent);
       const hasNumbered = indices.some((idx) => idx > 0);
 
       if (hasNumbered) {
         for (const idx of indices.filter((i) => i > 0)) {
-          const v = resolveFormuleringTokenValue(idx, selectedContent);
+          const v = resolveFormuleringTokenValue(idx, validationContent);
           if (!v) continue;
           text = replaceFormuleringTokenByIndex(text, idx, v);
         }
       }
 
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(validationContent);
       if (hasUnnumberedToken) {
-        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        // Verdiene bygges fra den effektive malen, ikke rå-malen. Erstatningen går
+        // gjennom tokenene i `text` i rekkefølge, så hadde vi tellet forekomster i
+        // rå-malen ville en umerket FORMULERING inne i en bortvalgt setning ha
+        // forskjøvet indeksene og satt inn verdien fra feil forekomst.
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(validationContent);
         if (occurrenceValues.length > 0) {
           text = replaceUnnumberedFormuleringTokensByOccurrence(text, occurrenceValues);
         } else {
-          const v0 = resolveFormuleringTokenValue(0, selectedContent);
+          const v0 = resolveFormuleringTokenValue(0, validationContent);
           if (v0) {
             text = replaceFormuleringTokenByIndex(text, 0, v0);
           }
         }
+      }
+    }
+
+    // DOSERING (fritekst) erstattes per indeks, som TALL.
+    if (templateHasDoseringToken(validationContent)) {
+      for (const idx of getDoseringTokenIndices(validationContent)) {
+        const v = (doseringByIndex[idx] ?? "").trim();
+        if (!v) continue;
+        text = replaceDoseringTokenByIndex(text, idx, v);
       }
     }
 
@@ -2054,6 +2102,7 @@ export default function StandardTekstPage() {
         }
         setAltByIndex({});
         setOptionalRemovedByIndex({});
+        setDoseringByIndex({ 0: "" });
         resetClockToAutomatic();
 
         setSearch("");
@@ -2100,6 +2149,7 @@ export default function StandardTekstPage() {
           }
           setAltByIndex({});
           setOptionalRemovedByIndex({});
+          setDoseringByIndex({ 0: "" });
           resetClockToAutomatic();
 
           setSearch("");
@@ -2826,9 +2876,25 @@ export default function StandardTekstPage() {
                   }
                   return arr;
                 })(),
+                // Fra den effektive malen: renderen teller ikke forekomster inne i
+                // bortvalgte setninger, så verdiene må telles på samme grunnlag.
                 formuleringOccurrenceValues: buildUnnumberedFormuleringOccurrenceValues(
-                  activeTemplateContent,
+                  effectiveTemplateContent,
                 ),
+                doseringValues: (() => {
+                  const indices = getDoseringTokenIndices(activeTemplateContent);
+                  const arr: string[] = [];
+                  for (const i of indices) {
+                    arr[i] = doseringByIndex[i] ?? "";
+                  }
+                  return arr;
+                })(),
+                onDoseringChange: (idx, value) => {
+                  setDoseringByIndex((prev) => ({ ...prev, [idx]: value }));
+                  if (errorLocal?.startsWith("Fyll inn dosering før du kopierer teksten")) {
+                    setErrorLocal(null);
+                  }
+                },
                 onTallChange: (idx, value) => {
                   const nextValue = value.replace(/[^\d.,]/g, "");
                   setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));

@@ -508,6 +508,46 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   return text.replace(re, safeValue);
 }
 
+// DOSERING er fritekst, i motsetning til TALL som valideres som et tall og styrer
+// entall/flertall for PAKKE og FORMULERING. Doseringer lar seg ofte ikke uttrykke
+// som ett tall – «2-3 doser inntil 4 ganger daglig» for inhalasjonsmedisiner er et
+// typisk eksempel – og med nummererte tokens (DOSERING1/DOSERING2) kan én mal gi
+// ulik dosering per preparat.
+export function templateHasDoseringToken(text: string): boolean {
+  return /\{\{\s*DOSERING\d*\s*\}\}|\bDOSERING\d*\b/i.test(text ?? "");
+}
+
+export function getDoseringTokenIndices(text: string): number[] {
+  const indices = new Set<number>();
+
+  const re = /\{\{\s*DOSERING(\d*)\s*\}\}|\bDOSERING(\d*)\b/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text ?? ""))) {
+    const raw = (m[1] ?? m[2] ?? "").trim();
+    if (!raw) {
+      indices.add(0);
+    } else {
+      const n = Number(raw);
+      if (Number.isFinite(n)) indices.add(n);
+    }
+  }
+
+  return Array.from(indices).sort((a, b) => a - b);
+}
+
+export function replaceDoseringTokenByIndex(text: string, index: number, value: string): string {
+  if (!text) return text;
+  const safeValue = value ?? "";
+
+  if (index === 0) {
+    return text.replace(/\{\{\s*DOSERING\s*\}\}|\bDOSERING\b/gi, safeValue);
+  }
+
+  const re = new RegExp(`\\{\\{\\s*DOSERING${index}\\s*\\}\\}|\\bDOSERING${index}\\b`, "gi");
+
+  return text.replace(re, safeValue);
+}
+
 export function templateHasPakkeToken(text: string): boolean {
   // Case-sensitivt: kun store bokstaver PAKKE er et token. Det vanlige norske
   // ordet «pakke»/«pakker» i vanlig brødtekst skal IKKE tolkes som token –
@@ -605,7 +645,7 @@ export function replaceAltGroups(
 // Reserverte token-navn som også kan stå i {{ }} (f.eks. {{TALL}}). Disse skal
 // IKKE tolkes som valgfri setning eller alternativ-gruppe.
 const RESERVED_BRACE_TOKEN_RE =
-  /^(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|PREPARAT\d*|DEN_DE|VAREN\(E\)|MEDISIN\(ENE\)|XX)$/i;
+  /^(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|PREPARAT\d*|DEN_DE|VAREN\(E\)|MEDISIN\(ENE\)|XX)$/i;
 
 export function isReservedBraceToken(inner: string): boolean {
   return RESERVED_BRACE_TOKEN_RE.test((inner ?? "").trim());
@@ -630,7 +670,9 @@ export function getOptionalGroupCount(text: string): number {
 
 /**
  * Fjern bortvalgte valgfrie setninger og pakk ut resten (uten {{ }}). Rydder
- * opp doble mellomrom som oppstår der en setning ble fjernet midt i en linje.
+ * opp doble mellomrom som oppstår der en setning ble fjernet midt i en linje,
+ * og mellomrom som blir stående foran tegnsetting når setningen sto rett foran
+ * den ("... legen har skrevet {{(...)}}." ga tidligere "... skrevet .").
  */
 export function replaceOptionalGroups(
   text: string,
@@ -649,7 +691,10 @@ export function replaceOptionalGroups(
     return inner.trim() + trailing;
   });
   if (removedAny) {
-    result = result.replace(/ {2,}/g, " ").replace(/ +$/gm, "");
+    result = result
+      .replace(/ {2,}/g, " ")
+      .replace(/ +([.,;:!?])/g, "$1")
+      .replace(/ +$/gm, "");
   }
   return result;
 }
@@ -1007,6 +1052,9 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat", group: "PREPARAT" },
   { label: "VIRKESTOFF", insert: "VIRKESTOFF", help: "Virkestoff fra valgt preparat", group: "PREPARAT" },
   { label: "DEN_DE", insert: "DEN_DE", help: "Setter inn den (1 preparat) eller de (flere preparater)", group: "PREPARAT" },
+  { label: "DOSERING", insert: "DOSERING", help: "Fri tekst for dosering (f.eks. «2 tabletter daglig» eller «2-3 doser inntil 4 ganger daglig»)", group: "ANNET" },
+  { label: "DOSERING1", insert: "DOSERING1", help: "Dosering for preparat 1", group: "ANNET" },
+  { label: "DOSERING2", insert: "DOSERING2", help: "Dosering for preparat 2", group: "ANNET" },
   { label: "FORMULERING", insert: "FORMULERING", help: "Fri tekst (f.eks. tablett/kapsel/nesespray)", group: "ANNET" },
   { label: "FORMULERING1", insert: "FORMULERING1", help: "Formulering for preparat 1", group: "ANNET" },
   { label: "FORMULERING2", insert: "FORMULERING2", help: "Formulering for preparat 2", group: "ANNET" },
