@@ -15,6 +15,9 @@ export interface Strength {
   value: number;
   unit: StrengthUnit; // mg | mcg | µg
   perHour?: boolean; // true for mcg/time or mcg/h (transdermal plaster)
+  // true for konsentrasjoner ("1 mg/ml"). Skiller mikstur som doseres i ml fra
+  // endoser der styrken er mg per beholder (Metadon Nordic Drugs "10 mg").
+  perMl?: boolean;
 }
 
 export interface ParsedMedicationInput {
@@ -137,8 +140,8 @@ export const extractStrength = (input: string): Strength | null => {
   }
 
   // Matches e.g.:
-  // 200 mg, 200mg, 0,2 mg, 100 mcg, 100 ug
-  const simpleMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(mg|mcg|µg|ug)\b/i);
+  // 200 mg, 200mg, 0,2 mg, 100 mcg, 100 ug, 1 mg/ml
+  const simpleMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(mg|mcg|µg|ug)\b\s*(\/\s*ml)?/i);
   if (!simpleMatch) return null;
 
   const value = Number(simpleMatch[1].replace(",", "."));
@@ -148,7 +151,9 @@ export const extractStrength = (input: string): Strength | null => {
   const unit: StrengthUnit =
     rawUnit === "mg" ? "mg" : rawUnit === "µg" || rawUnit === "ug" ? "µg" : "mcg";
 
-  return { value, unit };
+  // Verdien er den samme enten styrken er "10 mg" eller "10 mg/ml" – forskjellen
+  // ligger i hva døgndosen teller (beholdere mot ml).
+  return { value, unit, perMl: Boolean(simpleMatch[3]) };
 };
 
 type VariantHit = {
@@ -220,8 +225,10 @@ const extractCodeineStrengthFromCombo = (text: string): Strength | null => {
 };
 
 const extractOxycodoneStrengthFromCombo = (text: string): Strength | null => {
-  // For combo strengths like "5 mg/2,5 mg" (oxycodone/naloxone): use the first mg value (oxycodone)
-  const m = text.match(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\//i);
+  // For combo strengths like "5 mg/2,5 mg" (oxycodone/naloxone): use the first mg value (oxycodone).
+  // Krev et tall etter skilletegnet – uten det traff mønsteret også konsentrasjoner
+  // som "1 mg/ml", og oksykodon-miksturene mistet perMl fra styrken.
+  const m = text.match(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*\d/i);
   if (!m) return null;
 
   const value = Number(m[1].replace(",", "."));
