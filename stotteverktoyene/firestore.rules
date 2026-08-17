@@ -456,8 +456,9 @@ service cloud.firestore {
       }
     }
 
-    // Innspill fra brukerne. Alle aktive medlemmer kan sende inn og lese sine
-    // egne (for å følge status og svar). Kun eier ser alt og kan endre/slette.
+    // Innspill fra brukerne. Alle aktive medlemmer kan sende inn og lese hele
+    // samlingen – lista er delt slik at samme sak ikke meldes inn to ganger.
+    // Kun eier kan endre status/svar eller slette.
     match /feedbacks/{feedbackId} {
       function validFeedbackCreate() {
         return request.resource.data.keys().hasOnly([
@@ -498,10 +499,9 @@ service cloud.firestore {
           && request.resource.data.updatedAt is timestamp;
       }
 
-      // get: eier eller den som meldte inn.
-      allow get: if isOwnerRole() || (isSignedIn() && resource.data.createdByUid == request.auth.uid);
-      // list: eier kan hente alt; andre må spørre med where("createdByUid","==",egen uid).
-      allow list: if isOwnerRole() || (isSignedIn() && resource.data.createdByUid == request.auth.uid);
+      // Innspill er delt internt: alle aktive medlemmer leser hele samlingen, så
+      // man kan se hva som alt er meldt inn før man melder på nytt.
+      allow get, list: if isActiveMember();
 
       allow create: if isActiveMember() && validFeedbackCreate();
       allow update: if isOwnerRole() && validFeedbackOwnerUpdate();

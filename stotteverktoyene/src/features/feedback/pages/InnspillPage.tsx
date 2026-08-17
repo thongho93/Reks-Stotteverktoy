@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  InputAdornment,
   MenuItem,
   Paper,
   Snackbar,
@@ -16,6 +17,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import BugReportRoundedIcon from "@mui/icons-material/BugReportRounded";
 import LightbulbRoundedIcon from "@mui/icons-material/LightbulbRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { feedbackApi, FEEDBACK_MAX_LENGTH } from "../services/feedbackApi";
@@ -29,6 +31,8 @@ import {
   type Feedback,
   type FeedbackCategory,
 } from "../types";
+
+type Scope = "alle" | "mine";
 
 function formatDateTime(ms: number): string {
   if (!ms) return "–";
@@ -86,7 +90,9 @@ function StatusTrail({ status }: { status: Feedback["status"] }) {
 
 /**
  * Brukernes innspillsside: meld inn feil eller ønsker, og følg med på hva eier
- * gjør med dem. Eiers samleside ligger på /rekspert/feedbacks.
+ * gjør med dem. Lista er delt med alle brukere, slik at man kan sjekke om en sak
+ * alt er meldt inn. Eiers samleside – med status, svar og sletting – ligger på
+ * /rekspert/feedbacks.
  */
 export default function InnspillPage() {
   const { user, firstName } = useAuthUser();
@@ -101,6 +107,8 @@ export default function InnspillPage() {
   const [items, setItems] = React.useState<Feedback[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [listError, setListError] = React.useState<string | null>(null);
+  const [scope, setScope] = React.useState<Scope>("alle");
+  const [search, setSearch] = React.useState("");
 
   const reporterName = React.useMemo(
     () => firstName?.trim() || user?.displayName?.trim() || user?.email?.trim() || "Ukjent bruker",
@@ -108,10 +116,7 @@ export default function InnspillPage() {
   );
 
   React.useEffect(() => {
-    if (!user?.uid) return undefined;
-
-    const unsubscribe = feedbackApi.subscribeMine(
-      user.uid,
+    const unsubscribe = feedbackApi.subscribeAll(
       (next) => {
         setItems(next);
         setListError(null);
@@ -121,15 +126,33 @@ export default function InnspillPage() {
         const code = (err as { code?: string } | undefined)?.code ?? "";
         setListError(
           code === "permission-denied"
-            ? "Mangler tilgang til å hente dine innspill (permission-denied)."
-            : "Kunne ikke hente dine innspill akkurat nå."
+            ? "Mangler tilgang til å hente innspill (permission-denied)."
+            : "Kunne ikke hente innspill akkurat nå."
         );
         setIsLoading(false);
       }
     );
 
     return unsubscribe;
-  }, [user?.uid]);
+  }, []);
+
+  const mineCount = React.useMemo(
+    () => items.filter((item) => item.createdByUid === user?.uid).length,
+    [items, user?.uid]
+  );
+
+  const filtered = React.useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase("nb-NO");
+
+    return items.filter((item) => {
+      if (scope === "mine" && item.createdByUid !== user?.uid) return false;
+      if (!needle) return true;
+
+      const haystack = `${item.message} ${item.createdByName} ${feedbackPageLabel(item.pagePath)}`
+        .toLocaleLowerCase("nb-NO");
+      return haystack.includes(needle);
+    });
+  }, [items, scope, search, user?.uid]);
 
   const trimmed = message.trim();
   const canSubmit = trimmed.length >= 3 && !submitting && Boolean(user?.uid);
@@ -267,8 +290,9 @@ export default function InnspillPage() {
                 />
 
                 <Typography variant="caption" color="text.secondary">
-                  Sendes som <strong>{reporterName}</strong>, slik at eier kan følge opp med deg.
-                  Ikke skriv personopplysninger om kunder eller pasienter.
+                  Sendes som <strong>{reporterName}</strong>, og er synlig for alle i appen slik at
+                  samme sak ikke meldes inn to ganger. Ikke skriv personopplysninger om kunder eller
+                  pasienter.
                 </Typography>
 
                 <Button
@@ -282,9 +306,41 @@ export default function InnspillPage() {
             </Paper>
 
             <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
-                Mine innspill ({items.length})
-              </Typography>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+                alignItems={{ xs: "stretch", sm: "center" }}
+                sx={{ mb: 1.5 }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, flex: 1 }}>
+                  {scope === "mine" ? `Mine innspill (${mineCount})` : `Alle innspill (${items.length})`}
+                </Typography>
+                <ToggleButtonGroup
+                  size="small"
+                  exclusive
+                  value={scope}
+                  onChange={(_, next: Scope | null) => next && setScope(next)}
+                >
+                  <ToggleButton value="alle">Alle</ToggleButton>
+                  <ToggleButton value="mine">Mine</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Søk – er saken alt meldt inn?"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 1.5 }}
+              />
 
               {listError && (
                 <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
@@ -292,16 +348,20 @@ export default function InnspillPage() {
                 </Alert>
               )}
 
-              {!listError && !isLoading && items.length === 0 && (
+              {!listError && !isLoading && filtered.length === 0 && (
                 <Paper variant="outlined" sx={{ p: 4, borderRadius: 2, textAlign: "center" }}>
                   <Typography color="text.secondary">
-                    Du har ikke sendt inn noe ennå. Første innspill dukker opp her.
+                    {search.trim()
+                      ? "Ingen innspill passer søket."
+                      : scope === "mine"
+                        ? "Du har ikke sendt inn noe ennå. Første innspill dukker opp her."
+                        : "Ingen innspill er meldt inn ennå."}
                   </Typography>
                 </Paper>
               )}
 
               <Stack spacing={1.5}>
-                {items.map((item) => (
+                {filtered.map((item) => (
                   <Paper
                     key={item.id}
                     variant="outlined"
@@ -332,6 +392,12 @@ export default function InnspillPage() {
                         label={item.category === "bug" ? "Feil / bug" : "Ny funksjon"}
                       />
                       <Chip size="small" variant="outlined" label={feedbackPageLabel(item.pagePath)} />
+                      {item.createdByUid === user?.uid && (
+                        <Chip size="small" color="primary" variant="outlined" label="Ditt innspill" />
+                      )}
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {item.createdByName || "Ukjent bruker"}
+                      </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {formatDateTime(item.createdAtMs)}
                       </Typography>

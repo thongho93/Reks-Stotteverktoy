@@ -39,8 +39,8 @@ function formatDateTime(ms: number): string {
 
 /**
  * Eiers samleside for innspill sendt fra /innspill.
- * Ruten er gatet av RequireOwner, og firestore.rules åpner lesing av hele
- * samlingen kun for eier – brukerne ser bare sine egne.
+ * Ruten er gatet av RequireOwner. Alle brukere leser hele samlingen på /innspill,
+ * men bare eier kan sette status, svare og slette.
  */
 export default function FeedbackPage() {
   const [items, setItems] = React.useState<Feedback[]>([]);
@@ -160,7 +160,7 @@ export default function FeedbackPage() {
               Innspill
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-              Innspill fra brukerne – status og svar vises til den som meldte inn
+              Innspill fra brukerne – status og svar vises til alle på /innspill
             </Typography>
           </Box>
 
@@ -323,7 +323,7 @@ export default function FeedbackPage() {
                     fullWidth
                     multiline
                     minRows={1}
-                    label="Svar til bruker (synlig for avsender)"
+                    label="Svar til bruker (synlig for alle)"
                     placeholder="Fikset i neste versjon, eller: trenger mer info om …"
                     value={replyDrafts[item.id] ?? item.ownerReply}
                     onChange={(e) =>
