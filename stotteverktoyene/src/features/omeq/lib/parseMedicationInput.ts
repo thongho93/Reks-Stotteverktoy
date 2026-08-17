@@ -44,25 +44,70 @@ export const buildProductIndex = (): ProductIndexItem[] => {
   return cachedProductIndex;
 };
 
+// Ord i inputen som peker på en formulering. Brukes bare til å skille mellom
+// produkter som deler handelsnavn – f.eks. OxyNorm, som finnes som mikstur,
+// kapsel og injeksjonsvæske. Uten dette avgjorde rekkefølgen i datasettet, slik
+// at mikstur og kapsel arvet injeksjonsvæskens parenterale vei og faktor 3.
+const FORM_HINTS: Record<ProductForm, string[]> = {
+  mikstur: ["mikstur", "oral væske", "oral løsning", "oral oppløsning"],
+  dråper: ["dråpe"],
+  kapsel: ["kapsel", "kapsler"],
+  tablett: ["tablett"],
+  brusetablett: ["brusetablett"],
+  depottablett: ["depottablett"],
+  depotplaster: ["depotplaster", "plaster"],
+  stikkpille: ["stikkpille", "suppositor"],
+  nesespray: ["nesespray"],
+  sublingvaltablett: ["sublingvaltablett", "resoriblett"],
+  sublingvalfilm: ["sublingvalfilm"],
+  lyofilisattablett: ["lyofilisat"],
+  injeksjon: ["injeksjon"],
+  "infusjons-/injeksjonsvæske": ["injeksjonsvæske", "infusjon", "injeksjon"],
+  depotinjeksjonsvæske: ["depotinjeksjon"],
+  annet: [],
+};
+
+// Lengste treff vinner, slik at «depottablett» ikke også regnes som «tablett».
+const formHintScore = (text: string, form?: ProductForm): number => {
+  if (!form) return 0;
+
+  return (FORM_HINTS[form] ?? []).reduce(
+    (best, hint) => (text.includes(hint) ? Math.max(best, hint.length) : best),
+    0
+  );
+};
+
+const nameMatchesText = (text: string, name: string): boolean => {
+  // Krev “ordgrense-ish” på begge sider der det gir mening
+  // (hindrer litt feiltreff, men fortsatt robust)
+  const pattern = new RegExp(`(^|\\s)${escapeRegExp(name)}(\\s|$)`, "i");
+  if (pattern.test(text)) return true;
+
+  // Fallback: inkluderende match (hjelper når input har ekstra ord som “depottabletter”)
+  return text.includes(name);
+};
+
 export const findProductInText = (
   input: string,
   products: ProductIndexItem[]
 ): ProductIndexItem | null => {
   const text = normalizeText(input);
 
-  for (const p of products) {
-    const name = normalizeText(p.name);
+  // products er sortert med lengste navn først, så det mest spesifikke
+  // handelsnavnet vinner («Reltebon Depot» foran «Reltebon»).
+  const matches = products.filter((p) => nameMatchesText(text, normalizeText(p.name)));
+  if (matches.length === 0) return null;
 
-    // Krev “ordgrense-ish” på begge sider der det gir mening
-    // (hindrer litt feiltreff, men fortsatt robust)
-    const pattern = new RegExp(`(^|\\s)${escapeRegExp(name)}(\\s|$)`, "i");
-    if (pattern.test(text)) return p;
+  const best = matches[0];
+  const bestName = normalizeText(best.name);
+  const sameName = matches.filter((p) => normalizeText(p.name) === bestName);
+  if (sameName.length === 1) return best;
 
-    // Fallback: inkluderende match (hjelper når input har ekstra ord som “depottabletter”)
-    if (text.includes(name)) return p;
-  }
-
-  return null;
+  // Samme handelsnavn i flere formuleringer: la ordet i teksten avgjøre.
+  // Uten treff faller vi tilbake til datarekkefølgen, som før.
+  return sameName.reduce((chosen, candidate) =>
+    formHintScore(text, candidate.form) > formHintScore(text, chosen.form) ? candidate : chosen
+  );
 };
 
 // Støtter:
@@ -111,12 +156,24 @@ type VariantHit = {
   strengthText: string | null;
 };
 
-const extractProductNumber = (input: string): number | null => {
-  // Accept 5–7 digits, but in practice varenummer is 6 digits (may have leading zeros in sources).
-  const m = input.match(/\b\d{5,7}\b/);
-  if (!m) return null;
-  const n = Number(m[0].replace(/^0+/, ""));
-  return Number.isFinite(n) ? n : null;
+// Varenummer er 6 siffer, men kildedata har strippet ledende nuller, så flere
+// ligger inne med 4–5 siffer (OxyNorm mikstur er 9587). Kravet om minst 5 siffer
+// gjorde at de aldri traff, og da falt oppslaget tilbake på navnesøket.
+//
+// Appen skriver selv varenummeret i parentes ("… (9587)"), så det er den sikreste
+// kandidaten. Tall som følges av en enhet er en styrke og hoppes over.
+const extractProductNumberCandidates = (input: string): number[] => {
+  const candidates: number[] = [];
+
+  const add = (raw: string) => {
+    const n = Number(raw);
+    if (Number.isFinite(n) && !candidates.includes(n)) candidates.push(n);
+  };
+
+  for (const m of input.matchAll(/\((\d{4,7})\)/g)) add(m[1]);
+  for (const m of input.matchAll(/\b(\d{4,7})\b(?!\s*(?:mg|mcg|µg|ug|ml|g)\b)/gi)) add(m[1]);
+
+  return candidates;
 };
 
 const parseStrengthString = (strengthText?: string | null): Strength | null => {
@@ -125,24 +182,25 @@ const parseStrengthString = (strengthText?: string | null): Strength | null => {
 };
 
 const findByProductNumber = (input: string): VariantHit | null => {
-  const pn = extractProductNumber(input);
-  if (pn == null) return null;
-
-  // Search in the source dataset (ATC_PRODUCTS) where variants/productNumbers live
-  for (const [atcCode, products] of Object.entries(ATC_PRODUCTS)) {
-    for (const p of products ?? []) {
-      for (const v of p.variants ?? []) {
-        const nums = v.productNumbers ?? [];
-        if (nums.includes(pn)) {
-          return {
-            product: {
-              name: p.name,
-              manufacturer: p.manufacturer,
-              atcCode: atcCode as ATCcode,
-              form: p.form,
-            },
-            strengthText: v.strength ?? null,
-          };
+  // Kandidatene prøves i prioritert rekkefølge mot datasettet. Et tall som ikke
+  // er et kjent varenummer gir ingen treff, og vi går videre til neste.
+  for (const pn of extractProductNumberCandidates(input)) {
+    // Search in the source dataset (ATC_PRODUCTS) where variants/productNumbers live
+    for (const [atcCode, products] of Object.entries(ATC_PRODUCTS)) {
+      for (const p of products ?? []) {
+        for (const v of p.variants ?? []) {
+          const nums = v.productNumbers ?? [];
+          if (nums.includes(pn)) {
+            return {
+              product: {
+                name: p.name,
+                manufacturer: p.manufacturer,
+                atcCode: atcCode as ATCcode,
+                form: p.form,
+              },
+              strengthText: v.strength ?? null,
+            };
+          }
         }
       }
     }
