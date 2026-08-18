@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
 import styles from "../../../styles/standardTekstPage.module.css";
+import { plainTextFromSelection } from "../utils/copySelection";
 import { STANDARDTEKST_TOKEN_DEFS } from "../utils/preparat";
 
 type Props = {
@@ -567,7 +568,21 @@ export default function StandardTekstContent({
             </>
           ) : (
             <>
-              <Typography variant="body1" component="div" className={styles.body}>
+              <Typography
+                variant="body1"
+                component="div"
+                className={styles.body}
+                // Manuell markering + Ctrl+C skal gi samme rene tekst som
+                // Kopier-knappen – uten ✕-markører, med verdiene fra input-feltene
+                // og uten linjeskift rundt token-boksene.
+                onCopy={(e) => {
+                  const root = e.currentTarget as HTMLElement;
+                  const text = plainTextFromSelection(window.getSelection(), root);
+                  if (text === null) return;
+                  e.clipboardData.setData("text/plain", text);
+                  e.preventDefault();
+                }}
+              >
                 {previewNode}
               </Typography>
               {belowContent}
