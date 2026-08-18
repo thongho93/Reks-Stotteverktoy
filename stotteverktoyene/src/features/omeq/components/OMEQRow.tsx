@@ -70,8 +70,18 @@ export const OMEQRow = ({
 
   const formLower = parsed.product?.form?.toLowerCase() ?? "";
   const isPatch = formLower === "depotplaster";
-  const isMixture =
+  const isLiquidForm =
     formLower.includes("mikstur") || formLower.includes("oral") || formLower.includes("dråpe");
+
+  // Doseenheten følger styrken, ikke formuleringen. "1 mg/ml" er en konsentrasjon
+  // og doseres i ml, mens "10 mg" på en mikstur er en endose som doseres i antall
+  // beholdere (Metadon Nordic Drugs). Da formuleringen alene styrte dette, ba
+  // feltet om ml for endoser – og et innskrevet volum ga da for høy OMEQ.
+  // Uten kjent styrke faller vi tilbake på formuleringen.
+  const dosesInMl = parsed.strength ? parsed.strength.perMl === true : isLiquidForm;
+
+  // Hva brukeren skal skrive i dosefeltet.
+  const doseUnitNoun = dosesInMl ? "ml" : isLiquidForm ? "endoser" : "tablett/kapsel/dose";
 
   useEffect(() => {
     // When the user selects a valid product (or it becomes uniquely identified),
@@ -224,11 +234,9 @@ export const OMEQRow = ({
     }
   }, [parsed.product, result.reason, isPatch, doseOverLimit]);
 
-  const mlHintText = `Skriv antall ml per døgn.`;
+  const doseHintText = `Skriv antall ${doseUnitNoun} per døgn${dosesInMl ? "" : " (ikke mg)"}.`;
 
-  const mgWarningText = isMixture
-    ? `Det ser ut som du har skrevet mg. Skriv antall ml per døgn.`
-    : `Det ser ut som du har skrevet mg. Skriv antall tablett/kapsel/dose per døgn.`;
+  const mgWarningText = `Det ser ut som du har skrevet mg. Skriv antall ${doseUnitNoun} per døgn.`;
 
   const infoText = useMemo(() => {
     if (!matchedOpioid?.helpText) return "";
@@ -255,25 +263,23 @@ export const OMEQRow = ({
     if (!isDoseFocused && !raw) return "";
 
     // While focused but empty: show a short guidance.
-    if (!raw)
-      return isMixture ? `${mlHintText}` : "Skriv antall tablett/kapsel/dose per døgn (ikke mg).";
+    if (!raw) return doseHintText;
 
     if (isBlockedByOverLimit) return mgWarningText;
 
     // When user has typed a value but we can't compute mg yet.
-    if (dailyDose == null || strengthMg == null)
-      return isMixture ? `${mlHintText}` : "Skriv antall tablett/kapsel/dose per døgn (ikke mg).";
+    if (dailyDose == null || strengthMg == null) return doseHintText;
     const impliedTotalMg = dailyDose * strengthMg;
     const roundedTotal = Math.round((impliedTotalMg + Number.EPSILON) * 100) / 100;
     const substance = substanceText || "virkestoff";
 
-    if (!Number.isFinite(roundedTotal))
-      return isMixture ? `${mlHintText}` : "Skriv antall tablett/kapsel/dose per døgn (ikke mg).";
+    if (!Number.isFinite(roundedTotal)) return doseHintText;
 
     return `Tilsvarer ${roundedTotal} mg ${substance} per døgn.`;
   }, [
     isPatch,
-    isMixture,
+    doseHintText,
+    mgWarningText,
     value.doseText,
     isDoseFocused,
     dailyDose,
@@ -370,7 +376,7 @@ export const OMEQRow = ({
         >
           <Box sx={{ width: "100%" }}>
             <TextField
-              label={isMixture ? "Antall ml per døgn" : "Antall per døgn"}
+              label={dosesInMl ? "Antall ml per døgn" : "Antall per døgn"}
               inputRef={doseInputRef}
               value={value.doseText}
               onChange={(e) => {
@@ -411,7 +417,7 @@ export const OMEQRow = ({
                         </Tooltip>
                       )}
                       <Box component="span" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
-                        {isMixture ? "ml/døgn" : "stk/døgn"}
+                        {dosesInMl ? "ml/døgn" : "stk/døgn"}
                       </Box>
                     </Box>
                   </InputAdornment>
@@ -524,10 +530,8 @@ export const OMEQRow = ({
         <DialogTitle id="over-limit-dialog-title">Høyt antall registrert</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Du har lagt inn <strong>{dailyDose} {isMixture ? "ml" : "stk"}/døgn</strong>.{" "}
-            {isMixture
-              ? "Det ser ut som du har skrevet mg. Skriv antall ml per døgn, ikke mg."
-              : "Det ser ut som du har skrevet mg. Skriv antall tablett/kapsel/dose per døgn, ikke mg."}
+            Du har lagt inn <strong>{dailyDose} {dosesInMl ? "ml" : "stk"}/døgn</strong>.{" "}
+            {`Det ser ut som du har skrevet mg. Skriv antall ${doseUnitNoun} per døgn, ikke mg.`}
             <br />
             <br />
             Vil du likevel bekrefte at dette er riktig antall?
@@ -545,7 +549,7 @@ export const OMEQRow = ({
             color="primary"
             variant="contained"
           >
-            Bekreft {dailyDose} {isMixture ? "ml" : "stk"}/døgn
+            Bekreft {dailyDose} {dosesInMl ? "ml" : "stk"}/døgn
           </Button>
         </DialogActions>
       </Dialog>

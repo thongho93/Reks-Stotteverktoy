@@ -166,11 +166,18 @@ export const ATC_PRODUCTS: Partial<Record<ATCcode, ATCProduct[]>> = {
   ],
   N01AH01: [
     {
+      // Injeksjonsfentanyl hører under N01AH01. Produktet lå tidligere også som
+      // et duplikat under N02AB03 (analgetikum) med varenummer 70007/70016 og
+      // samme 432520. Varenumrene er samlet her.
+      // TODO: 7007/7016 mot 70007/70016 kan være en tastefeil i én av kildene –
+      // bør sjekkes mot Felleskatalogen/PIM.
       name: "Fentanyl Hameln",
       manufacturer: "Hameln",
       form: "injeksjon",
       strengths: ["50 µg/ml"],
-      variants: [{ strength: "50 µg/ml", productNumbers: [7007, 7016, 432520] }],
+      variants: [
+        { strength: "50 µg/ml", productNumbers: [7007, 7016, 70007, 70016, 432520] },
+      ],
     },
     {
       name: "Fentanyl Kalceks",
@@ -212,13 +219,6 @@ export const ATC_PRODUCTS: Partial<Record<ATCcode, ATCProduct[]>> = {
         { strength: "75 µg/time", productNumbers: [479288] },
         { strength: "100 µg/time", productNumbers: [559779] },
       ],
-    },
-    {
-      name: "Fentanyl Hameln",
-      manufacturer: "Hameln",
-      form: "injeksjon",
-      strengths: ["50 µg/ml"],
-      variants: [{ strength: "50 µg/ml", productNumbers: [70007, 70016, 432520] }],
     },
     {
       name: "Fentanyl ratiopharm",

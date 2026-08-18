@@ -430,6 +430,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         }}
         sx={{
           height: 64,
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -474,6 +475,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       </Box>
       <Toolbar
         sx={{
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-end",
@@ -487,9 +489,25 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         </Tooltip>
       </Toolbar>
 
-      <Divider />
+      <Divider sx={{ flexShrink: 0 }} />
 
-      <List sx={{ py: 0.5 }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+          scrollbarWidth: "thin",
+          "&::-webkit-scrollbar": { width: 6 },
+          "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
+          "&::-webkit-scrollbar-thumb": {
+            borderRadius: 999,
+            backgroundColor: (theme) =>
+              alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.24 : 0.18),
+          },
+        }}
+      >
+        <List sx={{ py: 0.5 }}>
         {mainItems.map((item, index) => (
           <React.Fragment key={item.path}>
             {item.path === "/produkt-og-rad" ? (
@@ -682,11 +700,12 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             ))}
           </>
         )}
-      </List>
-      <Box sx={{ flexGrow: 1 }} />
-      <Divider />
+        </List>
+      </Box>
+      <Divider sx={{ flexShrink: 0 }} />
       <Box
         sx={{
+          flexShrink: 0,
           px: collapsed ? 0.6 : 1.4,
           pt: 1.1,
           pb: 0.7,
@@ -723,6 +742,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       </Box>
       <Box
         sx={{
+          flexShrink: 0,
           display: "flex",
           justifyContent: "center",
           py: 0.75,
