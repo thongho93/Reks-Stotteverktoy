@@ -2,6 +2,7 @@ import type { ChangeEvent, KeyboardEvent, MouseEvent, WheelEvent } from "react";
 import { Box } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
 
+import { COPY_SKIP_ATTR, COPY_SKIP_MARK, COPY_SKIP_SENTENCE } from "./copySelection";
 import { isReservedBraceToken, pakkeWordForValue } from "./preparat";
 
 export function renderContentWithPreparatHighlight(
@@ -247,6 +248,8 @@ export function renderContentWithPreparatHighlight(
     fontWeight: 700,
     ml: 0.4,
     verticalAlign: "super",
+    // Rent redigerings-UI: skal verken kunne markeres eller havne i kopiert tekst.
+    userSelect: "none",
     color: (theme: Theme) =>
       theme.palette.mode === "dark" ? "rgba(248, 113, 113, 0.9)" : "rgba(220, 38, 38, 0.7)",
   } as const;
@@ -675,6 +678,9 @@ export function renderContentWithPreparatHighlight(
                 component="span"
                 role="button"
                 tabIndex={0}
+                // Bortvalgt setning skal ikke bli med ved manuell markering heller
+                // – Kopier-knappen fjerner den, og de to må gi samme tekst.
+                {...(removed ? { [COPY_SKIP_ATTR]: COPY_SKIP_SENTENCE } : {})}
                 title={
                   removed
                     ? "Valgt bort – klikk for å ta med setningen igjen"
@@ -694,7 +700,7 @@ export function renderContentWithPreparatHighlight(
                 }}
               >
                 {removed ? inner : renderTokensInText(inner)}
-                <Box component="span" sx={optionalMarkSx}>
+                <Box component="span" sx={optionalMarkSx} {...{ [COPY_SKIP_ATTR]: COPY_SKIP_MARK }}>
                   {removed ? "+" : "✕"}
                 </Box>
               </Box>
