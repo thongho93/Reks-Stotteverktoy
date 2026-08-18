@@ -51,6 +51,8 @@ import {
   templateHasDoseringToken,
   templateHasKlokkeslettDagToken,
   templateHasTallToken,
+  tokenRegex,
+  tokenRegexSource,
   usePreparatRows,
 } from "../utils/preparat";
 import { buildPreviewContent, templateHasPreparatToken, templateUsesPreparat1 } from "../utils/content";
@@ -218,6 +220,8 @@ const SINGULAR_TO_PLURAL_FORMULERING: Record<string, string> = {
   sublingvaltablett: "sublingvaltabletter",
   brusetablett: "brusetabletter",
   depotkapsel: "depotkapsler",
+  // Inhalasjonspreparater doseres i «doser» (f.eks. «2 doser morgen og kveld»).
+  dose: "doser",
   nesespray: "nesesprayer",
   oyedrape: "oyedraper",
   oredrape: "oredraper",
@@ -269,6 +273,22 @@ function toPluralFormulering(value: string): string {
   if (mapped) return mapped;
   if (trimmed.endsWith("er")) return trimmed;
   return `${trimmed}er`;
+}
+
+// DOSERING er fritekst, så antallet må plukkes ut av strengen for å kunne bøye
+// FORMULERING. Ved flere tall (typisk intervaller som «1-2» eller «2-3») brukes
+// det høyeste – «1-2 tabletter» er riktig, «1-2 tablett» er det ikke. Strenger
+// uten tall («ved behov») gir null, og da bøyes ingenting.
+function parseDoseringCount(value: string): number | null {
+  const matches = (value ?? "").match(/\d+(?:[.,]\d+)?/g);
+  if (!matches?.length) return null;
+
+  const numbers = matches
+    .map((m) => Number(m.replace(",", ".")))
+    .filter((n) => Number.isFinite(n));
+  if (!numbers.length) return null;
+
+  return Math.max(...numbers);
 }
 
 function toSingularFormulering(value: string): string {
@@ -620,7 +640,7 @@ export default function StandardTekstPage() {
 
   const templateHasVirkestoffToken = (template: string) => /\bVIRKESTOFF\b/.test(template ?? "");
   const templateHasFormuleringTokens = (template: string) =>
-    /\{\{\s*FORMULERING\d*\s*\}\}|\bFORMULERING\d*\b/i.test(template ?? "");
+    tokenRegex("FORMULERING", "\\d*").test(template ?? "");
   const isTallValueValid = (value: string) => {
     const trimmed = (value ?? "").trim();
     return !trimmed || /^\d+(?:[.,]\d+)?$/.test(trimmed);
@@ -628,7 +648,7 @@ export default function StandardTekstPage() {
 
   const getFormuleringTokenIndices = (template: string): number[] => {
     const indices = new Set<number>();
-    const re = /\{\{\s*FORMULERING(\d*)\s*\}\}|\bFORMULERING(\d*)\b/gi;
+    const re = tokenRegex("FORMULERING", "(\\d*)", "g");
     let m: RegExpExecArray | null;
 
     while ((m = re.exec(template ?? ""))) {
@@ -648,13 +668,10 @@ export default function StandardTekstPage() {
     const safeValue = value ?? "";
 
     if (index === 0) {
-      return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, safeValue);
+      return text.replace(tokenRegex("FORMULERING", "", "g"), safeValue);
     }
 
-    const re = new RegExp(
-      `\\{\\{\\s*FORMULERING${index}\\s*\\}\\}|\\bFORMULERING${index}\\b`,
-      "gi",
-    );
+    const re = tokenRegex("FORMULERING", String(index), "g");
     return text.replace(re, safeValue);
   };
 
@@ -672,24 +689,67 @@ export default function StandardTekstPage() {
     [tallByIndex],
   );
 
+  const getDoseringNumericValue = useCallback(
+    (index: number): number | null => {
+      const candidate =
+        (doseringByIndex[index] ?? "").trim() ||
+        (index !== 0 ? (doseringByIndex[0] ?? "").trim() : "");
+      if (!candidate) return null;
+
+      return parseDoseringCount(candidate);
+    },
+    [doseringByIndex],
+  );
+
+  // Bøyer FORMULERING etter antallet foran seg. TALL har forrang siden det er et
+  // rent tallfelt; har malen bare DOSERING (fritekst), leses antallet ut av den.
+  const getFormuleringCount = useCallback(
+    (index: number, template: string): number | null => {
+      if (templateHasTallToken(template)) {
+        const numeric = getTallNumericValue(index);
+        if (numeric !== null) return numeric;
+      }
+
+      if (templateHasDoseringToken(template)) {
+        return getDoseringNumericValue(index);
+      }
+
+      return null;
+    },
+    [getDoseringNumericValue, getTallNumericValue],
+  );
+
   const resolveFormuleringForPreviewAndCopy = useCallback(
     (index: number, value: string, template: string): string => {
       const raw = (value ?? "").trim();
       if (!raw) return raw;
-      if (!templateHasTallToken(template)) return raw;
 
-      const numeric = getTallNumericValue(index);
+      const numeric = getFormuleringCount(index, template);
       if (numeric === null) return raw;
       if (numeric === 1) return toSingularFormulering(raw);
       if (numeric > 1) return toPluralFormulering(raw);
       return raw;
     },
-    [getTallNumericValue],
+    [getFormuleringCount],
   );
 
   const getTallTokenOccurrences = useCallback((template: string): number[] => {
     const occurrences: number[] = [];
-    const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
+    const re = tokenRegex("TALL", "(\\d*)", "g");
+    let m: RegExpExecArray | null;
+
+    while ((m = re.exec(template ?? ""))) {
+      const raw = (m[1] ?? m[2] ?? "").trim();
+      const idx = raw ? Number(raw) : 0;
+      occurrences.push(Number.isFinite(idx) ? idx : 0);
+    }
+
+    return occurrences;
+  }, []);
+
+  const getDoseringTokenOccurrences = useCallback((template: string): number[] => {
+    const occurrences: number[] = [];
+    const re = tokenRegex("DOSERING", "(\\d*)", "g");
     let m: RegExpExecArray | null;
 
     while ((m = re.exec(template ?? ""))) {
@@ -702,7 +762,7 @@ export default function StandardTekstPage() {
   }, []);
 
   const getUnnumberedFormuleringOccurrenceCount = useCallback((template: string): number => {
-    const re = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi;
+    const re = tokenRegex("FORMULERING", "", "g");
     let count = 0;
     while (re.exec(template ?? "")) count += 1;
     return count;
@@ -712,7 +772,9 @@ export default function StandardTekstPage() {
     (template: string): Array<number | null> => {
       const positions: Array<number | null> = [];
       let currentPreparatPosition: number | null = null;
-      const re = /\{\{\s*(PREPARAT\d*|FORMULERING)\s*\}\}|\b(PREPARAT\d*|FORMULERING)\b/gi;
+      // Navnet ligger i en capture-gruppe her (m[1] = {{ }}-varianten, m[2] = den
+      // bare), så mønsteret bygges av gruppa i stedet for ett enkelt token-navn.
+      const re = new RegExp(tokenRegexSource("(PREPARAT\\d*|FORMULERING)"), "g");
       let m: RegExpExecArray | null;
 
       while ((m = re.exec(template ?? ""))) {
@@ -749,6 +811,8 @@ export default function StandardTekstPage() {
 
       const hasTallTokens = templateHasTallToken(template);
       const tallOccurrences = hasTallTokens ? getTallTokenOccurrences(template) : [];
+      const hasDoseringTokens = templateHasDoseringToken(template);
+      const doseringOccurrences = hasDoseringTokens ? getDoseringTokenOccurrences(template) : [];
 
       const getRawFromPreparatPosition = (position: number | null | undefined): string => {
         if (position === null || position === undefined || position < 0) return "";
@@ -775,12 +839,24 @@ export default function StandardTekstPage() {
           }
         }
 
+        // Ingen TALL-verdi å bøye etter – prøv DOSERING på samme plassering.
+        if (hasDoseringTokens) {
+          const doseringIdx = doseringOccurrences[occurrenceIdx];
+          if (typeof doseringIdx === "number") {
+            const numeric = getDoseringNumericValue(doseringIdx);
+            if (numeric === 1) return toSingularFormulering(raw);
+            if (numeric !== null && numeric > 1) return toPluralFormulering(raw);
+          }
+        }
+
         return raw;
       });
     },
     [
       formuleringByIndex,
       formuleringByPreparatKey,
+      getDoseringNumericValue,
+      getDoseringTokenOccurrences,
       getTallNumericValue,
       getTallTokenOccurrences,
       getUnnumberedFormuleringOccurrenceCount,
@@ -807,7 +883,7 @@ export default function StandardTekstPage() {
         const key = String(row?.pickedKey ?? row?.picked ?? "").trim();
         return key ? count + 1 : count;
       }, 0);
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(template ?? "");
+      const hasUnnumberedToken = tokenRegex("FORMULERING").test(template ?? "");
       const preparatPosition = index === 0
         ? 0
         : hasUnnumberedToken
@@ -837,7 +913,7 @@ export default function StandardTekstPage() {
       if (!values.length) return text;
 
       let cursor = 0;
-      return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, () => {
+      return text.replace(tokenRegex("FORMULERING", "", "g"), () => {
         const value = values[cursor] ?? values[values.length - 1] ?? "";
         cursor += 1;
         return value;
@@ -1533,6 +1609,8 @@ export default function StandardTekstPage() {
       "brusetablett",
       "depottablett",
       "depotplaster",
+      "dose",
+      "doser",
       "dråper",
       "gel",
       "granulat",
@@ -1953,7 +2031,7 @@ export default function StandardTekstPage() {
         }
       }
 
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(validationContent);
+      const hasUnnumberedToken = tokenRegex("FORMULERING").test(validationContent);
       if (hasUnnumberedToken) {
         const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(validationContent);
         if (!occurrenceValues.length || occurrenceValues.some((value) => !value.trim())) {
@@ -2055,7 +2133,7 @@ export default function StandardTekstPage() {
         }
       }
 
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(validationContent);
+      const hasUnnumberedToken = tokenRegex("FORMULERING").test(validationContent);
       if (hasUnnumberedToken) {
         // Verdiene bygges fra den effektive malen, ikke rå-malen. Erstatningen går
         // gjennom tokenene i `text` i rekkefølge, så hadde vi tellet forekomster i
