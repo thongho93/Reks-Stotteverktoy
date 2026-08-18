@@ -397,7 +397,7 @@ export function replaceNextPreparatToken(text: string, value: string) {
   // - Never touch PREPARAT1 or PREPARAT2
   // This guarantees PREPARAT1 can never end up inside PREPARAT2
   // when only one preparat is selected.
-  return text.replace(/\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b/i, value);
+  return text.replace(tokenRegex("PREPARAT"), value);
 }
 
 export const replaceVareTokenByCount = (text: string, count: number): string => {
@@ -461,26 +461,49 @@ export const replaceMedisineneTokenByCount = (text: string, count: number): stri
   );
 };
 
+// Token-matching skal speile visningen i render.tsx: et token UTEN {{ }} må stå i
+// VERSALER for å telle. Ellers blir vanlige ord i brødteksten – «dosering»,
+// «dato», «pakke», «preparat» – tolket som tokens, og kopieringen krever
+// utfylling av felter som aldri vises i teksten. Inne i {{ }} godtas alle
+// skrivemåter, slik render.tsx også gjør (se isReservedBraceToken).
+// Samme resonnement som for PAKKE i replacePakkeTokens.
+const anyCaseSource = (word: string) =>
+  word.replace(/[A-Z]/g, (c) => `[${c}${c.toLowerCase()}]`);
+
+/**
+ * Regex-kilde for et token. `indexPattern` er det som følger navnet – f.eks.
+ * `"\\d*"`, `"(\\d*)"` for en capture-gruppe, eller et konkret tall.
+ * Merk: med capture-gruppe gir mønsteret to grupper (én for {{ }}-varianten og
+ * én for den bare) – bruk `m[1] ?? m[2]`.
+ */
+export function tokenRegexSource(name: string, indexPattern = ""): string {
+  return `\\{\\{\\s*${anyCaseSource(name)}${indexPattern}\\s*\\}\\}|\\b${name}${indexPattern}\\b`;
+}
+
+export function tokenRegex(name: string, indexPattern = "", flags = ""): RegExp {
+  return new RegExp(tokenRegexSource(name, indexPattern), flags);
+}
+
 export function replaceNextTallToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
   // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i, value);
+  return text.replace(tokenRegex("TALL", "\\d*"), value);
 }
 
 export function replaceTallTokens(text: string, value: string) {
   // Replace ALL occurrences.
   // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/gi, value);
+  return text.replace(tokenRegex("TALL", "\\d*", "g"), value);
 }
 
 export function templateHasTallToken(text: string): boolean {
-  return /\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i.test(text);
+  return tokenRegex("TALL", "\\d*").test(text);
 }
 
 export function getTallTokenIndices(text: string): number[] {
   const indices = new Set<number>();
 
-  const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
+  const re = tokenRegex("TALL", "(\\d*)", "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const raw = (m[1] ?? m[2] ?? "").trim();
@@ -500,10 +523,10 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   const safeValue = value ?? "";
 
   if (index === 0) {
-    return text.replace(/\{\{\s*TALL\s*\}\}|\bTALL\b/gi, safeValue);
+    return text.replace(tokenRegex("TALL", "", "g"), safeValue);
   }
 
-  const re = new RegExp(`\\{\\{\\s*TALL${index}\\s*\\}\\}|\\bTALL${index}\\b`, "gi");
+  const re = tokenRegex("TALL", String(index), "g");
 
   return text.replace(re, safeValue);
 }
@@ -514,13 +537,13 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
 // typisk eksempel – og med nummererte tokens (DOSERING1/DOSERING2) kan én mal gi
 // ulik dosering per preparat.
 export function templateHasDoseringToken(text: string): boolean {
-  return /\{\{\s*DOSERING\d*\s*\}\}|\bDOSERING\d*\b/i.test(text ?? "");
+  return tokenRegex("DOSERING", "\\d*").test(text ?? "");
 }
 
 export function getDoseringTokenIndices(text: string): number[] {
   const indices = new Set<number>();
 
-  const re = /\{\{\s*DOSERING(\d*)\s*\}\}|\bDOSERING(\d*)\b/gi;
+  const re = tokenRegex("DOSERING", "(\\d*)", "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(text ?? ""))) {
     const raw = (m[1] ?? m[2] ?? "").trim();
@@ -540,10 +563,10 @@ export function replaceDoseringTokenByIndex(text: string, index: number, value: 
   const safeValue = value ?? "";
 
   if (index === 0) {
-    return text.replace(/\{\{\s*DOSERING\s*\}\}|\bDOSERING\b/gi, safeValue);
+    return text.replace(tokenRegex("DOSERING", "", "g"), safeValue);
   }
 
-  const re = new RegExp(`\\{\\{\\s*DOSERING${index}\\s*\\}\\}|\\bDOSERING${index}\\b`, "gi");
+  const re = tokenRegex("DOSERING", String(index), "g");
 
   return text.replace(re, safeValue);
 }
@@ -747,27 +770,27 @@ export function migrateLegacyClockTallTokens(text: string): string {
 export function replaceNextDatoToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
   // Supports {{DATO}} and DATO
-  return text.replace(/\{\{\s*DATO\s*\}\}|\bDATO\b/i, value);
+  return text.replace(tokenRegex("DATO"), value);
 }
 
 export function replaceDatoTokens(text: string, value: string) {
   // Replace ALL occurrences.
   // Supports {{DATO}} and DATO
-  return text.replace(/\{\{\s*DATO\s*\}\}|\bDATO\b/gi, value);
+  return text.replace(tokenRegex("DATO", "", "g"), value);
 }
 
 export function templateHasDatoToken(text: string): boolean {
-  return /\{\{\s*DATO\s*\}\}|\bDATO\b/i.test(text);
+  return tokenRegex("DATO").test(text);
 }
 
 export function templateHasDatoMndToken(text: string): boolean {
-  return /\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/i.test(text ?? "");
+  return tokenRegex("DATO_MND").test(text ?? "");
 }
 
 export function getFormuleringTokenIndices(text: string): number[] {
   const indices = new Set<number>();
 
-  const re = /\{\{\s*FORMULERING(\d*)\s*\}\}|\bFORMULERING(\d*)\b/gi;
+  const re = tokenRegex("FORMULERING", "(\\d*)", "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const raw = (m[1] ?? m[2] ?? "").trim();
@@ -786,21 +809,21 @@ export function replaceFormuleringTokenByIndex(text: string, index: number, valu
   const safeValue = value ?? "";
 
   if (index === 0) {
-    return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, safeValue);
+    return text.replace(tokenRegex("FORMULERING", "", "g"), safeValue);
   }
 
-  const re = new RegExp(`\\{\\{\\s*FORMULERING${index}\\s*\\}\\}|\\bFORMULERING${index}\\b`, "gi");
+  const re = tokenRegex("FORMULERING", String(index), "g");
   return text.replace(re, safeValue);
 }
 
 export function replaceDatoMndTokens(text: string, value: string) {
   if (!text) return text;
-  return text.replace(/\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/gi, value);
+  return text.replace(tokenRegex("DATO_MND", "", "g"), value);
 }
 
 export function replaceNextDatoMndToken(text: string, value: string) {
   if (!text) return text;
-  return text.replace(/\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/i, value);
+  return text.replace(tokenRegex("DATO_MND"), value);
 }
 
 export function usePreparatRows() {

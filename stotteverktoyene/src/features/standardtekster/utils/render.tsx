@@ -101,7 +101,9 @@ export function renderContentWithPreparatHighlight(
     ({
       ...placeholderTallSx,
       borderStyle: filled ? "solid" : "dashed",
-      font: "inherit",
+      // Bruk `fontFamily`, ikke `font`-shorthanden: shorthanden nullstiller også
+      // line-height fra tokenSx, og da blir inputet høyere enn pillene rundt.
+      fontFamily: "inherit",
       fontSize: "0.9em",
       fontWeight: 650,
       textAlign: "center",
@@ -123,7 +125,7 @@ export function renderContentWithPreparatHighlight(
     }) as const;
 
   // DOSERING er fritekst, og skiller seg visuelt fra det blå TALL-feltet med en
-  // teal pille. Feltet er bredt siden doseringer er lengre enn tall.
+  // teal pille.
   const placeholderDoseringSx = {
     ...tokenPlaceholderSx,
     bgcolor: (theme: Theme) =>
@@ -133,14 +135,21 @@ export function renderContentWithPreparatHighlight(
       theme.palette.mode === "dark" ? "rgba(45, 212, 191, 0.8)" : "rgba(13, 148, 136, 0.5)",
   } as const;
 
-  const inlineDoseringInputSx = (filled: boolean) =>
+  const inlineDoseringInputSx = (filled: boolean, chars: number) =>
     ({
       ...placeholderDoseringSx,
       borderStyle: filled ? "solid" : "dashed",
-      font: "inherit",
+      // Se kommentaren i inlineTallInputSx om `fontFamily` vs `font`.
+      fontFamily: "inherit",
       fontSize: "0.9em",
       fontWeight: 650,
-      minWidth: "9em",
+      textAlign: "center",
+      // Bredden settes eksplisitt i stedet for å overlates til `size`-attributtet:
+      // nettleseren legger på rundt 40 px slack for `size`, og feltet holder maks
+      // to siffer. `ch` + slack for padding gir et kompakt felt som fortsatt
+      // vokser hvis noen skriver noe lengre.
+      width: `calc(${chars}ch + 1.6em)`,
+      minWidth: "2.6em",
       appearance: "none",
       outline: "none",
       cursor: "text",
@@ -501,6 +510,13 @@ export function renderContentWithPreparatHighlight(
 
             const rawValue = opts?.doseringValues?.[idx] ?? "";
             const tokenLabel = idx === 0 ? "DOSERING" : `DOSERING${idx}`;
+            // Kort placeholder, siden feltbredden følger den lengste av verdi og
+            // placeholder – verdien er maks to siffer. «ANT» og ikke «DOSE», siden
+            // «dose» også er en gyldig FORMULERING (inhalasjoner doseres i doser)
+            // og de to står side om side i teksten. Full token-tekst ligger i
+            // aria-label og tooltip.
+            const doseringPlaceholder = idx === 0 ? "ANT" : `ANT${idx}`;
+            const doseringChars = Math.max(rawValue.length, doseringPlaceholder.length, 2);
 
             if (opts?.onDoseringChange) {
               const onDoseringChange = opts.onDoseringChange;
@@ -510,16 +526,17 @@ export function renderContentWithPreparatHighlight(
                   component="input"
                   type="text"
                   value={rawValue}
-                  placeholder={tokenLabel}
-                  size={Math.max(rawValue.length, tokenLabel.length, 2)}
+                  placeholder={doseringPlaceholder}
+                  size={doseringChars}
                   aria-label={tokenLabel}
+                  title={tokenLabel}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     onDoseringChange(idx, e.target.value)
                   }
                   // Ikke la klikk/markering i feltet trigge klikk-for-kopi på kortet.
                   onClick={(e: MouseEvent) => e.stopPropagation()}
                   onMouseDown={(e: MouseEvent) => e.stopPropagation()}
-                  sx={inlineDoseringInputSx(Boolean(rawValue.trim()))}
+                  sx={inlineDoseringInputSx(Boolean(rawValue.trim()), doseringChars)}
                 />
               );
             }
