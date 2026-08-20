@@ -16,7 +16,8 @@
     "pim:sync": "tsx scripts/extractPimProducts.ts",
     "hv:sync": "tsx scripts/syncHvProductsFromCsv.ts",
     "raad:sync": "node scripts/extractPharmacistAdvice.mjs",
-    "interaksjon:prune": "node scripts/pruneInteractions.mjs"
+    "interaksjon:prune": "node scripts/pruneInteractions.mjs",
+    "users:backfill": "node scripts/backfillUserDocs.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",
@@ -44,6 +45,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "fast-xml-parser": "^5.3.3",
+    "firebase-admin": "^14.3.0",
     "globals": "^16.5.0",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",

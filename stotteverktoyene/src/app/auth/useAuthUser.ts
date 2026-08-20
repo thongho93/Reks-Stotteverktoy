@@ -65,11 +65,14 @@ export function useAuthUser() {
             : prev
         );
 
-        // Approval gate:
-        // - approved === false => NOT approved
-        // - approved missing/true => approved
-        const approvedRaw = data?.approved;
-        const approved = approvedRaw !== false;
+        // Approval gate – speiler isApprovedUser() i firestore.rules:
+        // - users/{uid} mangler   => IKKE godkjent. Reglene krever at dokumentet
+        //   finnes, så uten det avvises alle delte lesinger og skrivinger
+        //   (feedbacks, fagligDocuments, internalChats). Brukeren skal da møte
+        //   godkjenningssiden, ikke en kryptisk permission-denied inne i appen.
+        // - approved === false    => IKKE godkjent
+        // - approved mangler/true => godkjent
+        const approved = userSnap.exists() && data?.approved !== false;
         setIsApproved(approved);
 
         try {
@@ -123,6 +126,10 @@ export function useAuthUser() {
           setRole(rekspertFromUserDoc ? "rekspert" : "user");
         }
       } catch {
+        // Lesingen av users/{uid} feilet (nettverk/App Check), så vi vet ikke om
+        // brukeren er godkjent. Porten holdes åpen med vilje: å låse hele appen
+        // på en forbigående lesefeil er verre enn at et enkelt kall eventuelt
+        // avvises av reglene.
         setIsAdmin(false);
         setIsRekspert(false);
         setRole("user");

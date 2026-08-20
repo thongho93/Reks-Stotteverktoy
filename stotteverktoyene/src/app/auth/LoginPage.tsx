@@ -57,6 +57,12 @@ export function LoginPage() {
       if (mode === "signup") {
         const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
 
+        // Kontoen finnes nå i Auth, men appen krever i tillegg users/{uid}:
+        // isApprovedUser() i firestore.rules krever at dokumentet finnes, og
+        // uten det blir brukeren avvist på alt delt innhold. Feiler skrivingen
+        // må det sies med en gang – ikke svelges og oppdages senere som
+        // "permission-denied", og brukeren finnes da ikke i brukerlisten som
+        // eier godkjenner fra.
         try {
           await setDoc(
             doc(db, "users", cred.user.uid),
@@ -65,12 +71,19 @@ export function LoginPage() {
               firstName: trimmedFirstName,
               avatarUrl: null,
               createdAt: serverTimestamp(),
-              approved: false, 
+              approved: false,
             },
             { merge: true }
           );
-        } catch {
-          // ignore
+        } catch (docErr) {
+          const code = (docErr as { code?: string } | null)?.code;
+          setError(
+            "Kontoen ble opprettet, men brukerprofilen kunne ikke lagres" +
+              (code ? ` (${code})` : "") +
+              ". Kontakt eier – kontoen må registreres manuelt før du får tilgang."
+          );
+          setBusy(false);
+          return;
         }
       } else {
         await signInWithEmailAndPassword(auth, trimmedEmail, password);
