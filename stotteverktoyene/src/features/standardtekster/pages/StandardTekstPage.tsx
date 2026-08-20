@@ -34,11 +34,13 @@ import {
   formatPreparatRowText,
   getAltGroupCount,
   getDoseringTokenIndices,
+  getFritekstTokenIndices,
   getOptionalGroupCount,
   getTallTokenIndices,
   migrateLegacyClockTallTokens,
   replaceAltGroups,
   replaceDoseringTokenByIndex,
+  replaceFritekstTokenByIndex,
   replaceOptionalGroups,
   replaceNextPreparatToken,
   replaceKlokkeslettDagTokens,
@@ -49,6 +51,7 @@ import {
   templateHasDatoMndToken,
   templateHasDatoToken,
   templateHasDoseringToken,
+  templateHasFritekstToken,
   templateHasKlokkeslettDagToken,
   templateHasTallToken,
   tokenRegex,
@@ -556,6 +559,7 @@ export default function StandardTekstPage() {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
 
       // Reset date input
@@ -578,6 +582,8 @@ export default function StandardTekstPage() {
   );
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
   const [doseringByIndex, setDoseringByIndex] = useState<Record<number, string>>({ 0: "" });
+  // FRITEKST: fritt felt uten validering. Verdien lagres og settes inn ordrett.
+  const [fritekstByIndex, setFritekstByIndex] = useState<Record<number, string>>({ 0: "" });
   // Valgt segment-indeks per alternativ-gruppe-forekomst (null/manglende = ikke valgt).
   const [altByIndex, setAltByIndex] = useState<Record<number, number | null>>({});
   // true per valgfri-setning-forekomst ({{...}}) som er valgt bort før kopiering.
@@ -1227,6 +1233,7 @@ export default function StandardTekstPage() {
       setAltByIndex({});
       setOptionalRemovedByIndex({});
       setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       setDatoInput("");
       setErrorLocal(null);
@@ -1250,6 +1257,7 @@ export default function StandardTekstPage() {
       setAltByIndex({});
       setOptionalRemovedByIndex({});
       setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       // Måned/år (MM.YYYY) fra "dekket til" → DATO-tokenet rendres som "desember 2026".
       setDatoInput(pendingLager.datoInput);
@@ -1285,6 +1293,7 @@ export default function StandardTekstPage() {
       setAltByIndex({});
       setOptionalRemovedByIndex({});
       setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
 
       if (pendingPalette.formuleringValues) {
         const nextF: Record<number, string> = { 0: "" };
@@ -1314,6 +1323,7 @@ export default function StandardTekstPage() {
       setAltByIndex({});
       setOptionalRemovedByIndex({});
       setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       setDatoInput("");
       const fIndices = getFormuleringTokenIndices(activeTemplateContent);
@@ -1993,6 +2003,18 @@ export default function StandardTekstPage() {
       }
     }
 
+    // FRITEKST godtar alt innhold, men feltet må være utfylt – ellers ville
+    // token-navnet blitt kopiert rått inn i en melding til kunden.
+    if (templateHasFritekstToken(validationContent)) {
+      const indices = getFritekstTokenIndices(validationContent);
+      const missing = indices.filter((i) => !(fritekstByIndex[i] ?? "").trim());
+      if (missing.length) {
+        const label = missing.map((i) => (i === 0 ? "FRITEKST" : `FRITEKST${i}`)).join(", ");
+        setErrorLocal(`Fyll inn fritekstfeltet før du kopierer teksten: ${label}.`);
+        return false;
+      }
+    }
+
     if (templateHasKlokkeslettDagToken(validationContent)) {
       const clockLabel = formatClockTallValue(clockTime, clockDay).trim();
       if (!clockLabel) {
@@ -2160,6 +2182,17 @@ export default function StandardTekstPage() {
       }
     }
 
+    // FRITEKST erstattes per indeks. Bare mellomrom rundt verdien fjernes –
+    // innholdet ellers settes inn ordrett, med tegnene og bokstavstørrelsen
+    // brukeren skrev.
+    if (templateHasFritekstToken(validationContent)) {
+      for (const idx of getFritekstTokenIndices(validationContent)) {
+        const v = (fritekstByIndex[idx] ?? "").trim();
+        if (!v) continue;
+        text = replaceFritekstTokenByIndex(text, idx, v);
+      }
+    }
+
     text = (text ?? "").trim();
     if (!text) return false;
 
@@ -2181,6 +2214,7 @@ export default function StandardTekstPage() {
         setAltByIndex({});
         setOptionalRemovedByIndex({});
         setDoseringByIndex({ 0: "" });
+        setFritekstByIndex({ 0: "" });
         resetClockToAutomatic();
 
         setSearch("");
@@ -2228,6 +2262,7 @@ export default function StandardTekstPage() {
           setAltByIndex({});
           setOptionalRemovedByIndex({});
           setDoseringByIndex({ 0: "" });
+          setFritekstByIndex({ 0: "" });
           resetClockToAutomatic();
 
           setSearch("");
@@ -2970,6 +3005,22 @@ export default function StandardTekstPage() {
                 onDoseringChange: (idx, value) => {
                   setDoseringByIndex((prev) => ({ ...prev, [idx]: value }));
                   if (errorLocal?.startsWith("Fyll inn dosering før du kopierer teksten")) {
+                    setErrorLocal(null);
+                  }
+                },
+                fritekstValues: (() => {
+                  const indices = getFritekstTokenIndices(activeTemplateContent);
+                  const arr: string[] = [];
+                  for (const i of indices) {
+                    arr[i] = fritekstByIndex[i] ?? "";
+                  }
+                  return arr;
+                })(),
+                onFritekstChange: (idx, value) => {
+                  // Ingen filtrering av verdien – i motsetning til onTallChange,
+                  // som fjerner alt annet enn siffer.
+                  setFritekstByIndex((prev) => ({ ...prev, [idx]: value }));
+                  if (errorLocal?.startsWith("Fyll inn fritekstfeltet før du kopierer teksten")) {
                     setErrorLocal(null);
                   }
                 },
