@@ -31,9 +31,22 @@ service cloud.firestore {
       return isAdminRole() || isOwnerRole();
     }
 
+    // Godkjent bruker = users/{uid} finnes og approved er ikke false.
+    //
+    // NB: approved-feltet MÅ sjekkes med "in" først. I Firestore-regler er
+    // oppslag på et felt som ikke finnes en evalueringsfeil, og feilen gjør at
+    // hele regelen blir false – ikke at uttrykket blir null. Den bare
+    // `data.approved != false` avviste derfor alle brukere som er opprettet før
+    // approved-feltet fantes, selv om både appen og brukerlisten på Profil-siden
+    // viste dem som aktive ("approved mangler => godkjent"). De møtte
+    // permission-denied på alt bak isActiveMember(): innspill, faglig innhold og
+    // intern chat. Tolkningen under er den samme som klienten bruker.
     function isApprovedUser(uid) {
       return exists(/databases/$(database)/documents/users/$(uid))
-        && get(/databases/$(database)/documents/users/$(uid)).data.approved != false;
+        && (
+          !("approved" in get(/databases/$(database)/documents/users/$(uid)).data)
+          || get(/databases/$(database)/documents/users/$(uid)).data.approved != false
+        );
     }
 
     // Owner/admin regnes som "tillatte" chat-brukere selv uten users/{uid}

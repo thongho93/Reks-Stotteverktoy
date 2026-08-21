@@ -23,6 +23,9 @@ export function renderContentWithPreparatHighlight(
     doseringValues?: string[];
     /** Når satt gjøres DOSERING-tokens til inline redigerbare fritekstfelter i teksten. */
     onDoseringChange?: (idx: number, value: string) => void;
+    fritekstValues?: string[];
+    /** Når satt gjøres FRITEKST-tokens til inline redigerbare felter uten validering. */
+    onFritekstChange?: (idx: number, value: string) => void;
     /** Valgt segment-indeks per alternativ-gruppe-forekomst (null = ikke valgt ennå). */
     altSelections?: Array<number | null>;
     /** Kalles med (forekomst, segment) når bruker velger; (forekomst, null) for å angre valget. */
@@ -158,6 +161,51 @@ export function renderContentWithPreparatHighlight(
         borderStyle: "solid",
         boxShadow: (theme: Theme) =>
           `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(45,212,191,0.5)" : "rgba(13,148,136,0.35)"}`,
+      },
+      "&::placeholder": {
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        letterSpacing: "0.025em",
+        opacity: 0.85,
+      },
+    }) as const;
+
+  // FRITEKST er et helt åpent felt, og får en indigo pille slik at den ikke
+  // forveksles med det blå TALL-feltet eller det teal DOSERING-feltet.
+  const placeholderFritekstSx = {
+    ...tokenPlaceholderSx,
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(67, 56, 202, 0.45)" : "rgba(99, 102, 241, 0.16)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#E0E7FF" : "#3730A3"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(165, 180, 252, 0.8)" : "rgba(79, 70, 229, 0.5)",
+  } as const;
+
+  const inlineFritekstInputSx = (filled: boolean, chars: number) =>
+    ({
+      ...placeholderFritekstSx,
+      borderStyle: filled ? "solid" : "dashed",
+      // Se kommentaren i inlineTallInputSx om `fontFamily` vs `font`.
+      fontFamily: "inherit",
+      fontSize: "0.9em",
+      fontWeight: 650,
+      // Venstrejustert, ikke sentrert som TALL/DOSERING: innholdet kan være en
+      // hel setning, og da leses den lettere når den starter samme sted uansett
+      // lengde.
+      textAlign: "left",
+      // Feltet vokser med innholdet. Bredden settes eksplisitt av samme grunn som
+      // for DOSERING (`size` gir ~40 px slack), men minimumsbredden er større –
+      // en kode eller setning trenger mer plass enn to siffer.
+      width: `calc(${chars}ch + 1.6em)`,
+      minWidth: "6ch",
+      maxWidth: "100%",
+      appearance: "none",
+      outline: "none",
+      cursor: "text",
+      "&:focus": {
+        borderStyle: "solid",
+        boxShadow: (theme: Theme) =>
+          `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(129,140,248,0.5)" : "rgba(79,70,229,0.35)"}`,
       },
       "&::placeholder": {
         fontFamily:
@@ -372,7 +420,7 @@ export function renderContentWithPreparatHighlight(
     // grupper {{seg1 / seg2 / ...}} (sjekkes først – tokens under inneholder aldri "/").
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*)\b)/g
+      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|FRITEKST\d*)\b)/g
     );
     if (parts.length <= 1) return t;
 
@@ -546,6 +594,48 @@ export function renderContentWithPreparatHighlight(
 
             return (
               <Box key={i} component="span" sx={placeholderDoseringSx}>
+                {rawValue.trim() || tokenLabel}
+              </Box>
+            );
+          }
+
+          // FRITEKST / {{FRITEKST}} / FRITEKST1 ... – helt fritt felt. Verdien
+          // sendes videre uendret; ingen validering, ingen normalisering.
+          const fritekstMatch = part.match(/^(?:\{\{\s*)?FRITEKST(\d*)(?:\s*\}\})?$/i);
+          if (fritekstMatch) {
+            const rawIdx = (fritekstMatch[1] ?? "").trim();
+            const idx = rawIdx ? Number(rawIdx) : 0;
+
+            const rawValue = opts?.fritekstValues?.[idx] ?? "";
+            const tokenLabel = idx === 0 ? "FRITEKST" : `FRITEKST${idx}`;
+            // Placeholderen er token-navnet: feltet er bredt nok til å vise det,
+            // og da slipper brukeren å gjette hva som skal fylles inn.
+            const fritekstChars = Math.max(rawValue.length, tokenLabel.length);
+
+            if (opts?.onFritekstChange) {
+              const onFritekstChange = opts.onFritekstChange;
+              return (
+                <Box
+                  key={i}
+                  component="input"
+                  type="text"
+                  value={rawValue}
+                  placeholder={tokenLabel}
+                  aria-label={tokenLabel}
+                  title={tokenLabel}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    onFritekstChange(idx, e.target.value)
+                  }
+                  // Ikke la klikk/markering i feltet trigge klikk-for-kopi på kortet.
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
+                  onMouseDown={(e: MouseEvent) => e.stopPropagation()}
+                  sx={inlineFritekstInputSx(Boolean(rawValue.trim()), fritekstChars)}
+                />
+              );
+            }
+
+            return (
+              <Box key={i} component="span" sx={placeholderFritekstSx}>
                 {rawValue.trim() || tokenLabel}
               </Box>
             );

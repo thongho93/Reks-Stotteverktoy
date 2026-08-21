@@ -571,6 +571,52 @@ export function replaceDoseringTokenByIndex(text: string, index: number, value: 
   return text.replace(re, safeValue);
 }
 
+// FRITEKST er et helt åpent felt: hva som helst av tekst, tall, store eller små
+// bokstaver, uten validering og uten avledet grammatikk. Flere maler har en
+// plassholder som verken er dosering eller tall – en fraktkode eller rabattkode
+// som limes inn per kunde er det typiske tilfellet. DOSERING kunne vært brukt,
+// men det feltet er smalt og heter noe annet enn det det da fylles med.
+// Nummererte tokens (FRITEKST1/FRITEKST2) gir flere frie felt i samme mal.
+//
+// Som for DATO og PAKKE er kun STORE bokstaver et token, slik at ordet
+// «fritekst» i vanlig brødtekst står i fred.
+export function templateHasFritekstToken(text: string): boolean {
+  return tokenRegex("FRITEKST", "\\d*").test(text ?? "");
+}
+
+export function getFritekstTokenIndices(text: string): number[] {
+  const indices = new Set<number>();
+
+  const re = tokenRegex("FRITEKST", "(\\d*)", "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text ?? ""))) {
+    const raw = (m[1] ?? m[2] ?? "").trim();
+    if (!raw) {
+      indices.add(0);
+    } else {
+      const n = Number(raw);
+      if (Number.isFinite(n)) indices.add(n);
+    }
+  }
+
+  return Array.from(indices).sort((a, b) => a - b);
+}
+
+export function replaceFritekstTokenByIndex(text: string, index: number, value: string): string {
+  if (!text) return text;
+  // Verdien settes inn slik brukeren skrev den – ingen normalisering av tegn,
+  // store/små bokstaver eller mellomrom inni. Det er hele poenget med tokenet.
+  const safeValue = value ?? "";
+
+  if (index === 0) {
+    return text.replace(tokenRegex("FRITEKST", "", "g"), safeValue);
+  }
+
+  const re = tokenRegex("FRITEKST", String(index), "g");
+
+  return text.replace(re, safeValue);
+}
+
 export function templateHasPakkeToken(text: string): boolean {
   // Case-sensitivt: kun store bokstaver PAKKE er et token. Det vanlige norske
   // ordet «pakke»/«pakker» i vanlig brødtekst skal IKKE tolkes som token –
@@ -668,7 +714,7 @@ export function replaceAltGroups(
 // Reserverte token-navn som også kan stå i {{ }} (f.eks. {{TALL}}). Disse skal
 // IKKE tolkes som valgfri setning eller alternativ-gruppe.
 const RESERVED_BRACE_TOKEN_RE =
-  /^(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|PREPARAT\d*|DEN_DE|VAREN\(E\)|MEDISIN\(ENE\)|XX)$/i;
+  /^(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|FRITEKST\d*|PREPARAT\d*|DEN_DE|VAREN\(E\)|MEDISIN\(ENE\)|XX)$/i;
 
 export function isReservedBraceToken(inner: string): boolean {
   return RESERVED_BRACE_TOKEN_RE.test((inner ?? "").trim());
@@ -1078,6 +1124,14 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "DOSERING", insert: "DOSERING", help: "Fri tekst for dosering (f.eks. «2 tabletter daglig» eller «2-3 doser inntil 4 ganger daglig»)", group: "ANNET" },
   { label: "DOSERING1", insert: "DOSERING1", help: "Dosering for preparat 1", group: "ANNET" },
   { label: "DOSERING2", insert: "DOSERING2", help: "Dosering for preparat 2", group: "ANNET" },
+  {
+    label: "FRITEKST",
+    insert: "FRITEKST",
+    help: "Helt fritt felt – tekst, tall, store og små bokstaver (f.eks. en fraktkode)",
+    group: "ANNET",
+  },
+  { label: "FRITEKST1", insert: "FRITEKST1", help: "Andre frie felt i samme tekst", group: "ANNET" },
+  { label: "FRITEKST2", insert: "FRITEKST2", help: "Tredje frie felt i samme tekst", group: "ANNET" },
   { label: "FORMULERING", insert: "FORMULERING", help: "Fri tekst (f.eks. tablett/kapsel/nesespray)", group: "ANNET" },
   { label: "FORMULERING1", insert: "FORMULERING1", help: "Formulering for preparat 1", group: "ANNET" },
   { label: "FORMULERING2", insert: "FORMULERING2", help: "Formulering for preparat 2", group: "ANNET" },
