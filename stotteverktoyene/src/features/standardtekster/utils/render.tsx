@@ -418,9 +418,11 @@ export function renderContentWithPreparatHighlight(
 
     // Match both legacy {{...}} and plain tokens (no braces), samt alternativ-
     // grupper {{seg1 / seg2 / ...}} (sjekkes først – tokens under inneholder aldri "/").
+    // [[ ... ]] er avkryssbare setninger som KAN nestes (innholdet kan inneholde
+    // {{a / b}} og tokens), så de matches først og som ett hele.
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|FRITEKST\d*)\b)/g
+      /(\[\[[\s\S]+?\]\]|\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|FRITEKST\d*)\b)/g
     );
     if (parts.length <= 1) return t;
 
@@ -742,6 +744,61 @@ export function renderContentWithPreparatHighlight(
             return (
               <Box key={i} component="span" sx={placeholderDatoSx}>
                 {label}
+              </Box>
+            );
+          }
+
+          // Avkryssbar setning med hakeparenteser: [[ ... ]]. Fungerer som
+          // {{setning}}-varianten under, men kan NESTES: innholdet kan inneholde
+          // alternativ-grupper ({{a / b}}), tokens ({{TALL}}, FORMULERING …) og
+          // skråstrek. Derfor en egen delimiter – {{ }} kan ikke inneholde {{ }}.
+          const bracketOptionalMatch = part.match(/^\[\[([\s\S]+)\]\]$/);
+          if (bracketOptionalMatch && bracketOptionalMatch[1].trim()) {
+            const inner = bracketOptionalMatch[1].trim();
+            const occurrenceIdx = optionalOccurrenceIdx;
+            optionalOccurrenceIdx += 1;
+            const onOptionalToggle = opts?.onOptionalToggle;
+
+            if (!onOptionalToggle) {
+              // Ingen interaksjon koblet inn (f.eks. i lister) – vis som vanlig tekst.
+              return <span key={i}>{renderTokensInText(inner)}</span>;
+            }
+
+            const removed = Boolean(opts?.optionalRemoved?.[occurrenceIdx]);
+            return (
+              <Box
+                key={i}
+                component="span"
+                role="button"
+                tabIndex={0}
+                // Bortvalgt setning skal ikke bli med ved manuell markering heller
+                // – Kopier-knappen fjerner den, og de to må gi samme tekst.
+                {...(removed ? { [COPY_SKIP_ATTR]: COPY_SKIP_SENTENCE } : {})}
+                title={
+                  removed
+                    ? "Valgt bort – klikk for å ta med setningen igjen"
+                    : "Klikk for å velge bort denne setningen før kopiering"
+                }
+                sx={removed ? optionalRemovedSx : optionalIncludedSx}
+                onClick={(e: MouseEvent) => {
+                  e.stopPropagation();
+                  onOptionalToggle(occurrenceIdx);
+                }}
+                onKeyDown={(e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOptionalToggle(occurrenceIdx);
+                  }
+                }}
+              >
+                {/* Bortvalgt: vis innholdet rått (ingen rekursjon), ellers ville de
+                    indre token-/alternativ-tellerne økt for en setning som ikke
+                    havner i teksten – og komme i utakt med kopieringslogikken. */}
+                {removed ? inner : renderTokensInText(inner)}
+                <Box component="span" sx={optionalMarkSx} {...{ [COPY_SKIP_ATTR]: COPY_SKIP_MARK }}>
+                  {removed ? "+" : "✕"}
+                </Box>
               </Box>
             );
           }
