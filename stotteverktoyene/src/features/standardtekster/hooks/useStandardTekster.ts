@@ -33,6 +33,41 @@ let memoryCache:
     }
   | null = null;
 
+// Sammenligner to tekster på de feltene som faktisk vises/redigeres. updatedAt
+// utelates med vilje: den endres bare sammen med et annet felt (all lagring
+// setter både updatedAt OG innhold/tittel/kategori/isActive), og å ta den med
+// ville brutt referanse-gjenbruken for et ferskt, ulagret utkast der bare
+// server-tidsstemplet skiller den optimistiske og den realtime-versjonen.
+const sameStandardTekst = (a: StandardTekst, b: StandardTekst): boolean =>
+  a.title === b.title &&
+  a.content === b.content &&
+  (a.category ?? "") === (b.category ?? "") &&
+  a.isActive === b.isActive &&
+  (a.updatedByName ?? "") === (b.updatedByName ?? "") &&
+  JSON.stringify(a.followUps ?? null) === JSON.stringify(b.followUps ?? null);
+
+// Behold objekt-referansen for uendrede tekster på tvers av realtime-oppdateringer.
+// Da bytter `selected` kun identitet når nettopp DEN teksten endres – ellers ville
+// et innkommende snapshot (utløst av at en annen tekst ble endret) nullstilt
+// skjemaet (preparat/tall/formulering) hos en bruker midt i utfylling.
+const reconcileItems = (
+  prev: StandardTekst[],
+  next: StandardTekst[],
+): StandardTekst[] => {
+  const prevById = new Map(prev.map((it) => [it.id, it]));
+  let changed = prev.length !== next.length;
+
+  const result = next.map((n) => {
+    const p = prevById.get(n.id);
+    if (p && sameStandardTekst(p, n)) return p;
+    changed = true;
+    return n;
+  });
+
+  if (!changed && result.every((it, i) => it === prev[i])) return prev;
+  return result;
+};
+
 const toDateOrNull = (value: unknown): Date | null => {
   if (!value) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -152,6 +187,7 @@ export function useStandardTekster(): UseStandardTeksterResult {
   }, [reloadFromServer]);
 
   useEffect(() => {
+    // Umiddelbar first paint fra cache mens realtime-abonnementet kobles opp.
     const cached = readCachedItems();
     if (cached?.length) {
       setItems(cached);
@@ -160,16 +196,32 @@ export function useStandardTekster(): UseStandardTeksterResult {
         return null;
       });
       setLoading(false);
-      void reloadFromServer(false);
-    } else {
-      void reloadFromServer(true);
     }
 
+    // Realtime: alle brukere ser nye/endrede/slettede tekster uten å laste siden
+    // på nytt. reconcileItems beholder referanser for uendrede tekster.
+    const unsubscribe = standardTeksterApi.subscribeAll(
+      (mapped) => {
+        setItems((prev) => reconcileItems(prev, mapped));
+        writeCachedItems(mapped);
+        // Nullstill valget kun hvis den valgte teksten faktisk er slettet.
+        setSelectedId((prev) => (prev && !mapped.some((it) => it.id === prev) ? null : prev));
+        setError(null);
+        setLoading(false);
+      },
+      (e) => {
+        const message = e instanceof Error ? e.message : "Ukjent feil ved henting fra Firebase";
+        setError(message);
+        setLoading(false);
+      },
+    );
+
     return () => {
-      // Invalidate any in-flight reload
+      // Invalidate any in-flight reload og koble fra realtime-abonnementet.
       runIdRef.current++;
+      unsubscribe();
     };
-  }, [reloadFromServer]);
+  }, []);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();

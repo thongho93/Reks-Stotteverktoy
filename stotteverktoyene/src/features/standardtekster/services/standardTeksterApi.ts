@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   updateDoc,
@@ -29,6 +30,27 @@ export const standardTeksterApi = {
     return snap.docs
       .map((d) => mapDocToStandardTekst(d.id, d.data()))
       .sort((a, b) => a.title.localeCompare(b.title, "nb"));
+  },
+
+  // Realtime-abonnement: kaller onData hver gang en standardtekst opprettes,
+  // endres eller slettes, slik at alle brukere ser oppdateringen uten å måtte
+  // laste siden på nytt. Returnerer en unsubscribe-funksjon.
+  subscribeAll(
+    onData: (items: StandardTekst[]) => void,
+    onError?: (error: Error) => void,
+  ): () => void {
+    const q = query(collection(db, COL_NAME));
+
+    return onSnapshot(
+      q,
+      (snap) => {
+        const items = snap.docs
+          .map((d) => mapDocToStandardTekst(d.id, d.data()))
+          .sort((a, b) => a.title.localeCompare(b.title, "nb"));
+        onData(items);
+      },
+      (error) => onError?.(error),
+    );
   },
 
   async update(id: string, patch: UpdateStandardTekstDto, actor?: StandardTekstActor): Promise<void> {

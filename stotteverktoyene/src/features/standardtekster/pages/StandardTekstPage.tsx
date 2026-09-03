@@ -586,11 +586,12 @@ export default function StandardTekstPage() {
   const [fritekstByIndex, setFritekstByIndex] = useState<Record<number, string>>({ 0: "" });
   // Valgt segment-indeks per alternativ-gruppe-forekomst (null/manglende = ikke valgt).
   const [altByIndex, setAltByIndex] = useState<Record<number, number | null>>({});
-  // true per valgfri-setning-forekomst ({{...}}) som er valgt bort før kopiering.
+  // true per avkryssbar-setning-forekomst ([[...]] eller {{...}}) som er valgt
+  // bort før kopiering. Begge variantene deler samme forekomst-teller.
   const [optionalRemovedByIndex, setOptionalRemovedByIndex] = useState<Record<number, boolean>>({});
 
   // Malen slik den faktisk blir seende ut ved kopiering: valgte alternativer satt
-  // inn, bortvalgte {{setninger}} fjernet. Validering og forekomsttelling må se
+  // inn, bortvalgte setninger ([[...]] / {{...}}) fjernet. Validering og forekomsttelling må se
   // denne og ikke rå-malen. Tokens inne i en bortvalgt setning eller i et
   // alternativ brukeren ikke valgte forsvinner ved kopiering, og skal derfor
   // heller ikke kreves utfylt – ellers blir kopiering blokkert av et felt som
@@ -599,8 +600,13 @@ export default function StandardTekstPage() {
   // Merk: uvalgte alternativ-grupper står igjen som {{a / b}}, og brukes til å
   // avgjøre om kopiering skal blokkeres.
   const effectiveTemplateContent = useMemo(() => {
-    const afterAlt = replaceAltGroups(activeTemplateContent, (idx) => altByIndex[idx] ?? null);
-    return replaceOptionalGroups(afterAlt, (idx) => Boolean(optionalRemovedByIndex[idx]));
+    // Fjern bortvalgte avkryssbare setninger FØRST: en bortvalgt [[...]] kan selv
+    // inneholde alternativ-grupper og tokens som da verken skal telles eller
+    // kreves utfylt. Deretter løses de gjenværende alternativ-gruppene opp.
+    const afterOptional = replaceOptionalGroups(activeTemplateContent, (idx) =>
+      Boolean(optionalRemovedByIndex[idx]),
+    );
+    return replaceAltGroups(afterOptional, (idx) => altByIndex[idx] ?? null);
   }, [activeTemplateContent, altByIndex, optionalRemovedByIndex]);
   const [clockTime, setClockTime] = useState<string>(() => getAutomaticClockTallTime());
   const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
@@ -2077,12 +2083,14 @@ export default function StandardTekstPage() {
       picked: pickedPreparats,
     });
 
+    // Fjern bortvalgte avkryssbare setninger ([[...]] / {{...}}) FØRST, så indre
+    // alternativ-grupper og tokens i en bortvalgt setning ikke resolves eller
+    // forskyver forekomst-indeksene til det som faktisk blir med.
+    text = replaceOptionalGroups(text, (idx) => Boolean(optionalRemovedByIndex[idx]));
+
     // Løs opp alternativ-grupper FØR de andre tokenene erstattes – et valgt
     // segment kan selv inneholde f.eks. DATO/PREPARAT1/TALL som må resolves videre.
     text = replaceAltGroups(text, (idx) => altByIndex[idx] ?? null);
-
-    // Fjern bortvalgte valgfrie setninger ({{...}}) og pakk ut resten.
-    text = replaceOptionalGroups(text, (idx) => Boolean(optionalRemovedByIndex[idx]));
 
     // Ensure PREPARAT tokens are actually resolved in the copied text.
     // Preview replaces them in the renderer, but clipboard needs real text.
