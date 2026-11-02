@@ -720,28 +720,42 @@ export function isReservedBraceToken(inner: string): boolean {
   return RESERVED_BRACE_TOKEN_RE.test((inner ?? "").trim());
 }
 
-// Valgfri setning: {{setning uten skråstrek}}. Tas med som standard, men kan
-// velges bort i forhåndsvisningen før kopiering. Grupper MED "/" er
-// alternativ-grupper (se over), og kjente tokens i {{ }} er heller ikke valgfrie.
-const OPTIONAL_GROUP_RE = () => /\{\{([^{}/]+)\}\}/g;
+// Avkryssbar setning. To varianter, som telles i samme rekkefølge de forekommer:
+//   [[ ... ]]  – kan nestes: innholdet kan inneholde alternativ-grupper
+//                ({{a / b}}), tokens ({{TALL}}, FORMULERING …) og skråstrek.
+//   {{setning}} – eldre variant uten skråstrek. Grupper MED "/" er
+//                alternativ-grupper (se over), og kjente tokens i {{ }} er ikke
+//                valgfrie.
+// Rekkefølgen i alternasjonen betyr at [[ ... ]] konsumeres som ett hele, så en
+// indre {{ }} aldri telles separat.
+const OPTIONAL_ANY_RE = () => /\[\[[\s\S]+?\]\]|\{\{([^{}/]+)\}\}/g;
 
-/** Antall valgfrie setninger i malen, i rekkefølgen de forekommer. */
+/** Antall avkryssbare setninger i malen, i rekkefølgen de forekommer. */
 export function getOptionalGroupCount(text: string): number {
   if (!text) return 0;
-  const re = OPTIONAL_GROUP_RE();
+  const re = OPTIONAL_ANY_RE();
   let count = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    if (!isReservedBraceToken(m[1]) && m[1].trim()) count += 1;
+    if (m[0].startsWith("[[")) {
+      if (m[0].slice(2, -2).trim()) count += 1;
+      continue;
+    }
+    // {{ }}-variant: m[1] er innholdet.
+    if (m[1] != null && !isReservedBraceToken(m[1]) && m[1].trim()) count += 1;
   }
   return count;
 }
 
 /**
- * Fjern bortvalgte valgfrie setninger og pakk ut resten (uten {{ }}). Rydder
- * opp doble mellomrom som oppstår der en setning ble fjernet midt i en linje,
- * og mellomrom som blir stående foran tegnsetting når setningen sto rett foran
- * den ("... legen har skrevet {{(...)}}." ga tidligere "... skrevet .").
+ * Fjern bortvalgte avkryssbare setninger og pakk ut resten (uten [[ ]] / {{ }}).
+ * Begge variantene håndteres i samme venstre-til-høyre-pass, så forekomst-
+ * indeksene stemmer med rekkefølgen render teller dem i. Rydder opp doble
+ * mellomrom som oppstår der en setning ble fjernet midt i en linje, og mellomrom
+ * som blir stående foran tegnsetting når setningen sto rett foran den
+ * ("... legen har skrevet [[(...)]]." ga ellers "... skrevet ."). Innholdet i en
+ * beholdt [[...]] pakkes ut uendret, så indre {{a / b}} og tokens resolves i
+ * senere steg.
  */
 export function replaceOptionalGroups(
   text: string,
@@ -750,15 +764,39 @@ export function replaceOptionalGroups(
   if (!text) return text;
   let occurrence = -1;
   let removedAny = false;
-  let result = text.replace(/\{\{([^{}/]+)\}\}( ?)/g, (match, inner: string, trailing: string) => {
-    if (isReservedBraceToken(inner) || !inner.trim()) return match;
-    occurrence += 1;
-    if (isRemoved(occurrence)) {
-      removedAny = true;
-      return "";
-    }
-    return inner.trim() + trailing;
-  });
+  const re = /\[\[([\s\S]+?)\]\]( ?)|\{\{([^{}/]+)\}\}( ?)/g;
+  let result = text.replace(
+    re,
+    (
+      match: string,
+      bracketInner: string | undefined,
+      bracketTrailing: string | undefined,
+      braceInner: string | undefined,
+      braceTrailing: string | undefined,
+    ) => {
+      // [[ ... ]]-variant.
+      if (bracketInner !== undefined) {
+        if (!bracketInner.trim()) return match;
+        occurrence += 1;
+        if (isRemoved(occurrence)) {
+          removedAny = true;
+          return "";
+        }
+        return bracketInner.trim() + (bracketTrailing ?? "");
+      }
+
+      // {{ fritekst }}-variant.
+      if (braceInner === undefined || isReservedBraceToken(braceInner) || !braceInner.trim()) {
+        return match;
+      }
+      occurrence += 1;
+      if (isRemoved(occurrence)) {
+        removedAny = true;
+        return "";
+      }
+      return braceInner.trim() + (braceTrailing ?? "");
+    },
+  );
   if (removedAny) {
     result = result
       .replace(/ {2,}/g, " ")
@@ -1141,9 +1179,15 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
   { label: "PAKKE", insert: "PAKKE", help: "Skriver «pakke»/«pakker» ut fra tallet foran", group: "TALL" },
   {
+    label: "ALTERNATIV",
+    insert: "{{alternativ 1 / alternativ 2}}",
+    help: "Bruker velger ett alternativ før kopiering. Skill med skråstrek: {{a / b}}",
+    group: "ANNET",
+  },
+  {
     label: "VALGFRI SETNING",
-    insert: "{{Denne setningen kan velges bort.}}",
-    help: "Setning i {{ }} kan velges bort før kopiering",
+    insert: "[[Denne setningen kan velges bort.]]",
+    help: "Setning i [[ ]] tas med som standard, men kan krysses av. Kan inneholde tokens og alternativ.",
     group: "ANNET",
   },
 

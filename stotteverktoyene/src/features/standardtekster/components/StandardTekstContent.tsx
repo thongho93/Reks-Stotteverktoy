@@ -13,6 +13,7 @@ import {
   Chip,
   Divider,
 } from "@mui/material";
+import type { Theme } from "@mui/material/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { StandardTekst } from "../types";
@@ -267,6 +268,20 @@ export default function StandardTekstContent({
         draftContent.trim() === "")
   );
 
+  // Inline «kode»-stil for syntaks-eksemplene i forklaringen under editoren.
+  const codeSx = {
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+    fontSize: "0.85em",
+    px: 0.5,
+    py: 0.1,
+    borderRadius: "4px",
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(148,163,184,0.16)" : "rgba(100,116,139,0.12)",
+    border: (theme: Theme) =>
+      `1px solid ${theme.palette.mode === "dark" ? "rgba(148,163,184,0.28)" : "rgba(100,116,139,0.22)"}`,
+    whiteSpace: "nowrap",
+  } as const;
+
   return (
     <Paper
       sx={{ position: "relative" }}
@@ -457,6 +472,82 @@ export default function StandardTekstContent({
                       );
                     })}
                   </Stack>
+                </Box>
+
+                <Box
+                  component="details"
+                  onClick={(e) => e.stopPropagation()}
+                  sx={{
+                    mt: 0.5,
+                    fontSize: "0.8rem",
+                    color: "text.secondary",
+                    "& > summary": {
+                      cursor: "pointer",
+                      userSelect: "none",
+                      fontWeight: 600,
+                      color: "text.secondary",
+                      listStyle: "revert",
+                    },
+                  }}
+                >
+                  <Box component="summary">Slik fungerer feltene (syntaks)</Box>
+
+                  <Box sx={{ mt: 1, display: "flex", flexDirection: "column", gap: 1.25, lineHeight: 1.5 }}>
+                    <Box>
+                      <strong>Innsettingsfelt (tokens).</strong> Skriv token-navnet rett i teksten,
+                      f.eks. <Box component="code" sx={codeSx}>PREPARAT1</Box>,{" "}
+                      <Box component="code" sx={codeSx}>TALL</Box>,{" "}
+                      <Box component="code" sx={codeSx}>DOSERING</Box> eller{" "}
+                      <Box component="code" sx={codeSx}>FORMULERING</Box>. Det blir automatisk et
+                      utfyllingsfelt/chip som fylles ut før kopiering. Bruk hurtigvalgene over eller{" "}
+                      <Box component="code" sx={codeSx}>Ctrl+Space</Box>. Nummererte varianter
+                      (<Box component="code" sx={codeSx}>TALL1</Box>,{" "}
+                      <Box component="code" sx={codeSx}>FORMULERING2</Box>) knytter feltet til
+                      preparat 1/2.
+                    </Box>
+
+                    <Box>
+                      <strong>Krøllparenteser på tokens.</strong> Du kan skrive et token i doble
+                      krøllparenteser, f.eks. <Box component="code" sx={codeSx}>{"{{TALL}}"}</Box> —
+                      samme effekt som <Box component="code" sx={codeSx}>TALL</Box>. Nyttig når
+                      tokenet står klint inntil andre tegn, som{" "}
+                      <Box component="code" sx={codeSx}>{"{{TALL}}stk"}</Box>.
+                    </Box>
+
+                    <Box>
+                      <strong>Alternativ.</strong>{" "}
+                      <Box component="code" sx={codeSx}>{"{{alt 1 / alt 2}}"}</Box> lar brukeren
+                      velge ett alternativ før kopiering. Skråstrek{" "}
+                      <Box component="code" sx={codeSx}>/</Box> skiller alternativene. Vanlig
+                      «og/eller» i teksten berøres ikke – kun tekst i{" "}
+                      <Box component="code" sx={codeSx}>{"{{ }}"}</Box> med skråstrek.
+                    </Box>
+
+                    <Box>
+                      <strong>Avkryssbar setning.</strong>{" "}
+                      <Box component="code" sx={codeSx}>{"[[setning]]"}</Box> tas med som standard,
+                      men kan krysses av (velges bort) i forhåndsvisningen før kopiering. Den kan
+                      inneholde tokens og alternativ, f.eks.{" "}
+                      <Box component="code" sx={codeSx}>{"[[Ta {{1 / 2}} FORMULERING daglig.]]"}</Box>.
+                      Vil du gjøre ett enkelt token valgfritt:{" "}
+                      <Box component="code" sx={codeSx}>{"[[FORMULERING]]"}</Box>. (Eldre{" "}
+                      <Box component="code" sx={codeSx}>{"{{setning}}"}</Box> uten skråstrek virker
+                      fortsatt, men bruk <Box component="code" sx={codeSx}>[[ ]]</Box> – den kan
+                      nestes.)
+                    </Box>
+
+                    <Box>
+                      <strong>Grammatikk.</strong>{" "}
+                      <Box component="code" sx={codeSx}>DEN_DE</Box>,{" "}
+                      <Box component="code" sx={codeSx}>VAREN(E)</Box> og{" "}
+                      <Box component="code" sx={codeSx}>MEDISIN(ENE)</Box> bøyes automatisk etter
+                      antall valgte preparater. <Box component="code" sx={codeSx}>PAKKE</Box> blir
+                      «pakke»/«pakker» ut fra tallet foran, og{" "}
+                      <Box component="code" sx={codeSx}>FORMULERING</Box> bøyes i entall/flertall
+                      etter <Box component="code" sx={codeSx}>TALL</Box>/
+                      <Box component="code" sx={codeSx}>DOSERING</Box> foran.
+                    </Box>
+                  </Box>
                 </Box>
 
                 <Popper
