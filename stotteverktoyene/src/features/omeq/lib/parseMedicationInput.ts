@@ -111,12 +111,15 @@ type VariantHit = {
   strengthText: string | null;
 };
 
-const extractProductNumber = (input: string): number | null => {
-  // Accept 5–7 digits, but in practice varenummer is 6 digits (may have leading zeros in sources).
-  const m = input.match(/\b\d{5,7}\b/);
-  if (!m) return null;
-  const n = Number(m[0].replace(/^0+/, ""));
-  return Number.isFinite(n) ? n : null;
+const extractProductNumbers = (input: string): number[] => {
+  // Varenummer er 4–7 sifre (kan ha ledende nuller i kildene). Tall som står foran en enhet
+  // (f.eks. "1000 mg", "250 ml") er styrke/mengde, ikke varenummer.
+  const numbers: number[] = [];
+  for (const m of input.matchAll(/\b\d{4,7}\b(?!\s*(?:mg|ml|mcg|µg|ug|g)\b)/gi)) {
+    const n = Number(m[0].replace(/^0+/, ""));
+    if (Number.isFinite(n)) numbers.push(n);
+  }
+  return numbers;
 };
 
 const parseStrengthString = (strengthText?: string | null): Strength | null => {
@@ -125,24 +128,23 @@ const parseStrengthString = (strengthText?: string | null): Strength | null => {
 };
 
 const findByProductNumber = (input: string): VariantHit | null => {
-  const pn = extractProductNumber(input);
-  if (pn == null) return null;
-
   // Search in the source dataset (ATC_PRODUCTS) where variants/productNumbers live
-  for (const [atcCode, products] of Object.entries(ATC_PRODUCTS)) {
-    for (const p of products ?? []) {
-      for (const v of p.variants ?? []) {
-        const nums = v.productNumbers ?? [];
-        if (nums.includes(pn)) {
-          return {
-            product: {
-              name: p.name,
-              manufacturer: p.manufacturer,
-              atcCode: atcCode as ATCcode,
-              form: p.form,
-            },
-            strengthText: v.strength ?? null,
-          };
+  for (const pn of extractProductNumbers(input)) {
+    for (const [atcCode, products] of Object.entries(ATC_PRODUCTS)) {
+      for (const p of products ?? []) {
+        for (const v of p.variants ?? []) {
+          const nums = v.productNumbers ?? [];
+          if (nums.includes(pn)) {
+            return {
+              product: {
+                name: p.name,
+                manufacturer: p.manufacturer,
+                atcCode: atcCode as ATCcode,
+                form: p.form,
+              },
+              strengthText: v.strength ?? null,
+            };
+          }
         }
       }
     }
