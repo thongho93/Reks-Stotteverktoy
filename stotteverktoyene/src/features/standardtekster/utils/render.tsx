@@ -2,6 +2,7 @@ import type { ChangeEvent, KeyboardEvent, MouseEvent, WheelEvent } from "react";
 import { Box } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
 
+import { COPY_SKIP_ATTR, COPY_SKIP_MARK, COPY_SKIP_SENTENCE } from "./copySelection";
 import { isReservedBraceToken, pakkeWordForValue } from "./preparat";
 
 export function renderContentWithPreparatHighlight(
@@ -19,6 +20,12 @@ export function renderContentWithPreparatHighlight(
     formuleringOccurrenceValues?: string[];
     /** Når satt gjøres TALL-tokens til inline redigerbare input-felter i teksten. */
     onTallChange?: (idx: number, value: string) => void;
+    doseringValues?: string[];
+    /** Når satt gjøres DOSERING-tokens til inline redigerbare fritekstfelter i teksten. */
+    onDoseringChange?: (idx: number, value: string) => void;
+    fritekstValues?: string[];
+    /** Når satt gjøres FRITEKST-tokens til inline redigerbare felter uten validering. */
+    onFritekstChange?: (idx: number, value: string) => void;
     /** Valgt segment-indeks per alternativ-gruppe-forekomst (null = ikke valgt ennå). */
     altSelections?: Array<number | null>;
     /** Kalles med (forekomst, segment) når bruker velger; (forekomst, null) for å angre valget. */
@@ -98,7 +105,9 @@ export function renderContentWithPreparatHighlight(
     ({
       ...placeholderTallSx,
       borderStyle: filled ? "solid" : "dashed",
-      font: "inherit",
+      // Bruk `fontFamily`, ikke `font`-shorthanden: shorthanden nullstiller også
+      // line-height fra tokenSx, og da blir inputet høyere enn pillene rundt.
+      fontFamily: "inherit",
       fontSize: "0.9em",
       fontWeight: 650,
       textAlign: "center",
@@ -110,6 +119,93 @@ export function renderContentWithPreparatHighlight(
         borderStyle: "solid",
         boxShadow: (theme: Theme) =>
           `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(56,189,248,0.5)" : "rgba(2,132,199,0.35)"}`,
+      },
+      "&::placeholder": {
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        letterSpacing: "0.025em",
+        opacity: 0.85,
+      },
+    }) as const;
+
+  // DOSERING er fritekst, og skiller seg visuelt fra det blå TALL-feltet med en
+  // teal pille.
+  const placeholderDoseringSx = {
+    ...tokenPlaceholderSx,
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(13, 148, 136, 0.45)" : "rgba(20, 184, 166, 0.16)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#CCFBF1" : "#115E59"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(45, 212, 191, 0.8)" : "rgba(13, 148, 136, 0.5)",
+  } as const;
+
+  const inlineDoseringInputSx = (filled: boolean, chars: number) =>
+    ({
+      ...placeholderDoseringSx,
+      borderStyle: filled ? "solid" : "dashed",
+      // Se kommentaren i inlineTallInputSx om `fontFamily` vs `font`.
+      fontFamily: "inherit",
+      fontSize: "0.9em",
+      fontWeight: 650,
+      textAlign: "center",
+      // Bredden settes eksplisitt i stedet for å overlates til `size`-attributtet:
+      // nettleseren legger på rundt 40 px slack for `size`, og feltet holder maks
+      // to siffer. `ch` + slack for padding gir et kompakt felt som fortsatt
+      // vokser hvis noen skriver noe lengre.
+      width: `calc(${chars}ch + 1.6em)`,
+      minWidth: "2.6em",
+      appearance: "none",
+      outline: "none",
+      cursor: "text",
+      "&:focus": {
+        borderStyle: "solid",
+        boxShadow: (theme: Theme) =>
+          `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(45,212,191,0.5)" : "rgba(13,148,136,0.35)"}`,
+      },
+      "&::placeholder": {
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        letterSpacing: "0.025em",
+        opacity: 0.85,
+      },
+    }) as const;
+
+  // FRITEKST er et helt åpent felt, og får en indigo pille slik at den ikke
+  // forveksles med det blå TALL-feltet eller det teal DOSERING-feltet.
+  const placeholderFritekstSx = {
+    ...tokenPlaceholderSx,
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(67, 56, 202, 0.45)" : "rgba(99, 102, 241, 0.16)",
+    color: (theme: Theme) => (theme.palette.mode === "dark" ? "#E0E7FF" : "#3730A3"),
+    borderColor: (theme: Theme) =>
+      theme.palette.mode === "dark" ? "rgba(165, 180, 252, 0.8)" : "rgba(79, 70, 229, 0.5)",
+  } as const;
+
+  const inlineFritekstInputSx = (filled: boolean, chars: number) =>
+    ({
+      ...placeholderFritekstSx,
+      borderStyle: filled ? "solid" : "dashed",
+      // Se kommentaren i inlineTallInputSx om `fontFamily` vs `font`.
+      fontFamily: "inherit",
+      fontSize: "0.9em",
+      fontWeight: 650,
+      // Venstrejustert, ikke sentrert som TALL/DOSERING: innholdet kan være en
+      // hel setning, og da leses den lettere når den starter samme sted uansett
+      // lengde.
+      textAlign: "left",
+      // Feltet vokser med innholdet. Bredden settes eksplisitt av samme grunn som
+      // for DOSERING (`size` gir ~40 px slack), men minimumsbredden er større –
+      // en kode eller setning trenger mer plass enn to siffer.
+      width: `calc(${chars}ch + 1.6em)`,
+      minWidth: "6ch",
+      maxWidth: "100%",
+      appearance: "none",
+      outline: "none",
+      cursor: "text",
+      "&:focus": {
+        borderStyle: "solid",
+        boxShadow: (theme: Theme) =>
+          `0 0 0 2px ${theme.palette.mode === "dark" ? "rgba(129,140,248,0.5)" : "rgba(79,70,229,0.35)"}`,
       },
       "&::placeholder": {
         fontFamily:
@@ -200,6 +296,8 @@ export function renderContentWithPreparatHighlight(
     fontWeight: 700,
     ml: 0.4,
     verticalAlign: "super",
+    // Rent redigerings-UI: skal verken kunne markeres eller havne i kopiert tekst.
+    userSelect: "none",
     color: (theme: Theme) =>
       theme.palette.mode === "dark" ? "rgba(248, 113, 113, 0.9)" : "rgba(220, 38, 38, 0.7)",
   } as const;
@@ -320,9 +418,11 @@ export function renderContentWithPreparatHighlight(
 
     // Match both legacy {{...}} and plain tokens (no braces), samt alternativ-
     // grupper {{seg1 / seg2 / ...}} (sjekkes først – tokens under inneholder aldri "/").
+    // [[ ... ]] er avkryssbare setninger som KAN nestes (innholdet kan inneholde
+    // {{a / b}} og tokens), så de matches først og som ett hele.
     // Supports: TALL, TALL1, TALL2... and KLOKKESLETT_DAG and DATO and DATO_MND and VIRKESTOFF and FORMULERING1, FORMULERING2...
     const parts = t.split(
-      /(\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*)\b)/g
+      /(\[\[[\s\S]+?\]\]|\{\{[^{}]*\/[^{}]*\}\}|\{\{[^{}]+\}\}|\b(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|FRITEKST\d*)\b)/g
     );
     if (parts.length <= 1) return t;
 
@@ -455,6 +555,94 @@ export function renderContentWithPreparatHighlight(
             );
           }
 
+          // DOSERING / {{DOSERING}} / DOSERING1 ... – fritekst, ingen tallvalidering.
+          const doseringMatch = part.match(/^(?:\{\{\s*)?DOSERING(\d*)(?:\s*\}\})?$/i);
+          if (doseringMatch) {
+            const rawIdx = (doseringMatch[1] ?? "").trim();
+            const idx = rawIdx ? Number(rawIdx) : 0;
+
+            const rawValue = opts?.doseringValues?.[idx] ?? "";
+            const tokenLabel = idx === 0 ? "DOSERING" : `DOSERING${idx}`;
+            // Kort placeholder, siden feltbredden følger den lengste av verdi og
+            // placeholder – verdien er maks to siffer. «ANT» og ikke «DOSE», siden
+            // «dose» også er en gyldig FORMULERING (inhalasjoner doseres i doser)
+            // og de to står side om side i teksten. Full token-tekst ligger i
+            // aria-label og tooltip.
+            const doseringPlaceholder = idx === 0 ? "ANT" : `ANT${idx}`;
+            const doseringChars = Math.max(rawValue.length, doseringPlaceholder.length, 2);
+
+            if (opts?.onDoseringChange) {
+              const onDoseringChange = opts.onDoseringChange;
+              return (
+                <Box
+                  key={i}
+                  component="input"
+                  type="text"
+                  value={rawValue}
+                  placeholder={doseringPlaceholder}
+                  size={doseringChars}
+                  aria-label={tokenLabel}
+                  title={tokenLabel}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    onDoseringChange(idx, e.target.value)
+                  }
+                  // Ikke la klikk/markering i feltet trigge klikk-for-kopi på kortet.
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
+                  onMouseDown={(e: MouseEvent) => e.stopPropagation()}
+                  sx={inlineDoseringInputSx(Boolean(rawValue.trim()), doseringChars)}
+                />
+              );
+            }
+
+            return (
+              <Box key={i} component="span" sx={placeholderDoseringSx}>
+                {rawValue.trim() || tokenLabel}
+              </Box>
+            );
+          }
+
+          // FRITEKST / {{FRITEKST}} / FRITEKST1 ... – helt fritt felt. Verdien
+          // sendes videre uendret; ingen validering, ingen normalisering.
+          const fritekstMatch = part.match(/^(?:\{\{\s*)?FRITEKST(\d*)(?:\s*\}\})?$/i);
+          if (fritekstMatch) {
+            const rawIdx = (fritekstMatch[1] ?? "").trim();
+            const idx = rawIdx ? Number(rawIdx) : 0;
+
+            const rawValue = opts?.fritekstValues?.[idx] ?? "";
+            const tokenLabel = idx === 0 ? "FRITEKST" : `FRITEKST${idx}`;
+            // Placeholderen er token-navnet: feltet er bredt nok til å vise det,
+            // og da slipper brukeren å gjette hva som skal fylles inn.
+            const fritekstChars = Math.max(rawValue.length, tokenLabel.length);
+
+            if (opts?.onFritekstChange) {
+              const onFritekstChange = opts.onFritekstChange;
+              return (
+                <Box
+                  key={i}
+                  component="input"
+                  type="text"
+                  value={rawValue}
+                  placeholder={tokenLabel}
+                  aria-label={tokenLabel}
+                  title={tokenLabel}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    onFritekstChange(idx, e.target.value)
+                  }
+                  // Ikke la klikk/markering i feltet trigge klikk-for-kopi på kortet.
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
+                  onMouseDown={(e: MouseEvent) => e.stopPropagation()}
+                  sx={inlineFritekstInputSx(Boolean(rawValue.trim()), fritekstChars)}
+                />
+              );
+            }
+
+            return (
+              <Box key={i} component="span" sx={placeholderFritekstSx}>
+                {rawValue.trim() || tokenLabel}
+              </Box>
+            );
+          }
+
           // PAKKE / {{PAKKE}} – avledet av nærmeste foranstående TALL-verdi.
           const pakkeMatch = part.match(/^(?:\{\{\s*)?PAKKE(?:\s*\}\})?$/i);
           if (pakkeMatch) {
@@ -560,6 +748,61 @@ export function renderContentWithPreparatHighlight(
             );
           }
 
+          // Avkryssbar setning med hakeparenteser: [[ ... ]]. Fungerer som
+          // {{setning}}-varianten under, men kan NESTES: innholdet kan inneholde
+          // alternativ-grupper ({{a / b}}), tokens ({{TALL}}, FORMULERING …) og
+          // skråstrek. Derfor en egen delimiter – {{ }} kan ikke inneholde {{ }}.
+          const bracketOptionalMatch = part.match(/^\[\[([\s\S]+)\]\]$/);
+          if (bracketOptionalMatch && bracketOptionalMatch[1].trim()) {
+            const inner = bracketOptionalMatch[1].trim();
+            const occurrenceIdx = optionalOccurrenceIdx;
+            optionalOccurrenceIdx += 1;
+            const onOptionalToggle = opts?.onOptionalToggle;
+
+            if (!onOptionalToggle) {
+              // Ingen interaksjon koblet inn (f.eks. i lister) – vis som vanlig tekst.
+              return <span key={i}>{renderTokensInText(inner)}</span>;
+            }
+
+            const removed = Boolean(opts?.optionalRemoved?.[occurrenceIdx]);
+            return (
+              <Box
+                key={i}
+                component="span"
+                role="button"
+                tabIndex={0}
+                // Bortvalgt setning skal ikke bli med ved manuell markering heller
+                // – Kopier-knappen fjerner den, og de to må gi samme tekst.
+                {...(removed ? { [COPY_SKIP_ATTR]: COPY_SKIP_SENTENCE } : {})}
+                title={
+                  removed
+                    ? "Valgt bort – klikk for å ta med setningen igjen"
+                    : "Klikk for å velge bort denne setningen før kopiering"
+                }
+                sx={removed ? optionalRemovedSx : optionalIncludedSx}
+                onClick={(e: MouseEvent) => {
+                  e.stopPropagation();
+                  onOptionalToggle(occurrenceIdx);
+                }}
+                onKeyDown={(e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOptionalToggle(occurrenceIdx);
+                  }
+                }}
+              >
+                {/* Bortvalgt: vis innholdet rått (ingen rekursjon), ellers ville de
+                    indre token-/alternativ-tellerne økt for en setning som ikke
+                    havner i teksten – og komme i utakt med kopieringslogikken. */}
+                {removed ? inner : renderTokensInText(inner)}
+                <Box component="span" sx={optionalMarkSx} {...{ [COPY_SKIP_ATTR]: COPY_SKIP_MARK }}>
+                  {removed ? "+" : "✕"}
+                </Box>
+              </Box>
+            );
+          }
+
           // Valgfri setning: {{setning uten skråstrek}} – tas med som standard,
           // klikk for å velge bort / ta med igjen. Sjekkes ETTER token-branchene
           // over, så {{TALL}} o.l. aldri havner her.
@@ -582,6 +825,9 @@ export function renderContentWithPreparatHighlight(
                 component="span"
                 role="button"
                 tabIndex={0}
+                // Bortvalgt setning skal ikke bli med ved manuell markering heller
+                // – Kopier-knappen fjerner den, og de to må gi samme tekst.
+                {...(removed ? { [COPY_SKIP_ATTR]: COPY_SKIP_SENTENCE } : {})}
                 title={
                   removed
                     ? "Valgt bort – klikk for å ta med setningen igjen"
@@ -601,7 +847,7 @@ export function renderContentWithPreparatHighlight(
                 }}
               >
                 {removed ? inner : renderTokensInText(inner)}
-                <Box component="span" sx={optionalMarkSx}>
+                <Box component="span" sx={optionalMarkSx} {...{ [COPY_SKIP_ATTR]: COPY_SKIP_MARK }}>
                   {removed ? "+" : "✕"}
                 </Box>
               </Box>

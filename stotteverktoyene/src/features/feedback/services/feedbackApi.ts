@@ -8,7 +8,6 @@ import {
   query,
   serverTimestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 
 import { db } from "../../../firebase/firebase";
@@ -64,10 +63,6 @@ function mapFeedback(id: string, data: Record<string, unknown>): Feedback {
   };
 }
 
-function byNewestFirst(a: Feedback, b: Feedback): number {
-  return b.createdAtMs - a.createdAtMs;
-}
-
 export const feedbackApi = {
   async submit(input: NewFeedbackInput, author: Author): Promise<void> {
     await addDoc(collection(db, FEEDBACKS_COLLECTION), {
@@ -84,7 +79,7 @@ export const feedbackApi = {
     });
   },
 
-  /** Alle innspill, nyeste først. Kun eier har leserett på hele samlingen. */
+  /** Alle innspill, nyeste først. Alle aktive medlemmer har leserett. */
   subscribeAll(
     onData: (items: Feedback[]) => void,
     onError: (error: unknown) => void
@@ -92,27 +87,6 @@ export const feedbackApi = {
     return onSnapshot(
       query(collection(db, FEEDBACKS_COLLECTION), orderBy("createdAt", "desc")),
       (snap) => onData(snap.docs.map((d) => mapFeedback(d.id, d.data() as Record<string, unknown>))),
-      onError
-    );
-  },
-
-  /**
-   * Brukerens egne innspill. Sorteres i klienten – et where + orderBy på ulike
-   * felt ville krevd et sammensatt Firestore-indeks som må settes opp manuelt.
-   */
-  subscribeMine(
-    uid: string,
-    onData: (items: Feedback[]) => void,
-    onError: (error: unknown) => void
-  ): () => void {
-    return onSnapshot(
-      query(collection(db, FEEDBACKS_COLLECTION), where("createdByUid", "==", uid)),
-      (snap) =>
-        onData(
-          snap.docs
-            .map((d) => mapFeedback(d.id, d.data() as Record<string, unknown>))
-            .sort(byNewestFirst)
-        ),
       onError
     );
   },

@@ -397,7 +397,7 @@ export function replaceNextPreparatToken(text: string, value: string) {
   // - Never touch PREPARAT1 or PREPARAT2
   // This guarantees PREPARAT1 can never end up inside PREPARAT2
   // when only one preparat is selected.
-  return text.replace(/\{\{\s*PREPARAT\s*\}\}|\bPREPARAT\b/i, value);
+  return text.replace(tokenRegex("PREPARAT"), value);
 }
 
 export const replaceVareTokenByCount = (text: string, count: number): string => {
@@ -461,26 +461,49 @@ export const replaceMedisineneTokenByCount = (text: string, count: number): stri
   );
 };
 
+// Token-matching skal speile visningen i render.tsx: et token UTEN {{ }} må stå i
+// VERSALER for å telle. Ellers blir vanlige ord i brødteksten – «dosering»,
+// «dato», «pakke», «preparat» – tolket som tokens, og kopieringen krever
+// utfylling av felter som aldri vises i teksten. Inne i {{ }} godtas alle
+// skrivemåter, slik render.tsx også gjør (se isReservedBraceToken).
+// Samme resonnement som for PAKKE i replacePakkeTokens.
+const anyCaseSource = (word: string) =>
+  word.replace(/[A-Z]/g, (c) => `[${c}${c.toLowerCase()}]`);
+
+/**
+ * Regex-kilde for et token. `indexPattern` er det som følger navnet – f.eks.
+ * `"\\d*"`, `"(\\d*)"` for en capture-gruppe, eller et konkret tall.
+ * Merk: med capture-gruppe gir mønsteret to grupper (én for {{ }}-varianten og
+ * én for den bare) – bruk `m[1] ?? m[2]`.
+ */
+export function tokenRegexSource(name: string, indexPattern = ""): string {
+  return `\\{\\{\\s*${anyCaseSource(name)}${indexPattern}\\s*\\}\\}|\\b${name}${indexPattern}\\b`;
+}
+
+export function tokenRegex(name: string, indexPattern = "", flags = ""): RegExp {
+  return new RegExp(tokenRegexSource(name, indexPattern), flags);
+}
+
 export function replaceNextTallToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
   // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i, value);
+  return text.replace(tokenRegex("TALL", "\\d*"), value);
 }
 
 export function replaceTallTokens(text: string, value: string) {
   // Replace ALL occurrences.
   // Supports {{TALL}}, {{TALL1}}, TALL, TALL1
-  return text.replace(/\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/gi, value);
+  return text.replace(tokenRegex("TALL", "\\d*", "g"), value);
 }
 
 export function templateHasTallToken(text: string): boolean {
-  return /\{\{\s*TALL\d*\s*\}\}|\bTALL\d*\b/i.test(text);
+  return tokenRegex("TALL", "\\d*").test(text);
 }
 
 export function getTallTokenIndices(text: string): number[] {
   const indices = new Set<number>();
 
-  const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
+  const re = tokenRegex("TALL", "(\\d*)", "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const raw = (m[1] ?? m[2] ?? "").trim();
@@ -500,10 +523,96 @@ export function replaceTallTokenByIndex(text: string, index: number, value: stri
   const safeValue = value ?? "";
 
   if (index === 0) {
-    return text.replace(/\{\{\s*TALL\s*\}\}|\bTALL\b/gi, safeValue);
+    return text.replace(tokenRegex("TALL", "", "g"), safeValue);
   }
 
-  const re = new RegExp(`\\{\\{\\s*TALL${index}\\s*\\}\\}|\\bTALL${index}\\b`, "gi");
+  const re = tokenRegex("TALL", String(index), "g");
+
+  return text.replace(re, safeValue);
+}
+
+// DOSERING er fritekst, i motsetning til TALL som valideres som et tall og styrer
+// entall/flertall for PAKKE og FORMULERING. Doseringer lar seg ofte ikke uttrykke
+// som ett tall – «2-3 doser inntil 4 ganger daglig» for inhalasjonsmedisiner er et
+// typisk eksempel – og med nummererte tokens (DOSERING1/DOSERING2) kan én mal gi
+// ulik dosering per preparat.
+export function templateHasDoseringToken(text: string): boolean {
+  return tokenRegex("DOSERING", "\\d*").test(text ?? "");
+}
+
+export function getDoseringTokenIndices(text: string): number[] {
+  const indices = new Set<number>();
+
+  const re = tokenRegex("DOSERING", "(\\d*)", "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text ?? ""))) {
+    const raw = (m[1] ?? m[2] ?? "").trim();
+    if (!raw) {
+      indices.add(0);
+    } else {
+      const n = Number(raw);
+      if (Number.isFinite(n)) indices.add(n);
+    }
+  }
+
+  return Array.from(indices).sort((a, b) => a - b);
+}
+
+export function replaceDoseringTokenByIndex(text: string, index: number, value: string): string {
+  if (!text) return text;
+  const safeValue = value ?? "";
+
+  if (index === 0) {
+    return text.replace(tokenRegex("DOSERING", "", "g"), safeValue);
+  }
+
+  const re = tokenRegex("DOSERING", String(index), "g");
+
+  return text.replace(re, safeValue);
+}
+
+// FRITEKST er et helt åpent felt: hva som helst av tekst, tall, store eller små
+// bokstaver, uten validering og uten avledet grammatikk. Flere maler har en
+// plassholder som verken er dosering eller tall – en fraktkode eller rabattkode
+// som limes inn per kunde er det typiske tilfellet. DOSERING kunne vært brukt,
+// men det feltet er smalt og heter noe annet enn det det da fylles med.
+// Nummererte tokens (FRITEKST1/FRITEKST2) gir flere frie felt i samme mal.
+//
+// Som for DATO og PAKKE er kun STORE bokstaver et token, slik at ordet
+// «fritekst» i vanlig brødtekst står i fred.
+export function templateHasFritekstToken(text: string): boolean {
+  return tokenRegex("FRITEKST", "\\d*").test(text ?? "");
+}
+
+export function getFritekstTokenIndices(text: string): number[] {
+  const indices = new Set<number>();
+
+  const re = tokenRegex("FRITEKST", "(\\d*)", "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text ?? ""))) {
+    const raw = (m[1] ?? m[2] ?? "").trim();
+    if (!raw) {
+      indices.add(0);
+    } else {
+      const n = Number(raw);
+      if (Number.isFinite(n)) indices.add(n);
+    }
+  }
+
+  return Array.from(indices).sort((a, b) => a - b);
+}
+
+export function replaceFritekstTokenByIndex(text: string, index: number, value: string): string {
+  if (!text) return text;
+  // Verdien settes inn slik brukeren skrev den – ingen normalisering av tegn,
+  // store/små bokstaver eller mellomrom inni. Det er hele poenget med tokenet.
+  const safeValue = value ?? "";
+
+  if (index === 0) {
+    return text.replace(tokenRegex("FRITEKST", "", "g"), safeValue);
+  }
+
+  const re = tokenRegex("FRITEKST", String(index), "g");
 
   return text.replace(re, safeValue);
 }
@@ -605,32 +714,48 @@ export function replaceAltGroups(
 // Reserverte token-navn som også kan stå i {{ }} (f.eks. {{TALL}}). Disse skal
 // IKKE tolkes som valgfri setning eller alternativ-gruppe.
 const RESERVED_BRACE_TOKEN_RE =
-  /^(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|PREPARAT\d*|DEN_DE|VAREN\(E\)|MEDISIN\(ENE\)|XX)$/i;
+  /^(?:TALL\d*|PAKKE|KLOKKESLETT_DAG|DATO_MND|DATO|VIRKESTOFF|FORMULERING\d*|DOSERING\d*|FRITEKST\d*|PREPARAT\d*|DEN_DE|VAREN\(E\)|MEDISIN\(ENE\)|XX)$/i;
 
 export function isReservedBraceToken(inner: string): boolean {
   return RESERVED_BRACE_TOKEN_RE.test((inner ?? "").trim());
 }
 
-// Valgfri setning: {{setning uten skråstrek}}. Tas med som standard, men kan
-// velges bort i forhåndsvisningen før kopiering. Grupper MED "/" er
-// alternativ-grupper (se over), og kjente tokens i {{ }} er heller ikke valgfrie.
-const OPTIONAL_GROUP_RE = () => /\{\{([^{}/]+)\}\}/g;
+// Avkryssbar setning. To varianter, som telles i samme rekkefølge de forekommer:
+//   [[ ... ]]  – kan nestes: innholdet kan inneholde alternativ-grupper
+//                ({{a / b}}), tokens ({{TALL}}, FORMULERING …) og skråstrek.
+//   {{setning}} – eldre variant uten skråstrek. Grupper MED "/" er
+//                alternativ-grupper (se over), og kjente tokens i {{ }} er ikke
+//                valgfrie.
+// Rekkefølgen i alternasjonen betyr at [[ ... ]] konsumeres som ett hele, så en
+// indre {{ }} aldri telles separat.
+const OPTIONAL_ANY_RE = () => /\[\[[\s\S]+?\]\]|\{\{([^{}/]+)\}\}/g;
 
-/** Antall valgfrie setninger i malen, i rekkefølgen de forekommer. */
+/** Antall avkryssbare setninger i malen, i rekkefølgen de forekommer. */
 export function getOptionalGroupCount(text: string): number {
   if (!text) return 0;
-  const re = OPTIONAL_GROUP_RE();
+  const re = OPTIONAL_ANY_RE();
   let count = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    if (!isReservedBraceToken(m[1]) && m[1].trim()) count += 1;
+    if (m[0].startsWith("[[")) {
+      if (m[0].slice(2, -2).trim()) count += 1;
+      continue;
+    }
+    // {{ }}-variant: m[1] er innholdet.
+    if (m[1] != null && !isReservedBraceToken(m[1]) && m[1].trim()) count += 1;
   }
   return count;
 }
 
 /**
- * Fjern bortvalgte valgfrie setninger og pakk ut resten (uten {{ }}). Rydder
- * opp doble mellomrom som oppstår der en setning ble fjernet midt i en linje.
+ * Fjern bortvalgte avkryssbare setninger og pakk ut resten (uten [[ ]] / {{ }}).
+ * Begge variantene håndteres i samme venstre-til-høyre-pass, så forekomst-
+ * indeksene stemmer med rekkefølgen render teller dem i. Rydder opp doble
+ * mellomrom som oppstår der en setning ble fjernet midt i en linje, og mellomrom
+ * som blir stående foran tegnsetting når setningen sto rett foran den
+ * ("... legen har skrevet [[(...)]]." ga ellers "... skrevet ."). Innholdet i en
+ * beholdt [[...]] pakkes ut uendret, så indre {{a / b}} og tokens resolves i
+ * senere steg.
  */
 export function replaceOptionalGroups(
   text: string,
@@ -639,17 +764,44 @@ export function replaceOptionalGroups(
   if (!text) return text;
   let occurrence = -1;
   let removedAny = false;
-  let result = text.replace(/\{\{([^{}/]+)\}\}( ?)/g, (match, inner: string, trailing: string) => {
-    if (isReservedBraceToken(inner) || !inner.trim()) return match;
-    occurrence += 1;
-    if (isRemoved(occurrence)) {
-      removedAny = true;
-      return "";
-    }
-    return inner.trim() + trailing;
-  });
+  const re = /\[\[([\s\S]+?)\]\]( ?)|\{\{([^{}/]+)\}\}( ?)/g;
+  let result = text.replace(
+    re,
+    (
+      match: string,
+      bracketInner: string | undefined,
+      bracketTrailing: string | undefined,
+      braceInner: string | undefined,
+      braceTrailing: string | undefined,
+    ) => {
+      // [[ ... ]]-variant.
+      if (bracketInner !== undefined) {
+        if (!bracketInner.trim()) return match;
+        occurrence += 1;
+        if (isRemoved(occurrence)) {
+          removedAny = true;
+          return "";
+        }
+        return bracketInner.trim() + (bracketTrailing ?? "");
+      }
+
+      // {{ fritekst }}-variant.
+      if (braceInner === undefined || isReservedBraceToken(braceInner) || !braceInner.trim()) {
+        return match;
+      }
+      occurrence += 1;
+      if (isRemoved(occurrence)) {
+        removedAny = true;
+        return "";
+      }
+      return braceInner.trim() + (braceTrailing ?? "");
+    },
+  );
   if (removedAny) {
-    result = result.replace(/ {2,}/g, " ").replace(/ +$/gm, "");
+    result = result
+      .replace(/ {2,}/g, " ")
+      .replace(/ +([.,;:!?])/g, "$1")
+      .replace(/ +$/gm, "");
   }
   return result;
 }
@@ -702,27 +854,27 @@ export function migrateLegacyClockTallTokens(text: string): string {
 export function replaceNextDatoToken(text: string, value: string) {
   // Replace ONLY the next (first) occurrence.
   // Supports {{DATO}} and DATO
-  return text.replace(/\{\{\s*DATO\s*\}\}|\bDATO\b/i, value);
+  return text.replace(tokenRegex("DATO"), value);
 }
 
 export function replaceDatoTokens(text: string, value: string) {
   // Replace ALL occurrences.
   // Supports {{DATO}} and DATO
-  return text.replace(/\{\{\s*DATO\s*\}\}|\bDATO\b/gi, value);
+  return text.replace(tokenRegex("DATO", "", "g"), value);
 }
 
 export function templateHasDatoToken(text: string): boolean {
-  return /\{\{\s*DATO\s*\}\}|\bDATO\b/i.test(text);
+  return tokenRegex("DATO").test(text);
 }
 
 export function templateHasDatoMndToken(text: string): boolean {
-  return /\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/i.test(text ?? "");
+  return tokenRegex("DATO_MND").test(text ?? "");
 }
 
 export function getFormuleringTokenIndices(text: string): number[] {
   const indices = new Set<number>();
 
-  const re = /\{\{\s*FORMULERING(\d*)\s*\}\}|\bFORMULERING(\d*)\b/gi;
+  const re = tokenRegex("FORMULERING", "(\\d*)", "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const raw = (m[1] ?? m[2] ?? "").trim();
@@ -741,21 +893,21 @@ export function replaceFormuleringTokenByIndex(text: string, index: number, valu
   const safeValue = value ?? "";
 
   if (index === 0) {
-    return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, safeValue);
+    return text.replace(tokenRegex("FORMULERING", "", "g"), safeValue);
   }
 
-  const re = new RegExp(`\\{\\{\\s*FORMULERING${index}\\s*\\}\\}|\\bFORMULERING${index}\\b`, "gi");
+  const re = tokenRegex("FORMULERING", String(index), "g");
   return text.replace(re, safeValue);
 }
 
 export function replaceDatoMndTokens(text: string, value: string) {
   if (!text) return text;
-  return text.replace(/\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/gi, value);
+  return text.replace(tokenRegex("DATO_MND", "", "g"), value);
 }
 
 export function replaceNextDatoMndToken(text: string, value: string) {
   if (!text) return text;
-  return text.replace(/\{\{\s*DATO_MND\s*\}\}|\bDATO_MND\b/i, value);
+  return text.replace(tokenRegex("DATO_MND"), value);
 }
 
 export function usePreparatRows() {
@@ -1007,6 +1159,17 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "PREPARAT2", insert: "PREPARAT2", help: "Andre preparat", group: "PREPARAT" },
   { label: "VIRKESTOFF", insert: "VIRKESTOFF", help: "Virkestoff fra valgt preparat", group: "PREPARAT" },
   { label: "DEN_DE", insert: "DEN_DE", help: "Setter inn den (1 preparat) eller de (flere preparater)", group: "PREPARAT" },
+  { label: "DOSERING", insert: "DOSERING", help: "Fri tekst for dosering (f.eks. «2 tabletter daglig» eller «2-3 doser inntil 4 ganger daglig»)", group: "ANNET" },
+  { label: "DOSERING1", insert: "DOSERING1", help: "Dosering for preparat 1", group: "ANNET" },
+  { label: "DOSERING2", insert: "DOSERING2", help: "Dosering for preparat 2", group: "ANNET" },
+  {
+    label: "FRITEKST",
+    insert: "FRITEKST",
+    help: "Helt fritt felt – tekst, tall, store og små bokstaver (f.eks. en fraktkode)",
+    group: "ANNET",
+  },
+  { label: "FRITEKST1", insert: "FRITEKST1", help: "Andre frie felt i samme tekst", group: "ANNET" },
+  { label: "FRITEKST2", insert: "FRITEKST2", help: "Tredje frie felt i samme tekst", group: "ANNET" },
   { label: "FORMULERING", insert: "FORMULERING", help: "Fri tekst (f.eks. tablett/kapsel/nesespray)", group: "ANNET" },
   { label: "FORMULERING1", insert: "FORMULERING1", help: "Formulering for preparat 1", group: "ANNET" },
   { label: "FORMULERING2", insert: "FORMULERING2", help: "Formulering for preparat 2", group: "ANNET" },
@@ -1016,9 +1179,15 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "TALL1", insert: "TALL1", help: "Andre tall", group: "TALL" },
   { label: "PAKKE", insert: "PAKKE", help: "Skriver «pakke»/«pakker» ut fra tallet foran", group: "TALL" },
   {
+    label: "ALTERNATIV",
+    insert: "{{alternativ 1 / alternativ 2}}",
+    help: "Bruker velger ett alternativ før kopiering. Skill med skråstrek: {{a / b}}",
+    group: "ANNET",
+  },
+  {
     label: "VALGFRI SETNING",
-    insert: "{{Denne setningen kan velges bort.}}",
-    help: "Setning i {{ }} kan velges bort før kopiering",
+    insert: "[[Denne setningen kan velges bort.]]",
+    help: "Setning i [[ ]] tas med som standard, men kan krysses av. Kan inneholde tokens og alternativ.",
     group: "ANNET",
   },
 
