@@ -64,9 +64,10 @@ const TEAL = "#0E9F8E";
 
 // Overføring til standardtekster: tittelen brukes til å matche malen, og nøkkelen
 // deles med StandardTekstPage via sessionStorage (samme mønster som OMEQ →
-// standardtekst). Ved nok dekning (≥ terskel) tilbys begge disse malene.
+// standardtekst). Ved nok dekning (≥ terskel) tilbys disse malene.
 const HAR_FATT_NOK_TITLE = "Hyppig uttak - Har fått nok til..";
 const OVER_3_MND_TITLE = "Over 3 mnds bruk, nedjustere?";
+const HYPPIG_UTTAK_KANSELLERE_TITLE = "Hyppig uttak - fått nok til - kansellere";
 const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
 // Terskel (dager igjen) for å tilby overføring – samme som grønn fargekode.
 const HAR_FATT_NOK_MIN_DAGER = 45;
@@ -1000,6 +1001,7 @@ export default function LagerbeholdningPage() {
                       {[
                         { title: HAR_FATT_NOK_TITLE, label: "Åpne standardtekst «Har fått nok til…»", medDato: true },
                         { title: OVER_3_MND_TITLE, label: "Åpne standardtekst «Over 3 mnds bruk, nedjustere?»", medDato: false },
+                        { title: HYPPIG_UTTAK_KANSELLERE_TITLE, label: "Åpne standardtekst «Hyppig uttak – kansellere»", medDato: true },
                       ].map(({ title, label, medDato }) => {
                         const busyAny = Boolean(openingStandardtekstKey?.startsWith(`${key}::`));
                         const busy = openingStandardtekstKey === `${key}::${title}`;
