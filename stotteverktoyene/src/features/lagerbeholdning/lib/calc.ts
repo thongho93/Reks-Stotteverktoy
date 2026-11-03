@@ -322,12 +322,14 @@ export const beregnVare = (
   const merged = members.length > 1;
   const varenr = members[0]?.varenr || uttakList.find((u) => u.varenr)?.varenr || varenrKey;
 
-  // Visningsnavn: ved virkestoff-treff vises virkestoff + form/styrke (det som
-  // faktisk slår preparatene sammen). Ellers brukes det innlimte varenavnet.
+  // Visningsnavn: når flere preparater faktisk er slått sammen vises virkestoff +
+  // form/styrke (det som slår dem sammen). Er det bare ett preparat, vises navnet
+  // brukeren limte inn (f.eks. «Norvasc tab 5 mg»), og virkestoffet står i meta.
   const fallbackNavn = members[0]?.varenavn || varenrKey;
-  const varenavn = match
-    ? `${capitalize(match.virkestoff)}${match.formStyrke ? ` ${match.formStyrke}` : ""}`.trim()
-    : fallbackNavn;
+  const varenavn =
+    match && merged
+      ? `${capitalize(match.virkestoff)}${match.formStyrke ? ` ${match.formStyrke}` : ""}`.trim()
+      : fallbackNavn;
 
   // Flytende preparat (enhet ml) → tillat mg-dosering med styrke-omregning.
   const erFlytende = enhet.toUpperCase() === "ML";
