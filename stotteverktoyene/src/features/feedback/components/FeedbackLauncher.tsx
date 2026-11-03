@@ -3,6 +3,9 @@ import { alpha } from "@mui/material/styles";
 import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { useAuthUser } from "../../../app/auth/useAuthUser";
+import { useFeedbackUpdates } from "../hooks/useFeedbackUpdates";
+
 export const FEEDBACK_ROUTE = "/innspill";
 
 const ACCENT = "#B648E8";
@@ -14,15 +17,24 @@ const ACCENT = "#B648E8";
 export default function FeedbackLauncher() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuthUser();
+  const onFeedbackPage = location.pathname === FEEDBACK_ROUTE;
+  const { unread } = useFeedbackUpdates(user?.uid, !onFeedbackPage);
 
-  if (location.pathname === FEEDBACK_ROUTE) return null;
+  if (onFeedbackPage) return null;
+
+  const unreadCount = unread.length;
+  const tooltip =
+    unreadCount > 0
+      ? `Du har ${unreadCount} ${unreadCount === 1 ? "oppdatering" : "oppdateringer"} på innspillene dine`
+      : "Meld inn feil eller ønske";
 
   return (
-    <Tooltip title="Meld inn feil eller ønske" placement="left">
+    <Tooltip title={tooltip} placement="left">
       <Box
         component="button"
         type="button"
-        aria-label="Gå til innspill"
+        aria-label={unreadCount > 0 ? `Gå til innspill, ${unreadCount} nye oppdateringer` : "Gå til innspill"}
         onClick={() => navigate(FEEDBACK_ROUTE)}
         sx={{
           position: "fixed",
@@ -52,6 +64,34 @@ export default function FeedbackLauncher() {
       >
         <FeedbackRoundedIcon sx={{ fontSize: 18, transform: "rotate(90deg)" }} />
         Innspill
+        {unreadCount > 0 && (
+          <Box
+            component="span"
+            aria-hidden="true"
+            sx={{
+              position: "absolute",
+              top: -7,
+              left: -7,
+              minWidth: 20,
+              height: 20,
+              px: 0.5,
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              writingMode: "horizontal-tb",
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              letterSpacing: 0,
+              color: "#fff",
+              bgcolor: "#E53935",
+              border: "2px solid #fff",
+              boxSizing: "border-box",
+            }}
+          >
+            {unreadCount}
+          </Box>
+        )}
       </Box>
     </Tooltip>
   );

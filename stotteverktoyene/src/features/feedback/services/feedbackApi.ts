@@ -7,7 +7,9 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -142,6 +144,41 @@ export const feedbackApi = {
           sortFeedbacks(snap.docs.map((d) => mapFeedback(d.id, d.data() as Record<string, unknown>)))
         ),
       onError
+    );
+  },
+
+  /** Brukerens egne innspill. Brukes til å varsle om svar og statusendringer fra eier. */
+  subscribeMine(
+    uid: string,
+    onData: (items: Feedback[]) => void,
+    onError: (error: unknown) => void
+  ): () => void {
+    return onSnapshot(
+      query(collection(db, FEEDBACKS_COLLECTION), where("createdByUid", "==", uid)),
+      (snap) =>
+        onData(snap.docs.map((d) => mapFeedback(d.id, d.data() as Record<string, unknown>))),
+      onError
+    );
+  },
+
+  /** Tidspunktet brukeren sist så innspillsiden – lagres i brukerens egne innstillinger. */
+  subscribeSeenAt(
+    uid: string,
+    onData: (seenAtMs: number) => void,
+    onError: (error: unknown) => void
+  ): () => void {
+    return onSnapshot(
+      doc(db, "users", uid, "preferences", "feedbackSeen"),
+      (snap) => onData(toMillis(snap.data()?.seenAt)),
+      onError
+    );
+  },
+
+  async markSeen(uid: string): Promise<void> {
+    await setDoc(
+      doc(db, "users", uid, "preferences", "feedbackSeen"),
+      { seenAt: serverTimestamp() },
+      { merge: true }
     );
   },
 

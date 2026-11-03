@@ -21,6 +21,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import FeedbackImages from "../components/FeedbackImages";
+import { hasOwnerUpdate, useFeedbackUpdates } from "../hooks/useFeedbackUpdates";
 import ImagePicker from "../components/ImagePicker";
 import { feedbackApi, FEEDBACK_MAX_LENGTH } from "../services/feedbackApi";
 import {
@@ -112,6 +113,16 @@ export default function InnspillPage() {
   const [listError, setListError] = React.useState<string | null>(null);
   const [scope, setScope] = React.useState<Scope>("alle");
   const [search, setSearch] = React.useState("");
+
+  // Oppdateringer fra eier siden forrige besøk utheves på denne visningen. Tidspunktet
+  // fryses første gang det er lastet, og siden merkes deretter som sett.
+  const { seenAtMs, markSeen } = useFeedbackUpdates(user?.uid);
+  const [highlightSince, setHighlightSince] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (seenAtMs === null || highlightSince !== null) return;
+    setHighlightSince(seenAtMs);
+    markSeen();
+  }, [highlightSince, markSeen, seenAtMs]);
 
   const reporterName = React.useMemo(
     () => firstName?.trim() || user?.displayName?.trim() || user?.email?.trim() || "Ukjent bruker",
@@ -406,6 +417,12 @@ export default function InnspillPage() {
                       {item.createdByUid === user?.uid && (
                         <Chip size="small" color="primary" variant="outlined" label="Ditt innspill" />
                       )}
+                      {item.createdByUid === user?.uid &&
+                        highlightSince !== null &&
+                        hasOwnerUpdate(item) &&
+                        item.updatedAtMs > highlightSince && (
+                          <Chip size="small" color="success" label="Ny oppdatering" />
+                        )}
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {item.createdByName || "Ukjent bruker"}
                       </Typography>
