@@ -224,13 +224,17 @@ const STATUS_FARGER: Record<StatusKind, { main: string; light: string; dark: str
 
 const dagTekst = (n: number): string => `${formatTall(n)} ${n === 1 ? "dag" : "dager"}`;
 
+// Hele dager i visningen: «65,82 dager» sier ikke mer enn «65 dager», og tallet
+// rundes ned så vi ikke lover mer dekning enn kunden har.
+const heleDager = (n: number): number => Math.floor(Math.abs(n));
+
 const statusTekst = (b: VareBeregning, kind: StatusKind): string => {
   if (kind === "mangler") return "Mangler dosering";
   const d = b.dagerIgjen as number;
   if (kind === "tom") {
-    return Math.abs(d) < 1 ? "Tom i dag" : `Tom for ${dagTekst(Math.abs(d))} siden`;
+    return heleDager(d) < 1 ? "Tom i dag" : `Tom for ${dagTekst(heleDager(d))} siden`;
   }
-  return `${dagTekst(d)} igjen`;
+  return `${dagTekst(heleDager(d))} igjen`;
 };
 
 const scrollTilKort = (key: string) => {
@@ -385,7 +389,7 @@ function ResultTile({
         component="div"
         sx={{
           mt: 0.5,
-          fontSize: small ? 22 : 28,
+          fontSize: small ? 20 : 28,
           lineHeight: "32px",
           fontWeight: 700,
           fontVariantNumeric: "tabular-nums",
@@ -1818,7 +1822,7 @@ export default function LagerbeholdningPage() {
                               />
                               <ResultTile
                                 label="Dager igjen"
-                                value={tom ? "Tom" : formatTall(b.dagerIgjen as number)}
+                                value={tom ? "Tom" : String(heleDager(b.dagerIgjen as number))}
                                 suffix={tom ? undefined : "dager"}
                                 kind={kind}
                                 dark={dark}
