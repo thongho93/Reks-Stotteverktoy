@@ -86,7 +86,12 @@ type LagerStandardtekstPrefill = {
   templateTitle: string;
   preparat: string;
   preparatKey: string;
+  // Ytterligere preparater når flere er valgt i en sammenslått gruppe.
+  ekstraPreparater: Array<{ preparat: string; preparatKey: string; formulering: string }>;
   datoInput: string;
+  // Dagsforbruk fra lagerbeholdning (ANT = DOSERING-tokenet) og formulering (tablett, kapsel, ml …).
+  antall: string;
+  formulering: string;
 };
 const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
 
@@ -100,7 +105,23 @@ function parseLagerPrefill(value: unknown): LagerStandardtekstPrefill | null {
     templateTitle: c.templateTitle.trim(),
     preparat: c.preparat.trim(),
     preparatKey: (typeof c.preparatKey === "string" && c.preparatKey.trim()) || c.preparat.trim(),
+    ekstraPreparater: Array.isArray(c.ekstraPreparater)
+      ? c.ekstraPreparater.flatMap((e) =>
+          e && typeof e.preparat === "string" && e.preparat.trim()
+            ? [
+                {
+                  preparat: e.preparat.trim(),
+                  preparatKey:
+                    (typeof e.preparatKey === "string" && e.preparatKey.trim()) || e.preparat.trim(),
+                  formulering: typeof e.formulering === "string" ? e.formulering.trim() : "",
+                },
+              ]
+            : [],
+        )
+      : [],
     datoInput: typeof c.datoInput === "string" ? c.datoInput.trim() : "",
+    antall: typeof c.antall === "string" ? c.antall.trim() : "",
+    formulering: typeof c.formulering === "string" ? c.formulering.trim() : "",
   };
 }
 
@@ -235,6 +256,8 @@ const SINGULAR_TO_PLURAL_FORMULERING: Record<string, string> = {
   inhalasjonspulver: "inhalasjonspulvere",
   inhalasjonsvaeske: "inhalasjonsvaesker",
   mikstur: "miksturer",
+  // Måleenhet for flytende preparater (dosert i ml) er uforanderlig.
+  ml: "ml",
   granulat: "granulater",
   plaster: "plastre",
   depotplaster: "depotplastre",
@@ -1258,11 +1281,36 @@ export default function StandardTekstPage() {
       setFormuleringByPreparatKey({});
 
       addPickedPreparat(pendingLager.preparat, pendingLager.preparatKey);
+      for (const e of pendingLager.ekstraPreparater) addPickedPreparat(e.preparat, e.preparatKey);
 
-      setTallByIndex(buildInitialTallValues(normalizeTemplateContent(selected.content)));
+      const lagerContent = normalizeTemplateContent(selected.content);
+      setTallByIndex(buildInitialTallValues(lagerContent));
+      if (pendingLager.formulering) {
+        setFormuleringByPreparatKey({
+          [pendingLager.preparatKey]: pendingLager.formulering,
+          ...Object.fromEntries(
+            pendingLager.ekstraPreparater
+              .filter((e) => e.formulering)
+              .map((e) => [e.preparatKey, e.formulering]),
+          ),
+        });
+        const fIndices = getFormuleringTokenIndices(lagerContent);
+        if (fIndices.length) {
+          const nextF: Record<number, string> = {};
+          for (const i of fIndices) nextF[i] = i === 0 ? pendingLager.formulering : "";
+          setFormuleringByIndex(nextF);
+        }
+      }
       setAltByIndex({});
       setOptionalRemovedByIndex({});
-      setDoseringByIndex({ 0: "" });
+      // «ANT» i malene er DOSERING-tokenet: første DOSERING får dagsforbruket fra
+      // lagerbeholdning (FORMULERING bøyes etter tallet).
+      const lagerDoseringIdx = getDoseringTokenIndices(lagerContent)[0];
+      setDoseringByIndex(
+        pendingLager.antall && lagerDoseringIdx !== undefined
+          ? { 0: "", [lagerDoseringIdx]: pendingLager.antall }
+          : { 0: "" },
+      );
       setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       // Måned/år (MM.YYYY) fra "dekket til" → DATO-tokenet rendres som "desember 2026".
