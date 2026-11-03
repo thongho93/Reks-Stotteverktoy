@@ -198,6 +198,19 @@ const finnMedlemmer = (uttakList: ParsedUttak[]): VareMedlem[] => {
   return [...seen.values()];
 };
 
+// Pakningsbetegnelser som alle betyr «enkeltenheter» (tabletter/kapsler o.l.):
+// ENPAC = blisterpakning, ENDOSE = endoseblisterpakning, STK/BOKS = boks. Mengden
+// er allerede antall enheter, så de summeres direkte – men gruppa skal ha ett
+// felles enhetsnavn, ikke det første uttakets.
+const ENKELTENHET_ALIAS = new Set(["STK", "BOKS", "ENPAC", "ENDOSE"]);
+
+const velgEnhet = (uttakList: ParsedUttak[]): string => {
+  const enheter = uttakList.map((u) => u.enhet).filter(Boolean);
+  const distinkte = new Set(enheter.map((e) => e.toUpperCase()));
+  if (distinkte.size > 1 && [...distinkte].every((e) => ENKELTENHET_ALIAS.has(e))) return "STK";
+  return enheter[0] ?? "";
+};
+
 export const beregnVare = (
   varenrKey: string,
   gruppe: UttakGruppe,
@@ -219,8 +232,7 @@ export const beregnVare = (
   const totaltHentet = tellende.reduce((sum, u) => sum + u.mengde!, 0);
   const forsteUttak = tellende.length ? tellende[0].dato! : null;
   const sisteUttak = tellende.length ? tellende[tellende.length - 1].dato! : null;
-  const enhet =
-    tellende.find((u) => u.enhet)?.enhet ?? uttakList.find((u) => u.enhet)?.enhet ?? "";
+  const enhet = velgEnhet(tellende.length ? tellende : uttakList);
 
   const members = finnMedlemmer(uttakList);
   const merged = members.length > 1;
