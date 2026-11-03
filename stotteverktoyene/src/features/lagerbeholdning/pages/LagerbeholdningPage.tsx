@@ -44,9 +44,13 @@ import { AccentSelection } from "../../../styles/AccentSelection";
 import { parseUttakInput } from "../lib/parse";
 import {
   beregnVare,
+  finnGruppeMaal,
   formatDato,
+  gruppeStyrke,
   fromDateInputValue,
   groupByVare,
+  slaaSammenGrupper,
+  styrkeFaktor,
   toDateInputValue,
   type VareBeregning,
 } from "../lib/calc";
@@ -206,6 +210,8 @@ export default function LagerbeholdningPage() {
   const [varierendeGrunnByVare, setVarierendeGrunnByVare] = useState<Record<string, VarierendeGrunn>>({});
   const [doseEnhetByVare, setDoseEnhetByVare] = useState<Record<string, "ml" | "mg">>({});
   const [styrkeByVare, setStyrkeByVare] = useState<Record<string, string>>({});
+  // Manuell sammenslåing: gruppenøkkel → gruppa den er slått inn i.
+  const [sammenslaing, setSammenslaing] = useState<Record<string, string>>({});
   const [showHelp, setShowHelp] = useState(false);
   const [openHistorikk, setOpenHistorikk] = useState<Record<string, boolean>>({});
 
@@ -269,7 +275,11 @@ export default function LagerbeholdningPage() {
   }, []);
 
   const uttak = useMemo(() => parseUttakInput(input), [input]);
-  const grupper = useMemo(() => groupByVare(uttak, resolver), [uttak, resolver]);
+  const grupperAuto = useMemo(() => groupByVare(uttak, resolver), [uttak, resolver]);
+  const grupper = useMemo(
+    () => slaaSammenGrupper(grupperAuto, sammenslaing),
+    [grupperAuto, sammenslaing],
+  );
 
   const beregninger = useMemo<VareBeregning[]>(() => {
     const result: VareBeregning[] = [];
@@ -329,6 +339,7 @@ export default function LagerbeholdningPage() {
     setVarierendeGrunnByVare({});
     setDoseEnhetByVare({});
     setStyrkeByVare({});
+    setSammenslaing({});
     setOpenHistorikk({});
     setReferansedatoInput(toDateInputValue(new Date()));
   }, []);
@@ -638,6 +649,69 @@ export default function LagerbeholdningPage() {
                       ))}
                     </Box>
                   ) : null}
+
+                  {(() => {
+                    const gruppeNavn = (k: string) =>
+                      grupperAuto.get(k)?.uttak.find((u) => u.varenavn)?.varenavn ?? k;
+                    const innslatt = [...grupperAuto.keys()].filter(
+                      (k) => k !== key && finnGruppeMaal(grupperAuto, sammenslaing, k) === key,
+                    );
+                    const kandidater = beregninger.filter((o) => o.key !== key);
+                    if (innslatt.length === 0 && kandidater.length === 0) return null;
+                    return (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", mb: 1.5 }}
+                      >
+                        {innslatt.map((k) => (
+                          <Chip
+                            key={k}
+                            size="small"
+                            variant="outlined"
+                            label={`Manuelt slått inn: ${gruppeNavn(k)}`}
+                            onDelete={() =>
+                              setSammenslaing((prev) => {
+                                const next = { ...prev };
+                                delete next[k];
+                                return next;
+                              })
+                            }
+                            sx={{ maxWidth: "100%" }}
+                          />
+                        ))}
+                        {kandidater.length > 0 ? (
+                          <TextField
+                            select
+                            size="small"
+                            label="Slå sammen med…"
+                            value=""
+                            onChange={(e) => {
+                              const valgt = e.target.value;
+                              if (!valgt) return;
+                              setSammenslaing((prev) => ({ ...prev, [valgt]: key }));
+                            }}
+                            helperText="Samme legemiddel i flere grupper? Regnes som ett lager med én dose. Denne gruppen er originalen: dosen angis i denne gruppas styrke, og andre styrker regnes om til den."
+                            sx={{ minWidth: 260 }}
+                          >
+                            {kandidater.map((o) => {
+                              const fra = grupper.get(o.key);
+                              const til = grupper.get(key);
+                              const faktor = fra && til ? styrkeFaktor(fra, til) : 1;
+                              const fraStyrke = fra ? gruppeStyrke(fra) : null;
+                              const tilStyrke = til ? gruppeStyrke(til) : null;
+                              return (
+                                <MenuItem key={o.key} value={o.key}>
+                                  {o.varenavn}
+                                  {faktor !== 1 && fraStyrke && tilStyrke
+                                    ? ` – ulik styrke: 1 stk à ${formatTall(fraStyrke.verdi)} ${fraStyrke.enhet} teller som ${formatTall(faktor)} stk à ${formatTall(tilStyrke.verdi)} ${tilStyrke.enhet}`
+                                    : ""}
+                                </MenuItem>
+                              );
+                            })}
+                          </TextField>
+                        ) : null}
+                      </Box>
+                    );
+                  })()}
 
                   <Box
                     sx={{
@@ -1076,7 +1150,7 @@ export default function LagerbeholdningPage() {
                                   align="right"
                                   sx={{ textDecoration: u.annullert ? "line-through" : "none" }}
                                 >
-                                  {u.mengde != null ? `${formatTall(u.mengde)}${u.enhet ? ` ${u.enhet}` : ""}` : "–"}
+                                  {u.mengde != null ? `${formatTall(u.mengde)}${u.enhet ? ` ${u.enhet}` : ""}${u.omregningsfaktor ? ` (×${formatTall(u.omregningsfaktor)})` : ""}` : "–"}
                                 </TableCell>
                                 <TableCell align="right">{u.dager ?? "–"}</TableCell>
                               </TableRow>
