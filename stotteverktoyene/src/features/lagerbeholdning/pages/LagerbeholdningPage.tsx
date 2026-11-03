@@ -72,6 +72,7 @@ const TEAL = "#0E9F8E";
 const HAR_FATT_NOK_TITLE = "Hyppig uttak - Har fått nok til..";
 const OVER_3_MND_TITLE = "Over 3 mnds bruk, nedjustere?";
 const HYPPIG_UTTAK_KANSELLERE_TITLE = "Hyppig uttak - fått nok til - kansellere";
+const NEDJUSTERING_TITLE = "Nedjustering - For mange pakninger ifht. dosering";
 const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
 // Terskel (dager igjen) for å tilby overføring – samme som grønn fargekode.
 const HAR_FATT_NOK_MIN_DAGER = 45;
@@ -1076,6 +1077,7 @@ export default function LagerbeholdningPage() {
                         { title: HAR_FATT_NOK_TITLE, label: "Åpne standardtekst «Har fått nok til…»", medDato: true },
                         { title: OVER_3_MND_TITLE, label: "Åpne standardtekst «Over 3 mnds bruk, nedjustere?»", medDato: false },
                         { title: HYPPIG_UTTAK_KANSELLERE_TITLE, label: "Åpne standardtekst «Hyppig uttak – kansellere»", medDato: true },
+                        { title: NEDJUSTERING_TITLE, label: "Åpne standardtekst «Nedjustering – for mange pakninger»", medDato: false },
                       ].map(({ title, label, medDato }) => {
                         const busyAny = Boolean(openingStandardtekstKey?.startsWith(`${key}::`));
                         const busy = openingStandardtekstKey === `${key}::${title}`;
