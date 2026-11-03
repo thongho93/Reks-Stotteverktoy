@@ -59,5 +59,40 @@
   {
     "name": "Contour next blodsukk strimmel 50 stk",
     "farmaloggNumber": "923119"
+  },
+  {
+    "name": "Somac enterotab 20mg 100 100 stk. Blisterpakning",
+    "farmaloggNumber": "556922",
+    "atc": "A02BC02",
+    "virkestoff": "Pantoprazol",
+    "produsent": "Takeda"
+  },
+  {
+    "name": "Estradot dep plast 37,5mcg/24t 24 stk",
+    "farmaloggNumber": "177449",
+    "atc": "G03CA03",
+    "virkestoff": "Østradiol",
+    "produsent": "Sandoz"
+  },
+  {
+    "name": "Pimaxiro tab 200mg 100 100 stk. Blisterpakning",
+    "farmaloggNumber": "391793",
+    "atc": "P01BA02",
+    "virkestoff": "Hydroksyklorokin",
+    "produsent": "Medical Valley"
+  },
+  {
+    "name": "Estradot dep plast 50mcg/24t 24 stk",
+    "farmaloggNumber": "374310",
+    "atc": "G03CA03",
+    "virkestoff": "Østradiol",
+    "produsent": "Sandoz"
+  },
+  {
+    "name": "Somac enterotab 40mg 100 100 stk. Blisterpakning",
+    "farmaloggNumber": "183733",
+    "atc": "A02BC02",
+    "virkestoff": "Pantoprazol",
+    "produsent": "Takeda"
   }
 ]
