@@ -87,7 +87,7 @@ type LagerStandardtekstPrefill = {
   preparat: string;
   preparatKey: string;
   datoInput: string;
-  // Dagsforbruk fra lagerbeholdning (ANT/TALL) og formulering (tablett, kapsel, ml …).
+  // Dagsforbruk fra lagerbeholdning (ANT = DOSERING-tokenet) og formulering (tablett, kapsel, ml …).
   antall: string;
   formulering: string;
 };
@@ -1267,13 +1267,7 @@ export default function StandardTekstPage() {
       addPickedPreparat(pendingLager.preparat, pendingLager.preparatKey);
 
       const lagerContent = normalizeTemplateContent(selected.content);
-      const lagerTall = buildInitialTallValues(lagerContent);
-      // ANT (første TALL-token) = dagsforbruk fra lagerbeholdning.
-      if (pendingLager.antall) {
-        const firstTallIdx = Math.min(...Object.keys(lagerTall).map(Number));
-        lagerTall[firstTallIdx] = pendingLager.antall;
-      }
-      setTallByIndex(lagerTall);
+      setTallByIndex(buildInitialTallValues(lagerContent));
       if (pendingLager.formulering) {
         setFormuleringByPreparatKey({ [pendingLager.preparatKey]: pendingLager.formulering });
         const fIndices = getFormuleringTokenIndices(lagerContent);
@@ -1285,7 +1279,14 @@ export default function StandardTekstPage() {
       }
       setAltByIndex({});
       setOptionalRemovedByIndex({});
-      setDoseringByIndex({ 0: "" });
+      // «ANT» i malene er DOSERING-tokenet: første DOSERING får dagsforbruket fra
+      // lagerbeholdning (FORMULERING bøyes etter tallet).
+      const lagerDoseringIdx = getDoseringTokenIndices(lagerContent)[0];
+      setDoseringByIndex(
+        pendingLager.antall && lagerDoseringIdx !== undefined
+          ? { 0: "", [lagerDoseringIdx]: pendingLager.antall }
+          : { 0: "" },
+      );
       setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       // Måned/år (MM.YYYY) fra "dekket til" → DATO-tokenet rendres som "desember 2026".
