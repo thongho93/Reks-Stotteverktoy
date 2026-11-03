@@ -20,6 +20,8 @@ import LightbulbRoundedIcon from "@mui/icons-material/LightbulbRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
 import { useAuthUser } from "../../../app/auth/useAuthUser";
+import FeedbackImages from "../components/FeedbackImages";
+import ImagePicker from "../components/ImagePicker";
 import { feedbackApi, FEEDBACK_MAX_LENGTH } from "../services/feedbackApi";
 import {
   FEEDBACK_CATEGORIES,
@@ -100,6 +102,7 @@ export default function InnspillPage() {
   const [category, setCategory] = React.useState<FeedbackCategory>("bug");
   const [pagePath, setPagePath] = React.useState<string>("__annet");
   const [message, setMessage] = React.useState("");
+  const [images, setImages] = React.useState<File[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState(false);
@@ -165,11 +168,12 @@ export default function InnspillPage() {
 
     try {
       await feedbackApi.submit(
-        { message: trimmed, category, pagePath },
+        { message: trimmed, category, pagePath, images },
         { uid: user.uid, name: reporterName, email: user.email?.trim() ?? "" }
       );
 
       setMessage("");
+      setImages([]);
       setSent(true);
     } catch (err) {
       const code = (err as { code?: string } | undefined)?.code ?? "";
@@ -181,7 +185,7 @@ export default function InnspillPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, category, pagePath, reporterName, trimmed, user]);
+  }, [canSubmit, category, images, pagePath, reporterName, trimmed, user]);
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -287,6 +291,13 @@ export default function InnspillPage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value.slice(0, FEEDBACK_MAX_LENGTH))}
                   helperText={`${message.length}/${FEEDBACK_MAX_LENGTH}`}
+                />
+
+                <ImagePicker
+                  files={images}
+                  onChange={setImages}
+                  onError={setFormError}
+                  disabled={submitting}
                 />
 
                 <Typography variant="caption" color="text.secondary">
@@ -404,6 +415,8 @@ export default function InnspillPage() {
                     </Stack>
 
                     <Typography sx={{ whiteSpace: "pre-wrap", mb: 1.5 }}>{item.message}</Typography>
+
+                    <FeedbackImages attachments={item.attachments} />
 
                     <StatusTrail status={item.status} />
 

@@ -30,6 +30,12 @@ export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number]["value"];
 export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number]["value"];
 export type FeedbackPage = (typeof FEEDBACK_PAGES)[number]["value"];
 
+/** Skjermbilde lagt ved et innspill. `path` brukes til sletting i Storage. */
+export type FeedbackAttachment = {
+  url: string;
+  path: string;
+};
+
 export type Feedback = {
   id: string;
   message: string;
@@ -42,6 +48,7 @@ export type Feedback = {
   createdByUid: string;
   createdByName: string;
   createdByEmail: string;
+  attachments: FeedbackAttachment[];
   createdAtMs: number;
   updatedAtMs: number;
 };
@@ -50,6 +57,8 @@ export type NewFeedbackInput = {
   message: string;
   category: FeedbackCategory;
   pagePath: string;
+  /** Skjermbilder som lastes opp når innspillet sendes. */
+  images?: File[];
 };
 
 export function feedbackCategoryLabel(value: string): string {
