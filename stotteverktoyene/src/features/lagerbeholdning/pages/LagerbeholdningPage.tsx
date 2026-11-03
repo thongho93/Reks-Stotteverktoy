@@ -62,7 +62,10 @@ import {
 import { useVnrAutoPaste } from "../../../shared/hooks/useVnrAutoPaste";
 import { useAutoVnrPreference } from "../../../shared/hooks/useAutoVnrPreference";
 import { loadMedicationItems } from "../../fest/components/MedicationSearch";
-import { formatPreparatForTemplate } from "../../standardtekster/utils/preparat";
+import {
+  deriveFormuleringBase,
+  formatPreparatForTemplate,
+} from "../../standardtekster/utils/preparat";
 
 const TEAL = "#0E9F8E";
 
@@ -355,6 +358,7 @@ export default function LagerbeholdningPage() {
       setOpeningStandardtekstKey(`${b.key}::${templateTitle}`);
 
       let preparatText = (b.varenavn ?? "").trim();
+      let formulering = "";
       try {
         const meds = await loadMedicationItems();
         const vnr = (b.varenr ?? "").replace(/\D/g, "");
@@ -364,10 +368,17 @@ export default function LagerbeholdningPage() {
           );
           const formatted = hit ? formatPreparatForTemplate(hit) : "";
           if (formatted) preparatText = formatted;
+          if (hit) formulering = deriveFormuleringBase(hit);
         }
       } catch {
         // Katalogen kunne ikke lastes – behold lagerbeholdning-navnet.
       }
+
+      // Formulering utledes fra preparatnavnet hvis katalogen ikke ga treff.
+      // Flytende preparat doseres i ml.
+      if (b.erFlytende) formulering = "ml";
+      else if (!formulering) formulering = deriveFormuleringBase({ name: preparatText }) ||
+        deriveFormuleringBase({ name: b.varenavn });
 
       const payload = {
         requestId: Date.now(),
@@ -375,6 +386,9 @@ export default function LagerbeholdningPage() {
         preparat: preparatText,
         preparatKey: (b.varenr ?? "").trim() || preparatText,
         datoInput: medDato ? datoMndFromDate(b.dekketTil) : "",
+        // Dagsforbruk (ANT) – tomt hvis dosering ikke er oppgitt.
+        antall: b.dagligForbruk != null && b.dagligForbruk > 0 ? formatTall(b.dagligForbruk) : "",
+        formulering,
       };
 
       try {

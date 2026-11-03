@@ -1197,3 +1197,56 @@ export const STANDARDTEKST_TOKEN_DEFS: StandardTekstTokenDef[] = [
   { label: "DATO", insert: "DATO", help: "Dato (DD.MM.YYYY)", group: "ANNET" },
   { label: "DATO_MND", insert: "DATO_MND", help: "Måned/år (MM.YYYY)", group: "ANNET" },
 ];
+
+// Utleder formulering (tablett, kapsel, …) fra et preparat/navn, til FORMULERING-tokenet.
+export const deriveFormuleringBase = (m: any): string => {
+  const texts = [
+    m?.navnForStyrke,
+    m?.navnFormStyrke,
+    m?.nameFormStrength,
+    m?.varenavn,
+    m?.name,
+    m?.displayName,
+    m?.label,
+    m?.searchText,
+  ]
+    .map((v) => (typeof v === "string" ? v.toLowerCase() : ""))
+    .filter(Boolean);
+
+  const hay = texts.join(" ");
+
+  const rules: Array<[RegExp, string]> = [
+    [/\bdepotplaster\b|\bdepotplastre\b/, "depotplaster"],
+    [/\btyggetablett\b|\btyggetab\b|\btyggetabletter\b/, "tyggetablett"],
+    [/\bdepottablett\b|\bdepottab\b|\bdepottabletter\b/, "depottablett"],
+    [/\bsmeltetablett\b|\bsmeltetab\b|\bsmeltetabletter\b/, "smeltetablett"],
+    [/\benterotablett\b|\benterotab\b|\benterotabletter\b/, "enterotablett"],
+    [/\bsublingvaltablett\b|\bsublingvaltab\b|\bsublingvaltabletter\b/, "sublingvaltablett"],
+    [/\bbrusetablett\b|\bbrusetab\b|\bbrusetabletter\b/, "brusetablett"],
+    [/\bdepotkapsel\b|\bdepotkaps\b|\bdepotkapsler\b/, "depotkapsel"],
+    [/\bnesespray\b|\bnesesprayer\b/, "nesespray"],
+    [/\bøyedråpe\b|\bøyedr\b|\boyedr\b|\bøyedråper\b/, "øyedråpe"],
+    [/\børedråpe\b|\boredr\b|\børedråper\b/, "øredråpe"],
+    [/\bstikkpille\b|\bstikkpil\b|\bsupp\b|\bstikkpiller\b/, "stikkpille"],
+    [/\binjeksjon\b|\binj\b|\binjeksjoner\b/, "injeksjon"],
+    [/\binfusjon\b|\binf\b|\binfusjoner\b/, "infusjon"],
+    [/\binhalasjonspulver\b|\binh\s*pulv\b|\binhalasjonspulvere\b/, "inhalasjonspulver"],
+    [/\binhalasjonsvæske\b|\binh\s*væske\b|\binhalasjonsvæsker\b/, "inhalasjonsvæske"],
+    [/\bmikstur\b|\bmiksturer\b/, "mikstur"],
+    [/\bgranulat\b|\bgran\b|\bgranulater\b/, "granulat"],
+    [/\bplaster\b|\bplastre\b/, "plaster"],
+    [/\btablett\b|\btab\b|\btabl\b|\btabletter\b/, "tablett"],
+    [/\bkapsel\b|\bkaps\b|\bkapsler\b/, "kapsel"],
+    [/\bdråpe\b|\bdråper\b|\bdr\b/, "dråpe"],
+    [/\bsalve\b|\bsalver\b/, "salve"],
+    [/\bkrem\b|\bkremer\b/, "krem"],
+    [/\bgel\b|\bgeler\b/, "gel"],
+    [/\bspray\b|\bsprayer\b/, "spray"],
+  ];
+
+  for (const [re, plural] of rules) {
+    if (re.test(hay)) return plural;
+  }
+
+  return "";
+};

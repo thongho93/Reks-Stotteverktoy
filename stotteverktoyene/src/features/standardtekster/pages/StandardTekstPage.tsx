@@ -87,6 +87,9 @@ type LagerStandardtekstPrefill = {
   preparat: string;
   preparatKey: string;
   datoInput: string;
+  // Dagsforbruk fra lagerbeholdning (ANT/TALL) og formulering (tablett, kapsel, ml …).
+  antall: string;
+  formulering: string;
 };
 const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
 
@@ -101,6 +104,8 @@ function parseLagerPrefill(value: unknown): LagerStandardtekstPrefill | null {
     preparat: c.preparat.trim(),
     preparatKey: (typeof c.preparatKey === "string" && c.preparatKey.trim()) || c.preparat.trim(),
     datoInput: typeof c.datoInput === "string" ? c.datoInput.trim() : "",
+    antall: typeof c.antall === "string" ? c.antall.trim() : "",
+    formulering: typeof c.formulering === "string" ? c.formulering.trim() : "",
   };
 }
 
@@ -235,6 +240,8 @@ const SINGULAR_TO_PLURAL_FORMULERING: Record<string, string> = {
   inhalasjonspulver: "inhalasjonspulvere",
   inhalasjonsvaeske: "inhalasjonsvaesker",
   mikstur: "miksturer",
+  // Måleenhet for flytende preparater (dosert i ml) er uforanderlig.
+  ml: "ml",
   granulat: "granulater",
   plaster: "plastre",
   depotplaster: "depotplastre",
@@ -1259,7 +1266,23 @@ export default function StandardTekstPage() {
 
       addPickedPreparat(pendingLager.preparat, pendingLager.preparatKey);
 
-      setTallByIndex(buildInitialTallValues(normalizeTemplateContent(selected.content)));
+      const lagerContent = normalizeTemplateContent(selected.content);
+      const lagerTall = buildInitialTallValues(lagerContent);
+      // ANT (første TALL-token) = dagsforbruk fra lagerbeholdning.
+      if (pendingLager.antall) {
+        const firstTallIdx = Math.min(...Object.keys(lagerTall).map(Number));
+        lagerTall[firstTallIdx] = pendingLager.antall;
+      }
+      setTallByIndex(lagerTall);
+      if (pendingLager.formulering) {
+        setFormuleringByPreparatKey({ [pendingLager.preparatKey]: pendingLager.formulering });
+        const fIndices = getFormuleringTokenIndices(lagerContent);
+        if (fIndices.length) {
+          const nextF: Record<number, string> = {};
+          for (const i of fIndices) nextF[i] = i === 0 ? pendingLager.formulering : "";
+          setFormuleringByIndex(nextF);
+        }
+      }
       setAltByIndex({});
       setOptionalRemovedByIndex({});
       setDoseringByIndex({ 0: "" });
