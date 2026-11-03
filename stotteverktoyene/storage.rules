@@ -1,0 +1,57 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Samme eier som i firestore.rules.
+    function ownerUid() {
+      return "uFRgce8mJjaVeDjqyJZ0wsiLqNo2";
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/(default)/documents/users/$(uid);
+    }
+
+    // Tolkes likt som isApprovedUser i firestore.rules: users/{uid} finnes, og
+    // approved er enten ikke satt eller ikke false.
+    function isApprovedUser(uid) {
+      return firestore.exists(userPath(uid))
+        && (
+          !("approved" in firestore.get(userPath(uid)).data)
+          || firestore.get(userPath(uid)).data.approved != false
+        );
+    }
+
+    function isPrivilegedUser(uid) {
+      return uid == ownerUid()
+        || firestore.exists(/databases/(default)/documents/admins/$(uid));
+    }
+
+    function isActiveMember() {
+      return isSignedIn() && (isApprovedUser(request.auth.uid) || isPrivilegedUser(request.auth.uid));
+    }
+
+    function isOwnerRole() {
+      return isSignedIn()
+        && request.auth.uid == ownerUid()
+        && firestore.exists(/databases/(default)/documents/owners/$(request.auth.uid));
+    }
+
+    // Skjermbilder lagt ved innspill. Alle aktive medlemmer kan lese (innspillslista
+    // er delt). Man laster bare opp i sin egen mappe: kun bilder, maks 5 MB.
+    // Opplasteren kan slette sine egne filer (opprydding hvis innsendingen feiler),
+    // og eier kan slette alle (når innspillet slettes).
+    match /feedback/{uid}/{fileName} {
+      allow read: if isActiveMember();
+      allow create: if isActiveMember()
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow update: if false;
+      allow delete: if isSignedIn() && (request.auth.uid == uid || isOwnerRole());
+    }
+  }
+}

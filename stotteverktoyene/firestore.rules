@@ -483,6 +483,7 @@ service cloud.firestore {
             "createdByUid",
             "createdByName",
             "createdByEmail",
+            "attachments",
             "createdAt",
             "updatedAt"
           ])
@@ -496,6 +497,14 @@ service cloud.firestore {
           && request.resource.data.createdByUid == request.auth.uid
           && request.resource.data.createdByName is string
           && request.resource.data.createdByEmail is string
+          // Skjermbilder ligger i Storage under feedback/{uid}/…; her lagres lenkene.
+          && (
+            !("attachments" in request.resource.data)
+            || (
+              request.resource.data.attachments is list
+              && request.resource.data.attachments.size() <= 3
+            )
+          )
           && request.resource.data.createdAt is timestamp
           && request.resource.data.updatedAt is timestamp;
       }

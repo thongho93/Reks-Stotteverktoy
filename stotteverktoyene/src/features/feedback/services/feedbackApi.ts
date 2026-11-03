@@ -10,8 +10,11 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-import { db } from "../../../firebase/firebase";
-import type { Feedback, FeedbackStatus, NewFeedbackInput } from "../types";
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+import { db, storage } from "../../../firebase/firebase";
+import { compressImage, FEEDBACK_MAX_IMAGES } from "../utils/image";
+import type { Feedback, FeedbackAttachment, FeedbackStatus, NewFeedbackInput } from "../types";
 import { FEEDBACK_CATEGORIES, FEEDBACK_STATUSES } from "../types";
 
 export const FEEDBACKS_COLLECTION = "feedbacks";
@@ -43,6 +46,16 @@ function asStatus(value: unknown): FeedbackStatus {
   return match ? match.value : "ikke_behandlet";
 }
 
+function asAttachments(value: unknown): FeedbackAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const candidate = entry as { url?: unknown; path?: unknown } | null;
+    return candidate && typeof candidate.url === "string" && typeof candidate.path === "string"
+      ? [{ url: candidate.url, path: candidate.path }]
+      : [];
+  });
+}
+
 function mapFeedback(id: string, data: Record<string, unknown>): Feedback {
   // createdAt er null i det lokale snapshotet rett etter skriving (serverTimestamp
   // er ikke bekreftet ennå). Vi faller da tilbake til updatedAt, ellers 0.
@@ -58,25 +71,63 @@ function mapFeedback(id: string, data: Record<string, unknown>): Feedback {
     createdByUid: String(data.createdByUid ?? ""),
     createdByName: String(data.createdByName ?? ""),
     createdByEmail: String(data.createdByEmail ?? ""),
+    attachments: asAttachments(data.attachments),
     createdAtMs,
     updatedAtMs: toMillis(data.updatedAt) || createdAtMs,
   };
 }
 
+/**
+ * Rekkefølge i lista: ikke behandlet øverst, så under behandling, og ferdig
+ * behandlet nederst. Innenfor hver gruppe kommer nyeste innspill først.
+ */
+const STATUS_RANK: Record<FeedbackStatus, number> = {
+  ikke_behandlet: 0,
+  under_behandling: 1,
+  ferdig_behandlet: 2,
+};
+
+export function sortFeedbacks(items: Feedback[]): Feedback[] {
+  return [...items].sort(
+    (a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || b.createdAtMs - a.createdAtMs
+  );
+}
+
 export const feedbackApi = {
   async submit(input: NewFeedbackInput, author: Author): Promise<void> {
-    await addDoc(collection(db, FEEDBACKS_COLLECTION), {
-      message: input.message.trim().slice(0, FEEDBACK_MAX_LENGTH),
-      category: input.category,
-      pagePath: input.pagePath,
-      status: "ikke_behandlet",
-      ownerReply: "",
-      createdByUid: author.uid,
-      createdByName: author.name,
-      createdByEmail: author.email,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    // Bildene lastes opp først (komprimert), og lenkene lagres sammen med innspillet.
+    // Feiler lagringen av innspillet, ryddes de opplastede bildene bort igjen.
+    const attachments: FeedbackAttachment[] = [];
+    try {
+      const images = (input.images ?? []).slice(0, FEEDBACK_MAX_IMAGES);
+      for (const [index, file] of images.entries()) {
+        const blob = await compressImage(file);
+        const random = Math.random().toString(36).slice(2, 10);
+        const path = `feedback/${author.uid}/${Date.now()}-${index}-${random}.jpg`;
+        const fileRef = ref(storage, path);
+        await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
+        attachments.push({ url: await getDownloadURL(fileRef), path });
+      }
+
+      await addDoc(collection(db, FEEDBACKS_COLLECTION), {
+        message: input.message.trim().slice(0, FEEDBACK_MAX_LENGTH),
+        category: input.category,
+        pagePath: input.pagePath,
+        status: "ikke_behandlet",
+        ownerReply: "",
+        createdByUid: author.uid,
+        createdByName: author.name,
+        createdByEmail: author.email,
+        attachments,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      await Promise.all(
+        attachments.map((att) => deleteObject(ref(storage, att.path)).catch(() => undefined))
+      );
+      throw error;
+    }
   },
 
   /** Alle innspill, nyeste først. Alle aktive medlemmer har leserett. */
@@ -86,7 +137,10 @@ export const feedbackApi = {
   ): () => void {
     return onSnapshot(
       query(collection(db, FEEDBACKS_COLLECTION), orderBy("createdAt", "desc")),
-      (snap) => onData(snap.docs.map((d) => mapFeedback(d.id, d.data() as Record<string, unknown>))),
+      (snap) =>
+        onData(
+          sortFeedbacks(snap.docs.map((d) => mapFeedback(d.id, d.data() as Record<string, unknown>)))
+        ),
       onError
     );
   },
@@ -102,7 +156,11 @@ export const feedbackApi = {
     });
   },
 
-  async remove(id: string): Promise<void> {
+  /** Sletter innspillet og de vedlagte bildene (bildene slettes på beste forsøk). */
+  async remove(id: string, attachments: FeedbackAttachment[] = []): Promise<void> {
     await deleteDoc(doc(db, FEEDBACKS_COLLECTION, id));
+    await Promise.all(
+      attachments.map((att) => deleteObject(ref(storage, att.path)).catch(() => undefined))
+    );
   },
 };

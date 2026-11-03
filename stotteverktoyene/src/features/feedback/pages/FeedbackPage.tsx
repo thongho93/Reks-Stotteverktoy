@@ -20,6 +20,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import LightbulbRoundedIcon from "@mui/icons-material/LightbulbRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
+import FeedbackImages from "../components/FeedbackImages";
 import { feedbackApi, FEEDBACK_REPLY_MAX_LENGTH } from "../services/feedbackApi";
 import {
   FEEDBACK_CATEGORIES,
@@ -125,7 +126,7 @@ export default function FeedbackPage() {
     }
 
     try {
-      await feedbackApi.remove(item.id);
+      await feedbackApi.remove(item.id, item.attachments);
     } catch {
       setError("Kunne ikke slette innspillet.");
     }
@@ -317,6 +318,8 @@ export default function FeedbackPage() {
                   </Stack>
 
                   <Typography sx={{ whiteSpace: "pre-wrap", mb: 1.5 }}>{item.message}</Typography>
+
+                  <FeedbackImages attachments={item.attachments} />
 
                   <TextField
                     size="small"
