@@ -469,7 +469,7 @@ export default function LagerbeholdningPage() {
   } | null>(null);
   const [flereMeny, setFlereMeny] = useState<{ anchor: HTMLElement; key: string } | null>(null);
 
-  // Auto-lim inn: kopier uttakshistorikk i fagsystemet og alt-tab tilbake – blokken
+  // Auto-lim inn: kopier uttakshistorikk i Reks og alt-tab tilbake – blokken
   // limes automatisk inn når feltet er aktivt, uten manuell Ctrl+V.
   const [isUttakFocused, setIsUttakFocused] = useState(false);
   const [autoPasteUttak, setAutoPasteUttak] = useAutoVnrPreference("lagerbeholdning");
@@ -991,7 +991,7 @@ export default function LagerbeholdningPage() {
                     {[
                       {
                         t: "Lim inn",
-                        d: "Kopier fra fagsystemet og trykk Ctrl + S, eller slå på auto-lim inn.",
+                        d: "Kopier fra Reks og trykk Ctrl + S, eller slå på auto-lim inn.",
                       },
                       {
                         t: "Oppgi dosering",
