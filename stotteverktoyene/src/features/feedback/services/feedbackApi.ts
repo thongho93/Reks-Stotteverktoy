@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -16,7 +17,13 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage
 
 import { db, storage } from "../../../firebase/firebase";
 import { compressImage, FEEDBACK_MAX_IMAGES } from "../utils/image";
-import type { Feedback, FeedbackAttachment, FeedbackStatus, NewFeedbackInput } from "../types";
+import type {
+  Feedback,
+  FeedbackAttachment,
+  FeedbackComment,
+  FeedbackStatus,
+  NewFeedbackInput,
+} from "../types";
 import { FEEDBACK_CATEGORIES, FEEDBACK_STATUSES } from "../types";
 
 export const FEEDBACKS_COLLECTION = "feedbacks";
@@ -76,8 +83,22 @@ function mapFeedback(id: string, data: Record<string, unknown>): Feedback {
     attachments: asAttachments(data.attachments),
     createdAtMs,
     updatedAtMs: toMillis(data.updatedAt) || createdAtMs,
+    editedAtMs: toMillis(data.editedAt) || null,
   };
 }
+
+function mapComment(id: string, data: Record<string, unknown>): FeedbackComment {
+  return {
+    id,
+    message: String(data.message ?? ""),
+    createdByUid: String(data.createdByUid ?? ""),
+    createdByName: String(data.createdByName ?? ""),
+    isOwner: data.isOwner === true,
+    createdAtMs: toMillis(data.createdAt),
+  };
+}
+
+export const FEEDBACK_COMMENT_MAX_LENGTH = 1000;
 
 /**
  * Rekkefølge i lista: ikke behandlet øverst, så under behandling, og ferdig
@@ -193,8 +214,61 @@ export const feedbackApi = {
     });
   },
 
-  /** Sletter innspillet og de vedlagte bildene (bildene slettes på beste forsøk). */
+  /** Avsenderen retter teksten i sitt eget innspill. */
+  async updateMessage(id: string, message: string): Promise<void> {
+    await updateDoc(doc(db, FEEDBACKS_COLLECTION, id), {
+      message: message.trim().slice(0, FEEDBACK_MAX_LENGTH),
+      editedAt: serverTimestamp(),
+    });
+  },
+
+  /** Kommentarene under et innspill, eldste først. */
+  subscribeComments(
+    feedbackId: string,
+    onData: (items: FeedbackComment[]) => void,
+    onError: (error: unknown) => void
+  ): () => void {
+    return onSnapshot(
+      query(
+        collection(db, FEEDBACKS_COLLECTION, feedbackId, "comments"),
+        orderBy("createdAt", "asc")
+      ),
+      (snap) =>
+        onData(snap.docs.map((d) => mapComment(d.id, d.data() as Record<string, unknown>))),
+      onError
+    );
+  },
+
+  /**
+   * Legger til en kommentar. Når eier kommenterer, oppdateres innspillets updatedAt, så
+   * avsenderen får varsel om at det har skjedd noe.
+   */
+  async addComment(
+    feedbackId: string,
+    message: string,
+    author: { uid: string; name: string },
+    asOwner: boolean
+  ): Promise<void> {
+    await addDoc(collection(db, FEEDBACKS_COLLECTION, feedbackId, "comments"), {
+      message: message.trim().slice(0, FEEDBACK_COMMENT_MAX_LENGTH),
+      createdByUid: author.uid,
+      createdByName: author.name,
+      isOwner: asOwner,
+      createdAt: serverTimestamp(),
+    });
+    if (asOwner) {
+      await updateDoc(doc(db, FEEDBACKS_COLLECTION, feedbackId), { updatedAt: serverTimestamp() });
+    }
+  },
+
+  async removeComment(feedbackId: string, commentId: string): Promise<void> {
+    await deleteDoc(doc(db, FEEDBACKS_COLLECTION, feedbackId, "comments", commentId));
+  },
+
+  /** Sletter innspillet, kommentarene og de vedlagte bildene (bildene på beste forsøk). */
   async remove(id: string, attachments: FeedbackAttachment[] = []): Promise<void> {
+    const comments = await getDocs(collection(db, FEEDBACKS_COLLECTION, id, "comments"));
+    await Promise.all(comments.docs.map((c) => deleteDoc(c.ref)));
     await deleteDoc(doc(db, FEEDBACKS_COLLECTION, id));
     await Promise.all(
       attachments.map((att) => deleteObject(ref(storage, att.path)).catch(() => undefined))
