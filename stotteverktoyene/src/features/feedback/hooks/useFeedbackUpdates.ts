@@ -5,7 +5,13 @@ import type { Feedback } from "../types";
 
 /** Har eier svart eller flyttet saken videre? (Brukeren kan ikke endre innspillet selv.) */
 export function hasOwnerUpdate(item: Feedback): boolean {
-  return item.ownerReply.trim() !== "" || item.status !== "ikke_behandlet";
+  return (
+    item.ownerReply.trim() !== "" ||
+    item.status !== "ikke_behandlet" ||
+    // updatedAt flyttes bare av eier (svar, status eller kommentar), og er lik createdAt
+    // til noe har skjedd.
+    item.updatedAtMs > item.createdAtMs + 1000
+  );
 }
 
 /**

@@ -20,6 +20,8 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import LightbulbRoundedIcon from "@mui/icons-material/LightbulbRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
+import { useAuthUser } from "../../../app/auth/useAuthUser";
+import FeedbackComments from "../components/FeedbackComments";
 import FeedbackImages from "../components/FeedbackImages";
 import { feedbackApi, FEEDBACK_REPLY_MAX_LENGTH } from "../services/feedbackApi";
 import {
@@ -44,6 +46,7 @@ function formatDateTime(ms: number): string {
  * men bare eier kan sette status, svare og slette.
  */
 export default function FeedbackPage() {
+  const { user } = useAuthUser();
   const [items, setItems] = React.useState<Feedback[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -336,6 +339,13 @@ export default function FeedbackPage() {
                       }))
                     }
                     onBlur={() => void handleReplyBlur(item)}
+                  />
+
+                  <FeedbackComments
+                    feedbackId={item.id}
+                    me={user?.uid ? { uid: user.uid, name: user.displayName?.trim() || "Eier" } : null}
+                    canComment
+                    isOwner
                   />
 
                   {item.createdByEmail && (
