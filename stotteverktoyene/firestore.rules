@@ -521,13 +521,67 @@ service cloud.firestore {
           && request.resource.data.updatedAt is timestamp;
       }
 
+      // Den som meldte inn saken kan rette teksten så lenge den ikke er ferdig behandlet.
+      // updatedAt røres ikke her: den brukes til å varsle om eiers oppdateringer.
+      function validFeedbackAuthorEdit() {
+        return resource.data.createdByUid == request.auth.uid
+          && resource.data.status != "ferdig_behandlet"
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            "message",
+            "editedAt"
+          ])
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0
+          && request.resource.data.message.size() <= 2000
+          && request.resource.data.editedAt is timestamp;
+      }
+
       // Innspill er delt internt: alle aktive medlemmer leser hele samlingen, så
       // man kan se hva som alt er meldt inn før man melder på nytt.
       allow get, list: if isActiveMember();
 
       allow create: if isActiveMember() && validFeedbackCreate();
-      allow update: if isOwnerRole() && validFeedbackOwnerUpdate();
-      allow delete: if isOwnerRole();
+      allow update: if (isOwnerRole() && validFeedbackOwnerUpdate())
+        || (isActiveMember() && validFeedbackAuthorEdit());
+      // Avsender kan slette sin egen sak så lenge eier ikke har begynt på den.
+      allow delete: if isOwnerRole()
+        || (isActiveMember()
+          && resource.data.createdByUid == request.auth.uid
+          && resource.data.status == "ikke_behandlet");
+
+      // Kommentarer under et innspill. Avsenderen og eier kan kommentere; alle aktive
+      // medlemmer kan lese. Den som skrev kommentaren, eier og innspillets avsender
+      // (som rydder ved sletting av saken) kan slette.
+      match /comments/{commentId} {
+        function parentFeedback() {
+          return get(/databases/$(database)/documents/feedbacks/$(feedbackId)).data;
+        }
+
+        allow get, list: if isActiveMember();
+
+        allow create: if isActiveMember()
+          && request.resource.data.keys().hasOnly([
+            "message",
+            "createdByUid",
+            "createdByName",
+            "isOwner",
+            "createdAt"
+          ])
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0
+          && request.resource.data.message.size() <= 1000
+          && request.resource.data.createdByUid == request.auth.uid
+          && request.resource.data.createdByName is string
+          && request.resource.data.isOwner == isOwnerRole()
+          && request.resource.data.createdAt is timestamp
+          && (isOwnerRole() || parentFeedback().createdByUid == request.auth.uid);
+
+        allow update: if false;
+        allow delete: if isOwnerRole()
+          || (isActiveMember()
+            && (resource.data.createdByUid == request.auth.uid
+              || parentFeedback().createdByUid == request.auth.uid));
+      }
     }
 
     // Beskyttet collection for rekspert
