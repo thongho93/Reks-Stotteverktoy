@@ -536,21 +536,30 @@ service cloud.firestore {
           && request.resource.data.editedAt is timestamp;
       }
 
+      // Når noen kommenterer, merkes innspillet så eier og avsenderen kan varsles. Kun
+      // disse to feltene, og kun med egen uid.
+      function validFeedbackCommentActivity() {
+        return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            "lastCommentAt",
+            "lastCommentByUid"
+          ])
+          && request.resource.data.lastCommentAt is timestamp
+          && request.resource.data.lastCommentByUid == request.auth.uid;
+      }
+
       // Innspill er delt internt: alle aktive medlemmer leser hele samlingen, så
       // man kan se hva som alt er meldt inn før man melder på nytt.
       allow get, list: if isActiveMember();
 
       allow create: if isActiveMember() && validFeedbackCreate();
       allow update: if (isOwnerRole() && validFeedbackOwnerUpdate())
-        || (isActiveMember() && validFeedbackAuthorEdit());
-      // Avsender kan slette sin egen sak så lenge eier ikke har begynt på den.
+        || (isActiveMember() && validFeedbackAuthorEdit())
+        || (isActiveMember() && validFeedbackCommentActivity());
+      // Avsender kan slette sin egen sak, uansett status.
       allow delete: if isOwnerRole()
-        || (isActiveMember()
-          && resource.data.createdByUid == request.auth.uid
-          && resource.data.status == "ikke_behandlet");
+        || (isActiveMember() && resource.data.createdByUid == request.auth.uid);
 
-      // Kommentarer under et innspill. Avsenderen og eier kan kommentere; alle aktive
-      // medlemmer kan lese. Den som skrev kommentaren, eier og innspillets avsender
+      // Kommentarer under et innspill. Alle aktive medlemmer kan lese og kommentere. Den som skrev kommentaren, eier og innspillets avsender
       // (som rydder ved sletting av saken) kan slette.
       match /comments/{commentId} {
         function parentFeedback() {
@@ -565,16 +574,26 @@ service cloud.firestore {
             "createdByUid",
             "createdByName",
             "isOwner",
+            "kind",
+            "status",
             "createdAt"
           ])
+          // «kind» er valgfritt: vanlig melding, eller en statushendelse som kun eier kan skrive.
+          && (
+            !("kind" in request.resource.data)
+            || (
+              request.resource.data.kind == "status"
+              && isOwnerRole()
+              && request.resource.data.status in ["ikke_behandlet", "under_behandling", "ferdig_behandlet"]
+            )
+          )
           && request.resource.data.message is string
           && request.resource.data.message.size() > 0
           && request.resource.data.message.size() <= 1000
           && request.resource.data.createdByUid == request.auth.uid
           && request.resource.data.createdByName is string
           && request.resource.data.isOwner == isOwnerRole()
-          && request.resource.data.createdAt is timestamp
-          && (isOwnerRole() || parentFeedback().createdByUid == request.auth.uid);
+          && request.resource.data.createdAt is timestamp;
 
         allow update: if false;
         allow delete: if isOwnerRole()

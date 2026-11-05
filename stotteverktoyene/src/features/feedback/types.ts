@@ -53,10 +53,17 @@ export type Feedback = {
   updatedAtMs: number;
   /** Når avsenderen sist rettet teksten, eller null hvis den aldri er rettet. */
   editedAtMs: number | null;
+  /** Siste kommentar fra en annen enn eier (0 = ingen), og hvem som skrev den. */
+  lastCommentAtMs: number;
+  lastCommentByUid: string;
 };
 
 export type FeedbackComment = {
   id: string;
+  /** «message» er en vanlig melding; «status» er en hendelse når eier endrer fremdriften. */
+  kind: "message" | "status";
+  /** Ny status når kind er «status». */
+  status: FeedbackStatus | null;
   message: string;
   createdByUid: string;
   createdByName: string;
