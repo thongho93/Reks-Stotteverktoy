@@ -51,6 +51,18 @@ export type Feedback = {
   attachments: FeedbackAttachment[];
   createdAtMs: number;
   updatedAtMs: number;
+  /** Når avsenderen sist rettet teksten, eller null hvis den aldri er rettet. */
+  editedAtMs: number | null;
+};
+
+export type FeedbackComment = {
+  id: string;
+  message: string;
+  createdByUid: string;
+  createdByName: string;
+  /** Skrevet av eier – vises med eget merke. */
+  isOwner: boolean;
+  createdAtMs: number;
 };
 
 export type NewFeedbackInput = {
