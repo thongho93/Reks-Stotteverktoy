@@ -84,12 +84,16 @@ function mapFeedback(id: string, data: Record<string, unknown>): Feedback {
     createdAtMs,
     updatedAtMs: toMillis(data.updatedAt) || createdAtMs,
     editedAtMs: toMillis(data.editedAt) || null,
+    lastCommentAtMs: toMillis(data.lastCommentAt),
+    lastCommentByUid: String(data.lastCommentByUid ?? ""),
   };
 }
 
 function mapComment(id: string, data: Record<string, unknown>): FeedbackComment {
   return {
     id,
+    kind: data.kind === "status" ? "status" : "message",
+    status: data.kind === "status" ? asStatus(data.status) : null,
     message: String(data.message ?? ""),
     createdByUid: String(data.createdByUid ?? ""),
     createdByName: String(data.createdByName ?? ""),
@@ -99,6 +103,14 @@ function mapComment(id: string, data: Record<string, unknown>): FeedbackComment 
 }
 
 export const FEEDBACK_COMMENT_MAX_LENGTH = 1000;
+
+type SeenDoc = "feedbackSeen" | "feedbackOwnerSeen";
+
+const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
+  ikke_behandlet: "Ikke behandlet",
+  under_behandling: "Under behandling",
+  ferdig_behandlet: "Ferdig",
+};
 
 /**
  * Rekkefølge i lista: ikke behandlet øverst, så under behandling, og ferdig
@@ -182,29 +194,61 @@ export const feedbackApi = {
     );
   },
 
-  /** Tidspunktet brukeren sist så innspillsiden – lagres i brukerens egne innstillinger. */
+  /**
+   * Tidspunktet brukeren sist så innspillsiden – lagres i brukerens egne innstillinger.
+   * Eier har sitt eget tidspunkt («feedbackOwnerSeen») for innspill og kommentarer fra andre.
+   */
   subscribeSeenAt(
     uid: string,
     onData: (seenAtMs: number) => void,
-    onError: (error: unknown) => void
+    onError: (error: unknown) => void,
+    docId: SeenDoc = "feedbackSeen"
   ): () => void {
     return onSnapshot(
-      doc(db, "users", uid, "preferences", "feedbackSeen"),
+      doc(db, "users", uid, "preferences", docId),
       (snap) => onData(toMillis(snap.data()?.seenAt)),
       onError
     );
   },
 
-  async markSeen(uid: string): Promise<void> {
+  async markSeen(uid: string, docId: SeenDoc = "feedbackSeen"): Promise<void> {
     await setDoc(
-      doc(db, "users", uid, "preferences", "feedbackSeen"),
+      doc(db, "users", uid, "preferences", docId),
       { seenAt: serverTimestamp() },
       { merge: true }
     );
   },
 
-  async setStatus(id: string, status: FeedbackStatus): Promise<void> {
+  /**
+   * Eier setter ny status. Endringen skrives også som en hendelse i samtalen, så
+   * avsenderen ser fremdriften med dato («Eier satte status til Under behandling»).
+   */
+  async changeStatus(
+    id: string,
+    status: FeedbackStatus,
+    owner: { uid: string; name: string }
+  ): Promise<void> {
     await updateDoc(doc(db, FEEDBACKS_COLLECTION, id), { status, updatedAt: serverTimestamp() });
+    await addDoc(collection(db, FEEDBACKS_COLLECTION, id, "comments"), {
+      message: `Satte status til ${FEEDBACK_STATUS_LABELS[status]}`,
+      createdByUid: owner.uid,
+      createdByName: owner.name,
+      isOwner: true,
+      kind: "status",
+      status,
+      createdAt: serverTimestamp(),
+    });
+  },
+
+  /** Eier svarer, og setter eventuelt ny status i samme handling. */
+  async ownerReply(
+    id: string,
+    text: string,
+    status: FeedbackStatus | null,
+    owner: { uid: string; name: string }
+  ): Promise<void> {
+    if (text.trim()) await feedbackApi.addComment(id, text, owner, true);
+    if (status) await feedbackApi.changeStatus(id, status, owner);
   },
 
   async setOwnerReply(id: string, ownerReply: string): Promise<void> {
@@ -247,17 +291,25 @@ export const feedbackApi = {
     feedbackId: string,
     message: string,
     author: { uid: string; name: string },
-    asOwner: boolean
+    asOwner: boolean,
+    event?: { status: FeedbackStatus }
   ): Promise<void> {
     await addDoc(collection(db, FEEDBACKS_COLLECTION, feedbackId, "comments"), {
       message: message.trim().slice(0, FEEDBACK_COMMENT_MAX_LENGTH),
       createdByUid: author.uid,
       createdByName: author.name,
       isOwner: asOwner,
+      ...(event ? { kind: "status", status: event.status } : {}),
       createdAt: serverTimestamp(),
     });
     if (asOwner) {
       await updateDoc(doc(db, FEEDBACKS_COLLECTION, feedbackId), { updatedAt: serverTimestamp() });
+    } else {
+      // Gir eier (og avsenderen) varsel om at noen har kommentert.
+      await updateDoc(doc(db, FEEDBACKS_COLLECTION, feedbackId), {
+        lastCommentAt: serverTimestamp(),
+        lastCommentByUid: author.uid,
+      });
     }
   },
 

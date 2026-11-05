@@ -14,7 +14,7 @@ type Props = {
 };
 
 /**
- * Legg ved skjermbilder: lim inn (Ctrl/Cmd+V mens skjemaet er aktivt), dra og slipp
+ * Legg ved skjermbilder: lim inn (Ctrl+V mens skjemaet er aktivt), dra og slipp
  * eller velg fra maskinen. Forhåndsvisning med mulighet for å fjerne før innsending.
  */
 export default function ImagePicker({ files, onChange, onError, disabled }: Props) {
@@ -48,7 +48,7 @@ export default function ImagePicker({ files, onChange, onError, disabled }: Prop
     [files, onChange, onError]
   );
 
-  // Innliming av skjermbilder fra utklippstavlen (Ctrl/Cmd+V) mens siden er åpen.
+  // Innliming av skjermbilder fra utklippstavlen (Ctrl+V) mens siden er åpen.
   // Vanlig tekst limes inn som før – vi griper bare inn når det ligger bilder der.
   React.useEffect(() => {
     if (disabled) return;
@@ -148,7 +148,7 @@ export default function ImagePicker({ files, onChange, onError, disabled }: Prop
             Velg bilde
           </Button>
           <Typography variant="caption" color="text.secondary">
-            Eller lim inn med Ctrl/Cmd + V, eller dra inn hit. Maks {FEEDBACK_MAX_IMAGES} bilder.
+            Eller lim inn med Ctrl + V, eller dra inn hit. Maks {FEEDBACK_MAX_IMAGES} bilder.
           </Typography>
         </Box>
 

@@ -5,9 +5,10 @@ import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuthUser } from "../../../app/auth/useAuthUser";
-import { useFeedbackUpdates } from "../hooks/useFeedbackUpdates";
+import { useFeedbackUpdates, useOwnerFeedbackAlerts } from "../hooks/useFeedbackUpdates";
 
 export const FEEDBACK_ROUTE = "/innspill";
+const OWNER_ROUTE = "/rekspert/feedbacks";
 
 const ACCENT = "#B648E8";
 
@@ -25,22 +26,29 @@ const pulse = keyframes`
 export default function FeedbackLauncher() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuthUser();
+  const { user, isOwner } = useAuthUser();
   const onFeedbackPage = location.pathname === FEEDBACK_ROUTE;
   const { unread: unreadRaw } = useFeedbackUpdates(user?.uid, !onFeedbackPage);
   // Nyeste oppdatering først, så du havner på det som skjedde sist.
   const unread = React.useMemo(
-    () => [...unreadRaw].sort((a, b) => b.updatedAtMs - a.updatedAtMs),
+    () =>
+      [...unreadRaw].sort(
+        (a, b) => Math.max(b.updatedAtMs, b.lastCommentAtMs) - Math.max(a.updatedAtMs, a.lastCommentAtMs)
+      ),
     [unreadRaw]
   );
+  // Eier varsles også om nye innspill og kommentarer fra andre.
+  const { unread: ownerUnread } = useOwnerFeedbackAlerts(user?.uid, isOwner && !onFeedbackPage);
 
   if (onFeedbackPage) return null;
 
-  const unreadCount = unread.length;
+  const unreadCount = unread.length + ownerUnread.length;
   const tooltip =
-    unreadCount > 0
-      ? `${unreadCount === 1 ? "Nytt svar" : `${unreadCount} nye svar`} på innspillene dine. Klikk for å se det.`
-      : "Meld inn feil eller ønske";
+    ownerUnread.length > 0
+      ? `${ownerUnread.length === 1 ? "1 nytt innspill eller kommentar" : `${ownerUnread.length} nye innspill eller kommentarer`}. Klikk for å se det.${unread.length > 0 ? ` I tillegg ${unread.length} nytt på dine egne.` : ""}`
+      : unreadCount > 0
+        ? `${unreadCount === 1 ? "Nytt" : `${unreadCount} nye`} på innspillene dine. Klikk for å se det.`
+        : "Meld inn feil eller ønske";
 
   return (
     <Tooltip title={tooltip} placement="left">
@@ -50,7 +58,13 @@ export default function FeedbackLauncher() {
         aria-label={unreadCount > 0 ? `Gå til innspill, ${unreadCount} nye oppdateringer` : "Gå til innspill"}
         // Har du uleste oppdateringer, går du rett til det innspillet saken gjelder.
         onClick={() =>
-          navigate(unread.length > 0 ? `${FEEDBACK_ROUTE}?innspill=${unread[0].id}` : FEEDBACK_ROUTE)
+          navigate(
+            ownerUnread.length > 0
+              ? `${OWNER_ROUTE}?innspill=${ownerUnread[0].id}`
+              : unread.length > 0
+                ? `${FEEDBACK_ROUTE}?innspill=${unread[0].id}`
+                : FEEDBACK_ROUTE
+          )
         }
         sx={{
           position: "fixed",
@@ -79,7 +93,7 @@ export default function FeedbackLauncher() {
         }}
       >
         <FeedbackRoundedIcon sx={{ fontSize: 18, transform: "rotate(90deg)" }} />
-        {unreadCount > 0 ? "Nytt svar" : "Innspill"}
+        {unreadCount > 0 ? (ownerUnread.length > 0 ? "Nytt" : "Nytt svar") : "Innspill"}
         {unreadCount > 0 && (
           <Box
             component="span"
