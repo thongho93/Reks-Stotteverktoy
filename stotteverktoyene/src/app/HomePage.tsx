@@ -1,68 +1,181 @@
 import { Box, Paper, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { Link as RouterLink } from "react-router-dom";
+import {
+  CalculatorIcon,
+  MessageSquareTextIcon,
+  NAV_COLORS,
+  PackageXIcon,
+  PillIcon,
+  ShieldAlertIcon,
+  SquarePenIcon,
+  WarehouseIcon,
+} from "./navIcons";
+import { logUsage, type UsagePage } from "../shared/services/usage";
+
+type Tool = {
+  label: string;
+  description: string;
+  path: string;
+  usagePage: UsagePage;
+  Icon: React.ElementType;
+  color: string; // samme farger som i sidemenyen (NAV_COLORS)
+};
+
+const TOOLS: Tool[] = [
+  {
+    label: "OMEQ-beregning",
+    description: "Regn om opioider til oral morfinekvivalent og sjekk mot vedtaket.",
+    path: "/omeq",
+    usagePage: "omeq",
+    Icon: CalculatorIcon,
+    color: NAV_COLORS.omeq.strong,
+  },
+  {
+    label: "Lagerbeholdning",
+    description: "Oversikt over lagerbeholdning.",
+    path: "/lagerbeholdning",
+    usagePage: "lagerbeholdning",
+    Icon: WarehouseIcon,
+    color: NAV_COLORS.lager.strong,
+  },
+  {
+    label: "Standardtekster",
+    description: "Søk og bruk ferdige tekster til kundekommunikasjon.",
+    path: "/standardtekster",
+    usagePage: "standardtekster",
+    Icon: MessageSquareTextIcon,
+    color: NAV_COLORS.standardtekster.strong,
+  },
+  {
+    label: "Interaksjonssøk",
+    description: "Sjekk interaksjoner, med standardtekst til kunden.",
+    path: "/interaksjoner",
+    usagePage: "interaksjoner",
+    Icon: ShieldAlertIcon,
+    color: NAV_COLORS.interaksjoner.strong,
+  },
+  {
+    label: "Produkt og råd",
+    description: "Produktinformasjon, faglig innhold og rutiner.",
+    path: "/produkt-og-rad",
+    usagePage: "produktograd",
+    Icon: PillIcon,
+    color: NAV_COLORS.produkt.strong,
+  },
+  {
+    label: "Innkjøp og anbrudd",
+    description: "Registrer anbrudd og send produktskjema til innkjøpsteamet.",
+    path: "/anbrudd",
+    usagePage: "anbrudd",
+    Icon: PackageXIcon,
+    color: NAV_COLORS.anbrudd.strong,
+  },
+  {
+    label: "Notater",
+    description: "Skriv og samle egne notater.",
+    path: "/tilbakemelding",
+    usagePage: "tilbakemelding",
+    Icon: SquarePenIcon,
+    color: NAV_COLORS.notater.strong,
+  },
+];
 
 export default function HomePage() {
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
-      <Paper sx={{ p: 4 }}>
-        <Typography variant="h1" gutterBottom>
-          Velkommen til REKS+ 👋
+    <Box sx={{ maxWidth: 1040, mx: "auto", py: { xs: 2, md: 5 }, px: { xs: 0, md: 2 } }}>
+      <Box sx={{ maxWidth: 680, mb: { xs: 4, md: 6 } }}>
+        <Box
+          component="span"
+          sx={(theme) => ({
+            display: "inline-block",
+            mb: 2,
+            px: 1.5,
+            py: 0.75,
+            borderRadius: 999,
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+            color: theme.palette.mode === "dark" ? theme.palette.primary.main : "#8F3F63",
+            bgcolor: alpha(theme.palette.primary.main, 0.16),
+          })}
+        >
+          Støtteverktøy for Farmasiet
+        </Box>
+
+        <Typography
+          variant="h1"
+          sx={{ fontSize: { xs: "2rem", md: "2.75rem" }, fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, mb: 1.75 }}
+        >
+          Velkommen til REKS+
         </Typography>
 
-        <Typography variant="body1" sx={{ mb: 2 }}>
-          Dette er et internt støtteverktøy for Farmasiet, laget for å gjøre farmasøytisk arbeid
-          raskere, tryggere og mer oversiktlig.
+        <Typography sx={{ fontSize: "1.125rem", lineHeight: 1.55, color: "text.secondary" }}>
+          Verktøy som gjør farmasøytisk arbeid raskere, tryggere og mer oversiktlig. Velg et verktøy
+          for å komme i gang.
         </Typography>
+      </Box>
 
-        <Typography variant="body1" sx={{ mb: 2 }}>
-          I denne appen kan du:
-        </Typography>
-
-        <ul>
-          <li>
-            <Typography variant="body1">Beregne OMEQ (opioid-omregning)</Typography>
-          </li>
-          <li>
-            <Typography variant="body1">
-              Søke og bruke standardtekster til kundekommunikasjon.
-            </Typography>
-          </li>
-          <li>
-            <Typography variant="body1">
-              Gjøre interaksjonssøk, som også inkluderer standardtekst til kunden.
-            </Typography>
-          </li>
-          <li>
-            <Typography variant="body1">Sende produktskjema til innkjøpsteamet</Typography>
-          </li>
-          <li>
-            <Typography variant="body1">Registrere anbrudd (skjema og oversikt)</Typography>
-          </li>
-        </ul>
-
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-          Tilgang og funksjonalitet kan variere basert på brukerrolle.
-        </Typography>
-      </Paper>
       <Box
         sx={{
-          mt: 3,
-          display: "flex",
-          justifyContent: "center",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          gap: 2,
         }}
       >
-        <Box
-          component="img"
-          src="/img/letscook.gif"
-          alt="Let’s cook"
-          loading="lazy"
-          decoding="async"
-          sx={{
-            maxWidth: 420,
-            width: "100%",
-            borderRadius: 2,
-          }}
-        />
+        {TOOLS.map(({ label, description, path, usagePage, Icon, color }) => (
+          <Paper
+            key={path}
+            component={RouterLink}
+            to={path}
+            variant="outlined"
+            onClick={() => logUsage("menu_click", { targetPage: usagePage })}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              p: 2.75,
+              borderRadius: 3,
+              textDecoration: "none",
+              color: "text.primary",
+              transition: "transform .15s ease, box-shadow .15s ease, border-color .15s ease",
+              "&:hover": {
+                transform: "translateY(-2px)",
+                boxShadow: "0 10px 28px rgba(17, 24, 39, 0.08)",
+                borderColor: alpha(color, 0.6),
+              },
+              "&:focus-visible": { outline: "2px solid", outlineColor: "text.primary", outlineOffset: 2 },
+            }}
+          >
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color,
+                bgcolor: alpha(color, 0.14),
+              }}
+            >
+              <Icon sx={{ fontSize: 28 }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: "1.0625rem", fontWeight: 600, letterSpacing: "-0.01em", mb: 0.75 }}>
+                {label}
+              </Typography>
+              <Typography variant="body2" sx={{ lineHeight: 1.5, color: "text.secondary" }}>
+                {description}
+              </Typography>
+            </Box>
+          </Paper>
+        ))}
       </Box>
+
+      <Typography variant="body2" sx={{ color: "text.secondary", mt: 5 }}>
+        Tilgang og funksjonalitet kan variere basert på brukerrolle.
+      </Typography>
     </Box>
   );
 }
