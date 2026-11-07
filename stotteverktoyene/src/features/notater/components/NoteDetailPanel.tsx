@@ -84,10 +84,11 @@ function PanelBody({
   const handleChange = React.useCallback(
     (patch: Partial<NoteDraft>) => {
       // Favoritt og farge kan også endres fra kortet – skriv dem direkte, ikke via utkastet.
-      const { color, isFavorite, reminderAtMs, ...textPatch } = patch;
+      const { color, isFavorite, reminderAtMs, deleteOn, ...textPatch } = patch;
       if (color !== undefined) void onSaveRef.current(noteId, { color });
       if (isFavorite !== undefined) void onSaveRef.current(noteId, { isFavorite });
       if (reminderAtMs !== undefined) void onSaveRef.current(noteId, { reminderAtMs });
+      if (deleteOn !== undefined) void onSaveRef.current(noteId, { deleteOn });
       if (Object.keys(textPatch).length === 0) return;
 
       const next = { ...draftRef.current, ...textPatch };
@@ -112,7 +113,7 @@ function PanelBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedChecklist]);
 
-  const editorDraft: NoteDraft = { ...draft, color: note.color, isFavorite: note.isFavorite, reminderAtMs: note.reminderAtMs };
+  const editorDraft: NoteDraft = { ...draft, color: note.color, isFavorite: note.isFavorite, reminderAtMs: note.reminderAtMs, deleteOn: note.deleteOn };
   const accent = note.color ? NOTE_COLOR_ACCENTS[note.color] : null;
 
   const handleCopy = () => {

@@ -29,6 +29,8 @@ export function useNoteReminders(uid: string | null | undefined) {
           snapshot.docs
             // Ikke varsle om skriving som ennå ikke er bekreftet av serveren (kan bli avvist).
             .filter((d) => !d.metadata.hasPendingWrites)
+            // Slettede notater skal ikke gi varsel.
+            .filter((d) => typeof (d.data() as Record<string, unknown>).deletedAt !== "number")
             .map((d) => {
               const data = d.data() as Record<string, unknown>;
               return {

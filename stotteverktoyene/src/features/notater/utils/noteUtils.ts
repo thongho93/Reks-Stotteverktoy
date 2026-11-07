@@ -125,6 +125,7 @@ export function draftFromNote(note: Note): NoteDraft {
     tags: note.tags,
     isFavorite: note.isFavorite,
     reminderAtMs: note.reminderAtMs,
+    deleteOn: note.deleteOn,
   };
 }
 
@@ -137,6 +138,7 @@ export const EMPTY_DRAFT: NoteDraft = {
   tags: [],
   isFavorite: false,
   reminderAtMs: null,
+  deleteOn: null,
 };
 
 export function normalizeTag(raw: string): string {
@@ -248,21 +250,15 @@ export function formatReminder(reminderAtMs: number, now: number = Date.now()): 
 
 export type ReminderPreset = { label: string; at: number };
 
-/** Hurtigvalg for tidsfrist, alltid i fremtiden. */
+/** Hurtigvalg for tidsfrist: om 1 time, og i morgen kl. 08:00. */
 export function getReminderPresets(now: number = Date.now()): ReminderPreset[] {
-  const base = new Date(now);
-  const at = (daysAhead: number, hour: number, minute = 0) => {
-    const d = new Date(base);
-    d.setDate(d.getDate() + daysAhead);
-    d.setHours(hour, minute, 0, 0);
-    return d.getTime();
-  };
-  const presets: ReminderPreset[] = [{ label: "Om 1 time", at: now + 3_600_000 }];
-  if (at(0, 16) > now + 15 * 60_000) presets.push({ label: "I dag kl. 16:00", at: at(0, 16) });
-  presets.push({ label: "I morgen kl. 08:00", at: at(1, 8) });
-  const daysToMonday = ((8 - base.getDay()) % 7) || 7;
-  presets.push({ label: "Mandag kl. 08:00", at: at(daysToMonday, 8) });
-  return presets;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(8, 0, 0, 0);
+  return [
+    { label: "Om 1 time", at: now + 3_600_000 },
+    { label: "I morgen kl. 08:00", at: tomorrow.getTime() },
+  ];
 }
 
 /** Verdi for <input type="datetime-local"> i lokal tid. */
@@ -276,4 +272,67 @@ export function fromDateTimeLocalValue(value: string): number | null {
   if (!value) return null;
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? ms : null;
+}
+
+// --- Automatisk sletting (kun dato) ------------------------------------------
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** «YYYY-MM-DD» i lokal tid. */
+export function toLocalDateString(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+export function isValidDateString(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+/** Utløpt = datoen er før i dag, altså midnatt etter den valgte datoen er passert. */
+export function isDeleteExpired(deleteOn: string | null, now: number = Date.now()): boolean {
+  return deleteOn !== null && deleteOn < toLocalDateString(now);
+}
+
+/** «Slettes i dag», «Slettes i morgen», «Slettes 12. nov». */
+export function formatDeleteOn(deleteOn: string, now: number = Date.now()): string {
+  const today = toLocalDateString(now);
+  const tomorrow = toLocalDateString(now + 86_400_000);
+  if (deleteOn === today) return "Slettes i dag";
+  if (deleteOn === tomorrow) return "Slettes i morgen";
+  const [y, m, d] = deleteOn.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const sameYear = y === new Date(now).getFullYear();
+  return `Slettes ${date.toLocaleDateString("nb-NO", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) })}`;
+}
+
+export function getDeletePresets(now: number = Date.now()): { label: string; value: string }[] {
+  const inDays = (days: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + days);
+    return toLocalDateString(d.getTime());
+  };
+  const inMonth = new Date(now);
+  inMonth.setMonth(inMonth.getMonth() + 1);
+  return [
+    { label: "Om 1 uke", value: inDays(7) },
+    { label: "Om 1 måned", value: toLocalDateString(inMonth.getTime()) },
+  ];
+}
+
+// --- Slettede notater (papirkurv) ----------------------------------------------
+
+export const TRASH_RETENTION_DAYS = 15;
+export const TRASH_RETENTION_MS = TRASH_RETENTION_DAYS * 86_400_000;
+
+/** Hele dager igjen før et slettet notat fjernes for godt (minst 0). */
+export function trashDaysLeft(deletedAtMs: number, now: number = Date.now()): number {
+  return Math.max(0, Math.ceil((deletedAtMs + TRASH_RETENTION_MS - now) / 86_400_000));
+}
+
+export function formatTrashRemaining(deletedAtMs: number, now: number = Date.now()): string {
+  const days = trashDaysLeft(deletedAtMs, now);
+  if (days <= 0) return "Slettes for godt snart";
+  return days === 1 ? "Slettes for godt i morgen" : `Slettes for godt om ${days} dager`;
 }

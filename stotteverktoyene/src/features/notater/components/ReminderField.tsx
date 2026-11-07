@@ -34,7 +34,8 @@ export function ReminderField({ value, onChange }: ReminderFieldProps) {
   const open = (el: HTMLElement) => {
     const current = Date.now();
     setNow(current);
-    const initial = value ?? getReminderPresets(current).find((p) => p.label.startsWith("I morgen"))?.at ?? current + 3_600_000;
+    // Standard: akkurat nå (dagens dato og klokkeslett), eller gjeldende frist hvis den er satt.
+    const initial = value ?? current;
     setInput(toDateTimeLocalValue(initial));
     setError(null);
     setPermission(getNotificationPermission());

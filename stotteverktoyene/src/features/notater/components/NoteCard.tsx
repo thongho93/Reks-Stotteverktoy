@@ -22,13 +22,14 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import AlarmRoundedIcon from "@mui/icons-material/AlarmRounded";
+import AutoDeleteRoundedIcon from "@mui/icons-material/AutoDeleteRounded";
 import AlarmOffRoundedIcon from "@mui/icons-material/AlarmOffRounded";
 import StarBorderRoundedIcon from "@mui/icons-material/StarBorderRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import VerticalAlignTopRoundedIcon from "@mui/icons-material/VerticalAlignTopRounded";
 import SubjectRoundedIcon from "@mui/icons-material/SubjectRounded";
 import type { Note } from "../types";
-import { NOTE_COLOR_ACCENTS, formatNoteDate, formatReminder, getNotePreviewText, isReminderDue } from "../utils/noteUtils";
+import { NOTE_COLOR_ACCENTS, formatDeleteOn, formatNoteDate, formatReminder, getNotePreviewText, isReminderDue } from "../utils/noteUtils";
 import { ColorPicker } from "./ColorPicker";
 import { Highlight } from "./Highlight";
 import { getHighlightTerms, snippetAround } from "../utils/highlight";
@@ -40,6 +41,7 @@ export type NoteCardActions = {
   onCopy: (id: string, withTitle?: boolean) => void;
   onToggleFavorite: (id: string) => void;
   onClearReminder: (id: string) => void;
+  onClearDeleteOn: (id: string) => void;
   onToggleChecklistItem: (id: string, itemId: string) => void;
   onColor: (id: string, color: string | null) => void;
   onMoveToFront: (id: string) => void;
@@ -349,28 +351,51 @@ function NoteCardImpl({ note, selected, dragging, dragOver, query, canMoveToFron
         </Box>
       )}
 
-      {/* Påminnelse / tidsfrist */}
-      {note.reminderAtMs !== null && (
-        <Box
-          sx={(theme) => {
-            const due = isReminderDue(note.reminderAtMs, now);
-            return {
-              alignSelf: "flex-start",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 0.5,
-              px: 1,
-              py: 0.25,
-              borderRadius: 999,
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              color: due ? "error.main" : "primary.main",
-              bgcolor: alpha(due ? theme.palette.error.main : theme.palette.primary.main, theme.palette.mode === "dark" ? 0.2 : 0.12),
-            };
-          }}
-        >
-          <AlarmRoundedIcon sx={{ fontSize: 14 }} />
-          {isReminderDue(note.reminderAtMs, now) ? `Forfalt · ${formatReminder(note.reminderAtMs, now)}` : formatReminder(note.reminderAtMs, now)}
+      {/* Påminnelse og automatisk sletting */}
+      {(note.reminderAtMs !== null || note.deleteOn !== null) && (
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+          {note.reminderAtMs !== null && (
+          <Box
+            sx={(theme) => {
+              const due = isReminderDue(note.reminderAtMs, now);
+              return {
+                alignSelf: "flex-start",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                px: 1,
+                py: 0.25,
+                borderRadius: 999,
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                color: due ? "error.main" : "primary.main",
+                bgcolor: alpha(due ? theme.palette.error.main : theme.palette.primary.main, theme.palette.mode === "dark" ? 0.2 : 0.12),
+              };
+            }}
+          >
+            <AlarmRoundedIcon sx={{ fontSize: 14 }} />
+            {isReminderDue(note.reminderAtMs, now) ? `Forfalt · ${formatReminder(note.reminderAtMs, now)}` : formatReminder(note.reminderAtMs, now)}
+          </Box>
+          )}
+          {note.deleteOn !== null && (
+            <Box
+              sx={(theme) => ({
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                px: 1,
+                py: 0.25,
+                borderRadius: 999,
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                color: "warning.dark",
+                bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.22 : 0.16),
+              })}
+            >
+              <AutoDeleteRoundedIcon sx={{ fontSize: 14 }} />
+              {formatDeleteOn(note.deleteOn, now)}
+            </Box>
+          )}
         </Box>
       )}
 
@@ -511,6 +536,17 @@ function NoteCardImpl({ note, selected, dragging, dragOver, query, canMoveToFron
           >
             <ListItemIcon><AlarmOffRoundedIcon fontSize="small" /></ListItemIcon>
             <ListItemText>{isReminderDue(note.reminderAtMs, now) ? "Marker påminnelse som ferdig" : "Fjern påminnelse"}</ListItemText>
+          </MenuItem>
+        )}
+        {note.deleteOn !== null && (
+          <MenuItem
+            onClick={() => {
+              closeMenu();
+              actions.onClearDeleteOn(note.id);
+            }}
+          >
+            <ListItemIcon><AutoDeleteRoundedIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Fjern automatisk sletting</ListItemText>
           </MenuItem>
         )}
         <MenuItem

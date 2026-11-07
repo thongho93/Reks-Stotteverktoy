@@ -36,6 +36,7 @@ import {
   stripHtml,
 } from "../utils/noteUtils";
 import { ColorPicker } from "./ColorPicker";
+import { AutoDeleteField } from "./AutoDeleteField";
 import { ReminderField } from "./ReminderField";
 
 type NoteEditorProps = {
@@ -511,7 +512,10 @@ export function NoteEditor({
             }}
           />
         </Box>
-        <ReminderField value={draft.reminderAtMs} onChange={(reminderAtMs) => onChange({ reminderAtMs })} />
+        <Box sx={{ display: "flex", alignItems: "center", columnGap: 3, rowGap: 1.25, flexWrap: "wrap" }}>
+          <ReminderField value={draft.reminderAtMs} onChange={(reminderAtMs) => onChange({ reminderAtMs })} />
+          <AutoDeleteField value={draft.deleteOn} onChange={(deleteOn) => onChange({ deleteOn })} />
+        </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
             Farge

@@ -5,6 +5,7 @@ import AlarmRoundedIcon from "@mui/icons-material/AlarmRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuthUser } from "../../../app/auth/useAuthUser";
+import { useAutoDeleteExpiredNotes } from "../hooks/useAutoDeleteExpiredNotes";
 import { useNoteReminders, type NoteReminder } from "../hooks/useNoteReminders";
 import { formatReminder } from "../utils/noteUtils";
 import { showBrowserNotification } from "../utils/browserNotifications";
@@ -46,6 +47,8 @@ export default function NoteReminderLauncher() {
   const location = useLocation();
   const { user } = useAuthUser();
   const { reminders, due } = useNoteReminders(user?.uid);
+  // Monteres globalt, så den også rydder utløpte notater når du ikke står på notatsiden.
+  useAutoDeleteExpiredNotes(user?.uid);
   const onNotesPage = location.pathname === NOTES_ROUTE;
 
   const openNote = React.useCallback(

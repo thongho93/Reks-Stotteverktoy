@@ -19,12 +19,14 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { useLocation } from "react-router-dom";
 import { AccentSelection } from "../../../styles/AccentSelection";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { NoteCard, type NoteCardActions } from "../components/NoteCard";
 import { NoteDetailPanel } from "../components/NoteDetailPanel";
 import { QuickComposer, type QuickComposerHandle } from "../components/QuickComposer";
+import { TrashList } from "../components/TrashList";
 import { useNotes } from "../hooks/useNotes";
 import type { Note, NotesRouteState } from "../types";
 import { getNoteClipboardText, getNoteClipboardTextWithTitle, matchesSearch } from "../utils/noteUtils";
@@ -140,6 +142,12 @@ function NotesContent() {
   const { user } = useAuthUser();
   const {
     notes,
+    trash,
+    autoDeleted,
+    clearAutoDeleted,
+    restoreFromTrash,
+    deletePermanently,
+    emptyTrash,
     loading,
     saving,
     error,
@@ -161,6 +169,7 @@ function NotesContent() {
   }, []);
   const [query, setQuery] = React.useState("");
   const [onlyFavorites, setOnlyFavorites] = React.useState(false);
+  const [showTrash, setShowTrash] = React.useState(false);
   const [activeTag, setActiveTag] = React.useState<string | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
@@ -202,7 +211,7 @@ function NotesContent() {
   );
   const favorites = React.useMemo(() => filtered.filter((n) => n.isFavorite), [filtered]);
   const others = React.useMemo(() => filtered.filter((n) => !n.isFavorite), [filtered]);
-  const visible = React.useMemo(() => [...favorites, ...others], [favorites, others]);
+  const visible = React.useMemo(() => (showTrash ? [] : [...favorites, ...others]), [favorites, others, showTrash]);
   const visibleRef = React.useRef<Note[]>(visible);
   React.useEffect(() => {
     visibleRef.current = visible;
@@ -226,6 +235,19 @@ function NotesContent() {
     const target = typeof routeState.selectedNoteId === "string" ? routeState.selectedNoteId.trim() : "";
     if (target && notes.some((n) => n.id === target)) setSelectedId(target);
   }, [routeState, location.key, loading, notes]);
+
+  // Notater som ble flyttet til Slettede notater fordi «slett automatisk»-datoen utløp.
+  React.useEffect(() => {
+    if (autoDeleted.length === 0) return;
+    showToast({
+      message:
+        autoDeleted.length === 1
+          ? `«${autoDeleted[0]}» ble slettet automatisk og ligger i Slettede notater`
+          : `${autoDeleted.length} notater ble slettet automatisk og ligger i Slettede notater`,
+      severity: "info",
+    });
+    clearAutoDeleted();
+  }, [autoDeleted, clearAutoDeleted, showToast]);
 
   // --- Handlinger -----------------------------------------------------------
   const copyNote = React.useCallback(
@@ -253,7 +275,7 @@ function NotesContent() {
       const result = await deleteNote(id);
       if (!result) return;
       showToast({
-        message: `«${result.note.title || "Uten tittel"}» er slettet`,
+        message: `«${result.note.title || "Uten tittel"}» er flyttet til Slettede notater`,
         severity: "info",
         actionLabel: "Angre",
         onAction: () => {
@@ -292,6 +314,7 @@ function NotesContent() {
       onCopy: (id, withTitle) => void copyNote(id, withTitle),
       onToggleFavorite: toggleFavorite,
       onClearReminder: (id) => void updateNote(id, { reminderAtMs: null }),
+      onClearDeleteOn: (id) => void updateNote(id, { deleteOn: null }),
       onToggleChecklistItem: toggleChecklistItem,
       onColor: (id, color) => void updateNote(id, { color }),
       onMoveToFront: (id) => void moveNoteToFront(id),
@@ -341,6 +364,7 @@ function NotesContent() {
   );
 
   const clearFilters = () => {
+    setShowTrash(false);
     setQuery("");
     setOnlyFavorites(false);
     setActiveTag(null);
@@ -611,12 +635,15 @@ function NotesContent() {
 
         <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Box sx={{ maxWidth: 520, mx: "auto", mb: 2.5 }}>
+            <Box sx={{ maxWidth: 520, mx: "auto", mb: 2.5, display: showTrash ? "none" : "block" }}>
               <QuickComposer
                 ref={composerRef}
                 tagSuggestions={allTags}
                 initialTags={composerTags}
-                onOpen={() => setSelectedId(null)}
+                onOpen={() => {
+                  setSelectedId(null);
+                  setShowTrash(false);
+                }}
                 onCreate={createNote}
                 onCreated={(note) =>
                   showToast({ message: `«${note.title}» er lagret`, severity: "success" })
@@ -625,7 +652,7 @@ function NotesContent() {
             </Box>
 
             {/* Filterlinje */}
-            {!loading && notes.length > 0 && (
+            {!loading && (notes.length > 0 || trash.length > 0) && (
               <Box
                 sx={{
                   display: "flex",
@@ -643,9 +670,9 @@ function NotesContent() {
                   label={`Alle · ${notes.length}`}
                   size="small"
                   clickable
-                  color={!onlyFavorites && !activeTag ? "primary" : "default"}
-                  variant={!onlyFavorites && !activeTag ? "filled" : "outlined"}
-                  onClick={() => { setOnlyFavorites(false); setActiveTag(null); }}
+                  color={!showTrash && !onlyFavorites && !activeTag ? "primary" : "default"}
+                  variant={!showTrash && !onlyFavorites && !activeTag ? "filled" : "outlined"}
+                  onClick={() => { setShowTrash(false); setOnlyFavorites(false); setActiveTag(null); }}
                   sx={{ fontWeight: 600, flexShrink: 0 }}
                 />
                 {favoriteCount > 0 && (
@@ -656,7 +683,7 @@ function NotesContent() {
                     clickable
                     color={onlyFavorites ? "primary" : "default"}
                     variant={onlyFavorites ? "filled" : "outlined"}
-                    onClick={() => setOnlyFavorites((v) => !v)}
+                    onClick={() => { setShowTrash(false); setOnlyFavorites((v) => !v); }}
                     sx={{ fontWeight: 600, flexShrink: 0 }}
                   />
                 )}
@@ -668,11 +695,24 @@ function NotesContent() {
                     clickable
                     color={activeTag === tag ? "primary" : "default"}
                     variant={activeTag === tag ? "filled" : "outlined"}
-                    onClick={() => setActiveTag((current) => (current === tag ? null : tag))}
+                    onClick={() => { setShowTrash(false); setActiveTag((current) => (current === tag ? null : tag)); }}
                     sx={{ fontWeight: 500, flexShrink: 0 }}
                   />
                 ))}
-                {isFiltering && (
+                <Chip
+                  icon={<DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />}
+                  label={`Slettede · ${trash.length}`}
+                  size="small"
+                  clickable
+                  color={showTrash ? "primary" : "default"}
+                  variant={showTrash ? "filled" : "outlined"}
+                  onClick={() => {
+                    setSelectedId(null);
+                    setShowTrash((v) => !v);
+                  }}
+                  sx={{ fontWeight: 600, flexShrink: 0, ml: "auto" }}
+                />
+                {isFiltering && !showTrash && (
                   <Button size="small" onClick={clearFilters} sx={{ textTransform: "none", flexShrink: 0, ml: 0.5 }}>
                     Fjern filter ({filtered.length} av {notes.length})
                   </Button>
@@ -681,7 +721,19 @@ function NotesContent() {
             )}
 
             {/* Innhold */}
-            {loading ? (
+            {showTrash ? (
+              <TrashList
+                notes={trash}
+                now={now}
+                onRestore={(id) => {
+                  void restoreFromTrash(id).then((ok) => {
+                    if (ok) showToast({ message: "Notatet er gjenopprettet", severity: "success" });
+                  });
+                }}
+                onDeleteForever={(id) => void deletePermanently([id])}
+                onEmpty={() => void emptyTrash()}
+              />
+            ) : loading ? (
               <Box sx={GRID_SX} aria-busy="true" aria-label="Laster notater">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} variant="rounded" height={150 + (i % 3) * 20} sx={{ borderRadius: "14px" }} />
