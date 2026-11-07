@@ -8,14 +8,16 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
   InputAdornment,
+  Paper,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { alpha } from "@mui/material/styles";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
-
-import styles from "../../../styles/app.module.css";
 
 import { MedicationInput } from "./MedicationInput";
 import { buildProductIndex, parseMedicationInput } from "../lib/parseMedicationInput";
@@ -34,6 +36,7 @@ interface Props {
   onChange: (next: OMEQRowValue) => void;
   autoFocusMedicationInput?: boolean;
   autoPasteNumericClipboard?: boolean;
+  onRemove?: () => void;
 }
 
 export const OMEQRow = ({
@@ -41,6 +44,7 @@ export const OMEQRow = ({
   onChange,
   autoFocusMedicationInput,
   autoPasteNumericClipboard,
+  onRemove,
 }: Props) => {
   const productIndex = useMemo(() => buildProductIndex(), []);
 
@@ -234,7 +238,9 @@ export const OMEQRow = ({
     }
   }, [parsed.product, result.reason, isPatch, doseOverLimit]);
 
-  const doseHintText = `Skriv antall ${doseUnitNoun} per døgn${dosesInMl ? "" : " (ikke mg)"}.`;
+  // Kort nok til å stå under dosefeltet uten å brytes over mange linjer.
+  const doseHintText = dosesInMl ? "Antall ml, ikke mg" : "Antall stk, ikke mg";
+  const doseMgShortWarning = "Ser ut som mg. Skriv antall stk.";
 
   const mgWarningText = `Det ser ut som du har skrevet mg. Skriv antall ${doseUnitNoun} per døgn.`;
 
@@ -257,234 +263,196 @@ export const OMEQRow = ({
   const doseHelperText = useMemo(() => {
     if (isPatch) return "";
 
-    const raw = value.doseText.trim();
+    // Advarselen blir stående til antallet er rettet; veiledningen vises kun mens feltet er aktivt.
+    if (isBlockedByOverLimit) return doseMgShortWarning;
+    if (isDoseFocused) return doseHintText;
 
-    // Only show helper text when the dose field is active (focused) or the user has typed something.
-    if (!isDoseFocused && !raw) return "";
+    // "Tilsvarer X mg per døgn" vises fast i linjen under raden (hintText).
+    return "";
+  }, [isPatch, doseHintText, doseMgShortWarning, isDoseFocused, isBlockedByOverLimit]);
 
-    // While focused but empty: show a short guidance.
-    if (!raw) return doseHintText;
+  // Faktor vises som dempet tekst under raden i stedet for eget felt.
+  const factorText = useMemo(() => {
+    if (!matchedOpioid) return "";
+    if (matchedOpioid.id === "hydromorfon-parenteral") return "";
+    if (
+      result.reason === "unsupported-ketobemidone" ||
+      result.reason === "unsupported-morphine-drops-or-parenteral"
+    ) {
+      return "";
+    }
+    return String(matchedOpioid.omeqFactor).replace(".", ",");
+  }, [matchedOpioid, result.reason]);
 
-    if (isBlockedByOverLimit) return mgWarningText;
+  const impliedMgText = useMemo(() => {
+    if (isPatch || isBlockedByOverLimit) return "";
+    if (dailyDose == null || strengthMg == null) return "";
+    const total = Math.round((dailyDose * strengthMg + Number.EPSILON) * 100) / 100;
+    if (!Number.isFinite(total)) return "";
+    return `tilsvarer ${String(total).replace(".", ",")} mg per døgn`;
+  }, [isPatch, isBlockedByOverLimit, dailyDose, strengthMg]);
 
-    // When user has typed a value but we can't compute mg yet.
-    if (dailyDose == null || strengthMg == null) return doseHintText;
-    const impliedTotalMg = dailyDose * strengthMg;
-    const roundedTotal = Math.round((impliedTotalMg + Number.EPSILON) * 100) / 100;
-    const substance = substanceText || "virkestoff";
-
-    if (!Number.isFinite(roundedTotal)) return doseHintText;
-
-    return `Tilsvarer ${roundedTotal} mg ${substance} per døgn.`;
-  }, [
-    isPatch,
-    doseHintText,
-    mgWarningText,
-    value.doseText,
-    isDoseFocused,
-    dailyDose,
-    strengthMg,
-    substanceText,
-    isBlockedByOverLimit,
-  ]);
+  const hintText = useMemo(
+    () =>
+      [substanceText, factorText ? `faktor ${factorText}` : "", impliedMgText]
+        .filter(Boolean)
+        .join(" · "),
+    [substanceText, factorText, impliedMgText],
+  );
 
   return (
-    <Box className={styles.omeqRow}>
-      <Box sx={{ width: "100%" }}>
-        <MedicationInput
-          value={value.medicationText}
-          onChange={(text) => onChange({ ...value, medicationText: text })}
-          autoFocus={autoFocusMedicationInput}
-          autoPasteNumericClipboard={autoPasteNumericClipboard}
-          onAutoPastedVnr={requestDoseFocusFromAutoVnr}
-        />
-      </Box>
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 3,
+        borderRadius: "14px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 2.5,
+      }}
+    >
+      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 2.5 }}>
+        <Box sx={{ flex: "1 1 260px", minWidth: 0 }}>
+          <MedicationInput
+            value={value.medicationText}
+            onChange={(text) => onChange({ ...value, medicationText: text })}
+            autoFocus={autoFocusMedicationInput}
+            autoPasteNumericClipboard={autoPasteNumericClipboard}
+            onAutoPastedVnr={requestDoseFocusFromAutoVnr}
+          />
+        </Box>
 
-      <Box className={styles.ratioBox}>
-        <TextField
-          value={
-            matchedOpioid &&
-            matchedOpioid.id !== "hydromorfon-parenteral" &&
-            result.reason !== "unsupported-ketobemidone" &&
-            result.reason !== "unsupported-morphine-drops-or-parenteral"
-              ? String(matchedOpioid.omeqFactor)
-              : ""
-          }
-          label="Faktor"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          InputProps={{ readOnly: true }}
-          fullWidth
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              "& fieldset": {
-                borderColor: "primary.main",
-                height: "125%",
-              },
-              "&:hover fieldset": {
-                borderColor: "primary.main",
-              },
-              "&.Mui-focused fieldset": {
-                borderColor: "primary.main",
-              },
-              "& .MuiOutlinedInput-input": {
-                textAlign: "center",
-              },
-            },
-          }}
-        />
-      </Box>
-
-      {isPatch ? (
-        <Box sx={{ width: "100%" }} aria-hidden />
-      ) : (
-        <Tooltip
-          title={doseHelperText}
-          open={!!doseHelperText && isDoseFocused}
-          placement="top-start"
-          arrow
-          PopperProps={{
-            modifiers: [
-              {
-                name: "offset",
-                options: { offset: [0, 8] },
-              },
-            ],
-          }}
-          componentsProps={{
-            tooltip: {
-              sx: (theme) => ({
-                backgroundColor:
-                  theme.palette.mode === "dark"
-                    ? "rgba(230, 237, 250, 0.95)"
-                    : "rgba(97, 97, 97, 1)",
-                color: theme.palette.mode === "dark" ? "#0f1622" : "#fff",
-              }),
-            },
-            arrow: {
-              sx: (theme) => ({
-                color:
-                  theme.palette.mode === "dark"
-                    ? "rgba(230, 237, 250, 0.95)"
-                    : "rgba(97, 97, 97, 1)",
-              }),
-            },
-          }}
-          disableFocusListener
-          disableHoverListener
-          disableTouchListener
-        >
-          <Box sx={{ width: "100%" }}>
-            <TextField
-              label={dosesInMl ? "Antall ml per døgn" : "Antall per døgn"}
-              inputRef={doseInputRef}
-              value={value.doseText}
-              onChange={(e) => {
-                onChange({ ...value, doseText: e.target.value, confirmedHighDose: false });
-              }}
-              inputProps={{
-                inputMode: "decimal",
-                "aria-label": "Antall per døgn",
-                style: { textAlign: "center" },
-              }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              error={doseLooksLikeMg}
-              // Keep helperText empty to avoid truncation; tooltip shows the full guidance when active.
-              helperText={""}
-              onFocus={() => setIsDoseFocused(true)}
-              onBlur={() => {
-                setIsDoseFocused(false);
-                if (isBlockedByOverLimit) setShowOverLimitDialog(true);
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      {doseLooksLikeMg && (
-                        <Tooltip title={mgWarningText} placement="top" arrow>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              color: "warning.main",
-                              cursor: "help",
-                            }}
-                          >
-                            <WarningAmberOutlinedIcon fontSize="small" />
-                          </Box>
-                        </Tooltip>
-                      )}
-                      <Box component="span" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
-                        {dosesInMl ? "ml/døgn" : "stk/døgn"}
+        {!isPatch && (
+          <Box sx={{ flex: "0 0 140px" }}>
+              <TextField
+                label={dosesInMl ? "Antall ml per døgn" : "Antall per døgn"}
+                inputRef={doseInputRef}
+                value={value.doseText}
+                onChange={(e) => {
+                  onChange({ ...value, doseText: e.target.value, confirmedHighDose: false });
+                }}
+                inputProps={{
+                  inputMode: "decimal",
+                  "aria-label": "Antall per døgn",
+                  style: { textAlign: "center", fontWeight: 600 },
+                }}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                error={doseLooksLikeMg}
+                // Veiledningen står rett under feltet (ikke som svevende tooltip), så det
+                // er tydelig at den hører til dette feltet.
+                helperText={doseHelperText || undefined}
+                FormHelperTextProps={{ sx: { mx: 0.5, mt: 0.5, lineHeight: 1.35 } }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    height: 48,
+                    "&:hover fieldset, &.Mui-focused fieldset": {
+                      borderColor: doseLooksLikeMg ? "error.main" : "primary.main",
+                    },
+                  },
+                }}
+                onFocus={() => setIsDoseFocused(true)}
+                onBlur={() => {
+                  setIsDoseFocused(false);
+                  if (isBlockedByOverLimit) setShowOverLimitDialog(true);
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        {doseLooksLikeMg && (
+                          <Tooltip title={mgWarningText} placement="top" arrow>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                color: "warning.main",
+                                cursor: "help",
+                              }}
+                            >
+                              <WarningAmberOutlinedIcon fontSize="small" />
+                            </Box>
+                          </Tooltip>
+                        )}
+                        <Box
+                          component="span"
+                          sx={{ color: "text.secondary", whiteSpace: "nowrap", fontSize: "0.8125rem" }}
+                        >
+                          {dosesInMl ? "ml/døgn" : "stk/døgn"}
+                        </Box>
                       </Box>
-                    </Box>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  "& fieldset": {
-                    borderColor: "primary.main",
-                    height: "125%",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "primary.main",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "primary.main",
-                  },
-                  "& .MuiOutlinedInput-input": {
-                    paddingRight: "6px",
-                    textAlign: "center",
-                  },
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+        )}
+
+        <Box sx={{ flex: "0 0 120px" }}>
+          <TextField
+            label="OMEQ"
+            value={omeqText ? omeqText.replace(".", ",") : ""}
+            placeholder="–"
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            InputProps={{ readOnly: true }}
+            inputProps={{
+              "aria-live": "polite",
+              tabIndex: -1,
+              style: { textAlign: "center", fontWeight: 700, fontSize: "1.125rem" },
+            }}
+            sx={(theme) => ({
+              "& .MuiOutlinedInput-root": {
+                height: 48,
+                backgroundColor: alpha(theme.palette.primary.main, 0.06),
+                cursor: "default",
+                "& fieldset, &:hover fieldset, &.Mui-focused fieldset": {
+                  borderColor: theme.palette.divider,
                 },
-              }}
-            />
-          </Box>
-        </Tooltip>
-      )}
+              },
+            })}
+          />
+        </Box>
 
-      <TextField
-        label="OMEQ"
-        value={omeqText}
-        size="small"
-        InputLabelProps={{ shrink: true }}
-        InputProps={{ readOnly: true }}
-        fullWidth
-        sx={{
-          "& .MuiOutlinedInput-root": {
-            "& fieldset": {
-              borderColor: "primary.main",
-              height: "125%",
-            },
-            "&:hover fieldset": {
-              borderColor: "primary.main",
-            },
-            "&.Mui-focused fieldset": {
-              borderColor: "primary.main",
-            },
-            "& .MuiOutlinedInput-input": {
-              textAlign: "center",
-            },
-          },
-        }}
-      />
+        {onRemove && (
+          <Tooltip title="Fjern preparat" placement="top">
+            <IconButton
+              aria-label="Fjern preparat"
+              onClick={onRemove}
+              sx={(theme) => ({
+                mt: "4px",
+                width: 40,
+                height: 40,
+                color: "text.secondary",
+                transition: "color .15s ease, background-color .15s ease",
+                // Rosa/rødlig ved hover for å signalisere at knappen sletter raden.
+                "&:hover, &:focus-visible": {
+                  color: theme.palette.error.main,
+                  backgroundColor: alpha(theme.palette.error.main, 0.1),
+                },
+              })}
+            >
+              <DeleteOutlineIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
 
-      {(!!substanceText || !!infoText) && (
+      {(!!hintText || !!infoText) && (
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
-            gap: 1.5,
-            minWidth: 0,
-            flexWrap: "nowrap",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 1.25,
+            pt: 2,
+            pl: 0.25,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
           }}
         >
-          {!!substanceText && (
-            <Typography variant="overline" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-              Virkestoff: {substanceText}
+          {!!hintText && (
+            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+              {hintText}
             </Typography>
           )}
 
@@ -495,19 +463,19 @@ export const OMEQRow = ({
               sx={{
                 width: "fit-content",
                 maxWidth: "100%",
-                px: 1,
-                py: 0.35,
-                borderRadius: 1.5,
+                px: 1.75,
+                py: 0.75,
+                borderRadius: 2,
                 backgroundColor: (theme) =>
                   theme.palette.mode === "dark"
                     ? "rgba(96, 165, 250, 0.18)"
                     : "rgba(25, 118, 210, 0.08)",
                 color: "text.primary",
-                fontSize: "0.7rem",
+                fontSize: "0.875rem",
+                lineHeight: 1.5,
                 border: "none",
                 display: "inline-flex",
                 alignItems: "center",
-                whiteSpace: "nowrap",
               }}
             >
               {infoText}
@@ -553,6 +521,6 @@ export const OMEQRow = ({
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Paper>
   );
 };
