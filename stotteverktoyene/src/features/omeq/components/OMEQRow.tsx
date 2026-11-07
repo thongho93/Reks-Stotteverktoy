@@ -24,6 +24,7 @@ import { buildProductIndex, parseMedicationInput } from "../lib/parseMedicationI
 import { formToRoute } from "../data/atcProducts";
 import { OPIOIDS } from "../data/opioids";
 import { calculateOMEQ } from "../lib/calc";
+import { isParenteralForm, parenteralDoseUnit } from "../lib/doseUnit";
 
 export interface OMEQRowValue {
   medicationText: string;
@@ -74,6 +75,9 @@ export const OMEQRow = ({
 
   const formLower = parsed.product?.form?.toLowerCase() ?? "";
   const isPatch = formLower === "depotplaster";
+  // Injeksjon/infusjon: brukeren skriver inn legens dosering i µg eller mg (følger styrken),
+  // og beregningen regner µg om til mg.
+  const isParenteral = isParenteralForm(formLower);
   const isLiquidForm =
     formLower.includes("mikstur") || formLower.includes("oral") || formLower.includes("dråpe");
 
@@ -86,6 +90,27 @@ export const OMEQRow = ({
 
   // Hva brukeren skal skrive i dosefeltet.
   const doseUnitNoun = dosesInMl ? "ml" : isLiquidForm ? "endoser" : "tablett/kapsel/dose";
+
+  // Kort enhet som vises i dosefeltet, tilpasset formuleringen:
+  // tbl (alle tabletter), kps (kapsler), ml (mikstur/konsentrasjon), supp (stikkpiller),
+  // dose (dråper, nesespray, endoser og injeksjoner/infusjoner), ellers stk.
+  const doseUnit = (() => {
+    if (isParenteral) return parenteralDoseUnit(parsed.strength);
+    if (formLower.includes("dråpe")) return "dose";
+    if (dosesInMl) return "ml";
+    if (formLower.includes("kapsel")) return "kps";
+    if (formLower.includes("tablett")) return "tbl";
+    if (formLower.includes("stikkpille")) return "supp";
+    if (
+      formLower.includes("nesespray") ||
+      formLower.includes("mikstur") ||
+      formLower.includes("injeks") ||
+      formLower.includes("infus")
+    ) {
+      return "dose";
+    }
+    return "stk";
+  })();
 
   useEffect(() => {
     // When the user selects a valid product (or it becomes uniquely identified),
@@ -138,10 +163,10 @@ export const OMEQRow = ({
   }, [value.doseText]);
 
   const doseOverLimit = useMemo(() => {
-    if (isPatch) return false;
+    if (isPatch || isParenteral) return false;
     if (dailyDose == null) return false;
     return dailyDose > MAX_UNITS_PER_DAY;
-  }, [isPatch, dailyDose]);
+  }, [isPatch, isParenteral, dailyDose]);
 
   const isOverLimitConfirmed = doseOverLimit && !!value.confirmedHighDose;
   const isBlockedByOverLimit = doseOverLimit && !isOverLimitConfirmed;
@@ -187,6 +212,15 @@ export const OMEQRow = ({
       };
     }
 
+    // Parenteral: kalkulatoren trenger kun enheten (µg eller mg) for å regne dosen om til mg.
+    if (isParenteral) {
+      return {
+        value: parsed.strength.value,
+        unit: parenteralDoseUnit(parsed.strength),
+        perHour: parsed.strength.perHour,
+      };
+    }
+
     if (strengthMg == null) return null;
 
     // For tablets/capsules etc. ensure calculator receives mg
@@ -195,7 +229,7 @@ export const OMEQRow = ({
       unit: "mg",
       perHour: parsed.strength.perHour,
     };
-  }, [parsed.strength, strengthMg, isPatch]);
+  }, [parsed.strength, strengthMg, isPatch, isParenteral]);
 
   const result = useMemo(() => {
     return calculateOMEQ({
@@ -239,8 +273,10 @@ export const OMEQRow = ({
   }, [parsed.product, result.reason, isPatch, doseOverLimit]);
 
   // Kort nok til å stå under dosefeltet uten å brytes over mange linjer.
-  const doseHintText = dosesInMl ? "Antall ml, ikke mg" : "Antall stk, ikke mg";
-  const doseMgShortWarning = "Ser ut som mg. Skriv antall stk.";
+  const doseHintText = isParenteral
+    ? `Dosering i ${doseUnit} per døgn`
+    : `Antall ${doseUnit}, ikke mg`;
+  const doseMgShortWarning = `Ser ut som mg. Skriv antall ${doseUnit}.`;
 
   const mgWarningText = `Det ser ut som du har skrevet mg. Skriv antall ${doseUnitNoun} per døgn.`;
 
@@ -286,11 +322,17 @@ export const OMEQRow = ({
 
   const impliedMgText = useMemo(() => {
     if (isPatch || isBlockedByOverLimit) return "";
+    if (isParenteral) {
+      // Dosen er allerede i mg eller µg; vis kun omregningen når den oppgis i µg.
+      if (dailyDose == null || doseUnit !== "µg") return "";
+      const mg = Math.round((dailyDose / 1000 + Number.EPSILON) * 10000) / 10000;
+      return `tilsvarer ${String(mg).replace(".", ",")} mg per døgn`;
+    }
     if (dailyDose == null || strengthMg == null) return "";
     const total = Math.round((dailyDose * strengthMg + Number.EPSILON) * 100) / 100;
     if (!Number.isFinite(total)) return "";
     return `tilsvarer ${String(total).replace(".", ",")} mg per døgn`;
-  }, [isPatch, isBlockedByOverLimit, dailyDose, strengthMg]);
+  }, [isPatch, isParenteral, doseUnit, isBlockedByOverLimit, dailyDose, strengthMg]);
 
   const hintText = useMemo(
     () =>
@@ -325,7 +367,7 @@ export const OMEQRow = ({
         {!isPatch && (
           <Box sx={{ flex: "0 0 140px" }}>
               <TextField
-                label={dosesInMl ? "Antall ml per døgn" : "Antall per døgn"}
+                label="Antall per døgn"
                 inputRef={doseInputRef}
                 value={value.doseText}
                 onChange={(e) => {
@@ -378,7 +420,7 @@ export const OMEQRow = ({
                           component="span"
                           sx={{ color: "text.secondary", whiteSpace: "nowrap", fontSize: "0.8125rem" }}
                         >
-                          {dosesInMl ? "ml/døgn" : "stk/døgn"}
+                          {doseUnit}/døgn
                         </Box>
                       </Box>
                     </InputAdornment>
@@ -498,7 +540,7 @@ export const OMEQRow = ({
         <DialogTitle id="over-limit-dialog-title">Høyt antall registrert</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Du har lagt inn <strong>{dailyDose} {dosesInMl ? "ml" : "stk"}/døgn</strong>.{" "}
+            Du har lagt inn <strong>{dailyDose} {doseUnit}/døgn</strong>.{" "}
             {`Det ser ut som du har skrevet mg. Skriv antall ${doseUnitNoun} per døgn, ikke mg.`}
             <br />
             <br />
@@ -517,7 +559,7 @@ export const OMEQRow = ({
             color="primary"
             variant="contained"
           >
-            Bekreft {dailyDose} {dosesInMl ? "ml" : "stk"}/døgn
+            Bekreft {dailyDose} {doseUnit}/døgn
           </Button>
         </DialogActions>
       </Dialog>
