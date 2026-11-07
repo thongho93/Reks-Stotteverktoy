@@ -668,6 +668,13 @@ export const ATC_PRODUCTS: Partial<Record<ATCcode, ATCProduct[]>> = {
       variants: [{ strength: "10 mg/ml", productNumbers: [171174] }],
     },
     {
+      name: "Morfin SA",
+      manufacturer: "Sykehusapoteket Oslo, Ullevål",
+      form: "stikkpille",
+      strengths: ["10 mg"],
+      variants: [{ strength: "10 mg", productNumbers: [310907] }],
+    },
+    {
       name: "Morfin Epidural",
       manufacturer: "Orifarm Healthcare",
       form: "infusjons-/injeksjonsvæske",
