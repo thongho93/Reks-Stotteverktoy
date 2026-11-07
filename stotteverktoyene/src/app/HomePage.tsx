@@ -66,8 +66,8 @@ const TOOLS: Tool[] = [
     color: "#FFA726",
   },
   {
-    label: "Notater og innspill",
-    description: "Skriv egne notater, eller send oss et forslag til forbedring.",
+    label: "Notater",
+    description: "Skriv og samle egne notater.",
     path: "/tilbakemelding",
     usagePage: "tilbakemelding",
     Icon: InnspillIcon,
