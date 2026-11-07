@@ -1497,7 +1497,7 @@ export default function ProduktOgRadPage() {
         </Box>
       ) : activeTab === 2 ? (
         <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 1, md: 1.5 }, py: 0.75 }}>
-          <TilbakemeldingPage variant="rutinerOnly" />
+          <TilbakemeldingPage />
         </Box>
       ) : (
         <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 1, md: 1.5 }, py: 0.75 }}>

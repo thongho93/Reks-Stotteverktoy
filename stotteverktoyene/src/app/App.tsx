@@ -62,8 +62,8 @@ const ProfilePage = React.lazy(() =>
 );
 const StatistikkPage = React.lazy(() => import("../features/statistikk/pages/StatistikkPage"));
 const AndbruddPage = React.lazy(() => import("../features/anbrudd/andbruddPage"));
-const TilbakemeldingPage = React.lazy(
-  () => import("../features/tilbakemelding/pages/TilbakemeldingPage")
+const NotesPage = React.lazy(
+  () => import("../features/notater/pages/NotesPage")
 );
 const RekspertPage = React.lazy(() => import("../features/rekspert/RekspertPage"));
 const StandardtekstStatistikkPage = React.lazy(
@@ -73,6 +73,9 @@ const FeedbackPage = React.lazy(() => import("../features/feedback/pages/Feedbac
 const InnspillPage = React.lazy(() => import("../features/feedback/pages/InnspillPage"));
 const FeedbackLauncher = React.lazy(
   () => import("../features/feedback/components/FeedbackLauncher")
+);
+const NoteReminderLauncher = React.lazy(
+  () => import("../features/notater/components/NoteReminderLauncher")
 );
 const LoginPage = React.lazy(() =>
   import("./auth/LoginPage").then((module) => ({ default: module.LoginPage }))
@@ -679,6 +682,7 @@ function Layout() {
         <GlobalSearch open={searchOpen} onClose={closeSearch} />
         <Suspense fallback={null}>
           <FeedbackLauncher />
+          <NoteReminderLauncher />
         </Suspense>
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
         <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -703,7 +707,7 @@ function Layout() {
                 <Route path="/statistikk" element={<StatistikkPage />} />
                 <Route path="/produktskjema" element={<Navigate to="/anbrudd" replace />} />
                 <Route path="/anbrudd" element={null} />
-                <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
+                <Route path="/tilbakemelding" element={<NotesPage />} />
                 <Route path="/innspill" element={<InnspillPage />} />
                 <Route element={<RequireRekspert />}>
                   <Route path="/rekspert" element={<RekspertPage />} />

@@ -100,6 +100,21 @@ service cloud.firestore {
         && (
           !("isFavorite" in request.resource.data)
           || request.resource.data.isFavorite is bool
+        )
+        && (
+          !("reminderAt" in request.resource.data)
+          || request.resource.data.reminderAt == null
+          || request.resource.data.reminderAt is number
+        )
+        && (
+          !("deleteOn" in request.resource.data)
+          || request.resource.data.deleteOn == null
+          || (request.resource.data.deleteOn is string && request.resource.data.deleteOn.size() == 10)
+        )
+        && (
+          !("deletedAt" in request.resource.data)
+          || request.resource.data.deletedAt == null
+          || request.resource.data.deletedAt is number
         );
     }
 
@@ -317,6 +332,9 @@ service cloud.firestore {
             "color",
             "tags",
             "isFavorite",
+            "reminderAt",
+            "deleteOn",
+            "deletedAt",
             "createdAt",
             "updatedAt"
           ])
@@ -332,6 +350,9 @@ service cloud.firestore {
             "color",
             "tags",
             "isFavorite",
+            "reminderAt",
+            "deleteOn",
+            "deletedAt",
             "createdAt",
             "updatedAt"
           ])
@@ -345,6 +366,9 @@ service cloud.firestore {
             "color",
             "tags",
             "isFavorite",
+            "reminderAt",
+            "deleteOn",
+            "deletedAt",
             "updatedAt"
           ]);
 
