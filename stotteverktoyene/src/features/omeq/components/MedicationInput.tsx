@@ -421,6 +421,9 @@ export const MedicationInput = ({
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
+                // Samme høyde som dose- og OMEQ-feltet i raden
+                height: 48,
+                alignItems: "center",
                 "& fieldset": {
                   borderColor: "primary.main",
                 },
