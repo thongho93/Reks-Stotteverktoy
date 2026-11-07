@@ -116,10 +116,6 @@ export default function HomePage() {
         </Typography>
       </Box>
 
-      <Typography component="h2" variant="body2" sx={{ fontWeight: 600, color: "text.secondary", mb: 2 }}>
-        Verktøy
-      </Typography>
-
       <Box
         sx={{
           display: "grid",
