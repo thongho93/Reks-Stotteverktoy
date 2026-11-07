@@ -356,6 +356,13 @@ export default function OMEQPage() {
   );
   const vedtakIsOk = useMemo(() => hasVedtak && totalOmeq <= vedtakNum, [hasVedtak, totalOmeq, vedtakNum]);
 
+  // Helfo tillater at vedtaket rundes opp til nærmeste hele tall: vedtak 25 og beregnet 25,1–25,9
+  // godkjennes (vedtaket rundes opp til 26). Beregnet 26 mot vedtak 25 godkjennes ikke.
+  const vedtakWithinTolerance =
+    hasVedtak && totalOmeq > vedtakNum && Math.floor(totalOmeq) <= vedtakNum;
+  const roundedVedtak = vedtakWithinTolerance ? Math.ceil(totalOmeq) : null;
+  const vedtakCovers = vedtakIsOk || vedtakWithinTolerance;
+
   const copyVedtakSummary = useCallback(async (text: string) => {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -388,13 +395,14 @@ export default function OMEQPage() {
   const vedtakSummaryText = useMemo(
     () =>
       `Total beregnet omeq: ${totalOmeqText} mg\nVedtaket dekker: ${debouncedVedtakOmeq} mg` +
+      (roundedVedtak != null ? ` (rundet opp til ${roundedVedtak} mg)` : "") +
       "\nOppgitt lege er kundens fastlege eller jobber ved fastlegens kontor.",
-    [totalOmeqText, debouncedVedtakOmeq],
+    [totalOmeqText, debouncedVedtakOmeq, roundedVedtak],
   );
 
   // Kan kopieres (automatisk og manuelt) når alt er utfylt: Total OMEQ > 0,
   // vedtaket dekker, og fastlege-boksen er avhaket.
-  const canCopyVedtakSummary = totalOmeq > 0 && vedtakIsOk && erFastlege;
+  const canCopyVedtakSummary = totalOmeq > 0 && vedtakCovers && erFastlege;
 
   useEffect(() => {
     // Auto-kopier kun når alt er utfylt. Uten avhaking skjer ingen auto-kopi.
@@ -422,7 +430,7 @@ export default function OMEQPage() {
   }, [copyVedtakSummary, vedtakSummaryText]);
 
   const canOpenOmeqStandardtekst =
-    selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakIsOk;
+    selectedPreparats.length > 0 && totalOmeq > 0 && hasVedtak && !vedtakCovers;
 
   const openOmeqStandardtekst = useCallback(() => {
     if (!canOpenOmeqStandardtekst) return;
@@ -882,12 +890,19 @@ export default function OMEQPage() {
 
           {/* Status: kun én av tre vises */}
 
-          {showStatus && vedtakIsOk && (
+          {showStatus && vedtakCovers && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75 }}>
-              <Alert severity="success">
-                <AlertTitle sx={{ mb: 0 }}>Vedtaket dekker</AlertTitle>
-                {marginText} mg margin
-              </Alert>
+              {vedtakWithinTolerance ? (
+                <Alert severity="warning">
+                  <AlertTitle sx={{ mb: 0 }}>Vedtaket dekker etter avrunding</AlertTitle>
+                  {marginText} mg over. Helfo tillater at vedtaket rundes opp til hele tall ({roundedVedtak} mg).
+                </Alert>
+              ) : (
+                <Alert severity="success">
+                  <AlertTitle sx={{ mb: 0 }}>Vedtaket dekker</AlertTitle>
+                  {marginText} mg margin
+                </Alert>
+              )}
 
               <FormControlLabel
                 sx={{ m: 0, alignItems: "flex-start" }}
@@ -930,7 +945,7 @@ export default function OMEQPage() {
             </Box>
           )}
 
-          {showStatus && !vedtakIsOk && (
+          {showStatus && !vedtakCovers && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75 }}>
               <Alert severity="error">
                 <AlertTitle sx={{ mb: 0 }}>Over vedtaket</AlertTitle>
