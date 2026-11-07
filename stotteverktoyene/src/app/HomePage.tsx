@@ -1,10 +1,16 @@
 import { Box, Paper, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import CalculateIcon from "@mui/icons-material/Calculate";
-import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
-import Inventory2Icon from "@mui/icons-material/Inventory2";
 import { Link as RouterLink } from "react-router-dom";
-import { InnkjopIcon, InnspillIcon, ProduktOgRadIcon, StandardteksterIcon } from "./navIcons";
+import {
+  CalculatorIcon,
+  MessageSquareTextIcon,
+  NAV_COLORS,
+  PackageXIcon,
+  PillIcon,
+  ShieldAlertIcon,
+  SquarePenIcon,
+  WarehouseIcon,
+} from "./navIcons";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 
 type Tool = {
@@ -13,7 +19,7 @@ type Tool = {
   path: string;
   usagePage: UsagePage;
   Icon: React.ElementType;
-  color: string; // samme farger som i sidemenyen
+  color: string; // samme farger som i sidemenyen (NAV_COLORS)
 };
 
 const TOOLS: Tool[] = [
@@ -22,56 +28,56 @@ const TOOLS: Tool[] = [
     description: "Regn om opioider til oral morfinekvivalent og sjekk mot vedtaket.",
     path: "/omeq",
     usagePage: "omeq",
-    Icon: CalculateIcon,
-    color: "#29A1FF",
+    Icon: CalculatorIcon,
+    color: NAV_COLORS.omeq.strong,
   },
   {
     label: "Lagerbeholdning",
     description: "Oversikt over lagerbeholdning.",
     path: "/lagerbeholdning",
     usagePage: "lagerbeholdning",
-    Icon: Inventory2Icon,
-    color: "#0E9F8E",
+    Icon: WarehouseIcon,
+    color: NAV_COLORS.lager.strong,
   },
   {
     label: "Standardtekster",
     description: "Søk og bruk ferdige tekster til kundekommunikasjon.",
     path: "/standardtekster",
     usagePage: "standardtekster",
-    Icon: StandardteksterIcon,
-    color: "#4BC76A",
+    Icon: MessageSquareTextIcon,
+    color: NAV_COLORS.standardtekster.strong,
   },
   {
     label: "Interaksjonssøk",
     description: "Sjekk interaksjoner, med standardtekst til kunden.",
     path: "/interaksjoner",
     usagePage: "interaksjoner",
-    Icon: CompareArrowsIcon,
-    color: "#FF5E5B",
+    Icon: ShieldAlertIcon,
+    color: NAV_COLORS.interaksjoner.strong,
   },
   {
     label: "Produkt og råd",
     description: "Produktinformasjon, faglig innhold og rutiner.",
     path: "/produkt-og-rad",
     usagePage: "produktograd",
-    Icon: ProduktOgRadIcon,
-    color: "#C93586",
+    Icon: PillIcon,
+    color: NAV_COLORS.produkt.strong,
   },
   {
     label: "Innkjøp og anbrudd",
     description: "Registrer anbrudd og send produktskjema til innkjøpsteamet.",
     path: "/anbrudd",
     usagePage: "anbrudd",
-    Icon: InnkjopIcon,
-    color: "#FFA726",
+    Icon: PackageXIcon,
+    color: NAV_COLORS.anbrudd.strong,
   },
   {
     label: "Notater",
     description: "Skriv og samle egne notater.",
     path: "/tilbakemelding",
     usagePage: "tilbakemelding",
-    Icon: InnspillIcon,
-    color: "#B648E8",
+    Icon: SquarePenIcon,
+    color: NAV_COLORS.notater.strong,
   },
 ];
 

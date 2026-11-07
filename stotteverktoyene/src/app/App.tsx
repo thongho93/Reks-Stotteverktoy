@@ -6,27 +6,13 @@ import {
   Divider,
   Drawer,
   IconButton,
-  List,
   ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Toolbar,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, type Theme } from "@mui/material/styles";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AppUpdater from "./AppUpdater";
-import CalculateIcon from "@mui/icons-material/Calculate";
-import Inventory2Icon from "@mui/icons-material/Inventory2";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ConstructionIcon from "@mui/icons-material/Construction";
-import LeaderboardRoundedIcon from "@mui/icons-material/LeaderboardRounded";
-import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
@@ -36,16 +22,26 @@ import RequireRekspert from "./auth/RequireRekspert";
 import RequireAdmin from "./auth/RequireAdmin";
 import RequireOwner from "./auth/RequireOwner";
 import { ProfileMenu } from "./auth/ProfileMenu";
-import { InnkjopIcon, InnspillIcon, ProduktOgRadIcon, StandardteksterIcon } from "./navIcons";
+import {
+  CalculatorIcon,
+  ChartColumnIcon,
+  ChevronDownIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  ChevronUpIcon,
+  InboxIcon,
+  MessageSquareTextIcon,
+  NAV_COLORS,
+  PackageXIcon,
+  PillIcon,
+  ShieldAlertIcon,
+  SquarePenIcon,
+  WarehouseIcon,
+  WrenchIcon,
+} from "./navIcons";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
 import { NavigationGuardProvider, useGuardedNavigate } from "../shared/hooks/useNavigationGuard";
 
-
-function getIconFontSize(Icon: React.ElementType, collapsed: boolean): number {
-  if (Icon === InnspillIcon) return collapsed ? 34 : 29;
-  if (Icon === CalculateIcon) return collapsed ? 42 : 35;
-  return collapsed ? 38 : 32;
-}
 
 const HomePage = React.lazy(() => import("./HomePage"));
 const OMEQPage = React.lazy(() => import("../features/omeq/pages/OMEQPage"));
@@ -97,12 +93,50 @@ function getIsoWeekNumber(date: Date): number {
   return Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
+type SidebarSubItem = { label: string; search: string };
+
 type SidebarItem = {
   label: string;
   path: string;
   Icon: React.ElementType;
-  color: string;
+  color: string; // toning av flis og hover
+  strong: string; // fylt flis (valgt side) og ikonfarge i lys modus
+  subItems?: SidebarSubItem[];
 };
+
+const MAIN_ITEMS: SidebarItem[] = [
+  { label: "OMEQ-beregning", path: "/omeq", Icon: CalculatorIcon, ...NAV_COLORS.omeq },
+  { label: "Lagerbeholdning", path: "/lagerbeholdning", Icon: WarehouseIcon, ...NAV_COLORS.lager },
+  {
+    label: "Standardtekster",
+    path: "/standardtekster",
+    Icon: MessageSquareTextIcon,
+    ...NAV_COLORS.standardtekster,
+  },
+  { label: "Interaksjonssøk", path: "/interaksjoner", Icon: ShieldAlertIcon, ...NAV_COLORS.interaksjoner },
+  {
+    label: "Produkt og råd",
+    path: "/produkt-og-rad",
+    Icon: PillIcon,
+    ...NAV_COLORS.produkt,
+    subItems: [
+      { label: "Produkt og råd", search: "" },
+      { label: "Faglig innhold", search: "?fagdoc=" },
+      { label: "Rutiner", search: "?tab=rutiner" },
+    ],
+  },
+  {
+    label: "Innkjøp og anbrudd",
+    path: "/anbrudd",
+    Icon: PackageXIcon,
+    ...NAV_COLORS.anbrudd,
+    subItems: [
+      { label: "Anbruddsoversikt", search: "" },
+      { label: "Produktskjema", search: "?tab=produktskjema" },
+    ],
+  },
+  { label: "Notater", path: "/tilbakemelding", Icon: SquarePenIcon, ...NAV_COLORS.notater },
+];
 
 function pathToUsagePage(pathname: string): UsagePage {
   if (pathname === "/") return "home";
@@ -205,102 +239,30 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     return location.pathname === path;
   };
 
-  const isProduktOgRad = location.pathname === "/produkt-og-rad";
-  const [produktOpen, setProduktOpen] = React.useState(isProduktOgRad);
-  React.useEffect(() => { if (isProduktOgRad) setProduktOpen(true); }, [isProduktOgRad]);
-
-  const produktSubItems = [
-    { label: "Produkt og råd", search: "" },
-    { label: "Faglig innhold", search: "?fagdoc=" },
-    { label: "Rutiner", search: "?tab=rutiner" },
-  ];
-
-  const activeSubItem = () => {
+  // Hvilken undermeny som er aktiv, ut fra søkeparametrene i adressen.
+  const activeSubIndex = (path: string): number => {
     const params = new URLSearchParams(location.search);
-    if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) return 2;
-    if (params.has(FAGLIG_DOC_QUERY_KEY)) return 1;
+    if (path === "/produkt-og-rad") {
+      if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) return 2;
+      if (params.has(FAGLIG_DOC_QUERY_KEY)) return 1;
+      return 0;
+    }
+    if (path === "/anbrudd") return params.get("tab") === "produktskjema" ? 1 : 0;
+    if (path === "/tilbakemelding") return params.get("tab") === "meldeskjema" ? 1 : 0;
     return 0;
   };
 
-  const isAnbrudd = location.pathname === "/anbrudd";
-  const [anbruddOpen, setAnbruddOpen] = React.useState(isAnbrudd);
-  React.useEffect(() => { if (isAnbrudd) setAnbruddOpen(true); }, [isAnbrudd]);
-
-  const anbruddSubItems = [
-    { label: "Anbruddsoversikt", search: "" },
-    { label: "Produktskjema", search: "?tab=produktskjema" },
-  ];
-
-  const activeAnbruddSubItem = () => {
-    const params = new URLSearchParams(location.search);
-    return params.get("tab") === "produktskjema" ? 1 : 0;
-  };
+  // Undermenyer åpnes automatisk når man er på siden de hører til.
+  const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>(() => ({
+    [location.pathname]: true,
+  }));
+  React.useEffect(() => {
+    if (MAIN_ITEMS.some((item) => item.subItems && item.path === location.pathname)) {
+      setOpenMenus((open) => ({ ...open, [location.pathname]: true }));
+    }
+  }, [location.pathname]);
 
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
-
-  const navItemButtonSx = (item: SidebarItem) => ({
-    justifyContent: collapsed ? "center" : "flex-start",
-    px: collapsed ? 1 : 2,
-    py: collapsed ? 0.85 : 0.95,
-    minHeight: collapsed ? 58 : 48,
-    borderLeft: "3px solid transparent",
-    transition: "background-color 160ms ease, border-color 160ms ease, transform 120ms ease",
-    "&:hover": {
-      backgroundColor: alpha(item.color, 0.12),
-      borderLeftColor: alpha(item.color, 0.6),
-      transform: collapsed ? "none" : "translateX(1px)",
-    },
-    "&.Mui-selected": {
-      backgroundColor: alpha(item.color, 0.2),
-      borderLeftColor: item.color,
-    },
-    "&.Mui-selected:hover": {
-      backgroundColor: alpha(item.color, 0.24),
-    },
-    "& .MuiListItemIcon-root": {
-      color: item.color,
-    },
-  });
-
-  const mainItems: SidebarItem[] = [
-    { label: "OMEQ-beregning", path: "/omeq", Icon: CalculateIcon, color: "#29A1FF" },
-    {
-      label: "Lagerbeholdning",
-      path: "/lagerbeholdning",
-      Icon: Inventory2Icon,
-      color: "#0E9F8E",
-    },
-    {
-      label: "Standardtekster",
-      path: "/standardtekster",
-      Icon: StandardteksterIcon,
-      color: "#4BC76A",
-    },
-    {
-      label: "Interaksjonssøk",
-      path: "/interaksjoner",
-      Icon: CompareArrowsIcon,
-      color: "#FF5E5B",
-    },
-    {
-      label: "Produkt og råd",
-      path: "/produkt-og-rad",
-      Icon: ProduktOgRadIcon,
-      color: "#C93586",
-    },
-    {
-      label: "Innkjøp og anbrudd",
-      path: "/anbrudd",
-      Icon: InnkjopIcon,
-      color: "#FFA726",
-    },
-    {
-      label: "Notater",
-      path: "/tilbakemelding",
-      Icon: InnspillIcon,
-      color: "#B648E8",
-    },
-  ];
 
   const adminItems: SidebarItem[] = [
     ...(hasRekspertAccess
@@ -308,8 +270,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           {
             label: "Rekspert",
             path: "/rekspert",
-            Icon: ConstructionIcon,
-            color: "#00A3D7",
+            Icon: WrenchIcon,
+            ...NAV_COLORS.rekspert,
           } satisfies SidebarItem,
         ]
       : []),
@@ -318,8 +280,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           {
             label: "Tekststatistikk",
             path: "/rekspert/tekststatistikk",
-            Icon: LeaderboardRoundedIcon,
-            color: "#7C5CFF",
+            Icon: ChartColumnIcon,
+            ...NAV_COLORS.statistikk,
           } satisfies SidebarItem,
         ]
       : []),
@@ -329,12 +291,177 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           {
             label: "Innspill",
             path: "/rekspert/feedbacks",
-            Icon: FeedbackRoundedIcon,
-            color: "#B648E8",
+            Icon: InboxIcon,
+            ...NAV_COLORS.innspill,
           } satisfies SidebarItem,
         ]
       : []),
   ];
+
+  // Ikonfargen: den mørkere varianten i lys modus gir nok kontrast mot hvit bakgrunn.
+  const iconColor = (theme: Theme, item: SidebarItem) =>
+    theme.palette.mode === "dark" ? item.color : item.strong;
+
+  const goTo = (item: SidebarItem) => {
+    logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+    navigate(item.path);
+    if (item.subItems) setOpenMenus((open) => ({ ...open, [item.path]: true }));
+  };
+
+  const renderItem = (item: SidebarItem) => {
+    const selected = isSelected(item.path);
+    const hasSub = Boolean(item.subItems) && !collapsed;
+    const open = hasSub && Boolean(openMenus[item.path]);
+    const ItemIcon = item.Icon;
+
+    return (
+      <Box key={item.path}>
+        <Box sx={{ position: "relative", px: collapsed ? 0 : 1.5, display: "flex", justifyContent: "center" }}>
+          <Tooltip title={collapsed ? item.label : ""} placement="right">
+            <ListItemButton
+              selected={selected}
+              onClick={() => goTo(item)}
+              aria-label={collapsed ? item.label : undefined}
+              aria-current={selected ? "page" : undefined}
+              sx={(theme) =>
+                collapsed
+                  ? {
+                      width: 48,
+                      height: 48,
+                      minHeight: 0,
+                      p: 0,
+                      borderRadius: "14px",
+                      justifyContent: "center",
+                      color: iconColor(theme, item),
+                      transition: "background-color 160ms ease, color 160ms ease",
+                      "&:hover": { backgroundColor: alpha(item.color, 0.14) },
+                      "&.Mui-selected, &.Mui-selected:hover": {
+                        backgroundColor: item.strong,
+                        color: "#FFFFFF",
+                      },
+                    }
+                  : {
+                      flex: 1,
+                      height: 44,
+                      minHeight: 0,
+                      px: 1.25,
+                      pr: hasSub ? 5 : 1.25,
+                      gap: 1.5,
+                      borderRadius: "12px",
+                      transition: "background-color 160ms ease",
+                      "&:hover": { backgroundColor: alpha(item.color, 0.1) },
+                      "&.Mui-selected": { backgroundColor: alpha(item.color, 0.12) },
+                      "&.Mui-selected:hover": { backgroundColor: alpha(item.color, 0.16) },
+                    }
+              }
+            >
+              {collapsed ? (
+                <ItemIcon sx={{ fontSize: 26 }} />
+              ) : (
+                <>
+                  <Box
+                    sx={(theme) => ({
+                      width: 32,
+                      height: 32,
+                      flexShrink: 0,
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: selected ? item.strong : alpha(item.color, 0.16),
+                      color: selected ? "#FFFFFF" : iconColor(theme, item),
+                      transition: "background-color 160ms ease, color 160ms ease",
+                    })}
+                  >
+                    <ItemIcon sx={{ fontSize: 20 }} />
+                  </Box>
+                  <Typography
+                    noWrap
+                    sx={{ fontSize: "0.9rem", fontWeight: selected ? 600 : 500, color: "text.primary" }}
+                  >
+                    {item.label}
+                  </Typography>
+                </>
+              )}
+            </ListItemButton>
+          </Tooltip>
+          {hasSub && (
+            <IconButton
+              size="small"
+              aria-label={open ? "Skjul undermeny" : "Vis undermeny"}
+              aria-expanded={open}
+              onClick={() => setOpenMenus((o) => ({ ...o, [item.path]: !o[item.path] }))}
+              sx={{
+                position: "absolute",
+                right: 20,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "text.secondary",
+              }}
+            >
+              {open ? <ChevronUpIcon sx={{ fontSize: 18 }} /> : <ChevronDownIcon sx={{ fontSize: 18 }} />}
+            </IconButton>
+          )}
+        </Box>
+
+        {hasSub && (
+          <Collapse in={open} timeout="auto" unmountOnExit>
+            <Box
+              sx={{
+                ml: "38px",
+                pl: 1.5,
+                my: 0.25,
+                borderLeft: "1.5px solid",
+                borderColor: "divider",
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.25,
+              }}
+            >
+              {item.subItems?.map((sub, i) => {
+                const subActive = selected && activeSubIndex(item.path) === i;
+                return (
+                  <ListItemButton
+                    key={sub.label}
+                    selected={subActive}
+                    onClick={() => navigate(`${item.path}${sub.search}`)}
+                    sx={(theme) => ({
+                      height: 34,
+                      minHeight: 0,
+                      px: 1.5,
+                      mr: 1.5,
+                      borderRadius: "10px",
+                      "&:hover": { backgroundColor: "action.hover" },
+                      "&.Mui-selected, &.Mui-selected:hover": {
+                        backgroundColor: alpha(item.color, 0.12),
+                        color: iconColor(theme, item),
+                      },
+                    })}
+                  >
+                    <Typography
+                      noWrap
+                      sx={{
+                        fontSize: "0.84rem",
+                        fontWeight: subActive ? 600 : 400,
+                        color: subActive ? "inherit" : "text.secondary",
+                      }}
+                    >
+                      {sub.label}
+                    </Typography>
+                  </ListItemButton>
+                );
+              })}
+            </Box>
+          </Collapse>
+        )}
+      </Box>
+    );
+  };
+
+  const goHome = () => {
+    logUsage("menu_click", { targetPage: "home" });
+    navigate("/");
+  };
 
   return (
     <Drawer
@@ -353,37 +480,35 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         },
       }}
     >
+      {/* Topp: logo og sammenslåing av menyen */}
       <Box
-        onClick={() => {
-          logUsage("menu_click", { targetPage: "home" });
-          navigate("/");
-        }}
         sx={{
-          height: 64,
           flexShrink: 0,
           display: "flex",
+          flexDirection: collapsed ? "column" : "row",
           alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          userSelect: "none",
+          justifyContent: collapsed ? "flex-start" : "space-between",
+          gap: collapsed ? 0.5 : 0,
+          pt: collapsed ? 1.5 : 1.25,
+          pb: collapsed ? 0.5 : 1.25,
+          pl: collapsed ? 0 : 2,
+          pr: collapsed ? 0 : 1.25,
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0 }}>
+        <Box
+          onClick={goHome}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+        >
           {collapsed ? (
             <Tooltip title="Reks+" placement="right">
-              <Box
-                component="img"
-                src="/logo.svg"
-                alt="REKS+ logo"
-                sx={{ width: 52, height: 52, flexShrink: 0 }}
-              />
+              <Box component="img" src="/logo.svg" alt="REKS+ logo" sx={{ width: 44, height: 44 }} />
             </Tooltip>
           ) : (
             <>
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: 28,
+                  fontSize: 24,
                   color: "primary.main",
                   letterSpacing: "0.04em",
                   lineHeight: 1,
@@ -393,34 +518,22 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
               >
                 REKS
               </Typography>
-              <Box
-                component="img"
-                src="/logo.svg"
-                alt=""
-                sx={{ width: 56, height: 56, flexShrink: 0 }}
-              />
+              <Box component="img" src="/logo.svg" alt="" sx={{ width: 48, height: 48, flexShrink: 0 }} />
             </>
           )}
         </Box>
-      </Box>
-      <Toolbar
-        sx={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: collapsed ? "center" : "flex-end",
-          px: 0.5,
-        }}
-      >
-        <Tooltip title={collapsed ? "Utvid meny" : "Skjul meny"}>
-          <IconButton onClick={onToggle} aria-label={collapsed ? "Utvid meny" : "Skjul meny"}>
-            {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        <Tooltip title={collapsed ? "Utvid meny" : "Skjul meny"} placement={collapsed ? "right" : "bottom"}>
+          <IconButton
+            onClick={onToggle}
+            aria-label={collapsed ? "Utvid meny" : "Skjul meny"}
+            sx={{ color: "text.secondary" }}
+          >
+            {collapsed ? <ChevronsRightIcon /> : <ChevronsLeftIcon />}
           </IconButton>
         </Tooltip>
-      </Toolbar>
+      </Box>
 
-      <Divider sx={{ flexShrink: 0 }} />
-
+      {/* Menylisten ruller hvis den blir for høy; topp og bunn står fast. */}
       <Box
         sx={{
           flex: 1,
@@ -437,165 +550,43 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           },
         }}
       >
-        <List sx={{ py: 0.5 }}>
-        {mainItems.map((item, index) => (
-          <React.Fragment key={item.path}>
-            {item.path === "/produkt-og-rad" ? (
-              <>
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <Tooltip title={collapsed ? item.label : ""} placement="right">
-                    <ListItemButton
-                      selected={isProduktOgRad}
-                      onClick={() => {
-                        logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
-                        navigate(item.path);
-                        if (!isProduktOgRad) setProduktOpen(true);
-                      }}
-                      sx={{ ...navItemButtonSx(item), flex: 1 }}
-                    >
-                      <ListItemIcon
-                        sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
-                      >
-                        <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
-                      </ListItemIcon>
-                      {!collapsed && <ListItemText primary={item.label} />}
-                    </ListItemButton>
-                  </Tooltip>
-                  {!collapsed && (
-                    <IconButton
-                      size="small"
-                      aria-label={produktOpen ? "Skjul undermeny" : "Vis undermeny"}
-                      onClick={() => setProduktOpen((o) => !o)}
-                      sx={{ p: 0.5, flexShrink: 0 }}
-                    >
-                      {produktOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                    </IconButton>
-                  )}
-                </Box>
-                {!collapsed && (
-                  <Collapse in={produktOpen} timeout="auto" unmountOnExit>
-                    <List disablePadding>
-                      {produktSubItems.map((sub, i) => (
-                        <ListItemButton
-                          key={sub.label}
-                          selected={isProduktOgRad && activeSubItem() === i}
-                          onClick={() => navigate(`/produkt-og-rad${sub.search}`)}
-                          sx={{
-                            pl: 5,
-                            py: 0.6,
-                            fontSize: 13,
-                            color: isProduktOgRad && activeSubItem() === i ? "primary.main" : "text.secondary",
-                            fontWeight: isProduktOgRad && activeSubItem() === i ? 700 : 400,
-                            "&.Mui-selected": {
-                              bgcolor: "transparent",
-                              color: "primary.main",
-                            },
-                            "&:hover": { bgcolor: "action.hover" },
-                          }}
-                        >
-                          <ListItemText
-                            primary={sub.label}
-                            primaryTypographyProps={{ fontSize: 13, fontWeight: isProduktOgRad && activeSubItem() === i ? 700 : 400 }}
-                          />
-                        </ListItemButton>
-                      ))}
-                    </List>
-                  </Collapse>
-                )}
-              </>
-            ) : item.path === "/anbrudd" ? (
-              <>
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <Tooltip title={collapsed ? item.label : ""} placement="right">
-                    <ListItemButton
-                      selected={isAnbrudd}
-                      onClick={() => {
-                        logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
-                        navigate(item.path);
-                        if (!isAnbrudd) setAnbruddOpen(true);
-                      }}
-                      sx={{ ...navItemButtonSx(item), flex: 1 }}
-                    >
-                      <ListItemIcon
-                        sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
-                      >
-                        <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
-                      </ListItemIcon>
-                      {!collapsed && <ListItemText primary={item.label} />}
-                    </ListItemButton>
-                  </Tooltip>
-                  {!collapsed && (
-                    <IconButton
-                      size="small"
-                      aria-label={anbruddOpen ? "Skjul undermeny" : "Vis undermeny"}
-                      onClick={() => setAnbruddOpen((o) => !o)}
-                      sx={{ p: 0.5, flexShrink: 0 }}
-                    >
-                      {anbruddOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                    </IconButton>
-                  )}
-                </Box>
-                {!collapsed && (
-                  <Collapse in={anbruddOpen} timeout="auto" unmountOnExit>
-                    <List disablePadding>
-                      {anbruddSubItems.map((sub, i) => (
-                        <ListItemButton
-                          key={sub.label}
-                          selected={isAnbrudd && activeAnbruddSubItem() === i}
-                          onClick={() => navigate(`/anbrudd${sub.search}`)}
-                          sx={{
-                            pl: 5,
-                            py: 0.6,
-                            color: isAnbrudd && activeAnbruddSubItem() === i ? "primary.main" : "text.secondary",
-                            "&.Mui-selected": { bgcolor: "transparent", color: "primary.main" },
-                            "&:hover": { bgcolor: "action.hover" },
-                          }}
-                        >
-                          <ListItemText
-                            primary={sub.label}
-                            primaryTypographyProps={{ fontSize: 13, fontWeight: isAnbrudd && activeAnbruddSubItem() === i ? 700 : 400 }}
-                          />
-                        </ListItemButton>
-                      ))}
-                    </List>
-                  </Collapse>
-                )}
-              </>
-            ) : (
-              <Tooltip title={collapsed ? item.label : ""} placement="right">
-                <ListItemButton
-                  selected={isSelected(item.path)}
-                  onClick={() => {
-                    logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
-                    navigate(item.path);
-                  }}
-                  sx={navItemButtonSx(item)}
-                >
-                  <ListItemIcon
-                    sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
-                  >
-                    <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
-                  </ListItemIcon>
-                  {!collapsed && <ListItemText primary={item.label} />}
-                </ListItemButton>
-              </Tooltip>
-            )}
-            {index < mainItems.length - 1 && (
-              <Divider sx={{ mx: collapsed ? 1.5 : 2, opacity: 0.45 }} />
-            )}
-          </React.Fragment>
-        ))}
+      {collapsed ? (
+        <Divider sx={{ mx: 2, my: 1 }} />
+      ) : (
+        <Typography
+          variant="caption"
+          component="div"
+          sx={{
+            px: 3,
+            pt: 1.5,
+            pb: 0.75,
+            color: "text.secondary",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}
+        >
+          Verktøy
+        </Typography>
+      )}
+
+      <Box component="nav" aria-label="Hovedmeny" sx={{ display: "flex", flexDirection: "column", gap: collapsed ? 0.75 : 0.25, pb: 1 }}>
+        {MAIN_ITEMS.map(renderItem)}
 
         {adminItems.length > 0 && (
           <>
-            <Divider sx={{ my: 1 }} />
-            {!collapsed && (
+            {collapsed ? (
+              <Divider sx={{ mx: 2, my: 1 }} />
+            ) : (
               <Typography
                 variant="caption"
+                component="div"
                 sx={{
-                  px: 2,
-                  pb: 0.5,
+                  px: 3,
+                  pt: 2.5,
+                  pb: 0.75,
                   color: "text.secondary",
+                  fontWeight: 600,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
                 }}
@@ -603,85 +594,44 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                 Rekspert-verktøy
               </Typography>
             )}
-            {adminItems.map((item) => (
-              <Tooltip key={item.path} title={collapsed ? item.label : ""} placement="right">
-                <ListItemButton
-                  selected={isSelected(item.path)}
-                  onClick={() => {
-                    logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
-                    navigate(item.path);
-                  }}
-                  sx={navItemButtonSx(item)}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 0,
-                      mr: collapsed ? 0 : 2,
-                      justifyContent: "center",
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
-                  </ListItemIcon>
-                  {!collapsed && <ListItemText primary={item.label} />}
-                </ListItemButton>
-              </Tooltip>
-            ))}
+            {adminItems.map(renderItem)}
           </>
         )}
-        </List>
       </Box>
-      <Divider sx={{ flexShrink: 0 }} />
+
+      </Box>
+
+      {/* Bunn: ukenummer og profil */}
+      <Divider sx={{ mx: collapsed ? 2 : 1.5, flexShrink: 0 }} />
       <Box
         sx={{
           flexShrink: 0,
-          px: collapsed ? 0.6 : 1.4,
-          pt: 1.1,
-          pb: 0.7,
           display: "flex",
-          justifyContent: "center",
+          flexDirection: collapsed ? "column" : "row-reverse",
+          alignItems: "center",
+          justifyContent: collapsed ? "center" : "space-between",
+          gap: collapsed ? 1 : 0,
+          px: collapsed ? 0 : 2,
+          py: 1.5,
+          "& .MuiAvatar-root": { width: 44, height: 44 },
         }}
       >
         <Tooltip title={collapsed ? `Uke ${currentWeekNumber}` : ""} placement="right">
           <Box
             sx={{
-              minWidth: collapsed ? 44 : "100%",
-              px: collapsed ? 0.75 : 1.1,
-              py: 0.55,
+              px: 1.25,
+              py: 0.5,
               borderRadius: 999,
-              textAlign: "center",
-              border: (theme) => `1px solid ${alpha(theme.palette.text.primary, 0.14)}`,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.025)",
+              backgroundColor: (theme) => alpha(theme.palette.text.primary, 0.06),
             }}
           >
             <Typography
-              sx={{
-                fontSize: collapsed ? "0.86rem" : "0.8rem",
-                fontWeight: 700,
-                color: "text.secondary",
-                lineHeight: 1.2,
-                letterSpacing: collapsed ? "0.02em" : "0.01em",
-              }}
+              sx={{ fontSize: "0.78rem", fontWeight: 600, color: "text.secondary", lineHeight: 1.2 }}
             >
               {collapsed ? `${currentWeekNumber}` : `Uke ${currentWeekNumber}`}
             </Typography>
           </Box>
         </Tooltip>
-      </Box>
-      <Box
-        sx={{
-          flexShrink: 0,
-          display: "flex",
-          justifyContent: "center",
-          py: 0.75,
-          "& .MuiAvatar-root": {
-            width: collapsed ? 54 : 58,
-            height: collapsed ? 54 : 58,
-          },
-        }}
-      >
         <ProfileMenu />
       </Box>
     </Drawer>
