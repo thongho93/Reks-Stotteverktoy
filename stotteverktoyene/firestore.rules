@@ -100,6 +100,11 @@ service cloud.firestore {
         && (
           !("isFavorite" in request.resource.data)
           || request.resource.data.isFavorite is bool
+        )
+        && (
+          !("reminderAt" in request.resource.data)
+          || request.resource.data.reminderAt == null
+          || request.resource.data.reminderAt is number
         );
     }
 
@@ -317,6 +322,7 @@ service cloud.firestore {
             "color",
             "tags",
             "isFavorite",
+            "reminderAt",
             "createdAt",
             "updatedAt"
           ])
@@ -332,6 +338,7 @@ service cloud.firestore {
             "color",
             "tags",
             "isFavorite",
+            "reminderAt",
             "createdAt",
             "updatedAt"
           ])
@@ -345,6 +352,7 @@ service cloud.firestore {
             "color",
             "tags",
             "isFavorite",
+            "reminderAt",
             "updatedAt"
           ]);
 
