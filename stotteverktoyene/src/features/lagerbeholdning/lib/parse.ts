@@ -28,6 +28,9 @@ export interface ParsedUttak {
   enhet: string;
   annullert: boolean;
   raw: string;
+  // Settes når uttaket er slått sammen med en gruppe av annen styrke: mengden
+  // ganges med faktoren (styrke ÷ målgruppas styrke) i beregningen. Mangler = 1.
+  omregningsfaktor?: number;
 }
 
 const DATE_RE = /(\d{1,2})\.(\d{1,2})\.(\d{2,4})/;

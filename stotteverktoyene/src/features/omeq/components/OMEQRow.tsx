@@ -8,25 +8,30 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
   InputAdornment,
+  Paper,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { alpha } from "@mui/material/styles";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
-
-import styles from "../../../styles/app.module.css";
 
 import { MedicationInput } from "./MedicationInput";
 import { buildProductIndex, parseMedicationInput } from "../lib/parseMedicationInput";
 import { formToRoute } from "../data/atcProducts";
 import { OPIOIDS } from "../data/opioids";
 import { calculateOMEQ } from "../lib/calc";
+import { isDoseProduct, isParenteralForm, parenteralDoseUnit, parseDoseInput } from "../lib/doseUnit";
 
 export interface OMEQRowValue {
   medicationText: string;
   doseText: string;
   confirmedHighDose?: boolean;
+  // Det brukeren skrev som produkt (f.eks. «2x4») etter at feltet er regnet om til 8.
+  doseExpression?: string;
 }
 
 interface Props {
@@ -34,6 +39,7 @@ interface Props {
   onChange: (next: OMEQRowValue) => void;
   autoFocusMedicationInput?: boolean;
   autoPasteNumericClipboard?: boolean;
+  onRemove?: () => void;
 }
 
 export const OMEQRow = ({
@@ -41,6 +47,7 @@ export const OMEQRow = ({
   onChange,
   autoFocusMedicationInput,
   autoPasteNumericClipboard,
+  onRemove,
 }: Props) => {
   const productIndex = useMemo(() => buildProductIndex(), []);
 
@@ -70,8 +77,42 @@ export const OMEQRow = ({
 
   const formLower = parsed.product?.form?.toLowerCase() ?? "";
   const isPatch = formLower === "depotplaster";
-  const isMixture =
+  // Injeksjon/infusjon: brukeren skriver inn legens dosering i µg eller mg (følger styrken),
+  // og beregningen regner µg om til mg.
+  const isParenteral = isParenteralForm(formLower);
+  const isLiquidForm =
     formLower.includes("mikstur") || formLower.includes("oral") || formLower.includes("dråpe");
+
+  // Doseenheten følger styrken, ikke formuleringen. "1 mg/ml" er en konsentrasjon
+  // og doseres i ml, mens "10 mg" på en mikstur er en endose som doseres i antall
+  // beholdere (Metadon Nordic Drugs). Da formuleringen alene styrte dette, ba
+  // feltet om ml for endoser – og et innskrevet volum ga da for høy OMEQ.
+  // Uten kjent styrke faller vi tilbake på formuleringen.
+  const dosesInMl = parsed.strength ? parsed.strength.perMl === true : isLiquidForm;
+
+  // Hva brukeren skal skrive i dosefeltet.
+  const doseUnitNoun = dosesInMl ? "ml" : isLiquidForm ? "endoser" : "tablett/kapsel/dose";
+
+  // Kort enhet som vises i dosefeltet, tilpasset formuleringen:
+  // tbl (alle tabletter), kps (kapsler), ml (mikstur/konsentrasjon), supp (stikkpiller),
+  // dose (dråper, nesespray, endoser og injeksjoner/infusjoner), ellers stk.
+  const doseUnit = (() => {
+    if (isParenteral) return parenteralDoseUnit(parsed.strength);
+    if (formLower.includes("dråpe")) return "dose";
+    if (dosesInMl) return "ml";
+    if (formLower.includes("kapsel")) return "kps";
+    if (formLower.includes("tablett")) return "tbl";
+    if (formLower.includes("stikkpille")) return "supp";
+    if (
+      formLower.includes("nesespray") ||
+      formLower.includes("mikstur") ||
+      formLower.includes("injeks") ||
+      formLower.includes("infus")
+    ) {
+      return "dose";
+    }
+    return "stk";
+  })();
 
   useEffect(() => {
     // When the user selects a valid product (or it becomes uniquely identified),
@@ -117,17 +158,15 @@ export const OMEQRow = ({
   const MAX_UNITS_PER_DAY = 20;
 
   const dailyDose = useMemo(() => {
-    const raw = value.doseText.trim();
-    if (!raw) return null;
-    const n = Number(raw.replace(",", "."));
-    return Number.isFinite(n) ? n : null;
+    // Tall («8») eller produkt («2x4» = 8)
+    return parseDoseInput(value.doseText);
   }, [value.doseText]);
 
   const doseOverLimit = useMemo(() => {
-    if (isPatch) return false;
+    if (isPatch || isParenteral) return false;
     if (dailyDose == null) return false;
     return dailyDose > MAX_UNITS_PER_DAY;
-  }, [isPatch, dailyDose]);
+  }, [isPatch, isParenteral, dailyDose]);
 
   const isOverLimitConfirmed = doseOverLimit && !!value.confirmedHighDose;
   const isBlockedByOverLimit = doseOverLimit && !isOverLimitConfirmed;
@@ -143,6 +182,29 @@ export const OMEQRow = ({
     if (isBlockedByOverLimit) return null;
     return dailyDose;
   }, [isBlockedByOverLimit, dailyDose]);
+
+  // Injeksjon/infusjon: laveste fornuftige døgndose er mengden i 1 ml av preparatet
+  // (styrken, i µg eller mg). Lavere tall er ofte antall doser/ampuller (1, 2) i stedet for
+  // døgndosen. Dette gir kun et varsel; brukeren kan fortsatt bruke tallet.
+  const parenteralMin = useMemo(() => {
+    if (!isParenteral || !parsed.strength) return null;
+    const v = Number(String(parsed.strength.value).replace(",", "."));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }, [isParenteral, parsed.strength]);
+  const parenteralMinText = parenteralMin == null ? "" : String(parenteralMin).replace(".", ",");
+
+  const isLowParenteral =
+    parenteralMin != null && dailyDose != null && dailyDose < parenteralMin;
+
+  // Vent litt før varselet vises, så det ikke blinker mens man skriver (f.eks. «1» på vei mot «100»).
+  const [lowDoseDelayed, setLowDoseDelayed] = useState(false);
+  useEffect(() => {
+    setLowDoseDelayed(false);
+    if (!isLowParenteral) return;
+    const id = setTimeout(() => setLowDoseDelayed(true), 700);
+    return () => clearTimeout(id);
+  }, [isLowParenteral, value.doseText]);
+  const showLowParenteral = isLowParenteral && lowDoseDelayed;
 
   const strengthMg = useMemo(() => {
     const s = parsed.strength;
@@ -173,6 +235,15 @@ export const OMEQRow = ({
       };
     }
 
+    // Parenteral: kalkulatoren trenger kun enheten (µg eller mg) for å regne dosen om til mg.
+    if (isParenteral) {
+      return {
+        value: parsed.strength.value,
+        unit: parenteralDoseUnit(parsed.strength),
+        perHour: parsed.strength.perHour,
+      };
+    }
+
     if (strengthMg == null) return null;
 
     // For tablets/capsules etc. ensure calculator receives mg
@@ -181,7 +252,7 @@ export const OMEQRow = ({
       unit: "mg",
       perHour: parsed.strength.perHour,
     };
-  }, [parsed.strength, strengthMg, isPatch]);
+  }, [parsed.strength, strengthMg, isPatch, isParenteral]);
 
   const result = useMemo(() => {
     return calculateOMEQ({
@@ -224,289 +295,327 @@ export const OMEQRow = ({
     }
   }, [parsed.product, result.reason, isPatch, doseOverLimit]);
 
-  const mlHintText = `Skriv antall ml per døgn.`;
+  // Kort nok til å stå under dosefeltet uten å brytes over mange linjer.
+  const doseHintText = isParenteral
+    ? `Dosering i ${doseUnit}`
+    : `Antall ${doseUnit}, ikke mg`;
+  const doseMgShortWarning = `Ser ut som mg. Skriv antall ${doseUnit}.`;
 
-  const mgWarningText = isMixture
-    ? `Det ser ut som du har skrevet mg. Skriv antall ml per døgn.`
-    : `Det ser ut som du har skrevet mg. Skriv antall tablett/kapsel/dose per døgn.`;
+  const mgWarningText = `Det ser ut som du har skrevet mg. Skriv antall ${doseUnitNoun} per døgn.`;
 
   const infoText = useMemo(() => {
     if (!matchedOpioid?.helpText) return "";
 
+    // Bruk den valgte doseenheten (tbl, kps, dose …) i stedet for et fast ord.
+    const helpText = matchedOpioid.helpText.replaceAll("{enhet}", doseUnit);
+
     // Bruk helpText også for depotplaster
-    if (isPatch) return matchedOpioid.helpText;
+    if (isPatch) return helpText;
 
     // Vis kun når produktet er gjenkjent og raden ellers er brukbar
-    if (result.reason === "ok" || result.reason === "missing-input") return matchedOpioid.helpText;
+    if (result.reason === "ok" || result.reason === "missing-input") return helpText;
 
     return "";
-  }, [isPatch, matchedOpioid?.helpText, result.reason]);
+  }, [isPatch, matchedOpioid?.helpText, result.reason, doseUnit]);
 
   const doseLooksLikeMg = useMemo(() => {
     return isBlockedByOverLimit;
   }, [isBlockedByOverLimit]);
 
+  const doseProductText = useMemo(() => {
+    // Etter innlegging står summen i feltet, og det brukeren skrev (2x4) vises under.
+    if (value.doseExpression && dailyDose != null) return value.doseExpression;
+    if (dailyDose == null || !isDoseProduct(value.doseText)) return "";
+    const shown = value.doseText.trim().replace(/\s+/g, "").replace(/[*×]/g, "x");
+    return `${shown} = ${String(dailyDose).replace(".", ",")} ${doseUnit}`;
+  }, [dailyDose, value.doseText, value.doseExpression, doseUnit]);
+
+  // «2x4» regnes om til 8 i feltet når brukeren er ferdig (Enter eller forlater feltet).
+  // Det som ble skrevet beholdes og vises under feltet.
+  const commitDoseProduct = () => {
+    if (!isDoseProduct(value.doseText) || dailyDose == null) return;
+    onChange({
+      ...value,
+      doseText: String(dailyDose).replace(".", ","),
+      doseExpression: value.doseText.trim().replace(/\s+/g, "").replace(/[*×]/g, "x"),
+    });
+  };
+
+  // Regn om automatisk så snart uttrykket er komplett (to tall med gangetegn), etter en kort
+  // pause slik at et flersifret tall hører med (f.eks. «2x10» ikke stopper på «2x1»).
+  useEffect(() => {
+    if (!isDoseProduct(value.doseText) || dailyDose == null) return;
+    const id = setTimeout(() => commitDoseProduct(), 350);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.doseText, dailyDose]);
+
   const doseHelperText = useMemo(() => {
     if (isPatch) return "";
 
-    const raw = value.doseText.trim();
+    // Injeksjon/infusjon: tydelig at tallet er total døgndose, og varsel ved uvanlig lavt tall.
+    if (isParenteral) {
+      if (showLowParenteral) return `Under ${parenteralMinText} ${doseUnit} – sjekk`;
+      return doseProductText || `Total døgndose i ${doseUnit}`;
+    }
 
-    // Only show helper text when the dose field is active (focused) or the user has typed something.
-    if (!isDoseFocused && !raw) return "";
+    // Advarselen blir stående til antallet er rettet; veiledningen vises kun mens feltet er aktivt.
+    if (isBlockedByOverLimit) return doseMgShortWarning;
+    // Dosen skrevet som produkt (2x4) vises som sum, f.eks. «2x4 = 8 tbl».
+    if (doseProductText) return doseProductText;
+    if (isDoseFocused) return doseHintText;
 
-    // While focused but empty: show a short guidance.
-    if (!raw)
-      return isMixture ? `${mlHintText}` : "Skriv antall tablett/kapsel/dose per døgn (ikke mg).";
-
-    if (isBlockedByOverLimit) return mgWarningText;
-
-    // When user has typed a value but we can't compute mg yet.
-    if (dailyDose == null || strengthMg == null)
-      return isMixture ? `${mlHintText}` : "Skriv antall tablett/kapsel/dose per døgn (ikke mg).";
-    const impliedTotalMg = dailyDose * strengthMg;
-    const roundedTotal = Math.round((impliedTotalMg + Number.EPSILON) * 100) / 100;
-    const substance = substanceText || "virkestoff";
-
-    if (!Number.isFinite(roundedTotal))
-      return isMixture ? `${mlHintText}` : "Skriv antall tablett/kapsel/dose per døgn (ikke mg).";
-
-    return `Tilsvarer ${roundedTotal} mg ${substance} per døgn.`;
+    return "";
   }, [
     isPatch,
-    isMixture,
-    value.doseText,
+    isParenteral,
+    showLowParenteral,
+    parenteralMinText,
+    doseUnit,
+    doseProductText,
+    doseHintText,
+    doseMgShortWarning,
     isDoseFocused,
-    dailyDose,
-    strengthMg,
-    substanceText,
     isBlockedByOverLimit,
   ]);
 
+  // Faktor vises som dempet tekst under raden i stedet for eget felt.
+  const factorText = useMemo(() => {
+    if (!matchedOpioid) return "";
+    if (matchedOpioid.id === "hydromorfon-parenteral") return "";
+    if (
+      result.reason === "unsupported-ketobemidone" ||
+      result.reason === "unsupported-morphine-drops-or-parenteral"
+    ) {
+      return "";
+    }
+    return String(matchedOpioid.omeqFactor).replace(".", ",");
+  }, [matchedOpioid, result.reason]);
+
+  const hintText = useMemo(
+    () =>
+      [substanceText, factorText ? `faktor ${factorText}` : ""]
+        .filter(Boolean)
+        .join(" · "),
+    [substanceText, factorText],
+  );
+
   return (
-    <Box className={styles.omeqRow}>
-      <Box sx={{ width: "100%" }}>
-        <MedicationInput
-          value={value.medicationText}
-          onChange={(text) => onChange({ ...value, medicationText: text })}
-          autoFocus={autoFocusMedicationInput}
-          autoPasteNumericClipboard={autoPasteNumericClipboard}
-          onAutoPastedVnr={requestDoseFocusFromAutoVnr}
-        />
-      </Box>
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 3,
+        borderRadius: "14px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 2.5,
+      }}
+    >
+      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 2.5 }}>
+        <Box sx={{ flex: "1 1 260px", minWidth: 0 }}>
+          <MedicationInput
+            value={value.medicationText}
+            onChange={(text) =>
+              onChange({
+                ...value,
+                medicationText: text,
+                // Tømmes preparatfeltet (f.eks. med kryss), nullstilles døgndosen på raden også.
+                ...(text.trim() === "" ? { doseText: "", confirmedHighDose: false, doseExpression: undefined } : {}),
+              })
+            }
+            autoFocus={autoFocusMedicationInput}
+            autoPasteNumericClipboard={autoPasteNumericClipboard}
+            onAutoPastedVnr={requestDoseFocusFromAutoVnr}
+          />
+          {/* Virkestoff, faktor og omregning rett under preparatet */}
+          {!!hintText && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, px: 0.5, lineHeight: 1.5 }}>
+              {hintText}
+            </Typography>
+          )}
+        </Box>
 
-      <Box className={styles.ratioBox}>
-        <TextField
-          value={
-            matchedOpioid &&
-            matchedOpioid.id !== "hydromorfon-parenteral" &&
-            result.reason !== "unsupported-ketobemidone" &&
-            result.reason !== "unsupported-morphine-drops-or-parenteral"
-              ? String(matchedOpioid.omeqFactor)
-              : ""
-          }
-          label="Faktor"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          InputProps={{ readOnly: true }}
-          fullWidth
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              "& fieldset": {
-                borderColor: "primary.main",
-                height: "125%",
-              },
-              "&:hover fieldset": {
-                borderColor: "primary.main",
-              },
-              "&.Mui-focused fieldset": {
-                borderColor: "primary.main",
-              },
-              "& .MuiOutlinedInput-input": {
-                textAlign: "center",
-              },
-            },
-          }}
-        />
-      </Box>
-
-      {isPatch ? (
-        <Box sx={{ width: "100%" }} aria-hidden />
-      ) : (
-        <Tooltip
-          title={doseHelperText}
-          open={!!doseHelperText && isDoseFocused}
-          placement="top-start"
-          arrow
-          PopperProps={{
-            modifiers: [
-              {
-                name: "offset",
-                options: { offset: [0, 8] },
-              },
-            ],
-          }}
-          componentsProps={{
-            tooltip: {
-              sx: (theme) => ({
-                backgroundColor:
-                  theme.palette.mode === "dark"
-                    ? "rgba(230, 237, 250, 0.95)"
-                    : "rgba(97, 97, 97, 1)",
-                color: theme.palette.mode === "dark" ? "#0f1622" : "#fff",
-              }),
-            },
-            arrow: {
-              sx: (theme) => ({
-                color:
-                  theme.palette.mode === "dark"
-                    ? "rgba(230, 237, 250, 0.95)"
-                    : "rgba(97, 97, 97, 1)",
-              }),
-            },
-          }}
-          disableFocusListener
-          disableHoverListener
-          disableTouchListener
-        >
-          <Box sx={{ width: "100%" }}>
-            <TextField
-              label={isMixture ? "Antall ml per døgn" : "Antall per døgn"}
-              inputRef={doseInputRef}
-              value={value.doseText}
-              onChange={(e) => {
-                onChange({ ...value, doseText: e.target.value, confirmedHighDose: false });
-              }}
-              inputProps={{
-                inputMode: "decimal",
-                "aria-label": "Antall per døgn",
-                style: { textAlign: "center" },
-              }}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              error={doseLooksLikeMg}
-              // Keep helperText empty to avoid truncation; tooltip shows the full guidance when active.
-              helperText={""}
-              onFocus={() => setIsDoseFocused(true)}
-              onBlur={() => {
-                setIsDoseFocused(false);
-                if (isBlockedByOverLimit) setShowOverLimitDialog(true);
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      {doseLooksLikeMg && (
-                        <Tooltip title={mgWarningText} placement="top" arrow>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              color: "warning.main",
-                              cursor: "help",
-                            }}
+        {!isPatch && (
+          <Box sx={{ flex: "0 0 140px" }}>
+              <TextField
+                label="Døgndose"
+                color={showLowParenteral ? "warning" : "primary"}
+                inputRef={doseInputRef}
+                value={value.doseText}
+                onChange={(e) => {
+                  onChange({
+                    ...value,
+                    doseText: e.target.value,
+                    confirmedHighDose: false,
+                    doseExpression: undefined,
+                  });
+                }}
+                inputProps={{
+                  inputMode: "text",
+                  "aria-label": "Døgndose",
+                  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (e.key === "Enter") commitDoseProduct();
+                  },
+                  style: { textAlign: "center", fontWeight: 600 },
+                }}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                error={doseLooksLikeMg}
+                // Veiledningen står rett under feltet (ikke som svevende tooltip), så det
+                // er tydelig at den hører til dette feltet.
+                helperText={doseHelperText || undefined}
+                FormHelperTextProps={{
+                  sx: {
+                    mx: 0.5,
+                    mt: 0.5,
+                    lineHeight: 1.35,
+                    ...(showLowParenteral ? { color: "warning.dark", fontWeight: 600 } : {}),
+                  },
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    height: 48,
+                    ...(showLowParenteral ? { "& fieldset": { borderColor: "warning.main" } } : {}),
+                    "&:hover fieldset, &.Mui-focused fieldset": {
+                      borderColor: doseLooksLikeMg
+                        ? "error.main"
+                        : showLowParenteral
+                          ? "warning.main"
+                          : "primary.main",
+                    },
+                  },
+                }}
+                onFocus={() => setIsDoseFocused(true)}
+                onBlur={() => {
+                  setIsDoseFocused(false);
+                  commitDoseProduct();
+                  if (isBlockedByOverLimit) setShowOverLimitDialog(true);
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        {(doseLooksLikeMg || showLowParenteral) && (
+                          <Tooltip
+                            title={
+                              doseLooksLikeMg
+                                ? mgWarningText
+                                : `Under ${parenteralMinText} ${doseUnit}. Skriv total døgndose i ${doseUnit}, ikke antall doser. Du kan likevel bruke tallet.`
+                            }
+                            placement="top"
+                            arrow
                           >
-                            <WarningAmberOutlinedIcon fontSize="small" />
-                          </Box>
-                        </Tooltip>
-                      )}
-                      <Box component="span" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
-                        {isMixture ? "ml/døgn" : "stk/døgn"}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                color: "warning.main",
+                                cursor: "help",
+                              }}
+                            >
+                              <WarningAmberOutlinedIcon fontSize="small" />
+                            </Box>
+                          </Tooltip>
+                        )}
+                        <Box
+                          component="span"
+                          sx={{ color: "text.secondary", whiteSpace: "nowrap", fontSize: "0.8125rem" }}
+                        >
+                          {doseUnit}/døgn
+                        </Box>
                       </Box>
-                    </Box>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  "& fieldset": {
-                    borderColor: "primary.main",
-                    height: "125%",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "primary.main",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "primary.main",
-                  },
-                  "& .MuiOutlinedInput-input": {
-                    paddingRight: "6px",
-                    textAlign: "center",
-                  },
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+        )}
+
+        <Box sx={{ flex: "0 0 100px" }}>
+          <TextField
+            label="OMEQ"
+            value={omeqText ? omeqText.replace(".", ",") : ""}
+            placeholder="–"
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            InputProps={{ readOnly: true }}
+            inputProps={{
+              "aria-live": "polite",
+              tabIndex: -1,
+              style: { textAlign: "center", fontWeight: 700, fontSize: "1.125rem" },
+            }}
+            sx={(theme) => ({
+              "& .MuiOutlinedInput-root": {
+                height: 48,
+                backgroundColor: alpha(theme.palette.primary.main, 0.06),
+                cursor: "default",
+                "& fieldset, &:hover fieldset, &.Mui-focused fieldset": {
+                  borderColor: theme.palette.divider,
                 },
-              }}
-            />
-          </Box>
-        </Tooltip>
-      )}
+              },
+            })}
+          />
+        </Box>
 
-      <TextField
-        label="OMEQ"
-        value={omeqText}
-        size="small"
-        InputLabelProps={{ shrink: true }}
-        InputProps={{ readOnly: true }}
-        fullWidth
-        sx={{
-          "& .MuiOutlinedInput-root": {
-            "& fieldset": {
-              borderColor: "primary.main",
-              height: "125%",
-            },
-            "&:hover fieldset": {
-              borderColor: "primary.main",
-            },
-            "&.Mui-focused fieldset": {
-              borderColor: "primary.main",
-            },
-            "& .MuiOutlinedInput-input": {
-              textAlign: "center",
-            },
-          },
-        }}
-      />
+        {onRemove && (
+          <Tooltip title="Fjern preparat" placement="top">
+            <IconButton
+              aria-label="Fjern preparat"
+              onClick={onRemove}
+              sx={(theme) => ({
+                mt: "4px",
+                width: 40,
+                height: 40,
+                color: "text.secondary",
+                transition: "color .15s ease, background-color .15s ease",
+                // Rosa/rødlig ved hover for å signalisere at knappen sletter raden.
+                "&:hover, &:focus-visible": {
+                  color: theme.palette.error.main,
+                  backgroundColor: alpha(theme.palette.error.main, 0.1),
+                },
+              })}
+            >
+              <DeleteOutlineIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
 
-      {(!!substanceText || !!infoText) && (
+      {!!infoText && (
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
-            gap: 1.5,
-            minWidth: 0,
-            flexWrap: "nowrap",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 1.25,
+            pt: 2,
+            pl: 0.25,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
           }}
         >
-          {!!substanceText && (
-            <Typography variant="overline" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-              Virkestoff: {substanceText}
-            </Typography>
-          )}
-
-          {!!infoText && (
-            <Alert
-              severity="info"
-              icon={false}
-              sx={{
-                width: "fit-content",
-                maxWidth: "100%",
-                px: 1,
-                py: 0.35,
-                borderRadius: 1.5,
-                backgroundColor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(96, 165, 250, 0.18)"
-                    : "rgba(25, 118, 210, 0.08)",
-                color: "text.primary",
-                fontSize: "0.7rem",
-                border: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {infoText}
-            </Alert>
-          )}
+          <Alert
+            severity="info"
+            icon={false}
+            sx={{
+              width: "fit-content",
+              maxWidth: "100%",
+              px: 1.75,
+              py: 0.75,
+              borderRadius: 2,
+              backgroundColor: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "rgba(96, 165, 250, 0.18)"
+                  : "rgba(25, 118, 210, 0.08)",
+              color: "text.primary",
+              fontSize: "0.875rem",
+              lineHeight: 1.5,
+              border: "none",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            {infoText}
+          </Alert>
         </Box>
       )}
 
@@ -524,10 +633,8 @@ export const OMEQRow = ({
         <DialogTitle id="over-limit-dialog-title">Høyt antall registrert</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Du har lagt inn <strong>{dailyDose} {isMixture ? "ml" : "stk"}/døgn</strong>.{" "}
-            {isMixture
-              ? "Det ser ut som du har skrevet mg. Skriv antall ml per døgn, ikke mg."
-              : "Det ser ut som du har skrevet mg. Skriv antall tablett/kapsel/dose per døgn, ikke mg."}
+            Du har lagt inn <strong>{dailyDose} {doseUnit}/døgn</strong>.{" "}
+            {`Det ser ut som du har skrevet mg. Skriv antall ${doseUnitNoun} per døgn, ikke mg.`}
             <br />
             <br />
             Vil du likevel bekrefte at dette er riktig antall?
@@ -545,10 +652,10 @@ export const OMEQRow = ({
             color="primary"
             variant="contained"
           >
-            Bekreft {dailyDose} {isMixture ? "ml" : "stk"}/døgn
+            Bekreft {dailyDose} {doseUnit}/døgn
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Paper>
   );
 };

@@ -139,6 +139,46 @@ export const varenavnSignatur = (varenavn: string): string | null => {
   return `${ledende}|${former}|${styrke}`;
 };
 
+// Numerisk styrke fra en normalisert styrke-tekst ("5mg", "10mg/1ml", "500mikrogram"),
+// i felles enhet slik at styrker kan sammenlignes: mg, mg/ml eller (uendret) ie/mmol/%.
+const styrkeTilTall = (styrke: string | null): { verdi: number; enhet: string } | null => {
+  if (!styrke) return null;
+  const m = styrke.match(/^(\d+(?:\.\d+)?)(mikrogram|mikrog|mcg|mg|g|mmol|ie|%)(?:\/(\d+(?:\.\d+)?)ml)?$/);
+  if (!m) return null;
+  const tall = Number(m[1]);
+  const perMl = m[3] ? Number(m[3]) : null;
+  const tilMg = m[2] === "g" ? 1000 : m[2] === "mg" ? 1 : ["mikrogram", "mikrog", "mcg"].includes(m[2]) ? 0.001 : null;
+  if (tilMg == null) return perMl ? { verdi: tall / perMl, enhet: `${m[2]}/ml` } : { verdi: tall, enhet: m[2] };
+  return perMl ? { verdi: (tall * tilMg) / perMl, enhet: "mg/ml" } : { verdi: tall * tilMg, enhet: "mg" };
+};
+
+/** Styrke for en gruppe (fra FEST-treffet, ellers første innlimte navn). */
+export const gruppeStyrke = (gruppe: UttakGruppe): { verdi: number; enhet: string } | null =>
+  styrkeTilTall(
+    extractStyrke((gruppe.match?.formStyrke ?? "").toLowerCase()) ??
+      extractStyrke(gruppe.uttak.find((u) => u.varenavn)?.varenavn.toLowerCase() ?? ""),
+  );
+
+/**
+ * Omregningsfaktor for å legge en gruppe inn i en annen: antall enheter av `fra`
+ * uttrykt i enheter av `til` (10 mg-tabletter inn i 5 mg-gruppe → 2). 1 når
+ * styrkene er like eller ikke kan sammenlignes.
+ */
+export const styrkeFaktor = (fra: UttakGruppe, til: UttakGruppe): number => {
+  const a = gruppeStyrke(fra);
+  const b = gruppeStyrke(til);
+  if (!a || !b || a.enhet !== b.enhet || b.verdi <= 0) return 1;
+  const faktor = a.verdi / b.verdi;
+  return Number.isFinite(faktor) && faktor > 0 ? Math.round(faktor * 1000) / 1000 : 1;
+};
+
+// Automatisk gruppenøkkel for et FEST-treff: virkestoff (ATC) + styrke. Form-teksten
+// ("tab" vs "filmdrasjert tab") og merkenavn skiller IKKE grupper – bare ulik styrke gjør det.
+const festNokkel = (match: VirkestoffMatch): string => {
+  const styrke = extractStyrke(match.formStyrke.toLowerCase());
+  return styrke ? `${match.atc}|${styrke}` : match.groupKey;
+};
+
 /**
  * Grupperer uttak. Når en `resolver` er gitt, slås preparater med samme
  * virkestoff + styrke + form sammen (på tvers av merkenavn og pakningsstørrelse).
@@ -163,7 +203,7 @@ export const groupByVare = (
     const match = matches[i];
     if (!match) return;
     const sig = varenavnSignatur(u.varenavn);
-    if (sig && !signaturTilGruppe.has(sig)) signaturTilGruppe.set(sig, match.groupKey);
+    if (sig && !signaturTilGruppe.has(sig)) signaturTilGruppe.set(sig, festNokkel(match));
   });
 
   // Pass 2: tildel gruppenøkkel. FEST-treff styrer; ellers brukes signaturen
@@ -172,7 +212,7 @@ export const groupByVare = (
   uttak.forEach((u, i) => {
     const match = matches[i];
     const sig = match ? null : varenavnSignatur(u.varenavn);
-    const fraNavn = match?.groupKey ?? (sig ? signaturTilGruppe.get(sig) ?? sig : null);
+    const fraNavn = (match ? festNokkel(match) : null) ?? (sig ? signaturTilGruppe.get(sig) ?? sig : null);
     const key = fraNavn || u.varenr?.trim() || u.varenavn?.trim() || "ukjent";
     const entry = map.get(key) ?? { uttak: [], match };
     entry.uttak.push(u);
@@ -180,6 +220,50 @@ export const groupByVare = (
     map.set(key, entry);
   });
   return map;
+};
+
+/** Gruppa en nøkkel til slutt havner i etter manuell sammenslåing (kjeder følges). */
+export const finnGruppeMaal = (
+  grupper: Map<string, UttakGruppe>,
+  mapping: Record<string, string>,
+  key: string,
+): string => {
+  let current = key;
+  const sett = new Set<string>([current]);
+  while (mapping[current] && grupper.has(mapping[current]) && !sett.has(mapping[current])) {
+    current = mapping[current];
+    sett.add(current);
+  }
+  return current;
+};
+
+/**
+ * Slår sammen grupper manuelt. `mapping` peker fra en gruppenøkkel til gruppa den
+ * skal inn i. Uttakene samles i målgruppa, som beholder sitt eget virkestoff-treff,
+ * slik at beholdning regnes fra ett felles første uttak med én dose – ellers telles
+ * forbruket etter det nyeste uttaket flere ganger. Nøkler som ikke finnes
+ * (f.eks. etter ny innliming) ignoreres.
+ */
+export const slaaSammenGrupper = (
+  grupper: Map<string, UttakGruppe>,
+  mapping: Record<string, string>,
+): Map<string, UttakGruppe> => {
+  const resultat = new Map<string, UttakGruppe>();
+  for (const [key, gruppe] of grupper) {
+    if (finnGruppeMaal(grupper, mapping, key) === key) {
+      resultat.set(key, { uttak: [...gruppe.uttak], match: gruppe.match });
+    }
+  }
+  for (const [key, gruppe] of grupper) {
+    const maal = finnGruppeMaal(grupper, mapping, key);
+    if (maal === key) continue;
+    const mal = grupper.get(maal);
+    const faktor = mal ? styrkeFaktor(gruppe, mal) : 1;
+    resultat
+      .get(maal)
+      ?.uttak.push(...gruppe.uttak.map((u) => (faktor === 1 ? u : { ...u, omregningsfaktor: faktor })));
+  }
+  return resultat;
 };
 
 const capitalize = (value: string): string =>
@@ -196,6 +280,19 @@ const finnMedlemmer = (uttakList: ParsedUttak[]): VareMedlem[] => {
     seen.set(dedupKey, { varenr, varenavn });
   }
   return [...seen.values()];
+};
+
+// Pakningsbetegnelser som alle betyr «enkeltenheter» (tabletter/kapsler o.l.):
+// ENPAC = blisterpakning, ENDOSE = endoseblisterpakning, STK/BOKS = boks. Mengden
+// er allerede antall enheter, så de summeres direkte – men gruppa skal ha ett
+// felles enhetsnavn, ikke det første uttakets.
+const ENKELTENHET_ALIAS = new Set(["STK", "BOKS", "ENPAC", "ENDOSE"]);
+
+const velgEnhet = (uttakList: ParsedUttak[]): string => {
+  const enheter = uttakList.map((u) => u.enhet).filter(Boolean);
+  const distinkte = new Set(enheter.map((e) => e.toUpperCase()));
+  if (distinkte.size > 1 && [...distinkte].every((e) => ENKELTENHET_ALIAS.has(e))) return "STK";
+  return enheter[0] ?? "";
 };
 
 export const beregnVare = (
@@ -216,22 +313,23 @@ export const beregnVare = (
 
   const tellende = medData.filter((u) => !u.annullert);
 
-  const totaltHentet = tellende.reduce((sum, u) => sum + u.mengde!, 0);
+  const totaltHentet = tellende.reduce((sum, u) => sum + u.mengde! * (u.omregningsfaktor ?? 1), 0);
   const forsteUttak = tellende.length ? tellende[0].dato! : null;
   const sisteUttak = tellende.length ? tellende[tellende.length - 1].dato! : null;
-  const enhet =
-    tellende.find((u) => u.enhet)?.enhet ?? uttakList.find((u) => u.enhet)?.enhet ?? "";
+  const enhet = velgEnhet(tellende.length ? tellende : uttakList);
 
   const members = finnMedlemmer(uttakList);
   const merged = members.length > 1;
   const varenr = members[0]?.varenr || uttakList.find((u) => u.varenr)?.varenr || varenrKey;
 
-  // Visningsnavn: ved virkestoff-treff vises virkestoff + form/styrke (det som
-  // faktisk slår preparatene sammen). Ellers brukes det innlimte varenavnet.
+  // Visningsnavn: når flere preparater faktisk er slått sammen vises virkestoff +
+  // form/styrke (det som slår dem sammen). Er det bare ett preparat, vises navnet
+  // brukeren limte inn (f.eks. «Norvasc tab 5 mg»), og virkestoffet står i meta.
   const fallbackNavn = members[0]?.varenavn || varenrKey;
-  const varenavn = match
-    ? `${capitalize(match.virkestoff)}${match.formStyrke ? ` ${match.formStyrke}` : ""}`.trim()
-    : fallbackNavn;
+  const varenavn =
+    match && merged
+      ? `${capitalize(match.virkestoff)}${match.formStyrke ? ` ${match.formStyrke}` : ""}`.trim()
+      : fallbackNavn;
 
   // Flytende preparat (enhet ml) → tillat mg-dosering med styrke-omregning.
   const erFlytende = enhet.toUpperCase() === "ML";

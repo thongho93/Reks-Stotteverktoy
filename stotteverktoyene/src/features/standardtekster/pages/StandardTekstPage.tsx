@@ -33,10 +33,14 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {
   formatPreparatRowText,
   getAltGroupCount,
+  getDoseringTokenIndices,
+  getFritekstTokenIndices,
   getOptionalGroupCount,
   getTallTokenIndices,
   migrateLegacyClockTallTokens,
   replaceAltGroups,
+  replaceDoseringTokenByIndex,
+  replaceFritekstTokenByIndex,
   replaceOptionalGroups,
   replaceNextPreparatToken,
   replaceKlokkeslettDagTokens,
@@ -46,8 +50,12 @@ import {
   templateHasAltToken,
   templateHasDatoMndToken,
   templateHasDatoToken,
+  templateHasDoseringToken,
+  templateHasFritekstToken,
   templateHasKlokkeslettDagToken,
   templateHasTallToken,
+  tokenRegex,
+  tokenRegexSource,
   usePreparatRows,
 } from "../utils/preparat";
 import { buildPreviewContent, templateHasPreparatToken, templateUsesPreparat1 } from "../utils/content";
@@ -78,7 +86,12 @@ type LagerStandardtekstPrefill = {
   templateTitle: string;
   preparat: string;
   preparatKey: string;
+  // Ytterligere preparater når flere er valgt i en sammenslått gruppe.
+  ekstraPreparater: Array<{ preparat: string; preparatKey: string; formulering: string }>;
   datoInput: string;
+  // Dagsforbruk fra lagerbeholdning (ANT = DOSERING-tokenet) og formulering (tablett, kapsel, ml …).
+  antall: string;
+  formulering: string;
 };
 const LAGER_STANDARDTEKST_PREFILL_STORAGE_KEY = "standardtekster:lagerPrefill";
 
@@ -92,7 +105,23 @@ function parseLagerPrefill(value: unknown): LagerStandardtekstPrefill | null {
     templateTitle: c.templateTitle.trim(),
     preparat: c.preparat.trim(),
     preparatKey: (typeof c.preparatKey === "string" && c.preparatKey.trim()) || c.preparat.trim(),
+    ekstraPreparater: Array.isArray(c.ekstraPreparater)
+      ? c.ekstraPreparater.flatMap((e) =>
+          e && typeof e.preparat === "string" && e.preparat.trim()
+            ? [
+                {
+                  preparat: e.preparat.trim(),
+                  preparatKey:
+                    (typeof e.preparatKey === "string" && e.preparatKey.trim()) || e.preparat.trim(),
+                  formulering: typeof e.formulering === "string" ? e.formulering.trim() : "",
+                },
+              ]
+            : [],
+        )
+      : [],
     datoInput: typeof c.datoInput === "string" ? c.datoInput.trim() : "",
+    antall: typeof c.antall === "string" ? c.antall.trim() : "",
+    formulering: typeof c.formulering === "string" ? c.formulering.trim() : "",
   };
 }
 
@@ -215,6 +244,8 @@ const SINGULAR_TO_PLURAL_FORMULERING: Record<string, string> = {
   sublingvaltablett: "sublingvaltabletter",
   brusetablett: "brusetabletter",
   depotkapsel: "depotkapsler",
+  // Inhalasjonspreparater doseres i «doser» (f.eks. «2 doser morgen og kveld»).
+  dose: "doser",
   nesespray: "nesesprayer",
   oyedrape: "oyedraper",
   oredrape: "oredraper",
@@ -225,6 +256,8 @@ const SINGULAR_TO_PLURAL_FORMULERING: Record<string, string> = {
   inhalasjonspulver: "inhalasjonspulvere",
   inhalasjonsvaeske: "inhalasjonsvaesker",
   mikstur: "miksturer",
+  // Måleenhet for flytende preparater (dosert i ml) er uforanderlig.
+  ml: "ml",
   granulat: "granulater",
   plaster: "plastre",
   depotplaster: "depotplastre",
@@ -266,6 +299,22 @@ function toPluralFormulering(value: string): string {
   if (mapped) return mapped;
   if (trimmed.endsWith("er")) return trimmed;
   return `${trimmed}er`;
+}
+
+// DOSERING er fritekst, så antallet må plukkes ut av strengen for å kunne bøye
+// FORMULERING. Ved flere tall (typisk intervaller som «1-2» eller «2-3») brukes
+// det høyeste – «1-2 tabletter» er riktig, «1-2 tablett» er det ikke. Strenger
+// uten tall («ved behov») gir null, og da bøyes ingenting.
+function parseDoseringCount(value: string): number | null {
+  const matches = (value ?? "").match(/\d+(?:[.,]\d+)?/g);
+  if (!matches?.length) return null;
+
+  const numbers = matches
+    .map((m) => Number(m.replace(",", ".")))
+    .filter((n) => Number.isFinite(n));
+  if (!numbers.length) return null;
+
+  return Math.max(...numbers);
 }
 
 function toSingularFormulering(value: string): string {
@@ -532,6 +581,8 @@ export default function StandardTekstPage() {
     clearNumbersAndDate: () => {
       // Reset tall fields based on the currently selected template
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
+      setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
 
       // Reset date input
@@ -553,10 +604,33 @@ export default function StandardTekstPage() {
     [selected?.content],
   );
   const [tallByIndex, setTallByIndex] = useState<Record<number, string>>({ 0: "" });
+  const [doseringByIndex, setDoseringByIndex] = useState<Record<number, string>>({ 0: "" });
+  // FRITEKST: fritt felt uten validering. Verdien lagres og settes inn ordrett.
+  const [fritekstByIndex, setFritekstByIndex] = useState<Record<number, string>>({ 0: "" });
   // Valgt segment-indeks per alternativ-gruppe-forekomst (null/manglende = ikke valgt).
   const [altByIndex, setAltByIndex] = useState<Record<number, number | null>>({});
-  // true per valgfri-setning-forekomst ({{...}}) som er valgt bort før kopiering.
+  // true per avkryssbar-setning-forekomst ([[...]] eller {{...}}) som er valgt
+  // bort før kopiering. Begge variantene deler samme forekomst-teller.
   const [optionalRemovedByIndex, setOptionalRemovedByIndex] = useState<Record<number, boolean>>({});
+
+  // Malen slik den faktisk blir seende ut ved kopiering: valgte alternativer satt
+  // inn, bortvalgte setninger ([[...]] / {{...}}) fjernet. Validering og forekomsttelling må se
+  // denne og ikke rå-malen. Tokens inne i en bortvalgt setning eller i et
+  // alternativ brukeren ikke valgte forsvinner ved kopiering, og skal derfor
+  // heller ikke kreves utfylt – ellers blir kopiering blokkert av et felt som
+  // ikke lenger finnes i skjemaet.
+  //
+  // Merk: uvalgte alternativ-grupper står igjen som {{a / b}}, og brukes til å
+  // avgjøre om kopiering skal blokkeres.
+  const effectiveTemplateContent = useMemo(() => {
+    // Fjern bortvalgte avkryssbare setninger FØRST: en bortvalgt [[...]] kan selv
+    // inneholde alternativ-grupper og tokens som da verken skal telles eller
+    // kreves utfylt. Deretter løses de gjenværende alternativ-gruppene opp.
+    const afterOptional = replaceOptionalGroups(activeTemplateContent, (idx) =>
+      Boolean(optionalRemovedByIndex[idx]),
+    );
+    return replaceAltGroups(afterOptional, (idx) => altByIndex[idx] ?? null);
+  }, [activeTemplateContent, altByIndex, optionalRemovedByIndex]);
   const [clockTime, setClockTime] = useState<string>(() => getAutomaticClockTallTime());
   const [clockDay, setClockDay] = useState<ClockTallDay>(() =>
     getAutomaticClockTallDay(getAutomaticClockTallTime()),
@@ -601,7 +675,7 @@ export default function StandardTekstPage() {
 
   const templateHasVirkestoffToken = (template: string) => /\bVIRKESTOFF\b/.test(template ?? "");
   const templateHasFormuleringTokens = (template: string) =>
-    /\{\{\s*FORMULERING\d*\s*\}\}|\bFORMULERING\d*\b/i.test(template ?? "");
+    tokenRegex("FORMULERING", "\\d*").test(template ?? "");
   const isTallValueValid = (value: string) => {
     const trimmed = (value ?? "").trim();
     return !trimmed || /^\d+(?:[.,]\d+)?$/.test(trimmed);
@@ -609,7 +683,7 @@ export default function StandardTekstPage() {
 
   const getFormuleringTokenIndices = (template: string): number[] => {
     const indices = new Set<number>();
-    const re = /\{\{\s*FORMULERING(\d*)\s*\}\}|\bFORMULERING(\d*)\b/gi;
+    const re = tokenRegex("FORMULERING", "(\\d*)", "g");
     let m: RegExpExecArray | null;
 
     while ((m = re.exec(template ?? ""))) {
@@ -629,13 +703,10 @@ export default function StandardTekstPage() {
     const safeValue = value ?? "";
 
     if (index === 0) {
-      return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, safeValue);
+      return text.replace(tokenRegex("FORMULERING", "", "g"), safeValue);
     }
 
-    const re = new RegExp(
-      `\\{\\{\\s*FORMULERING${index}\\s*\\}\\}|\\bFORMULERING${index}\\b`,
-      "gi",
-    );
+    const re = tokenRegex("FORMULERING", String(index), "g");
     return text.replace(re, safeValue);
   };
 
@@ -653,24 +724,67 @@ export default function StandardTekstPage() {
     [tallByIndex],
   );
 
+  const getDoseringNumericValue = useCallback(
+    (index: number): number | null => {
+      const candidate =
+        (doseringByIndex[index] ?? "").trim() ||
+        (index !== 0 ? (doseringByIndex[0] ?? "").trim() : "");
+      if (!candidate) return null;
+
+      return parseDoseringCount(candidate);
+    },
+    [doseringByIndex],
+  );
+
+  // Bøyer FORMULERING etter antallet foran seg. TALL har forrang siden det er et
+  // rent tallfelt; har malen bare DOSERING (fritekst), leses antallet ut av den.
+  const getFormuleringCount = useCallback(
+    (index: number, template: string): number | null => {
+      if (templateHasTallToken(template)) {
+        const numeric = getTallNumericValue(index);
+        if (numeric !== null) return numeric;
+      }
+
+      if (templateHasDoseringToken(template)) {
+        return getDoseringNumericValue(index);
+      }
+
+      return null;
+    },
+    [getDoseringNumericValue, getTallNumericValue],
+  );
+
   const resolveFormuleringForPreviewAndCopy = useCallback(
     (index: number, value: string, template: string): string => {
       const raw = (value ?? "").trim();
       if (!raw) return raw;
-      if (!templateHasTallToken(template)) return raw;
 
-      const numeric = getTallNumericValue(index);
+      const numeric = getFormuleringCount(index, template);
       if (numeric === null) return raw;
       if (numeric === 1) return toSingularFormulering(raw);
       if (numeric > 1) return toPluralFormulering(raw);
       return raw;
     },
-    [getTallNumericValue],
+    [getFormuleringCount],
   );
 
   const getTallTokenOccurrences = useCallback((template: string): number[] => {
     const occurrences: number[] = [];
-    const re = /\{\{\s*TALL(\d*)\s*\}\}|\bTALL(\d*)\b/gi;
+    const re = tokenRegex("TALL", "(\\d*)", "g");
+    let m: RegExpExecArray | null;
+
+    while ((m = re.exec(template ?? ""))) {
+      const raw = (m[1] ?? m[2] ?? "").trim();
+      const idx = raw ? Number(raw) : 0;
+      occurrences.push(Number.isFinite(idx) ? idx : 0);
+    }
+
+    return occurrences;
+  }, []);
+
+  const getDoseringTokenOccurrences = useCallback((template: string): number[] => {
+    const occurrences: number[] = [];
+    const re = tokenRegex("DOSERING", "(\\d*)", "g");
     let m: RegExpExecArray | null;
 
     while ((m = re.exec(template ?? ""))) {
@@ -683,7 +797,7 @@ export default function StandardTekstPage() {
   }, []);
 
   const getUnnumberedFormuleringOccurrenceCount = useCallback((template: string): number => {
-    const re = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi;
+    const re = tokenRegex("FORMULERING", "", "g");
     let count = 0;
     while (re.exec(template ?? "")) count += 1;
     return count;
@@ -693,7 +807,9 @@ export default function StandardTekstPage() {
     (template: string): Array<number | null> => {
       const positions: Array<number | null> = [];
       let currentPreparatPosition: number | null = null;
-      const re = /\{\{\s*(PREPARAT\d*|FORMULERING)\s*\}\}|\b(PREPARAT\d*|FORMULERING)\b/gi;
+      // Navnet ligger i en capture-gruppe her (m[1] = {{ }}-varianten, m[2] = den
+      // bare), så mønsteret bygges av gruppa i stedet for ett enkelt token-navn.
+      const re = new RegExp(tokenRegexSource("(PREPARAT\\d*|FORMULERING)"), "g");
       let m: RegExpExecArray | null;
 
       while ((m = re.exec(template ?? ""))) {
@@ -730,6 +846,8 @@ export default function StandardTekstPage() {
 
       const hasTallTokens = templateHasTallToken(template);
       const tallOccurrences = hasTallTokens ? getTallTokenOccurrences(template) : [];
+      const hasDoseringTokens = templateHasDoseringToken(template);
+      const doseringOccurrences = hasDoseringTokens ? getDoseringTokenOccurrences(template) : [];
 
       const getRawFromPreparatPosition = (position: number | null | undefined): string => {
         if (position === null || position === undefined || position < 0) return "";
@@ -756,12 +874,24 @@ export default function StandardTekstPage() {
           }
         }
 
+        // Ingen TALL-verdi å bøye etter – prøv DOSERING på samme plassering.
+        if (hasDoseringTokens) {
+          const doseringIdx = doseringOccurrences[occurrenceIdx];
+          if (typeof doseringIdx === "number") {
+            const numeric = getDoseringNumericValue(doseringIdx);
+            if (numeric === 1) return toSingularFormulering(raw);
+            if (numeric !== null && numeric > 1) return toPluralFormulering(raw);
+          }
+        }
+
         return raw;
       });
     },
     [
       formuleringByIndex,
       formuleringByPreparatKey,
+      getDoseringNumericValue,
+      getDoseringTokenOccurrences,
       getTallNumericValue,
       getTallTokenOccurrences,
       getUnnumberedFormuleringOccurrenceCount,
@@ -788,7 +918,7 @@ export default function StandardTekstPage() {
         const key = String(row?.pickedKey ?? row?.picked ?? "").trim();
         return key ? count + 1 : count;
       }, 0);
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(template ?? "");
+      const hasUnnumberedToken = tokenRegex("FORMULERING").test(template ?? "");
       const preparatPosition = index === 0
         ? 0
         : hasUnnumberedToken
@@ -818,7 +948,7 @@ export default function StandardTekstPage() {
       if (!values.length) return text;
 
       let cursor = 0;
-      return text.replace(/\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/gi, () => {
+      return text.replace(tokenRegex("FORMULERING", "", "g"), () => {
         const value = values[cursor] ?? values[values.length - 1] ?? "";
         cursor += 1;
         return value;
@@ -1131,6 +1261,8 @@ export default function StandardTekstPage() {
       setTallByIndex(nextTallValues);
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       setDatoInput("");
       setErrorLocal(null);
@@ -1149,10 +1281,37 @@ export default function StandardTekstPage() {
       setFormuleringByPreparatKey({});
 
       addPickedPreparat(pendingLager.preparat, pendingLager.preparatKey);
+      for (const e of pendingLager.ekstraPreparater) addPickedPreparat(e.preparat, e.preparatKey);
 
-      setTallByIndex(buildInitialTallValues(normalizeTemplateContent(selected.content)));
+      const lagerContent = normalizeTemplateContent(selected.content);
+      setTallByIndex(buildInitialTallValues(lagerContent));
+      if (pendingLager.formulering) {
+        setFormuleringByPreparatKey({
+          [pendingLager.preparatKey]: pendingLager.formulering,
+          ...Object.fromEntries(
+            pendingLager.ekstraPreparater
+              .filter((e) => e.formulering)
+              .map((e) => [e.preparatKey, e.formulering]),
+          ),
+        });
+        const fIndices = getFormuleringTokenIndices(lagerContent);
+        if (fIndices.length) {
+          const nextF: Record<number, string> = {};
+          for (const i of fIndices) nextF[i] = i === 0 ? pendingLager.formulering : "";
+          setFormuleringByIndex(nextF);
+        }
+      }
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      // «ANT» i malene er DOSERING-tokenet: første DOSERING får dagsforbruket fra
+      // lagerbeholdning (FORMULERING bøyes etter tallet).
+      const lagerDoseringIdx = getDoseringTokenIndices(lagerContent)[0];
+      setDoseringByIndex(
+        pendingLager.antall && lagerDoseringIdx !== undefined
+          ? { 0: "", [lagerDoseringIdx]: pendingLager.antall }
+          : { 0: "" },
+      );
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       // Måned/år (MM.YYYY) fra "dekket til" → DATO-tokenet rendres som "desember 2026".
       setDatoInput(pendingLager.datoInput);
@@ -1187,6 +1346,8 @@ export default function StandardTekstPage() {
       setTallByIndex(nextTall);
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
 
       if (pendingPalette.formuleringValues) {
         const nextF: Record<number, string> = { 0: "" };
@@ -1215,6 +1376,8 @@ export default function StandardTekstPage() {
       setTallByIndex(buildInitialTallValues(activeTemplateContent));
       setAltByIndex({});
       setOptionalRemovedByIndex({});
+      setDoseringByIndex({ 0: "" });
+      setFritekstByIndex({ 0: "" });
       resetClockToAutomatic();
       setDatoInput("");
       const fIndices = getFormuleringTokenIndices(activeTemplateContent);
@@ -1510,6 +1673,8 @@ export default function StandardTekstPage() {
       "brusetablett",
       "depottablett",
       "depotplaster",
+      "dose",
+      "doser",
       "dråper",
       "gel",
       "granulat",
@@ -1850,6 +2015,11 @@ export default function StandardTekstPage() {
     if (!selected) return false;
     if (isEditing) return false;
     const selectedContent = activeTemplateContent;
+    // All validering under kjører mot den effektive malen, ikke rå-malen: det som
+    // ikke havner i kopiert tekst skal ikke kreves utfylt. Garantien består – alt
+    // som faktisk overlever inn i teksten blir fortsatt krevd, så råtokens kan
+    // ikke nå kunden.
+    const validationContent = effectiveTemplateContent;
 
     // If the user has marked (selected) text, do NOT auto-copy the full template.
     // This keeps normal text selection + Ctrl/Cmd+C working.
@@ -1859,24 +2029,47 @@ export default function StandardTekstPage() {
     }
 
     // Prevent copying if the template requires a number and it hasn't been filled in.
-    if (templateHasTallToken(selectedContent)) {
-      const indices = getTallTokenIndices(selectedContent);
+    if (templateHasTallToken(validationContent)) {
+      const indices = getTallTokenIndices(validationContent);
       const missing = indices.filter((i) => !(tallByIndex[i] ?? "").trim());
       if (missing.length) {
-        const label = missing.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
+        const label = missing.map((i) => getTallFieldLabel(validationContent, i)).join(", ");
         setErrorLocal(`Fyll inn feltet før du kopierer teksten: ${label}.`);
         return false;
       }
 
       const invalid = indices.filter((i) => !isTallValueValid(tallByIndex[i] ?? ""));
       if (invalid.length) {
-        const label = invalid.map((i) => getTallFieldLabel(selectedContent, i)).join(", ");
+        const label = invalid.map((i) => getTallFieldLabel(validationContent, i)).join(", ");
         setErrorLocal(`Tallfelt må inneholde kun tall: ${label}.`);
         return false;
       }
     }
 
-    if (templateHasKlokkeslettDagToken(selectedContent)) {
+    // DOSERING er fritekst, så det eneste kravet er at feltet ikke står tomt.
+    if (templateHasDoseringToken(validationContent)) {
+      const indices = getDoseringTokenIndices(validationContent);
+      const missing = indices.filter((i) => !(doseringByIndex[i] ?? "").trim());
+      if (missing.length) {
+        const label = missing.map((i) => (i === 0 ? "DOSERING" : `DOSERING${i}`)).join(", ");
+        setErrorLocal(`Fyll inn dosering før du kopierer teksten: ${label}.`);
+        return false;
+      }
+    }
+
+    // FRITEKST godtar alt innhold, men feltet må være utfylt – ellers ville
+    // token-navnet blitt kopiert rått inn i en melding til kunden.
+    if (templateHasFritekstToken(validationContent)) {
+      const indices = getFritekstTokenIndices(validationContent);
+      const missing = indices.filter((i) => !(fritekstByIndex[i] ?? "").trim());
+      if (missing.length) {
+        const label = missing.map((i) => (i === 0 ? "FRITEKST" : `FRITEKST${i}`)).join(", ");
+        setErrorLocal(`Fyll inn fritekstfeltet før du kopierer teksten: ${label}.`);
+        return false;
+      }
+    }
+
+    if (templateHasKlokkeslettDagToken(validationContent)) {
       const clockLabel = formatClockTallValue(clockTime, clockDay).trim();
       if (!clockLabel) {
         setErrorLocal("Velg klokkeslett før du kopierer teksten.");
@@ -1886,45 +2079,41 @@ export default function StandardTekstPage() {
 
     // Krev utfylt preparat når malen har PREPARAT-token. Uten dette har det skjedd
     // at tekst med råtokenet "PREPARAT1" ble kopiert og sendt til kunde.
-    if (templateHasPreparatToken(selectedContent) && pickedPreparats.length === 0) {
+    if (templateHasPreparatToken(validationContent) && pickedPreparats.length === 0) {
       setErrorLocal("Velg preparat før du kopierer teksten.");
       return false;
     }
 
     // Krev at hver alternativ-gruppe ({{seg1 / seg2}}) er valgt, ellers kan de
-    // ubrukte alternativene ende opp i teksten som sendes til kunde.
-    if (templateHasAltToken(selectedContent)) {
-      const altCount = getAltGroupCount(selectedContent);
-      const hasUnselected = Array.from({ length: altCount }, (_, i) => i).some(
-        (i) => altByIndex[i] == null,
-      );
-      if (hasUnselected) {
-        setErrorLocal("Velg alternativ før du kopierer teksten.");
-        return false;
-      }
+    // ubrukte alternativene ende opp i teksten som sendes til kunde. replaceAltGroups
+    // bytter ut de valgte gruppene, så står det fortsatt en gruppe igjen i den
+    // effektive malen er den uvalgt.
+    if (templateHasAltToken(validationContent)) {
+      setErrorLocal("Velg alternativ før du kopierer teksten.");
+      return false;
     }
 
-    if (templateHasVirkestoffToken(selectedContent) && !resolvedVirkestoff) {
+    if (templateHasVirkestoffToken(validationContent) && !resolvedVirkestoff) {
       setErrorLocal("Velg et preparat med virkestoff før du kopierer teksten.");
       return false;
     }
-    if (templateHasFormuleringTokens(selectedContent)) {
-      const indices = getFormuleringTokenIndices(selectedContent);
+    if (templateHasFormuleringTokens(validationContent)) {
+      const indices = getFormuleringTokenIndices(validationContent);
       const missingLabels = new Set<string>();
 
       for (const idx of indices.filter((i) => i > 0)) {
-        if (!resolveFormuleringTokenValue(idx, selectedContent)) {
+        if (!resolveFormuleringTokenValue(idx, validationContent)) {
           missingLabels.add(`FORMULERING${idx}`);
         }
       }
 
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      const hasUnnumberedToken = tokenRegex("FORMULERING").test(validationContent);
       if (hasUnnumberedToken) {
-        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(validationContent);
         if (!occurrenceValues.length || occurrenceValues.some((value) => !value.trim())) {
           missingLabels.add("FORMULERING");
         }
-      } else if (indices.includes(0) && !resolveFormuleringTokenValue(0, selectedContent)) {
+      } else if (indices.includes(0) && !resolveFormuleringTokenValue(0, validationContent)) {
         missingLabels.add("FORMULERING");
       }
 
@@ -1942,12 +2131,14 @@ export default function StandardTekstPage() {
       picked: pickedPreparats,
     });
 
+    // Fjern bortvalgte avkryssbare setninger ([[...]] / {{...}}) FØRST, så indre
+    // alternativ-grupper og tokens i en bortvalgt setning ikke resolves eller
+    // forskyver forekomst-indeksene til det som faktisk blir med.
+    text = replaceOptionalGroups(text, (idx) => Boolean(optionalRemovedByIndex[idx]));
+
     // Løs opp alternativ-grupper FØR de andre tokenene erstattes – et valgt
     // segment kan selv inneholde f.eks. DATO/PREPARAT1/TALL som må resolves videre.
     text = replaceAltGroups(text, (idx) => altByIndex[idx] ?? null);
-
-    // Fjern bortvalgte valgfrie setninger ({{...}}) og pakk ut resten.
-    text = replaceOptionalGroups(text, (idx) => Boolean(optionalRemovedByIndex[idx]));
 
     // Ensure PREPARAT tokens are actually resolved in the copied text.
     // Preview replaces them in the renderer, but clipboard needs real text.
@@ -2008,29 +2199,53 @@ export default function StandardTekstPage() {
     }
 
     // Replace FORMULERING tokens (free text) by index (FORMULERING, FORMULERING1, ...)
-    if (templateHasFormuleringTokens(selectedContent)) {
-      const indices = getFormuleringTokenIndices(selectedContent);
+    if (templateHasFormuleringTokens(validationContent)) {
+      const indices = getFormuleringTokenIndices(validationContent);
       const hasNumbered = indices.some((idx) => idx > 0);
 
       if (hasNumbered) {
         for (const idx of indices.filter((i) => i > 0)) {
-          const v = resolveFormuleringTokenValue(idx, selectedContent);
+          const v = resolveFormuleringTokenValue(idx, validationContent);
           if (!v) continue;
           text = replaceFormuleringTokenByIndex(text, idx, v);
         }
       }
 
-      const hasUnnumberedToken = /\{\{\s*FORMULERING\s*\}\}|\bFORMULERING\b/i.test(selectedContent);
+      const hasUnnumberedToken = tokenRegex("FORMULERING").test(validationContent);
       if (hasUnnumberedToken) {
-        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(selectedContent);
+        // Verdiene bygges fra den effektive malen, ikke rå-malen. Erstatningen går
+        // gjennom tokenene i `text` i rekkefølge, så hadde vi tellet forekomster i
+        // rå-malen ville en umerket FORMULERING inne i en bortvalgt setning ha
+        // forskjøvet indeksene og satt inn verdien fra feil forekomst.
+        const occurrenceValues = buildUnnumberedFormuleringOccurrenceValues(validationContent);
         if (occurrenceValues.length > 0) {
           text = replaceUnnumberedFormuleringTokensByOccurrence(text, occurrenceValues);
         } else {
-          const v0 = resolveFormuleringTokenValue(0, selectedContent);
+          const v0 = resolveFormuleringTokenValue(0, validationContent);
           if (v0) {
             text = replaceFormuleringTokenByIndex(text, 0, v0);
           }
         }
+      }
+    }
+
+    // DOSERING (fritekst) erstattes per indeks, som TALL.
+    if (templateHasDoseringToken(validationContent)) {
+      for (const idx of getDoseringTokenIndices(validationContent)) {
+        const v = (doseringByIndex[idx] ?? "").trim();
+        if (!v) continue;
+        text = replaceDoseringTokenByIndex(text, idx, v);
+      }
+    }
+
+    // FRITEKST erstattes per indeks. Bare mellomrom rundt verdien fjernes –
+    // innholdet ellers settes inn ordrett, med tegnene og bokstavstørrelsen
+    // brukeren skrev.
+    if (templateHasFritekstToken(validationContent)) {
+      for (const idx of getFritekstTokenIndices(validationContent)) {
+        const v = (fritekstByIndex[idx] ?? "").trim();
+        if (!v) continue;
+        text = replaceFritekstTokenByIndex(text, idx, v);
       }
     }
 
@@ -2054,6 +2269,8 @@ export default function StandardTekstPage() {
         }
         setAltByIndex({});
         setOptionalRemovedByIndex({});
+        setDoseringByIndex({ 0: "" });
+        setFritekstByIndex({ 0: "" });
         resetClockToAutomatic();
 
         setSearch("");
@@ -2100,6 +2317,8 @@ export default function StandardTekstPage() {
           }
           setAltByIndex({});
           setOptionalRemovedByIndex({});
+          setDoseringByIndex({ 0: "" });
+          setFritekstByIndex({ 0: "" });
           resetClockToAutomatic();
 
           setSearch("");
@@ -2826,9 +3045,41 @@ export default function StandardTekstPage() {
                   }
                   return arr;
                 })(),
+                // Fra den effektive malen: renderen teller ikke forekomster inne i
+                // bortvalgte setninger, så verdiene må telles på samme grunnlag.
                 formuleringOccurrenceValues: buildUnnumberedFormuleringOccurrenceValues(
-                  activeTemplateContent,
+                  effectiveTemplateContent,
                 ),
+                doseringValues: (() => {
+                  const indices = getDoseringTokenIndices(activeTemplateContent);
+                  const arr: string[] = [];
+                  for (const i of indices) {
+                    arr[i] = doseringByIndex[i] ?? "";
+                  }
+                  return arr;
+                })(),
+                onDoseringChange: (idx, value) => {
+                  setDoseringByIndex((prev) => ({ ...prev, [idx]: value }));
+                  if (errorLocal?.startsWith("Fyll inn dosering før du kopierer teksten")) {
+                    setErrorLocal(null);
+                  }
+                },
+                fritekstValues: (() => {
+                  const indices = getFritekstTokenIndices(activeTemplateContent);
+                  const arr: string[] = [];
+                  for (const i of indices) {
+                    arr[i] = fritekstByIndex[i] ?? "";
+                  }
+                  return arr;
+                })(),
+                onFritekstChange: (idx, value) => {
+                  // Ingen filtrering av verdien – i motsetning til onTallChange,
+                  // som fjerner alt annet enn siffer.
+                  setFritekstByIndex((prev) => ({ ...prev, [idx]: value }));
+                  if (errorLocal?.startsWith("Fyll inn fritekstfeltet før du kopierer teksten")) {
+                    setErrorLocal(null);
+                  }
+                },
                 onTallChange: (idx, value) => {
                   const nextValue = value.replace(/[^\d.,]/g, "");
                   setTallByIndex((prev) => ({ ...prev, [idx]: nextValue }));

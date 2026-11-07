@@ -26,6 +26,7 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import LeaderboardRoundedIcon from "@mui/icons-material/LeaderboardRounded";
+import FeedbackRoundedIcon from "@mui/icons-material/FeedbackRounded";
 import { RequireAuth } from "./auth/RequireAuth";
 import { logUsage, type UsagePage } from "../shared/services/usage";
 import { useAuthUser } from "./auth/useAuthUser";
@@ -33,6 +34,7 @@ import { GlobalSearch } from "../features/commandpalette/GlobalSearch";
 import { useGlobalSearchHotkey } from "../features/commandpalette/useGlobalSearchHotkey";
 import RequireRekspert from "./auth/RequireRekspert";
 import RequireAdmin from "./auth/RequireAdmin";
+import RequireOwner from "./auth/RequireOwner";
 import { ProfileMenu } from "./auth/ProfileMenu";
 import { InnkjopIcon, InnspillIcon, ProduktOgRadIcon, StandardteksterIcon } from "./navIcons";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
@@ -70,6 +72,11 @@ const TilbakemeldingPage = React.lazy(
 const RekspertPage = React.lazy(() => import("../features/rekspert/RekspertPage"));
 const StandardtekstStatistikkPage = React.lazy(
   () => import("../features/statistikk/pages/StandardtekstStatistikkPage")
+);
+const FeedbackPage = React.lazy(() => import("../features/feedback/pages/FeedbackPage"));
+const InnspillPage = React.lazy(() => import("../features/feedback/pages/InnspillPage"));
+const FeedbackLauncher = React.lazy(
+  () => import("../features/feedback/components/FeedbackLauncher")
 );
 const LoginPage = React.lazy(() =>
   import("./auth/LoginPage").then((module) => ({ default: module.LoginPage }))
@@ -229,21 +236,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     return params.get("tab") === "produktskjema" ? 1 : 0;
   };
 
-  const isInnspill = location.pathname === "/tilbakemelding";
-  const [innspillOpen, setInnspillOpen] = React.useState(isInnspill);
-  React.useEffect(() => { if (isInnspill) setInnspillOpen(true); }, [isInnspill]);
-
-  const innspillSubItems = [
-    { label: "Mine notater", search: "" },
-    { label: "Innspill", search: "?tab=meldeskjema" },
-  ];
-
-  const activeInnspillSubItem = () => {
-    const params = new URLSearchParams(location.search);
-    if (params.get("tab") === "meldeskjema") return 1;
-    return 0;
-  };
-
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   const navItemButtonSx = (item: SidebarItem) => ({
@@ -303,7 +295,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       color: "#FFA726",
     },
     {
-      label: "Notater og innspill",
+      label: "Notater",
       path: "/tilbakemelding",
       Icon: InnspillIcon,
       color: "#B648E8",
@@ -328,6 +320,17 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             path: "/rekspert/tekststatistikk",
             Icon: LeaderboardRoundedIcon,
             color: "#7C5CFF",
+          } satisfies SidebarItem,
+        ]
+      : []),
+    // Innspill fra brukerne er kun eiers ansvar – admin skal ikke se dem.
+    ...(isOwner
+      ? [
+          {
+            label: "Innspill",
+            path: "/rekspert/feedbacks",
+            Icon: FeedbackRoundedIcon,
+            color: "#B648E8",
           } satisfies SidebarItem,
         ]
       : []),
@@ -357,6 +360,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         }}
         sx={{
           height: 64,
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -401,6 +405,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       </Box>
       <Toolbar
         sx={{
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-end",
@@ -414,9 +419,25 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         </Tooltip>
       </Toolbar>
 
-      <Divider />
+      <Divider sx={{ flexShrink: 0 }} />
 
-      <List sx={{ py: 0.5 }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+          scrollbarWidth: "thin",
+          "&::-webkit-scrollbar": { width: 6 },
+          "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
+          "&::-webkit-scrollbar-thumb": {
+            borderRadius: 999,
+            backgroundColor: (theme) =>
+              alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.24 : 0.18),
+          },
+        }}
+      >
+        <List sx={{ py: 0.5 }}>
         {mainItems.map((item, index) => (
           <React.Fragment key={item.path}>
             {item.path === "/produkt-og-rad" ? (
@@ -540,64 +561,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                   </Collapse>
                 )}
               </>
-            ) : item.path === "/tilbakemelding" ? (
-              <>
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <Tooltip title={collapsed ? item.label : ""} placement="right">
-                    <ListItemButton
-                      selected={isInnspill}
-                      onClick={() => {
-                        logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
-                        navigate(item.path);
-                        if (!isInnspill) setInnspillOpen(true);
-                      }}
-                      sx={{ ...navItemButtonSx(item), flex: 1 }}
-                    >
-                      <ListItemIcon
-                        sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: "center", display: "flex", alignItems: "center" }}
-                      >
-                        <item.Icon sx={{ fontSize: getIconFontSize(item.Icon, collapsed) }} />
-                      </ListItemIcon>
-                      {!collapsed && <ListItemText primary={item.label} />}
-                    </ListItemButton>
-                  </Tooltip>
-                  {!collapsed && (
-                    <IconButton
-                      size="small"
-                      aria-label={innspillOpen ? "Skjul undermeny" : "Vis undermeny"}
-                      onClick={() => setInnspillOpen((o) => !o)}
-                      sx={{ p: 0.5, flexShrink: 0 }}
-                    >
-                      {innspillOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                    </IconButton>
-                  )}
-                </Box>
-                {!collapsed && (
-                  <Collapse in={innspillOpen} timeout="auto" unmountOnExit>
-                    <List disablePadding>
-                      {innspillSubItems.map((sub, i) => (
-                        <ListItemButton
-                          key={sub.label}
-                          selected={isInnspill && activeInnspillSubItem() === i}
-                          onClick={() => navigate(`/tilbakemelding${sub.search}`)}
-                          sx={{
-                            pl: 5,
-                            py: 0.6,
-                            color: isInnspill && activeInnspillSubItem() === i ? "primary.main" : "text.secondary",
-                            "&.Mui-selected": { bgcolor: "transparent", color: "primary.main" },
-                            "&:hover": { bgcolor: "action.hover" },
-                          }}
-                        >
-                          <ListItemText
-                            primary={sub.label}
-                            primaryTypographyProps={{ fontSize: 13, fontWeight: isInnspill && activeInnspillSubItem() === i ? 700 : 400 }}
-                          />
-                        </ListItemButton>
-                      ))}
-                    </List>
-                  </Collapse>
-                )}
-              </>
             ) : (
               <Tooltip title={collapsed ? item.label : ""} placement="right">
                 <ListItemButton
@@ -667,11 +630,12 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             ))}
           </>
         )}
-      </List>
-      <Box sx={{ flexGrow: 1 }} />
-      <Divider />
+        </List>
+      </Box>
+      <Divider sx={{ flexShrink: 0 }} />
       <Box
         sx={{
+          flexShrink: 0,
           px: collapsed ? 0.6 : 1.4,
           pt: 1.1,
           pb: 0.7,
@@ -708,6 +672,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       </Box>
       <Box
         sx={{
+          flexShrink: 0,
           display: "flex",
           justifyContent: "center",
           py: 0.75,
@@ -762,6 +727,9 @@ function Layout() {
     <NavigationGuardProvider>
       <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
         <GlobalSearch open={searchOpen} onClose={closeSearch} />
+        <Suspense fallback={null}>
+          <FeedbackLauncher />
+        </Suspense>
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
         <Box component="main" sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {keepAnbruddMounted && (
@@ -786,6 +754,7 @@ function Layout() {
                 <Route path="/produktskjema" element={<Navigate to="/anbrudd" replace />} />
                 <Route path="/anbrudd" element={null} />
                 <Route path="/tilbakemelding" element={<TilbakemeldingPage />} />
+                <Route path="/innspill" element={<InnspillPage />} />
                 <Route element={<RequireRekspert />}>
                   <Route path="/rekspert" element={<RekspertPage />} />
                 </Route>
@@ -794,6 +763,9 @@ function Layout() {
                     path="/rekspert/tekststatistikk"
                     element={<StandardtekstStatistikkPage />}
                   />
+                </Route>
+                <Route element={<RequireOwner />}>
+                  <Route path="/rekspert/feedbacks" element={<FeedbackPage />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/omeq" replace />} />
               </Routes>

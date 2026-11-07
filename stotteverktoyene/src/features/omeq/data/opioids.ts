@@ -33,6 +33,7 @@ export interface OpioidDefinition {
   omeqFactor: number;
   isPatch?: boolean;
   isShortActing?: boolean;
+  // {enhet} byttes ut med enheten i dosefeltet (tbl, kps, dose osv.) når teksten vises.
   helpText?: string;
 }
 
@@ -68,7 +69,7 @@ export const OPIOIDS: OpioidDefinition[] = [
     route: ["parenteral"],
     omeqFactor: 150,
     isShortActing: true,
-    helpText: "Styrken er omregnet fra µg til mg. Er døgndosen 50 µg, skriv 1 dose.",
+    helpText: "Skriv døgndosen i µg, slik legen har oppgitt. Omregning til mg skjer automatisk.",
   },
   {
     id: "fentanyl-sublingval-intranasal",
@@ -78,7 +79,7 @@ export const OPIOIDS: OpioidDefinition[] = [
     omeqFactor: 250,
     isShortActing: true,
     helpText:
-      "Styrken er omregnet fra µg til mg. Eksempel: er styrken 50 µg, og døgndosen 100 µg, skriv 2 doser.",
+      "Styrken er omregnet fra µg til mg. Eksempel: er styrken 50 µg, og døgndosen 100 µg, skriv 2 {enhet}.",
   },
   {
     id: "fentanyl-transdermal",
