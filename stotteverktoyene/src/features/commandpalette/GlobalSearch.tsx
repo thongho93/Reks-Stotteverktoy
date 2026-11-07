@@ -48,6 +48,7 @@ import {
 import { isAvoidRelevance, relevanceKind, RelevanceIcon } from "../interaksjoner/utils/relevance";
 import { collection, getDocs, orderBy, query as fsQuery } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
+import { richHtmlToPlainText } from "../../shared/lib/richText";
 import { buildProductIndex, parseMedicationInput } from "../omeq/lib/parseMedicationInput";
 import { ATC_PRODUCTS } from "../omeq/data/atcProducts";
 
@@ -362,7 +363,8 @@ function buildTilbakemeldingNoteContent(data: Record<string, unknown>): string {
     return checklistItems.join("\n");
   }
 
-  return String(data.content ?? "");
+  // Tekstnotater lagres som HTML – vis ren tekst (uten <div>, <span> osv.).
+  return richHtmlToPlainText(String(data.content ?? ""));
 }
 
 function buildTilbakemeldingSnippet(content: string): string {
@@ -950,6 +952,8 @@ export function GlobalSearch({ open, onClose }: Props) {
       const notesRef = collection(db, "users", user.uid, "privateNotes");
       const snapshot = await getDocs(notesRef);
       const loaded = snapshot.docs
+        // Notater i «Slettede notater» skal ikke dukke opp i søket.
+        .filter((noteDoc) => typeof (noteDoc.data() as Record<string, unknown>).deletedAt !== "number")
         .map((noteDoc) => {
           const data = noteDoc.data() as Record<string, unknown>;
           const title = String(data.title ?? "").trim() || "Uten tittel";
