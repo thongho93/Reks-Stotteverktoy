@@ -2,6 +2,7 @@
 
 import { formToRoute } from "../data/atcProducts";
 import { OPIOIDS } from "../data/opioids";
+import { parenteralDoseUnit } from "./doseUnit";
 
 const inferRoute = (formRaw: unknown, mappedRoute: string | null | undefined) => {
   const form = String(formRaw ?? "")
@@ -176,6 +177,24 @@ export function calculateOMEQ({ product, dailyDose, strength }: CalcInput) {
 
     return {
       omeq: mcgPerHour * opioid.omeqFactor,
+      reason: "ok",
+    } as const;
+  }
+
+  // Injeksjon/infusjon (parenteral): dosen er legens dosering per døgn i µg eller mg
+  // (enheten følger styrken). Den regnes om til mg og ganges med OMEQ-faktoren;
+  // styrken (per ml) brukes ikke.
+  if (route === "parenteral") {
+    if (!strength) {
+      return { omeq: null, reason: "missing-strength" } as const;
+    }
+    if (!dailyDose) {
+      return { omeq: null, reason: "missing-input" } as const;
+    }
+
+    const doseMg = parenteralDoseUnit(strength) === "µg" ? dailyDose / 1000 : dailyDose;
+    return {
+      omeq: doseMg * opioid.omeqFactor,
       reason: "ok",
     } as const;
   }

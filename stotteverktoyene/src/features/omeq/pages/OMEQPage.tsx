@@ -48,6 +48,7 @@ import {
   type ProductIndexItem,
 } from "../lib/parseMedicationInput";
 import { calculateOMEQ } from "../lib/calc";
+import { isParenteralForm } from "../lib/doseUnit";
 import { OPIOIDS } from "../data/opioids";
 import { formToRoute } from "../data/atcProducts";
 
@@ -306,7 +307,10 @@ export default function OMEQPage() {
         if (!Number.isFinite(dailyDose)) return acc;
 
         // Block if over-limit and user has not explicitly confirmed the high value.
-        if (dailyDose > 20 && !r.confirmedHighDose) return acc;
+        // Gjelder ikke injeksjon/infusjon, der dosen er legens dosering i µg/mg.
+        if (dailyDose > 20 && !r.confirmedHighDose && !isParenteralForm(parsed.product?.form)) {
+          return acc;
+        }
 
         const result = calculateOMEQ({
           product: parsed.product ?? null,
