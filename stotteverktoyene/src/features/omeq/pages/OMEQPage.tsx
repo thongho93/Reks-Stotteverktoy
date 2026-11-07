@@ -48,7 +48,7 @@ import {
   type ProductIndexItem,
 } from "../lib/parseMedicationInput";
 import { calculateOMEQ } from "../lib/calc";
-import { isParenteralForm } from "../lib/doseUnit";
+import { isParenteralForm, parseDoseInput } from "../lib/doseUnit";
 import { OPIOIDS } from "../data/opioids";
 import { formToRoute } from "../data/atcProducts";
 
@@ -300,11 +300,9 @@ export default function OMEQPage() {
       const isPatch = parsed.product?.form?.toLowerCase() === "depotplaster";
 
       if (!isPatch) {
-        const raw = r.doseText.trim();
-        if (!raw) return acc;
-
-        const dailyDose = Number(raw.replace(",", "."));
-        if (!Number.isFinite(dailyDose)) return acc;
+        // Tall («8») eller produkt («2x4» = 8)
+        const dailyDose = parseDoseInput(r.doseText);
+        if (dailyDose == null) return acc;
 
         // Block if over-limit and user has not explicitly confirmed the high value.
         // Gjelder ikke injeksjon/infusjon, der dosen er legens dosering i µg/mg.
