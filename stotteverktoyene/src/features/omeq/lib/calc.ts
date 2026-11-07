@@ -2,7 +2,19 @@
 
 import { formToRoute } from "../data/atcProducts";
 import { OPIOIDS } from "../data/opioids";
-import { parenteralDoseUnit } from "./doseUnit";
+import { isDropForm, parenteralDoseUnit } from "./doseUnit";
+
+// Antall dråper per ml for morfindråper, slik de står i hjelpeteksten for oral morfin:
+// Oramorph 1 ml = 16 dråper, Dropizol 1 ml = 20 dråper.
+const DROPS_PER_ML: { match: string; dropsPerMl: number }[] = [
+  { match: "oramorph", dropsPerMl: 16 },
+  { match: "dropizol", dropsPerMl: 20 },
+];
+
+const dropsPerMlFor = (name: unknown): number | null => {
+  const n = String(name ?? "").toLowerCase();
+  return DROPS_PER_ML.find((d) => n.includes(d.match))?.dropsPerMl ?? null;
+};
 
 const inferRoute = (formRaw: unknown, mappedRoute: string | null | undefined) => {
   const form = String(formRaw ?? "")
@@ -139,12 +151,16 @@ export function calculateOMEQ({ product, dailyDose, strength }: CalcInput) {
     return { omeq: null, reason: "unsupported-ketobemidone" } as const;
   }
 
-  // Morfin (N02AA01) dråper og parenteral har egen logikk – støttes ikke i enkel beregning ennå.
-  const formLower = String(product.form ?? "").trim().toLowerCase();
-  if (
-    String(product.atcCode) === "N02AA01" &&
-    (route === "parenteral" || formLower.includes("dråpe"))
-  ) {
+  // Morfin (N02AA01) parenteral har egen logikk – støttes ikke i enkel beregning ennå.
+  if (String(product.atcCode) === "N02AA01" && route === "parenteral") {
+    return { omeq: null, reason: "unsupported-morphine-drops-or-parenteral" } as const;
+  }
+
+  // Morfin-dråper: døgndosen er antall dråper. mg per dråpe = styrke (mg/ml) / dråper per ml.
+  // Ukjent dråpetetthet gir ingen beregning i stedet for et gjetningstall.
+  const isMorphineDrops = String(product.atcCode) === "N02AA01" && isDropForm(product.form);
+  const dropsPerMl = isMorphineDrops ? dropsPerMlFor(product.name) : null;
+  if (isMorphineDrops && dropsPerMl == null) {
     return { omeq: null, reason: "unsupported-morphine-drops-or-parenteral" } as const;
   }
 
@@ -209,8 +225,10 @@ export function calculateOMEQ({ product, dailyDose, strength }: CalcInput) {
     return { omeq: null, reason: "missing-input" } as const;
   }
 
+  const mgPerUnit = dropsPerMl != null ? strengthMg / dropsPerMl : strengthMg;
+
   return {
-    omeq: dailyDose * strengthMg * opioid.omeqFactor,
+    omeq: dailyDose * mgPerUnit * opioid.omeqFactor,
     reason: "ok",
   } as const;
 }

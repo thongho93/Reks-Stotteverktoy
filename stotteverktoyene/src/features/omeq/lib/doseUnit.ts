@@ -5,6 +5,9 @@
 export const isParenteralForm = (form?: string | null): boolean =>
   /injeks|infus/i.test(String(form ?? ""));
 
+// Dråper (Dropizol, Oramorph). Her skriver brukeren antall dråper per døgn.
+export const isDropForm = (form?: string | null): boolean => /dråpe/i.test(String(form ?? ""));
+
 // Enheten for doseringen på parenterale preparater følger styrken:
 // står styrken i µg/mcg (f.eks. Fentanyl 50 µg/ml) skrives dosen i µg, ellers i mg.
 export const parenteralDoseUnit = (strength?: { unit: string } | null): "mg" | "µg" => {

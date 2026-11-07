@@ -24,7 +24,7 @@ import { buildProductIndex, parseMedicationInput } from "../lib/parseMedicationI
 import { formToRoute } from "../data/atcProducts";
 import { OPIOIDS } from "../data/opioids";
 import { calculateOMEQ } from "../lib/calc";
-import { isDoseProduct, isParenteralForm, parenteralDoseUnit, parseDoseInput } from "../lib/doseUnit";
+import { isDoseProduct, isDropForm, isParenteralForm, parenteralDoseUnit, parseDoseInput } from "../lib/doseUnit";
 
 export interface OMEQRowValue {
   medicationText: string;
@@ -91,14 +91,15 @@ export const OMEQRow = ({
   const dosesInMl = parsed.strength ? parsed.strength.perMl === true : isLiquidForm;
 
   // Hva brukeren skal skrive i dosefeltet.
-  const doseUnitNoun = dosesInMl ? "ml" : isLiquidForm ? "endoser" : "tablett/kapsel/dose";
+  const isDrops = isDropForm(formLower);
+  const doseUnitNoun = isDrops ? "dråper" : dosesInMl ? "ml" : isLiquidForm ? "endoser" : "tablett/kapsel/dose";
 
   // Kort enhet som vises i dosefeltet, tilpasset formuleringen:
   // tbl (alle tabletter), kps (kapsler), ml (mikstur/konsentrasjon), supp (stikkpiller),
   // dose (dråper, nesespray, endoser og injeksjoner/infusjoner), ellers stk.
   const doseUnit = (() => {
     if (isParenteral) return parenteralDoseUnit(parsed.strength);
-    if (formLower.includes("dråpe")) return "dose";
+    if (isDrops) return "dråper";
     if (dosesInMl) return "ml";
     if (formLower.includes("kapsel")) return "kps";
     if (formLower.includes("tablett")) return "tbl";
@@ -163,10 +164,10 @@ export const OMEQRow = ({
   }, [value.doseText]);
 
   const doseOverLimit = useMemo(() => {
-    if (isPatch || isParenteral) return false;
+    if (isPatch || isParenteral || isDrops) return false;
     if (dailyDose == null) return false;
     return dailyDose > MAX_UNITS_PER_DAY;
-  }, [isPatch, isParenteral, dailyDose]);
+  }, [isPatch, isParenteral, isDrops, dailyDose]);
 
   const isOverLimitConfirmed = doseOverLimit && !!value.confirmedHighDose;
   const isBlockedByOverLimit = doseOverLimit && !isOverLimitConfirmed;
