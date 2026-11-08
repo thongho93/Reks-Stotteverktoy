@@ -219,7 +219,18 @@ export default function InteractionDetails({
   const title = pair.map((p) => p.name).join(" × ");
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+    // Containerbredde avgjør oppsettet: faglig sammendrag og kundetekst side om side når det er plass,
+    // ellers under hverandre.
+    <Box sx={{ containerType: "inline-size", width: "100%" }}>
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr)",
+        gap: 2,
+        alignItems: "start",
+        "@container (min-width: 880px)": { gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.1fr)" },
+      }}
+    >
       {/* ───────── Faglig sammendrag ───────── */}
       <Box
         component="section"
@@ -551,10 +562,18 @@ export default function InteractionDetails({
             </Box>
           ) : active ? (
             <Box
-              sx={{
+              // Ett klikk kopierer: klikk hvor som helst i teksten kopierer hele standardteksten.
+              // Knapper (Rediger/Kopier) har egne handlinger, og markerer man tekst med musen, kopieres ikke noe.
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("button")) return;
+                if (window.getSelection()?.toString()) return;
+                onCopyText(active.text);
+                flashCopied("std");
+              }}
+              sx={(t) => ({
                 position: "relative",
                 bgcolor: "background.paper",
-                border: cardBorder,
+                border: cardBorder(t),
                 borderRadius: "16px",
                 px: 2.5,
                 pt: 2,
@@ -562,7 +581,10 @@ export default function InteractionDetails({
                 display: "flex",
                 flexDirection: "column",
                 gap: 1.25,
-              }}
+                cursor: "copy",
+                transition: "background-color 120ms ease",
+                "&:hover": { bgcolor: alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.06 : 0.025) },
+              })}
             >
               {/* Tittel vises bare når det ikke finnes en velger som allerede navngir teksten. */}
               {!showPicker ? (
@@ -578,19 +600,19 @@ export default function InteractionDetails({
                 </Box>
               ) : null}
 
-              <Typography
-                sx={{
-                  fontSize: 14.5,
-                  lineHeight: 1.65,
-                  whiteSpace: "pre-line",
-                  userSelect: "text",
-                  maxHeight: 320,
-                  overflowY: "auto",
-                  pr: isAdmin && showPicker ? 4 : 0,
-                }}
-              >
-                {renderMessage(active.text, firstName)}
-              </Typography>
+              <Tooltip title="Klikk i teksten for å kopiere" followCursor enterDelay={700} placement="top">
+                <Typography
+                  sx={{
+                    fontSize: 14.5,
+                    lineHeight: 1.65,
+                    whiteSpace: "pre-line",
+                    userSelect: "text",
+                    pr: isAdmin && showPicker ? 4 : 0,
+                  }}
+                >
+                  {renderMessage(active.text, firstName)}
+                </Typography>
+              </Tooltip>
 
               <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                 <CopyButton
@@ -653,6 +675,7 @@ export default function InteractionDetails({
           )}
         </Box>
       ) : null}
+    </Box>
     </Box>
   );
 }

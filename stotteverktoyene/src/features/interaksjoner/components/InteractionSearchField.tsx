@@ -264,7 +264,7 @@ export default function InteractionSearchField({
                     sx={{
                       position: "absolute",
                       left: hero ? 18 : 15,
-                      top: hero ? 19 : 14,
+                      top: hero ? 19 : 11,
                       color: "text.secondary",
                       fontSize: hero ? 26 : 22,
                       pointerEvents: "none",
@@ -290,7 +290,7 @@ export default function InteractionSearchField({
           borderRadius: radius,
           minHeight: hero ? 64 : 54,
           py: hero ? 0.75 : 0.5,
-          pb: selected.length > 0 ? 1 : undefined,
+          pb: selected.length > 0 ? 1.5 : undefined,
           gap: 0,
           fontSize: hero ? "1.05rem" : "0.95rem",
           bgcolor: t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#FFFFFF",
@@ -313,7 +313,11 @@ export default function InteractionSearchField({
           order: -1,
           flex: "1 0 100% !important",
           width: "100% !important",
-          py: "6px !important",
+          // Uten border-box blir feltet bredere enn boksen (bredde + padding) og gir sidelengs rulling.
+          boxSizing: "border-box !important",
+          // Fast høyde på selve søkelinjen, så den er like romslig med og uten chips under.
+          height: hero ? "52px !important" : "44px !important",
+          py: "0 !important",
           pl: `${iconGutter}px !important`,
           pr: "34px !important",
         },

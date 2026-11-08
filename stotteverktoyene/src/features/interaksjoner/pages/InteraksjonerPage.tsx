@@ -7,8 +7,6 @@ import {
   Box,
   Button,
   ButtonBase,
-  IconButton,
-  Paper,
   Stack,
   Typography,
   LinearProgress,
@@ -16,7 +14,9 @@ import {
   Snackbar,
 } from "@mui/material";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ContentPasteRoundedIcon from "@mui/icons-material/ContentPasteRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 
 import {
   CreateStandardtekstDialog,
@@ -34,6 +34,7 @@ import {
 } from "../../fest/mappers/interactionsToIndex";
 import { resolveSearchInput } from "../utils/resolveSearchInput";
 import { lookupBrand } from "../utils/brandLookup";
+import { pageFrameSx } from "../../../app/pageLayout";
 import InteractionSearchField from "../components/InteractionSearchField";
 import InteractionDetails from "../components/InteractionDetails";
 import { generateKundetekst } from "../services/claudeService";
@@ -50,13 +51,6 @@ import { useAuthUser } from "../../../app/auth/useAuthUser";
 
 const HISTORY_KEY_PREFIX = "interaksjoner_history_v1";
 const HISTORY_LAST_UID_KEY = "interaksjoner_last_uid_v1";
-const SPLIT_RATIO_STORAGE_KEY = "interaksjoner_split_ratio_v1";
-const DEFAULT_SPLIT_RATIO = 0.35;
-const MIN_SPLIT_RATIO = 0.2;
-const MAX_SPLIT_RATIO = 0.8;
-const DIVIDER_WIDTH_PX = 16;
-const MIN_LEFT_PANEL_PX = 380;
-const MIN_RIGHT_PANEL_PX = 520;
 
 const PREPARAT_SUFFIX_RE = /\s*\(preparatnavn\)\s*$/i;
 
@@ -99,9 +93,6 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
 
 function renderHighlightedText(label: string, matchedTerms: string[]): React.ReactNode {
   const terms = Array.from(
@@ -161,39 +152,11 @@ export default function InteraksjonerPage() {
   const { index, loading, error, reload } = useInteractions();
   const location = useLocation();
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
-  const splitContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const [isResizingSplit, setIsResizingSplit] = React.useState(false);
-  const [splitRatio, setSplitRatio] = React.useState<number>(() => {
-    try {
-      const raw = window.localStorage.getItem(SPLIT_RATIO_STORAGE_KEY);
-      if (!raw) return DEFAULT_SPLIT_RATIO;
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? clamp(parsed, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO) : DEFAULT_SPLIT_RATIO;
-    } catch {
-      return DEFAULT_SPLIT_RATIO;
-    }
-  });
-
   const getEntityId = React.useCallback(
     (entity: InteractionEntity) => entity.id ?? (entity.atc ? `atc:${entity.atc}` : `name:${entity.key}`),
     []
   );
 
-  const getSplitRatioFromClientX = React.useCallback((clientX: number): number | null => {
-    const container = splitContainerRef.current;
-    if (!container) return null;
-
-    const rect = container.getBoundingClientRect();
-    const availableWidth = rect.width - DIVIDER_WIDTH_PX;
-    if (availableWidth <= 0) return null;
-
-    const minLeft = Math.min(MIN_LEFT_PANEL_PX, availableWidth * 0.45);
-    const minRight = Math.min(MIN_RIGHT_PANEL_PX, availableWidth * 0.55);
-    const maxLeft = availableWidth - minRight;
-    const safeMinLeft = Math.min(minLeft, maxLeft);
-    const leftPx = clamp(clientX - rect.left, safeMinLeft, maxLeft);
-    return clamp(leftPx / availableWidth, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO);
-  }, []);
 
   const { user, isAdmin, isOwner } = useAuthUser();
   const lastKnownUidRef = React.useRef<string | null>(null);
@@ -728,46 +691,7 @@ export default function InteraksjonerPage() {
     setAiLoading(false);
   }, [activeCtx?.interactionId]);
 
-  React.useEffect(() => {
-    try {
-      window.localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(splitRatio));
-    } catch {
-      // ignore
-    }
-  }, [splitRatio]);
-
-  React.useEffect(() => {
-    if (!isResizingSplit) return;
-
-    const onPointerMove = (event: PointerEvent) => {
-      const nextRatio = getSplitRatioFromClientX(event.clientX);
-      if (nextRatio === null) return;
-      setSplitRatio(nextRatio);
-    };
-
-    const stopResizing = () => {
-      setIsResizingSplit(false);
-    };
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", stopResizing);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", stopResizing);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [isResizingSplit, getSplitRatioFromClientX]);
-
   const accentText = (t: Theme) => (t.palette.mode === "dark" ? "#E08A88" : "#A03A38");
-  const panelSx = {
-    bgcolor: (t: Theme) => (t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF"),
-    border: (t: Theme) =>
-      `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
-  } as const;
 
   const searchField = (hero: boolean) => (
     <InteractionSearchField
@@ -791,22 +715,33 @@ export default function InteraksjonerPage() {
 
   const autoToggle = (
     <Tooltip
-      title={`Auto-lim inn: ${autoPasteVnr ? "på" : "av"}. Når feltet er aktivt, limes kopiert varenummer, navn eller ATC-kode automatisk inn og søkes opp.`}
+      title={`Auto-lim inn er ${autoPasteVnr ? "på" : "av"}. Når søkefeltet er aktivt, limes kopiert varenummer, navn eller ATC-kode automatisk inn og søkes opp.`}
     >
-      <IconButton
-        size="small"
+      <ButtonBase
         aria-label="Auto-lim inn"
         aria-pressed={autoPasteVnr}
         onClick={() => setAutoPasteVnr(!autoPasteVnr)}
         sx={(t) => ({
           flexShrink: 0,
-          color: autoPasteVnr ? accentText(t) : t.palette.text.disabled,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.75,
+          pl: 1,
+          pr: 1.5,
+          py: 0.5,
+          borderRadius: 999,
+          fontSize: 13,
+          fontWeight: 700,
+          color: autoPasteVnr ? accentText(t) : t.palette.text.secondary,
           bgcolor: autoPasteVnr ? alpha(t.palette.primary.main, 0.12) : "transparent",
-          "&:hover": { bgcolor: alpha(t.palette.primary.main, autoPasteVnr ? 0.18 : 0.08) },
+          border: `1px solid ${autoPasteVnr ? alpha(t.palette.primary.main, 0.3) : t.palette.divider}`,
+          transition: "background-color 120ms ease, border-color 120ms ease",
+          "&:hover": { bgcolor: alpha(t.palette.primary.main, autoPasteVnr ? 0.18 : 0.06) },
         })}
       >
-        <ContentPasteRoundedIcon fontSize="small" />
-      </IconButton>
+        <ContentPasteRoundedIcon sx={{ fontSize: 17 }} />
+        Auto-lim inn
+      </ButtonBase>
     </Tooltip>
   );
 
@@ -830,56 +765,51 @@ export default function InteraksjonerPage() {
     setEditOpen(false);
   };
 
-  const heroView = (
-    <Paper
-      sx={{
-        ...panelSx,
-        flex: 1,
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-        overflow: { xs: "visible", md: "auto" },
-        p: { xs: 2.5, md: 3 },
-        borderRadius: "24px",
-      }}
-    >
-      <Box
-        sx={{
-          width: "100%",
-          maxWidth: 740,
-          mx: "auto",
-          my: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 1.75,
-          py: { xs: 1, md: 1 },
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.75, mb: 0.5 }}>
-          <Box
-            sx={(t) => ({
-              width: 52,
-              height: 52,
-              borderRadius: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: t.palette.mode === "dark" ? "rgba(200,70,70,0.18)" : "rgba(255,94,91,0.1)",
-              border: `1px solid ${t.palette.mode === "dark" ? "rgba(220,90,90,0.28)" : "rgba(200,80,80,0.18)"}`,
-            })}
-          >
-            <CompareArrowsIcon sx={{ fontSize: 28, color: accentText }} />
-          </Box>
-          <Box>
-            <Typography variant="h2" sx={{ fontWeight: 800, color: accentText, lineHeight: 1.15 }}>
-              Interaksjonssøk
-            </Typography>
-            <Typography color="text.secondary" sx={{ fontSize: 14.5 }}>
-              Sjekk om legemidler bør unngås sammen
-            </Typography>
-          </Box>
+  // Fast header: samme søkefelt på samme sted i alle tilstander (beholder fokus mens man legger til).
+  const pageHeader = (
+    <Box component="header" sx={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0, width: "100%" }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: 44 }}>
+        <Box
+          sx={(t) => ({
+            flexShrink: 0,
+            width: 40,
+            height: 40,
+            borderRadius: "12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: t.palette.mode === "dark" ? "rgba(200,70,70,0.18)" : "rgba(255,94,91,0.1)",
+            border: `1px solid ${t.palette.mode === "dark" ? "rgba(220,90,90,0.28)" : "rgba(200,80,80,0.18)"}`,
+          })}
+        >
+          <CompareArrowsIcon sx={{ fontSize: 24, color: accentText }} />
         </Box>
+        <Typography variant="h2" sx={{ fontWeight: 800, color: accentText, fontSize: 24, lineHeight: 1.2 }}>
+          Interaksjonssøk
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        {selected.length > 0 ? (
+          <Tooltip title="Fjern alle valgte og start på nytt (Esc)">
+            <Button
+              size="small"
+              onClick={handleReset}
+              sx={{
+                minWidth: 0,
+                px: 1.25,
+                fontWeight: 700,
+                fontSize: 13,
+                color: accentText,
+                "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.08) },
+              }}
+            >
+              Nullstill
+            </Button>
+          </Tooltip>
+        ) : null}
+        {autoToggle}
+      </Box>
 
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, width: "100%", maxWidth: 760, mx: "auto" }}>
         {error ? (
           <Alert
             severity="error"
@@ -894,119 +824,160 @@ export default function InteraksjonerPage() {
         ) : null}
 
         {searchField(true)}
-
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, px: 0.5 }}>
-          <Typography color="text.secondary" sx={{ fontSize: 13.5 }}>
-            Skriv et navn, eller lim inn ATC-kode, varenummer eller en hel FEST-linje.
-          </Typography>
-          {autoToggle}
-        </Box>
-
         {noticeAlert}
-
         {loading ? (
           <Box sx={{ px: 0.5 }}>
-            <LinearProgress sx={{ borderRadius: 999, height: 4 }} />
+            <LinearProgress sx={{ borderRadius: 999, height: 3 }} />
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-              Laster interaksjonsdata … du kan allerede lime inn, så søkes det opp straks dataene er klare.
+              Laster interaksjonsdata … du kan allerede lime inn.
             </Typography>
           </Box>
         ) : null}
+      </Box>
+    </Box>
+  );
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: history.length > 0 ? "1fr auto" : "1fr" },
-            gap: { xs: 2.5, md: 3 },
-            alignItems: "center",
-            mt: 1,
-          }}
-        >
-          {history.length > 0 ? (
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "text.secondary", px: 0.5 }}
-              >
-                Nylige søk
-              </Typography>
-              <Stack spacing={0.75} sx={{ mt: 0.75 }}>
-                {history.slice(0, 3).map((h) => (
-                  <ButtonBase
-                    key={h.id}
-                    onClick={() => openHistoryItem(h)}
-                    sx={(t) => ({
-                      display: "block",
-                      textAlign: "left",
-                      width: "100%",
-                      px: 1.75,
-                      py: 1,
-                      borderRadius: "12px",
-                      border: `1px solid ${t.palette.divider}`,
-                      transition: "background-color 120ms ease, border-color 120ms ease",
-                      "&:hover": {
-                        bgcolor: alpha(t.palette.primary.main, 0.06),
-                        borderColor: alpha(t.palette.primary.main, 0.4),
-                      },
-                    })}
-                  >
-                    <Typography noWrap sx={{ fontWeight: 700, fontSize: 14.5 }}>
+  const listCardSx = (t: Theme) => ({
+    bgcolor: t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF",
+    border: `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
+    borderRadius: "16px",
+  });
+
+  const tips = [
+    { label: "Navn eller virkestoff", example: "Cipralex, escitalopram" },
+    { label: "ATC-kode eller varenummer", example: "N06AB10, N06A" },
+    { label: "Hele FEST-linjen", example: "Lim inn linjen som den står" },
+  ];
+
+  // Startside: ingen ytre panel. Venstre: nylige søk (eller tips første gang). Høyre: GIF-en.
+  const startBody = (
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: 760,
+        mx: "auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: 3.5,
+        pt: { md: 1 },
+      }}
+    >
+      <Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+        {history.length > 0 ? (
+          <Box>
+            <Typography
+              variant="caption"
+              sx={{ display: "block", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "text.secondary", mb: 1 }}
+            >
+              Nylige søk
+            </Typography>
+            <Box sx={(t) => ({ ...listCardSx(t), overflow: "hidden" })}>
+              {history.slice(0, 5).map((h, i) => (
+                <ButtonBase
+                  key={h.id}
+                  onClick={() => openHistoryItem(h)}
+                  sx={(t) => ({
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                    width: "100%",
+                    textAlign: "left",
+                    px: 2,
+                    py: 1.4,
+                    borderTop: i > 0 ? `1px solid ${t.palette.divider}` : "none",
+                    transition: "background-color 120ms ease",
+                    "&:hover": { bgcolor: alpha(t.palette.primary.main, 0.05) },
+                  })}
+                >
+                  <HistoryRoundedIcon sx={{ fontSize: 20, color: "text.disabled", flexShrink: 0 }} />
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography noWrap sx={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.35 }}>
                       {h.title}
                     </Typography>
                     {h.subtitle ? (
-                      <Typography noWrap color="text.secondary" sx={{ fontSize: 13 }}>
+                      <Typography noWrap color="text.secondary" sx={{ fontSize: 12.5, lineHeight: 1.4 }}>
                         {h.subtitle}
                       </Typography>
                     ) : null}
-                  </ButtonBase>
-                ))}
-              </Stack>
+                  </Box>
+                  <ChevronRightRoundedIcon sx={{ flexShrink: 0, fontSize: 20, color: "text.disabled" }} />
+                </ButtonBase>
+              ))}
             </Box>
-          ) : null}
-
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifySelf: "center" }}>
-            <Box
-              component="img"
-              alt="Venter"
-              src="/img/imwaiting.gif"
-              loading="lazy"
-              decoding="async"
-              sx={{
-                // Skalerer med vindushøyden, slik at startsiden slipper å rulle.
-                width: "clamp(130px, 26vh, 210px)",
-                maxWidth: "70%",
-                borderRadius: "16px",
-                border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.18)" : "rgba(200,80,80,0.1)"}`,
-                boxShadow: (t) =>
-                  t.palette.mode === "dark"
-                    ? "0 10px 36px rgba(180,50,50,0.13), 0 2px 10px rgba(0,0,0,0.45)"
-                    : "0 8px 28px rgba(200,80,80,0.09), 0 2px 8px rgba(0,0,0,0.05)",
-                display: "block",
-              }}
-            />
-            <Typography
-              sx={{
-                mt: 1.25,
-                textAlign: "center",
-                fontSize: 14.5,
-                fontWeight: 500,
-                color: (t) => (t.palette.mode === "dark" ? "#A86A68" : "#B87A78"),
-              }}
-            >
-              Kom igjen. Jeg har ikke hele dagen.
-            </Typography>
           </Box>
-        </Box>
+        ) : null}
+
+        {/* Tips vises første gang, før man har noen historikk. */}
+        {history.length === 0 ? (
+          <Box>
+            <Typography
+              variant="caption"
+              sx={{ display: "block", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "text.secondary", mb: 1 }}
+            >
+              Slik søker du
+            </Typography>
+            <Box sx={(t) => ({ ...listCardSx(t), overflow: "hidden" })}>
+              {tips.map((tip, i) => (
+                <Box
+                  key={tip.label}
+                  sx={(t) => ({
+                    px: 2,
+                    py: 1.4,
+                    borderTop: i > 0 ? `1px solid ${t.palette.divider}` : "none",
+                  })}
+                >
+                  <Typography sx={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.35 }}>{tip.label}</Typography>
+                  <Typography color="text.secondary" sx={{ fontSize: 13 }}>
+                    {tip.example}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        ) : null}
       </Box>
-    </Paper>
+
+      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, pt: 1, pb: 1 }}>
+        <Box
+          component="img"
+          alt="Venter"
+          src="/img/imwaiting.gif"
+          loading="lazy"
+          decoding="async"
+          sx={{
+            // Større, og skalert etter vindushøyden så siden ikke må rulle unødvendig.
+            width: `clamp(180px, calc(100vh - ${history.length > 0 ? 400 : 560}px), 360px)`,
+            maxWidth: "100%",
+            aspectRatio: "1 / 1",
+            objectFit: "cover",
+            borderRadius: "20px",
+            display: "block",
+            boxShadow: (t) =>
+              t.palette.mode === "dark"
+                ? "0 10px 36px rgba(180,50,50,0.13), 0 2px 10px rgba(0,0,0,0.45)"
+                : "0 8px 28px rgba(200,80,80,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+          }}
+        />
+        <Typography
+          sx={{
+            textAlign: "center",
+            fontSize: 15,
+            fontWeight: 500,
+            color: (t) => (t.palette.mode === "dark" ? "#A86A68" : "#B87A78"),
+          }}
+        >
+          Kom igjen. Jeg har ikke hele dagen.
+        </Typography>
+      </Box>
+    </Box>
   );
 
   // Ett treff vises rett i detaljpanelet – listen trengs først når man må velge mellom flere.
   const resultsView =
     index && results.length > 1 ? (
-      <Box sx={{ pt: 0.5 }}>
-        <Typography sx={{ fontWeight: 800, color: accentText, mb: 1 }}>{results.length} treff</Typography>
-        <Stack spacing={0.75}>
+      <Box sx={(t) => ({ ...listCardSx(t), p: 1.5, width: { xs: "100%", md: 280 }, flexShrink: 0, alignSelf: "flex-start" })}>
+        <Typography sx={{ fontWeight: 800, color: accentText, mb: 1, px: 0.5 }}>{results.length} treff</Typography>
+        <Stack spacing={0.5}>
           {results.map((r, i) => {
             const it = index.interactions[r.interactionIndex];
             const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
@@ -1035,7 +1006,7 @@ export default function InteraksjonerPage() {
                   px: 1.5,
                   py: 1.1,
                   borderRadius: "12px",
-                  border: `1px solid ${active ? alpha(t.palette.primary.main, 0.7) : t.palette.divider}`,
+                  border: `1px solid ${active ? alpha(t.palette.primary.main, 0.55) : "transparent"}`,
                   bgcolor: active ? alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.16 : 0.07) : "transparent",
                   "&:hover": { bgcolor: alpha(t.palette.primary.main, active ? 0.1 : 0.05) },
                 })}
@@ -1071,188 +1042,42 @@ export default function InteraksjonerPage() {
     />
     <Box
       sx={{
-        maxWidth: 1760,
-        width: "100%",
-        mx: "auto",
-        mt: { xs: 2, md: 0 },
-        px: { xs: 1.5, md: 2.5 },
-        pt: { xs: 2, md: 0 },
+        ...pageFrameSx,
         height: { xs: "auto", md: "100%" },
         overflow: { xs: "visible", md: "hidden" },
         display: "flex",
         flexDirection: "column",
+        gap: 2.5,
       }}
     >
-      {selected.length === 0 ? (
-        heroView
-      ) : (
+      {pageHeader}
+
       <Box
-        ref={splitContainerRef}
         sx={{
-          display: { xs: "block", md: "flex" },
-          gap: { xs: 2.5, md: 0 },
-          alignItems: { xs: "stretch", md: "stretch" },
           flex: 1,
           minHeight: 0,
+          overflowX: "hidden",
+          overflowY: { xs: "visible", md: "auto" },
+          pb: 0.5,
         }}
       >
-        {/* Left: Search + treff */}
-        <Paper
-          sx={{
-            ...panelSx,
-            p: { xs: 2.5, md: 3 },
-            flex: { xs: "initial", md: `0 0 calc((100% - ${DIVIDER_WIDTH_PX}px) * ${splitRatio})` },
-            height: { xs: "auto", md: "100%" },
-            overflow: { xs: "visible", md: "auto" },
-            borderRadius: "20px",
-          }}
-        >
-          {error ? (
-            <Alert
-              severity="error"
-              sx={{ mb: 2 }}
-              action={
-                <Button color="inherit" size="small" onClick={reload}>
-                  Prøv igjen
-                </Button>
-              }
-            >
-              {error}
-            </Alert>
-          ) : null}
-
-          <Stack spacing={1.75}>
-            {searchField(false)}
-
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, px: 0.5 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
-                <Tooltip title="Fjern alle valgte og start på nytt (Esc)">
-                  <Button
-                    size="small"
-                    onClick={handleReset}
-                    sx={{
-                      minWidth: 0,
-                      px: 1,
-                      py: 0.25,
-                      fontWeight: 700,
-                      fontSize: 12.5,
-                      color: accentText,
-                      "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.08) },
-                    }}
-                  >
-                    Nullstill
-                  </Button>
-                </Tooltip>
-                {selected.length === 1 ? (
-                  <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-                    Legg til ett til …
-                  </Typography>
-                ) : null}
-              </Box>
-              {autoToggle}
-            </Box>
-
-            {noticeAlert}
-
+        {selected.length === 0 ? (
+          startBody
+        ) : (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: 2.5,
+              alignItems: "flex-start",
+            }}
+          >
             {resultsView}
 
-            {selected.length >= 2 && results.length === 0 ? (
-              <Typography color="text.secondary" sx={{ pt: 1, px: 0.5 }}>
-                Ingen interaksjoner å unngå mellom de valgte.
-              </Typography>
-            ) : null}
-          </Stack>
-        </Paper>
-
-        <Box
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Juster bredde mellom panelene"
-          tabIndex={0}
-          onPointerDown={(event) => {
-            if (event.button !== 0) return;
-            event.preventDefault();
-            const nextRatio = getSplitRatioFromClientX(event.clientX);
-            if (nextRatio !== null) setSplitRatio(nextRatio);
-            setIsResizingSplit(true);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") {
-              event.preventDefault();
-              setSplitRatio((prev) => clamp(prev - 0.02, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO));
-              return;
-            }
-            if (event.key === "ArrowRight") {
-              event.preventDefault();
-              setSplitRatio((prev) => clamp(prev + 0.02, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO));
-            }
-          }}
-          sx={{
-            display: { xs: "none", md: "flex" },
-            width: DIVIDER_WIDTH_PX,
-            cursor: "col-resize",
-            alignSelf: "stretch",
-            alignItems: "center",
-            justifyContent: "center",
-            touchAction: "none",
-            outline: "none",
-            position: "relative",
-            zIndex: 2,
-            "&::before": {
-              content: '""',
-              width: 2,
-              height: "100%",
-              borderRadius: 999,
-              bgcolor: "divider",
-              transition: "background-color 120ms ease",
-              position: "absolute",
-              top: 0,
-              left: "50%",
-              transform: "translateX(-50%)",
-            },
-            "&::after": {
-              content: '""',
-              width: 6,
-              height: 46,
-              borderRadius: 999,
-              bgcolor: "action.disabled",
-              boxShadow: 1,
-              transition: "background-color 120ms ease",
-            },
-            "&:hover::before, &:focus-visible::before": {
-              bgcolor: "text.secondary",
-            },
-            "&:hover::after, &:focus-visible::after": {
-              bgcolor: "text.secondary",
-            },
-          }}
-        />
-
-        {/* Right: Results + Details */}
-        <Paper
-          sx={{
-            p: { xs: 2.5, md: 3.5 },
-            flex: {
-              xs: "initial",
-              md: `0 0 calc((100% - ${DIVIDER_WIDTH_PX}px) * ${1 - splitRatio})`,
-            },
-            minHeight: { xs: 420, md: 560 },
-            height: { xs: "auto", md: "100%" },
-            overflow: { xs: "visible", md: "auto" },
-            ...(results.length > 0
-              ? // Detaljkortene ligger direkte på sidebakgrunnen, uten ytre panel.
-                { p: 0, pl: { md: 0.5 }, pr: { md: 0.5 }, bgcolor: "transparent", border: "none", boxShadow: "none" }
-              : {
-                  bgcolor: (t) => (t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF"),
-                  border: (t) =>
-                    `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
-                }),
-          }}
-        >
+            <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
           {results.length === 0 ? (
             <Box
               sx={{
-                height: "100%",
                 minHeight: { xs: 160, md: 320 },
                 display: "flex",
                 flexDirection: "column",
@@ -1481,9 +1306,10 @@ export default function InteraksjonerPage() {
               })()}
             </Stack>
           ) : null}
-        </Paper>
+            </Box>
+          </Box>
+        )}
       </Box>
-      )}
       <Snackbar
         open={copySnackOpen}
         autoHideDuration={1800}
