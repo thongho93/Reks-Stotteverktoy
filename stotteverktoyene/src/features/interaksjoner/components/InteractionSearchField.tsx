@@ -111,6 +111,7 @@ export default function InteractionSearchField({
   );
 
   const radius = hero ? "18px" : "14px";
+  const iconGutter = hero ? 40 : 32;
 
   return (
     <Autocomplete<InteractionEntity, true, false, false>
@@ -161,7 +162,6 @@ export default function InteractionSearchField({
       renderTags={(value, getTagProps) =>
         value.map((option, i) => {
           const { key, ...tagProps } = getTagProps({ index: i });
-          const isProduct = option.kind === "product";
           return (
             <Chip
               key={key}
@@ -181,12 +181,13 @@ export default function InteractionSearchField({
                 </>
               }
               sx={(t) => ({
-                height: 30,
+                height: 28,
+                "&&": { m: "2px 6px 4px 2px" },
                 borderRadius: 999,
                 fontWeight: 600,
                 color: t.palette.mode === "dark" ? "#F1B9B7" : "#8F2F2D",
                 bgcolor: alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.18 : 0.1),
-                border: `1px ${isProduct ? "dashed" : "solid"} ${alpha(t.palette.primary.main, 0.35)}`,
+                border: `1px solid ${alpha(t.palette.primary.main, 0.35)}`,
                 "& .MuiChip-deleteIcon": { color: "inherit", opacity: 0.55, "&:hover": { opacity: 1, color: "inherit" } },
               })}
             />
@@ -233,7 +234,7 @@ export default function InteractionSearchField({
           placeholder={
             selected.length === 0
               ? "Søk eller lim inn legemiddel, virkestoff, ATC eller varenummer"
-              : "Legg til flere …"
+              : "Legg til …"
           }
           aria-label="Søk etter interaksjoner"
           onFocus={onFocus}
@@ -260,7 +261,14 @@ export default function InteractionSearchField({
               startAdornment: (
                 <>
                   <SearchRoundedIcon
-                    sx={{ color: "text.secondary", fontSize: hero ? 26 : 22, mr: 0.75, ml: 0.25 }}
+                    sx={{
+                      position: "absolute",
+                      left: hero ? 18 : 15,
+                      top: hero ? 19 : 14,
+                      color: "text.secondary",
+                      fontSize: hero ? 26 : 22,
+                      pointerEvents: "none",
+                    }}
                   />
                   {params.InputProps.startAdornment}
                 </>
@@ -282,8 +290,8 @@ export default function InteractionSearchField({
           borderRadius: radius,
           minHeight: hero ? 64 : 54,
           py: hero ? 0.75 : 0.5,
-          pl: 1.5,
-          gap: 0.5,
+          pb: selected.length > 0 ? 1 : undefined,
+          gap: 0,
           fontSize: hero ? "1.05rem" : "0.95rem",
           bgcolor: t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#FFFFFF",
           boxShadow:
@@ -300,7 +308,16 @@ export default function InteractionSearchField({
           "&.Mui-focused": { boxShadow: `0 0 0 4px ${alpha(t.palette.primary.main, 0.16)}` },
           "&.Mui-focused fieldset": { borderColor: t.palette.primary.main, borderWidth: 1.5 },
         },
-        "& .MuiAutocomplete-input": { minWidth: "140px !important", py: "8px !important" },
+        // Søkelinjen ligger alltid øverst (egen rad); valgte chips legges på rader under.
+        "& .MuiAutocomplete-input": {
+          order: -1,
+          flex: "1 0 100% !important",
+          width: "100% !important",
+          py: "6px !important",
+          pl: `${iconGutter}px !important`,
+          pr: "34px !important",
+        },
+        "& .MuiAutocomplete-endAdornment": { top: hero ? "18px" : "13px" },
       })}
     />
   );
