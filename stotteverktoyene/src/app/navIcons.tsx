@@ -146,6 +146,46 @@ export const ChevronDownIcon = createSvgIcon(line(<path d="m6 9 6 6 6-6" />), "C
 
 export const ChevronUpIcon = createSvgIcon(line(<path d="m18 15-6-6-6 6" />), "ChevronUp");
 
+export const UserIcon = createSvgIcon(
+  line(
+    <>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </>
+  ),
+  "User"
+);
+
+export const LogOutIcon = createSvgIcon(
+  line(
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </>
+  ),
+  "LogOut"
+);
+
+export const SunIcon = createSvgIcon(
+  line(
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" />
+      <path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.34 17.66-1.41 1.41" />
+      <path d="m19.07 4.93-1.41 1.41" />
+    </>
+  ),
+  "Sun"
+);
+
+export const MoonIcon = createSvgIcon(line(<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />), "Moon");
+
 // Menyfarger per side. `color` brukes til toning, `strong` til fylt flis og ikon i lys modus
 // (mørkere, slik at ikonet har nok kontrast mot hvit bakgrunn).
 export const NAV_COLORS = {

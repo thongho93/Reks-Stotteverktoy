@@ -938,84 +938,6 @@
   background: #4f8f6c;
 }
 
-.profileMenuRoot {
-  margin-top: 6px;
-}
-
-.profileMenuPaper {
-  border-radius: 14px;
-  min-width: 260px;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-}
-
-.profileMenuList {
-  padding: 0;
-}
-
-.profileMenuHeader {
-  padding: 14px 14px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.profileMenuHeaderRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.profileMenuAvatarSmall {
-  width: 34px !important;
-  height: 34px !important;
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  background: #4f8f6c;
-}
-
-.profileMenuHeaderText {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.profileMenuHello {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.profileMenuEmail {
-  font-size: 12px;
-  opacity: 0.75;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.profileMenuRolePill {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(92, 170, 126, 0.18);
-  color: #2e694b;
-  white-space: nowrap;
-}
-
-.profileMenuLogout {
-  padding-top: 12px !important;
-  padding-bottom: 12px !important;
-}
-
-.profileMenuLogout:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
 .autoFocusGlow :global(.MuiOutlinedInput-root) {
   transition: box-shadow 220ms ease;
   box-shadow:
@@ -1027,10 +949,6 @@
   box-shadow:
     0 0 0 1px rgba(92, 170, 126, 0.28),
     0 0 16px 6px rgba(92, 170, 126, 0.32);
-}
-
-.profileThemeToggleItem {
-  gap: 8px;
 }
 
 :global([data-app-theme="dark"]) .page {
@@ -1205,28 +1123,9 @@
   background: rgba(165, 177, 198, 0.14);
 }
 
-:global([data-app-theme="dark"]) .profileAvatar,
-:global([data-app-theme="dark"]) .profileMenuAvatarSmall {
+:global([data-app-theme="dark"]) .profileAvatar {
   color: #e8fff3;
   background: linear-gradient(180deg, rgba(106, 189, 143, 0.94) 0%, rgba(78, 153, 112, 0.94) 100%);
-}
-
-:global([data-app-theme="dark"]) .profileMenuPaper {
-  border: 1px solid rgba(165, 177, 198, 0.22);
-  box-shadow: 0 22px 46px rgba(2, 6, 18, 0.62);
-}
-
-:global([data-app-theme="dark"]) .profileMenuRolePill {
-  background: rgba(106, 189, 143, 0.24);
-  color: #d6ffe9;
-}
-
-:global([data-app-theme="dark"]) .profileMenuEmail {
-  opacity: 0.84;
-}
-
-:global([data-app-theme="dark"]) .profileMenuLogout:hover {
-  background: rgba(165, 177, 198, 0.14);
 }
 
 :global([data-app-theme="dark"]) .autoFocusGlow :global(.MuiOutlinedInput-root) {
