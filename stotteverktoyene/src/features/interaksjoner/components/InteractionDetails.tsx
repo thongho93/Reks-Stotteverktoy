@@ -79,9 +79,11 @@ type Props = {
   ai: AiState;
 };
 
-const accentText = (t: Theme) => (t.palette.mode === "dark" ? "#E08A88" : "#A03A38");
+const accentText = (t: Theme) => (t.palette.mode === "dark" ? "#F4ABA9" : "#A03A38");
+// Valgt-kant: lys aksent i mørk modus (≥ 3:1 mot flaten), mørkere rød i lys modus.
+const selectedBorder = (t: Theme) => (t.palette.mode === "dark" ? "#F4ABA9" : "#B04442");
 const cardBorder = (t: Theme) =>
-  `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.16)"}`;
+  `1px solid ${t.palette.mode === "dark" ? "rgba(244,171,169,0.2)" : "rgba(200,80,80,0.16)"}`;
 
 // Viser «XX» som fornavnet (uthevet), slik at man ser hva som faktisk kopieres.
 function renderMessage(text: string, firstName: string | null): React.ReactNode {
@@ -219,16 +221,18 @@ export default function InteractionDetails({
   const title = pair.map((p) => p.name).join(" × ");
 
   return (
-    // Containerbredde avgjør oppsettet: faglig sammendrag og kundetekst side om side når det er plass,
+    // Containerbredde (720 px) avgjør oppsettet: faglig sammendrag og kundetekst side om side når det er plass,
     // ellers under hverandre.
-    <Box sx={{ containerType: "inline-size", width: "100%" }}>
+    // Detaljene fyller høyden de får (md+) uten å gå utover den: rullingen skjer inni meldingsfeltet.
+    <Box sx={{ containerType: "inline-size", width: "100%", height: { md: "100%" }, minHeight: 0 }}>
     <Box
       sx={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr)",
+        display: "flex",
+        flexDirection: "column",
         gap: 2,
-        alignItems: "start",
-        "@container (min-width: 880px)": { gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.1fr)" },
+        height: { md: "100%" },
+        minHeight: 0,
+        "@container (min-width: 720px)": { flexDirection: "row", alignItems: "stretch" },
       }}
     >
       {/* ───────── Faglig sammendrag ───────── */}
@@ -236,7 +240,7 @@ export default function InteractionDetails({
         component="section"
         aria-label="Faglig sammendrag"
         sx={{
-          bgcolor: (t) => (t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF"),
+          bgcolor: "background.paper",
           border: cardBorder,
           borderRadius: "20px",
           px: 3,
@@ -244,6 +248,11 @@ export default function InteractionDetails({
           display: "flex",
           flexDirection: "column",
           gap: 1.75,
+          // Smal visning (under hverandre): krymper ved behov. Bred visning (side om side): deler bredden.
+          flex: { md: "0 1 auto" },
+          minHeight: { md: 140 },
+          overflowY: { md: "auto" },
+          "@container (min-width: 720px)": { flex: "1 1 0", minWidth: 0, alignSelf: "flex-start", maxHeight: "100%" },
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5 }}>
@@ -370,11 +379,18 @@ export default function InteractionDetails({
             display: "flex",
             flexDirection: "column",
             gap: 1.5,
-            border: `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.26)" : "rgba(200,80,80,0.2)"}`,
-            bgcolor: t.palette.mode === "dark" ? "rgba(200,70,70,0.06)" : "#FFF7F6",
+            border: `1px solid ${t.palette.mode === "dark" ? "rgba(244,171,169,0.28)" : "rgba(200,80,80,0.2)"}`,
+            bgcolor: t.palette.mode === "dark" ? "#241E1F" : "#FFF7F6",
+            // Fyller resten av høyden; meldingsfeltet inni rulles, ikke siden.
+            // Kundekortet krymper ikke (så meldingen får plass); sammendraget krymper og ruller først.
+            flex: { md: "1 0 380px" },
+            minHeight: { md: 380 },
+            minWidth: 0,
+            overflow: { md: "hidden" },
+            "@container (min-width: 720px)": { flex: "1.1 1 0", alignSelf: "stretch" },
           })}
         >
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexShrink: 0 }}>
             <Typography id="kundetekst-tittel" component="h2" sx={{ fontSize: 17, fontWeight: 800 }}>
               Tekst til kunden
             </Typography>
@@ -403,7 +419,7 @@ export default function InteractionDetails({
 
           {/* Velger: kompakte piller, kun tittel */}
           {showPicker ? (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }} role="group" aria-label="Velg tekst">
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center", flexShrink: 0 }} role="group" aria-label="Velg tekst">
               {items.map((s) => {
                 const selected = !showAi && s.id === effectiveId;
                 return (
@@ -424,10 +440,10 @@ export default function InteractionDetails({
                       borderRadius: 999,
                       fontSize: 14,
                       fontWeight: 700,
-                      border: `1.5px solid ${selected ? "#B04442" : alpha(t.palette.primary.main, 0.28)}`,
+                      border: `1.5px solid ${selected ? selectedBorder(t) : alpha(t.palette.primary.main, 0.32)}`,
                       bgcolor: selected ? "background.paper" : "transparent",
                       boxShadow: selected ? `0 0 0 3px ${alpha(t.palette.primary.main, 0.16)}` : "none",
-                      "&:hover": { borderColor: "#B04442" },
+                      "&:hover": { borderColor: selectedBorder(t) },
                     })}
                   >
                     <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -466,7 +482,7 @@ export default function InteractionDetails({
                         fontSize: 14,
                         fontWeight: 700,
                         color: accentText(t),
-                        border: showAi ? "1.5px solid #B04442" : `1.5px dashed ${alpha("#B04442", 0.45)}`,
+                        border: showAi ? `1.5px solid ${selectedBorder(t)}` : `1.5px dashed ${alpha(selectedBorder(t), 0.55)}`,
                         bgcolor: showAi ? "background.paper" : "transparent",
                         boxShadow: showAi ? `0 0 0 3px ${alpha(t.palette.primary.main, 0.16)}` : "none",
                       })}
@@ -494,6 +510,9 @@ export default function InteractionDetails({
                 display: "flex",
                 flexDirection: "column",
                 gap: 1.25,
+                flex: { md: "1 1 auto" },
+                minHeight: { md: 0 },
+                overflow: { md: "hidden" },
               }}
             >
               <Box sx={{ position: "absolute", top: 8, right: 8 }}>
@@ -514,21 +533,23 @@ export default function InteractionDetails({
                 </Box>
               ) : null}
               {ai.text ? (
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={5}
-                  value={ai.text}
-                  onChange={(e) => ai.onChange(e.target.value)}
-                  slotProps={{ htmlInput: { "aria-label": "Utkast til kundetekst" } }}
-                  sx={{
-                    pr: 4,
-                    "& .MuiOutlinedInput-root": { borderRadius: "12px", fontSize: 14.5, lineHeight: 1.6 },
-                  }}
-                />
+                <Box sx={{ flex: { md: "1 1 auto" }, minHeight: { md: 0 }, overflowY: { md: "auto" } }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={5}
+                    value={ai.text}
+                    onChange={(e) => ai.onChange(e.target.value)}
+                    slotProps={{ htmlInput: { "aria-label": "Utkast til kundetekst" } }}
+                    sx={{
+                      pr: 4,
+                      "& .MuiOutlinedInput-root": { borderRadius: "12px", fontSize: 14.5, lineHeight: 1.6 },
+                    }}
+                  />
+                </Box>
               ) : null}
 
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexShrink: 0 }}>
                 <Tooltip
                   arrow
                   title={`Utkast generert med Claude basert på FEST-feltene – ingen kliniske fakta er lagt til av modellen. Må kvalitetssikres av farmasøyt før sending. Lim aldri inn kundeopplysninger. Endringer du gjør her kopieres, men lagres ikke.${
@@ -584,6 +605,10 @@ export default function InteractionDetails({
                 cursor: "copy",
                 transition: "background-color 120ms ease",
                 "&:hover": { bgcolor: alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.06 : 0.025) },
+                // Kortet fyller resten av høyden; bare selve teksten rulles.
+                flex: { md: "1 1 auto" },
+                minHeight: { md: 0 },
+                overflow: { md: "hidden" },
               })}
             >
               {/* Tittel vises bare når det ikke finnes en velger som allerede navngir teksten. */}
@@ -608,13 +633,16 @@ export default function InteractionDetails({
                     whiteSpace: "pre-line",
                     userSelect: "text",
                     pr: isAdmin && showPicker ? 4 : 0,
+                    flex: { md: "1 1 auto" },
+                    minHeight: { md: 0 },
+                    overflowY: { md: "auto" },
                   }}
                 >
                   {renderMessage(active.text, firstName)}
                 </Typography>
               </Tooltip>
 
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
                 <CopyButton
                   copied={copiedKey === "std"}
                   onClick={() => {

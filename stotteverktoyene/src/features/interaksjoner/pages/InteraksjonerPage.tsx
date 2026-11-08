@@ -147,7 +147,24 @@ type HistoryItem = {
 export default function InteraksjonerPage() {
   const RED = "#FF5E5B";
   const baseTheme = useTheme();
-  const redTheme = React.useMemo(() => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: RED } }) } }), [baseTheme]);
+  const redTheme = React.useMemo(
+    () =>
+      createTheme(baseTheme, {
+        palette: {
+          primary: baseTheme.palette.augmentColor({ color: { main: RED } }),
+          // Mørk modus: én varm, nøytral palett for hele siden (temaets blålige flater passet ikke med de røde
+          // aksentene). Kontrast mot flatene er målt: tekst ≥ 14:1, sekundærtekst ≈ 10:1, aksent ≈ 9:1 (WCAG AA = 4,5:1).
+          ...(baseTheme.palette.mode === "dark"
+            ? {
+                background: { default: "#141112", paper: "#1C1819" },
+                text: { primary: "#F4EEEE", secondary: "#CDC2C3", disabled: "#A8999A" },
+                divider: "rgba(244,171,169,0.18)",
+              }
+            : {}),
+        },
+      }),
+    [baseTheme],
+  );
 
   const { index, loading, error, reload } = useInteractions();
   const location = useLocation();
@@ -303,6 +320,10 @@ export default function InteraksjonerPage() {
         allowPrefix: !ambient,
       });
 
+      // Auto-lim inn skal bare reagere når HELE utklippstavlen er navn, virkestoff, ATC eller
+      // varenummer. Alt annet (f.eks. en kundetekst man nettopp har kopiert) ignoreres helt.
+      if (ambient && unmatched.length > 0) return;
+
       if (entities.length > 0) {
         setSelected((prev) => {
           // Flere treff fra én innliming (f.eks. en hel FEST-linje) er et nytt søk;
@@ -356,9 +377,10 @@ export default function InteraksjonerPage() {
     enabled: autoPasteVnr,
     isFocused: isSearchFocused,
     onVnr: (text) => addFromText(text, { ambient: true }),
+    // En FEST-linje eller en liste med navn er kort; lengre tekster er aldri aktuelle.
     extract: (text) => {
       const t = text.trim();
-      return t && t.length <= 1500 ? t : "";
+      return t && t.length <= 400 ? t : "";
     },
   });
 
@@ -691,7 +713,7 @@ export default function InteraksjonerPage() {
     setAiLoading(false);
   }, [activeCtx?.interactionId]);
 
-  const accentText = (t: Theme) => (t.palette.mode === "dark" ? "#E08A88" : "#A03A38");
+  const accentText = (t: Theme) => (t.palette.mode === "dark" ? "#F4ABA9" : "#A03A38");
 
   const searchField = (hero: boolean) => (
     <InteractionSearchField
@@ -838,8 +860,8 @@ export default function InteraksjonerPage() {
   );
 
   const listCardSx = (t: Theme) => ({
-    bgcolor: t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF",
-    border: `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
+    bgcolor: t.palette.background.paper,
+    border: `1px solid ${t.palette.mode === "dark" ? "rgba(244,171,169,0.2)" : "rgba(200,80,80,0.14)"}`,
     borderRadius: "16px",
   });
 
@@ -963,7 +985,7 @@ export default function InteraksjonerPage() {
             textAlign: "center",
             fontSize: 15,
             fontWeight: 500,
-            color: (t) => (t.palette.mode === "dark" ? "#A86A68" : "#B87A78"),
+            color: (t) => (t.palette.mode === "dark" ? "#E2AEAC" : "#9A5B59"),
           }}
         >
           Kom igjen. Jeg har ikke hele dagen.
@@ -975,7 +997,7 @@ export default function InteraksjonerPage() {
   // Ett treff vises rett i detaljpanelet – listen trengs først når man må velge mellom flere.
   const resultsView =
     index && results.length > 1 ? (
-      <Box sx={(t) => ({ ...listCardSx(t), p: 1.5, width: { xs: "100%", md: 280 }, flexShrink: 0, alignSelf: "flex-start" })}>
+      <Box sx={(t) => ({ ...listCardSx(t), p: 1.5, width: { xs: "100%", md: 280 }, flexShrink: 0, alignSelf: "flex-start", maxHeight: { md: "100%" }, overflowY: { md: "auto" } })}>
         <Typography sx={{ fontWeight: 800, color: accentText, mb: 1, px: 0.5 }}>{results.length} treff</Typography>
         <Stack spacing={0.5}>
           {results.map((r, i) => {
@@ -1034,9 +1056,9 @@ export default function InteraksjonerPage() {
     <Box
       sx={{
         position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
-        bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FBF5F5",
+        bgcolor: (t) => t.palette.mode === "dark" ? "#141112" : "#FBF5F5",
         backgroundImage: (t) => t.palette.mode === "dark"
-          ? "radial-gradient(circle at 6% -10%, rgba(200,60,60,0.11) 0%, rgba(200,60,60,0) 38%), radial-gradient(circle at 92% -6%, rgba(150,40,40,0.09) 0%, rgba(150,40,40,0) 32%)"
+          ? "radial-gradient(circle at 6% -10%, rgba(200,70,70,0.10) 0%, rgba(200,70,70,0) 38%), radial-gradient(circle at 92% -6%, rgba(150,50,50,0.08) 0%, rgba(150,50,50,0) 32%)"
           : "radial-gradient(circle at 6% -10%, rgba(255,94,91,0.16) 0%, rgba(255,94,91,0) 38%), radial-gradient(circle at 92% -6%, rgba(200,60,60,0.12) 0%, rgba(200,60,60,0) 32%)",
       }}
     />
@@ -1070,11 +1092,12 @@ export default function InteraksjonerPage() {
               flexDirection: { xs: "column", md: "row" },
               gap: 2.5,
               alignItems: "flex-start",
+              height: { md: "100%" },
             }}
           >
             {resultsView}
 
-            <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
+            <Box sx={{ flex: 1, minWidth: 0, width: "100%", height: { md: "100%" } }}>
           {results.length === 0 ? (
             <Box
               sx={{
@@ -1102,7 +1125,7 @@ export default function InteraksjonerPage() {
           ) : null}
 
           {index && results.length > 0 ? (
-            <Stack spacing={2}>
+            <Stack spacing={2} sx={{ height: { md: "100%" } }}>
               {/* Active result details */}
               {(() => {
                 const r = activeCtx?.r;

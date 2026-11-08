@@ -293,7 +293,7 @@ export default function InteractionSearchField({
           pb: selected.length > 0 ? 1.5 : undefined,
           gap: 0,
           fontSize: hero ? "1.05rem" : "0.95rem",
-          bgcolor: t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+          bgcolor: t.palette.background.paper,
           boxShadow:
             t.palette.mode === "dark"
               ? "0 1px 2px rgba(0,0,0,0.4)"
@@ -302,13 +302,19 @@ export default function InteractionSearchField({
                 : "0 1px 3px rgba(0,0,0,0.05)",
           transition: "box-shadow 160ms ease, border-color 160ms ease",
           "& fieldset": {
-            borderColor: t.palette.mode === "dark" ? "rgba(220,90,90,0.28)" : "rgba(200,80,80,0.28)",
+            // Rammen er en UI-komponent: ≥ 3:1 mot bakgrunnen (mørk: 3,4:1).
+            borderColor: t.palette.mode === "dark" ? "rgba(244,171,169,0.55)" : "rgba(200,80,80,0.34)",
           },
-          "&:hover fieldset": { borderColor: alpha(t.palette.primary.main, 0.6) },
+          "&:hover fieldset": { borderColor: t.palette.mode === "dark" ? "#F4ABA9" : alpha(t.palette.primary.main, 0.7) },
           "&.Mui-focused": { boxShadow: `0 0 0 4px ${alpha(t.palette.primary.main, 0.16)}` },
           "&.Mui-focused fieldset": { borderColor: t.palette.primary.main, borderWidth: 1.5 },
         },
         // Søkelinjen ligger alltid øverst (egen rad); valgte chips legges på rader under.
+        // Standard plassholder har for lav kontrast; gi den full dekning og en AA-farge.
+        "& .MuiAutocomplete-input::placeholder": {
+          color: t.palette.mode === "dark" ? "#B1A5A6" : "#6B7280",
+          opacity: 1,
+        },
         "& .MuiAutocomplete-input": {
           order: -1,
           flex: "1 0 100% !important",
