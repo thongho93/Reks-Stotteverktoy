@@ -39,6 +39,7 @@ import {
   toDateKey,
   type ViewMode,
 } from "../lib/period";
+import { PAGE_GUTTER_X, PAGE_GUTTER_Y, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
 
 const numberFormat = new Intl.NumberFormat("nb-NO");
 
@@ -354,8 +355,10 @@ export default function StandardtekstStatistikkPage() {
           flex: "1 1 auto",
           display: "flex",
           overflow: "hidden",
-          px: { xs: 1, sm: 2 },
-          py: { xs: 1, sm: 2 },
+          maxWidth: PAGE_MAX_WIDTH,
+          mx: "auto",
+          px: PAGE_GUTTER_X,
+          py: PAGE_GUTTER_Y,
         }}
       >
         <Paper

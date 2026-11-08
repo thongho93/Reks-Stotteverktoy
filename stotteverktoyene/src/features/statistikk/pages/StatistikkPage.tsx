@@ -32,6 +32,7 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
+import { PAGE_GUTTER_X, PAGE_GUTTER_Y, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -891,8 +892,10 @@ export default function StatistikkPage() {
           flex: "1 1 auto",
           display: "flex",
           overflow: "hidden",
-          px: { xs: 1, sm: 2 },
-          py: { xs: 1, sm: 2 },
+          maxWidth: PAGE_MAX_WIDTH,
+          mx: "auto",
+          px: PAGE_GUTTER_X,
+          py: PAGE_GUTTER_Y,
         }}
       >
         <Paper

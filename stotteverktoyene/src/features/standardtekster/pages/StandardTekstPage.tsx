@@ -69,6 +69,7 @@ import { deleteStandardTekst } from "../utils/deleteStandardTekst";
 import type { StandardTekstFollowUp } from "../types";
 import { logUsage } from "../../../shared/services/usage";
 import { useNavigationGuard } from "../../../shared/hooks/useNavigationGuard";
+import { PAGE_MAX_WIDTH, pageFrameSx } from "../../../app/pageLayout";
 
 type OMEQStandardtekstPrefill = {
   requestId: number;
@@ -2497,6 +2498,23 @@ export default function StandardTekstPage() {
 
   return (
     <Box className={styles.page}>
+      {/* Felles sideramme: samme bredde og marg som de andre sidene. Bakgrunnen går fortsatt kant til kant. */}
+      <Box
+        sx={{
+          ...pageFrameSx,
+          // Siden skaleres med --desktop-ui-scale (CSS zoom): kompenser, så rammen blir like bred som på de andre sidene.
+          maxWidth: `calc(${PAGE_MAX_WIDTH}px / var(--desktop-ui-scale, 1))`,
+          px: {
+            xs: "calc(12px / var(--desktop-ui-scale, 1))",
+            md: "calc(20px / var(--desktop-ui-scale, 1))",
+          },
+          py: 0,
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
       <Collapse in={showGuide} unmountOnExit>
         <Paper className={styles.guidePaper}>
           <Typography variant="h6" className={styles.guideTitle}>
@@ -3267,6 +3285,7 @@ export default function StandardTekstPage() {
           {errorToShow}
         </Alert>
       </Snackbar>
+      </Box>
     </Box>
   );
 }

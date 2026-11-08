@@ -27,6 +27,7 @@ import {
   type Feedback,
   type FeedbackStatus,
 } from "../types";
+import { pageFrameSx } from "../../../app/pageLayout";
 
 const ALL = "__alle__";
 
@@ -152,11 +153,9 @@ export default function FeedbackPage() {
             flex: "1 1 auto",
             minHeight: 0,
             overflow: "auto",
-            px: { xs: 1, sm: 2 },
-            py: { xs: 1, sm: 2 },
           }}
         >
-          <Box sx={{ maxWidth: 940, mx: "auto", display: "flex", flexDirection: "column", gap: 2.5 }}>
+          <Box sx={{ ...pageFrameSx, display: "flex", flexDirection: "column", gap: 2.5 }}>
             <Box>
               <Typography variant="h2" gutterBottom={false} sx={{ m: 0 }}>
                 Innspill

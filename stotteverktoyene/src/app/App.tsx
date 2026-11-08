@@ -7,6 +7,8 @@ import {
   Drawer,
   IconButton,
   ListItemButton,
+  Paper,
+  Popper,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -308,19 +310,122 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const goTo = (item: SidebarItem) => {
     logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
     navigate(item.path);
+    setFlyout(null);
     if (item.subItems) setOpenMenus((open) => ({ ...open, [item.path]: true }));
+  };
+
+  // Kollapset meny: undermenyen vises som en liten flyout til høyre når man holder
+  // musen over ikonet, slik at man kan gå rett til en undereside uten å utvide menyen.
+  const [flyout, setFlyout] = React.useState<{ path: string; anchor: HTMLElement } | null>(null);
+  const flyoutCloseTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const openFlyout = (path: string, anchor: HTMLElement) => {
+    clearTimeout(flyoutCloseTimer.current);
+    setFlyout({ path, anchor });
+  };
+  const scheduleFlyoutClose = () => {
+    clearTimeout(flyoutCloseTimer.current);
+    flyoutCloseTimer.current = setTimeout(() => setFlyout(null), 150);
+  };
+  React.useEffect(() => () => clearTimeout(flyoutCloseTimer.current), []);
+  React.useEffect(() => {
+    if (!collapsed) setFlyout(null);
+  }, [collapsed]);
+
+  const renderFlyout = (item: SidebarItem) => {
+    if (!collapsed || !item.subItems || flyout?.path !== item.path) return null;
+    const selected = isSelected(item.path);
+    return (
+      <Popper
+        open
+        anchorEl={flyout.anchor}
+        placement="right-start"
+        sx={{ zIndex: (theme) => theme.zIndex.tooltip }}
+      >
+        {/* Gjennomsiktig venstremarg gjør at musen kan flyttes fra ikonet til flyouten uten å miste hover. */}
+        <Box
+          onMouseEnter={() => clearTimeout(flyoutCloseTimer.current)}
+          onMouseLeave={scheduleFlyoutClose}
+          sx={{ pl: 0.5 }}
+        >
+          <Paper
+            elevation={8}
+            role="menu"
+            aria-label={item.label}
+            sx={{ minWidth: 190, p: 0.75, borderRadius: "14px", border: "1px solid", borderColor: "divider" }}
+          >
+            <Typography
+              variant="caption"
+              sx={(theme) => ({
+                display: "block",
+                px: 1.5,
+                pt: 0.5,
+                pb: 0.75,
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: iconColor(theme, item),
+              })}
+            >
+              {item.label}
+            </Typography>
+            {item.subItems.map((sub, i) => {
+              const subActive = selected && activeSubIndex(item.path) === i;
+              return (
+                <ListItemButton
+                  key={sub.label}
+                  role="menuitem"
+                  selected={subActive}
+                  onClick={() => {
+                    logUsage("menu_click", { targetPage: pathToUsagePage(item.path) });
+                    navigate(`${item.path}${sub.search}`);
+                    setFlyout(null);
+                  }}
+                  sx={(theme) => ({
+                    height: 36,
+                    minHeight: 0,
+                    px: 1.5,
+                    borderRadius: "10px",
+                    "&:hover": { backgroundColor: alpha(item.color, 0.1) },
+                    "&.Mui-selected, &.Mui-selected:hover": {
+                      backgroundColor: alpha(item.color, 0.14),
+                      color: iconColor(theme, item),
+                    },
+                  })}
+                >
+                  <Typography
+                    noWrap
+                    sx={{
+                      fontSize: "0.86rem",
+                      fontWeight: subActive ? 600 : 400,
+                      color: subActive ? "inherit" : "text.primary",
+                    }}
+                  >
+                    {sub.label}
+                  </Typography>
+                </ListItemButton>
+              );
+            })}
+          </Paper>
+        </Box>
+      </Popper>
+    );
   };
 
   const renderItem = (item: SidebarItem) => {
     const selected = isSelected(item.path);
     const hasSub = Boolean(item.subItems) && !collapsed;
+    const hasFlyout = Boolean(item.subItems) && collapsed;
     const open = hasSub && Boolean(openMenus[item.path]);
     const ItemIcon = item.Icon;
 
     return (
       <Box key={item.path}>
-        <Box sx={{ position: "relative", px: collapsed ? 0 : 1.5, display: "flex", justifyContent: "center" }}>
-          <Tooltip title={collapsed ? item.label : ""} placement="right">
+        <Box
+          onMouseEnter={hasFlyout ? (e) => openFlyout(item.path, e.currentTarget) : undefined}
+          onMouseLeave={hasFlyout ? scheduleFlyoutClose : undefined}
+          sx={{ position: "relative", px: collapsed ? 0 : 1.5, display: "flex", justifyContent: "center" }}
+        >
+          <Tooltip title={collapsed && !hasFlyout ? item.label : ""} placement="right">
             <ListItemButton
               selected={selected}
               onClick={() => goTo(item)}
@@ -405,6 +510,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
               {open ? <ChevronUpIcon sx={{ fontSize: 18 }} /> : <ChevronDownIcon sx={{ fontSize: 18 }} />}
             </IconButton>
           )}
+          {renderFlyout(item)}
         </Box>
 
         {hasSub && (

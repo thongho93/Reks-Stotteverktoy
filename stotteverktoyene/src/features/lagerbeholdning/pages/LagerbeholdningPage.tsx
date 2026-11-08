@@ -52,7 +52,7 @@ import CallMergeIcon from "@mui/icons-material/CallMerge";
 import ContentPasteIcon from "@mui/icons-material/ContentPaste";
 import { alpha, createTheme, ThemeProvider, useTheme } from "@mui/material/styles";
 
-import styles from "../../../styles/app.module.css";
+import { pageFrameSx } from "../../../app/pageLayout";
 import { AccentSelection } from "../../../styles/AccentSelection";
 import { parseUttakInput } from "../lib/parse";
 import {
@@ -762,7 +762,7 @@ export default function LagerbeholdningPage() {
               : "linear-gradient(160deg, rgba(14,159,142,0.08) 0%, rgba(14,159,142,0.03) 100%)",
         })}
       />
-      <Container maxWidth={false} className={styles.appContainer} sx={{ maxWidth: "1600px !important" }}>
+      <Container maxWidth={false} sx={pageFrameSx}>
         <Box
           sx={{
             display: "flex",

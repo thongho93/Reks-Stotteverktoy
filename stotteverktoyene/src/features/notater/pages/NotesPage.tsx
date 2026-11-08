@@ -30,6 +30,7 @@ import { TrashList } from "../components/TrashList";
 import { useNotes } from "../hooks/useNotes";
 import type { Note, NotesRouteState } from "../types";
 import { getNoteClipboardText, getNoteClipboardTextWithTitle, matchesSearch } from "../utils/noteUtils";
+import { pageFrameSx } from "../../../app/pageLayout";
 
 const PURPLE = "#B648E8";
 const GRID_SX = {
@@ -516,7 +517,7 @@ function NotesContent() {
   const showHeadings = favorites.length > 0 && others.length > 0;
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box sx={pageFrameSx}>
       {/* Topplinje */}
       <Box
         sx={{
