@@ -1,12 +1,12 @@
 import * as React from "react";
-import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { createTheme, useTheme, ThemeProvider, alpha, type Theme } from "@mui/material/styles";
 import { AccentSelection } from "../../../styles/AccentSelection";
 import { useLocation } from "react-router-dom";
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
+  ButtonBase,
   Card,
   CardContent,
   Chip,
@@ -15,10 +15,7 @@ import {
   Stack,
   TextField,
   Typography,
-  Divider,
-  List,
-  ListItemButton,
-  ListItemText,
+  LinearProgress,
   Tooltip,
   Snackbar,
   CircularProgress,
@@ -49,11 +46,8 @@ import {
   type InteractionEntity,
   type MatchResult,
 } from "../../fest/mappers/interactionsToIndex";
-import {
-  interactionPasteHasKnownContent,
-  parseInteractionPaste,
-  parsedToEntities,
-} from "../utils/parsePaste";
+import { resolveSearchInput } from "../utils/resolveSearchInput";
+import InteractionSearchField from "../components/InteractionSearchField";
 import { generateKundetekst } from "../services/claudeService";
 
 import {
@@ -250,6 +244,7 @@ export default function InteraksjonerPage() {
 
   // vnr (farmaloggNumber) → ATC, sourced from PIM/FEST medication items.
   const [medItems, setMedItems] = React.useState<Med[]>([]);
+  const [medsReady, setMedsReady] = React.useState(false);
   React.useEffect(() => {
     let alive = true;
     loadMedicationItems()
@@ -258,6 +253,9 @@ export default function InteraksjonerPage() {
       })
       .catch(() => {
         /* vnr-oppslag er valgfritt; ignorer lastefeil */
+      })
+      .finally(() => {
+        if (alive) setMedsReady(true);
       });
     return () => {
       alive = false;
@@ -288,26 +286,6 @@ export default function InteraksjonerPage() {
     },
     [vnrToAtc, index],
   );
-
-  const applyVnr = React.useCallback(
-    (digits: string) => {
-      const match = resolveVnrEntity(digits);
-      if (!match) return;
-      setSelected((prev) => {
-        const id = getEntityId(match);
-        if (prev.some((p) => getEntityId(p) === id)) return prev;
-        return [...prev, match];
-      });
-      setInputValue("");
-    },
-    [resolveVnrEntity, getEntityId],
-  );
-
-  const { onPaste: onVnrPaste } = useVnrAutoPaste({
-    enabled: autoPasteVnr,
-    isFocused: isSearchFocused,
-    onVnr: applyVnr,
-  });
 
   // Pre-fill search when navigated from the global command palette
   React.useEffect(() => {
@@ -348,33 +326,93 @@ export default function InteraksjonerPage() {
   const [copySnackMsg, setCopySnackMsg] = React.useState<string>("Tekst kopiert");
   const [standardtekstFilter, setStandardtekstFilter] = React.useState("");
 
-  // Prototype: lim-inn-søk (steg 1) + AI-generert kundetekst (steg 2)
-  const [pasteValue, setPasteValue] = React.useState("");
-  const [isPasteFocused, setIsPasteFocused] = React.useState(false);
-
-  // Auto-lim inn i "Eller lim inn interaksjon": når feltet er aktivt og
-  // utklippstavlen inneholder ATC-koder eller et gjenkjent virkestoffnavn,
-  // fylles teksten inn automatisk (samme "Auto vnr"-toggle). Tilfeldig tekst
-  // og rene varenumre ignoreres – de sistnevnte håndteres av søkefeltet over.
-  // Armes ved innliming/auto-lim → auto-kjør "Tolk og søk" (se effekt lenger nede).
-  const autoTolkRef = React.useRef(false);
-
-  useVnrAutoPaste({
-    enabled: autoPasteVnr,
-    isFocused: isPasteFocused,
-    onVnr: (text) => {
-      setPasteValue(text);
-      autoTolkRef.current = true;
-    },
-    extract: (text) =>
-      interactionPasteHasKnownContent(text, index) ? text.trim() : "",
-  });
+  // AI-generert kundetekst
   const [aiText, setAiText] = React.useState("");
   const [aiLoading, setAiLoading] = React.useState(false);
   const [aiError, setAiError] = React.useState<string | null>(null);
   const [aiLatencyMs, setAiLatencyMs] = React.useState<number | null>(null);
 
   const { standardtekster, reload: reloadStandardtekster } = useStandardtekster();
+
+  const [searchNotice, setSearchNotice] = React.useState<string | null>(null);
+  // Tekst som kom inn før interaksjonsdata/varenummer-oppslag var lastet (f.eks. auto-lim
+  // rett etter sidelast) – tolkes så snart alt er klart.
+  const pendingTextsRef = React.useRef<Array<{ text: string; ambient: boolean }>>([]);
+
+  // Ett felt for alt: tolker innlimt/skrevet tekst (varenummer, navn, ATC, lister, FEST-linjer).
+  const addFromText = React.useCallback(
+    (text: string, opts?: { ambient?: boolean }) => {
+      const ambient = Boolean(opts?.ambient);
+      if (!index || !medsReady) {
+        pendingTextsRef.current.push({ text, ambient });
+        return;
+      }
+
+      const { entities, unmatched } = resolveSearchInput(text, index, resolveVnrEntity, {
+        // Ambient (utklippstavle) skal aldri gjette: kun eksakte treff.
+        allowPrefix: !ambient,
+      });
+
+      if (entities.length > 0) {
+        setSelected((prev) => {
+          // Flere treff fra én innliming (f.eks. en hel FEST-linje) er et nytt søk;
+          // ett enkelt treff legges til i det som allerede er valgt.
+          const base = entities.length >= 2 ? [] : prev;
+          const seen = new Set(base.map(getEntityId));
+          return [...base, ...entities.filter((e) => !seen.has(getEntityId(e)))];
+        });
+        setInputValue("");
+        setActiveLinkedStdId(null);
+        setExpanded({});
+        setSearchNotice(unmatched.length > 0 ? `Fant ikke: ${unmatched.join(", ")}` : null);
+        return;
+      }
+
+      if (ambient) return;
+
+      // Ingenting å tolke: la teksten bli stående i feltet, så forslagene hjelper videre.
+      const shown = text.trim().replace(/\s+/g, " ");
+      setInputValue(shown.slice(0, 80));
+      setSearchNotice(
+        `Fant ikke «${shown.length > 40 ? `${shown.slice(0, 40)}…` : shown}». Velg blant forslagene, eller prøv virkestoff, ATC-kode eller varenummer.`,
+      );
+    },
+    [index, medsReady, resolveVnrEntity, getEntityId],
+  );
+
+  React.useEffect(() => {
+    if (!index || !medsReady || pendingTextsRef.current.length === 0) return;
+    const queued = pendingTextsRef.current;
+    pendingTextsRef.current = [];
+    for (const q of queued) addFromText(q.text, { ambient: q.ambient });
+  }, [index, medsReady, addFromText]);
+
+  // Innliming i søkefeltet: tolk umiddelbart når teksten kjennes igjen. Ellers (f.eks. en
+  // delvis skrevet «escit») skrives den inn som vanlig, slik at forslagene vises.
+  const handleFieldPaste = React.useCallback(
+    (text: string): boolean => {
+      if (!index || !medsReady) {
+        addFromText(text);
+        return true;
+      }
+      const { entities } = resolveSearchInput(text, index, resolveVnrEntity);
+      if (entities.length === 0) return false;
+      addFromText(text);
+      return true;
+    },
+    [index, medsReady, resolveVnrEntity, addFromText],
+  );
+
+  useVnrAutoPaste({
+    enabled: autoPasteVnr,
+    isFocused: isSearchFocused,
+    onVnr: (text) => addFromText(text, { ambient: true }),
+    extract: (text) => {
+      const t = text.trim();
+      return t && t.length <= 1500 ? t : "";
+    },
+  });
+
 
   const activeCtx = React.useMemo(() => {
     if (!index || results.length === 0) return null;
@@ -406,35 +444,13 @@ export default function InteraksjonerPage() {
     return map;
   }, [selected]);
 
-  const isExactAtc7 = (v: string) => {
-    const s = v.trim().toUpperCase();
-    // Eksakt ATC (7 tegn): f.eks. C09AA01 / N02AA03
-    return /^[A-Z][0-9]{2}[A-Z]{2}[0-9]{2}$/.test(s);
-  };
-
-  const normalizeAtcInput = (v: string) => {
-    const raw = v ?? "";
-    const trimmed = raw.trim();
-    if (!trimmed) return raw;
-
-    // Only collapse whitespace if the result looks like an ATC code/prefix.
-    // Examples users paste/type: "C03A A", "C03A B", "C03A B01".
-    const collapsed = trimmed.replace(/\s+/g, "");
-    const looksAtcPrefix = /^[A-Z][0-9]{2}[A-Z0-9]{1,4}$/.test(collapsed.toUpperCase());
-
-    if (looksAtcPrefix && /\s/.test(trimmed)) {
-      return collapsed;
-    }
-
-    return raw;
-  };
-
   const handleReset = React.useCallback(() => {
     setSelected([]);
     setResults([]);
     setActiveResult(0);
     setExpanded({});
     setInputValue("");
+    setSearchNotice(null);
     setActiveLinkedStdId(null);
     setCreateOpen(false);
     setEditOpen(false);
@@ -576,14 +592,6 @@ export default function InteraksjonerPage() {
     pushHistory(r);
   }, [index, results, selected, pushHistory]);
 
-  const showHistory = selected.length === 0 && inputValue.trim().length === 0 && history.length > 0;
-  const searchProgressLabel =
-    selected.length === 0
-      ? null
-      : selected.length === 1
-        ? "1 av 2 valgt"
-        : "Interaksjonssøk aktiv";
-
   const handleSearch = React.useCallback(() => {
     if (!index) return;
     const terms = selected.flatMap((s) => (s.atc ? [s.key, s.atc] : [s.key]));
@@ -647,36 +655,6 @@ export default function InteraksjonerPage() {
     },
     [showCopySnack, firstName]
   );
-
-  const handlePasteSearch = React.useCallback(
-    (override?: string) => {
-      if (!index) return;
-      const src = typeof override === "string" ? override : pasteValue;
-      const parsed = parseInteractionPaste(src);
-      const entities = parsedToEntities(parsed, index);
-      if (entities.length === 0) {
-        showCopySnack("Fant ingen ATC-koder eller virkestoff i teksten");
-        return;
-      }
-      setSelected(entities);
-      setInputValue("");
-      setPasteValue("");
-      setActiveLinkedStdId(null);
-      setExpanded({});
-    },
-    [index, pasteValue, showCopySnack],
-  );
-
-  // Auto-tolk: når lim-inn-feltet får gjenkjent innhold (via innliming eller
-  // ambient auto-lim), kjøres "Tolk og søk" automatisk. Armes ved paste/auto-lim
-  // (autoTolkRef) og utføres når indeksen er klar – ikke ved vanlig tasting.
-  React.useEffect(() => {
-    if (!autoTolkRef.current) return;
-    if (!index) return; // vent på at interaksjonsindeksen er lastet
-    autoTolkRef.current = false;
-    if (!interactionPasteHasKnownContent(pasteValue, index)) return;
-    handlePasteSearch(pasteValue);
-  }, [pasteValue, index, handlePasteSearch]);
 
   const handleGenerateAi = React.useCallback(async () => {
     if (!activeCtx?.it || !activeCtx.r) return;
@@ -807,6 +785,318 @@ export default function InteraksjonerPage() {
     };
   }, [isResizingSplit, getSplitRatioFromClientX]);
 
+  const accentText = (t: Theme) => (t.palette.mode === "dark" ? "#E08A88" : "#A03A38");
+  const panelSx = {
+    bgcolor: (t: Theme) => (t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF"),
+    border: (t: Theme) =>
+      `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
+  } as const;
+
+  const searchField = (hero: boolean) => (
+    <InteractionSearchField
+      hero={hero}
+      entities={index?.entities ?? []}
+      loading={loading}
+      selected={selected}
+      onSelectedChange={setSelected}
+      inputValue={inputValue}
+      onInputValueChange={(v) => {
+        setInputValue(v);
+        setSearchNotice(null);
+      }}
+      onSubmitText={(text) => addFromText(text)}
+      onPasteText={handleFieldPaste}
+      inputRef={searchInputRef}
+      onFocus={() => setIsSearchFocused(true)}
+      onBlur={() => setIsSearchFocused(false)}
+    />
+  );
+
+  const autoToggle = (
+    <Tooltip title="Når feltet er aktivt, limes kopiert varenummer, navn eller ATC-kode automatisk inn og søkes opp.">
+      <FormControlLabel
+        sx={{ m: 0, flexShrink: 0 }}
+        control={
+          <Switch size="small" checked={autoPasteVnr} onChange={(e) => setAutoPasteVnr(e.target.checked)} />
+        }
+        label={<Typography variant="caption">Auto-lim inn</Typography>}
+      />
+    </Tooltip>
+  );
+
+  const noticeAlert = searchNotice ? (
+    <Alert
+      severity="warning"
+      variant="outlined"
+      onClose={() => setSearchNotice(null)}
+      sx={{ borderRadius: "12px", py: 0.25, alignItems: "center" }}
+    >
+      {searchNotice}
+    </Alert>
+  ) : null;
+
+  const openHistoryItem = (h: HistoryItem) => {
+    setSelected(h.selected);
+    setInputValue("");
+    setSearchNotice(null);
+    setActiveLinkedStdId(null);
+    setExpanded({});
+    setCreateOpen(false);
+    setEditOpen(false);
+  };
+
+  const heroView = (
+    <Paper
+      sx={{
+        ...panelSx,
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: { xs: "visible", md: "auto" },
+        p: { xs: 2.5, md: 4 },
+        borderRadius: "24px",
+      }}
+    >
+      <Box
+        sx={{
+          width: "100%",
+          maxWidth: 740,
+          mx: "auto",
+          my: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 2.25,
+          py: { xs: 1, md: 2 },
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.75, mb: 0.5 }}>
+          <Box
+            sx={(t) => ({
+              width: 52,
+              height: 52,
+              borderRadius: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: t.palette.mode === "dark" ? "rgba(200,70,70,0.18)" : "rgba(255,94,91,0.1)",
+              border: `1px solid ${t.palette.mode === "dark" ? "rgba(220,90,90,0.28)" : "rgba(200,80,80,0.18)"}`,
+            })}
+          >
+            <CompareArrowsIcon sx={{ fontSize: 28, color: accentText }} />
+          </Box>
+          <Box>
+            <Typography variant="h2" sx={{ fontWeight: 800, color: accentText, lineHeight: 1.15 }}>
+              Interaksjonssøk
+            </Typography>
+            <Typography color="text.secondary" sx={{ fontSize: 14.5 }}>
+              Sjekk om legemidler bør unngås sammen
+            </Typography>
+          </Box>
+        </Box>
+
+        {error ? (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={reload}>
+                Prøv igjen
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        ) : null}
+
+        {searchField(true)}
+
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, px: 0.5 }}>
+          <Typography color="text.secondary" sx={{ fontSize: 13.5 }}>
+            Skriv, eller lim inn legemiddel, virkestoff, ATC-kode, varenummer – eller en hel interaksjonslinje fra FEST.
+          </Typography>
+          {autoToggle}
+        </Box>
+
+        {noticeAlert}
+
+        {loading ? (
+          <Box sx={{ px: 0.5 }}>
+            <LinearProgress sx={{ borderRadius: 999, height: 4 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+              Laster interaksjonsdata … du kan allerede lime inn, så søkes det opp straks dataene er klare.
+            </Typography>
+          </Box>
+        ) : null}
+
+        {history.length > 0 ? (
+          <Box sx={{ mt: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "text.secondary", px: 0.5 }}
+            >
+              Nylige søk
+            </Typography>
+            <Stack spacing={0.75} sx={{ mt: 0.75 }}>
+              {history.slice(0, 5).map((h) => (
+                <ButtonBase
+                  key={h.id}
+                  onClick={() => openHistoryItem(h)}
+                  sx={(t) => ({
+                    display: "block",
+                    textAlign: "left",
+                    width: "100%",
+                    px: 1.75,
+                    py: 1.1,
+                    borderRadius: "12px",
+                    border: `1px solid ${t.palette.divider}`,
+                    transition: "background-color 120ms ease, border-color 120ms ease",
+                    "&:hover": {
+                      bgcolor: alpha(t.palette.primary.main, 0.06),
+                      borderColor: alpha(t.palette.primary.main, 0.4),
+                    },
+                  })}
+                >
+                  <Typography noWrap sx={{ fontWeight: 700, fontSize: 14.5 }}>
+                    {h.title}
+                  </Typography>
+                  {h.subtitle ? (
+                    <Typography noWrap color="text.secondary" sx={{ fontSize: 13 }}>
+                      {h.subtitle}
+                    </Typography>
+                  ) : null}
+                </ButtonBase>
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
+
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mt: 1.5 }}>
+          <Box
+            component="img"
+            alt="Venter"
+            src="/img/imwaiting.gif"
+            loading="lazy"
+            decoding="async"
+            sx={{
+              width: 230,
+              maxWidth: "70%",
+              borderRadius: "16px",
+              border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.18)" : "rgba(200,80,80,0.1)"}`,
+              boxShadow: (t) =>
+                t.palette.mode === "dark"
+                  ? "0 10px 36px rgba(180,50,50,0.13), 0 2px 10px rgba(0,0,0,0.45)"
+                  : "0 8px 28px rgba(200,80,80,0.09), 0 2px 8px rgba(0,0,0,0.05)",
+              display: "block",
+            }}
+          />
+          <Typography
+            sx={{
+              mt: 1.5,
+              textAlign: "center",
+              fontSize: 15,
+              fontWeight: 500,
+              color: (t) => (t.palette.mode === "dark" ? "#A86A68" : "#B87A78"),
+            }}
+          >
+            Kom igjen. Jeg har ikke hele dagen.
+          </Typography>
+        </Box>
+      </Box>
+    </Paper>
+  );
+
+  const resultsView =
+    index && results.length > 0 ? (
+      <Box sx={{ pt: 0.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.25 }}>
+          <Typography sx={{ fontWeight: 800, color: accentText }}>Treff</Typography>
+          <Chip
+            size="small"
+            label={`${results.length}`}
+            sx={{
+              fontWeight: 700,
+              bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(200,70,70,0.22)" : "rgba(200,70,70,0.1)"),
+              color: accentText,
+            }}
+          />
+        </Box>
+        <Stack spacing={1}>
+          {results.map((r, i) => {
+            const it = index.interactions[r.interactionIndex];
+            const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
+            const gB = it.substansgrupper?.[r.matchedGroups?.[1]];
+            const kind = relevanceKind(it.relevansV, it.relevansDn);
+            const nameFromGroup = (g?: any) => (g ? g.navn || g.substanser?.[0]?.substans || "" : "");
+            const label =
+              [nameFromGroup(gA), nameFromGroup(gB)].filter(Boolean).join(" × ") || "Interaksjon";
+            const active = i === activeResult;
+
+            return (
+              <ButtonBase
+                key={`hit:${r.interactionIndex}:${i}`}
+                onClick={() => {
+                  setActiveResult(i);
+                  setActiveLinkedStdId(null);
+                  pushHistory(r);
+                }}
+                sx={(t) => ({
+                  display: "block",
+                  width: "100%",
+                  minWidth: 0,
+                  textAlign: "left",
+                  px: 1.75,
+                  py: 1.5,
+                  borderRadius: "14px",
+                  border: `1px solid ${active ? alpha(t.palette.primary.main, 0.7) : t.palette.divider}`,
+                  bgcolor: active ? alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.16 : 0.07) : "transparent",
+                  boxShadow: active ? `0 0 0 3px ${alpha(t.palette.primary.main, 0.12)}` : "none",
+                  transition: "background-color 120ms ease, border-color 120ms ease",
+                  "&:hover": {
+                    bgcolor: alpha(t.palette.primary.main, active ? 0.1 : 0.05),
+                  },
+                })}
+              >
+                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+                  <Typography sx={{ fontWeight: 800, lineHeight: 1.25, minWidth: 0, overflowWrap: "anywhere" }}>
+                    {label}
+                  </Typography>
+                  {kind ? (
+                    <Chip
+                      size="small"
+                      icon={<RelevanceIcon kind={kind} />}
+                      label={it.relevansDn ?? ""}
+                      variant="outlined"
+                      sx={{
+                        flexShrink: 0,
+                        fontWeight: 700,
+                        maxWidth: 170,
+                        "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+                      }}
+                    />
+                  ) : null}
+                </Box>
+                {it.kliniskKonsekvens ? (
+                  <Typography
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.5,
+                      fontSize: 14,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {it.kliniskKonsekvens}
+                  </Typography>
+                ) : null}
+              </ButtonBase>
+            );
+          })}
+        </Stack>
+      </Box>
+    ) : null;
+
   return (
   <ThemeProvider theme={redTheme}>
     <AccentSelection />
@@ -833,6 +1123,9 @@ export default function InteraksjonerPage() {
         flexDirection: "column",
       }}
     >
+      {selected.length === 0 ? (
+        heroView
+      ) : (
       <Box
         ref={splitContainerRef}
         sx={{
@@ -843,15 +1136,15 @@ export default function InteraksjonerPage() {
           minHeight: 0,
         }}
       >
-        {/* Left: Search */}
+        {/* Left: Search + treff */}
         <Paper
           sx={{
-            p: { xs: 2.5, md: 3.5 },
+            ...panelSx,
+            p: { xs: 2.5, md: 3 },
             flex: { xs: "initial", md: `0 0 calc((100% - ${DIVIDER_WIDTH_PX}px) * ${splitRatio})` },
             height: { xs: "auto", md: "100%" },
             overflow: { xs: "visible", md: "auto" },
-            bgcolor: (t) => t.palette.mode === "dark" ? "#151A1A" : "#FFFFFF",
-            border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
+            borderRadius: "20px",
           }}
         >
           {error ? (
@@ -868,470 +1161,25 @@ export default function InteraksjonerPage() {
             </Alert>
           ) : null}
 
-          <Stack spacing={2}>
-            <Autocomplete
-              multiple
-              loading={loading}
-              options={index?.entities ?? []}
-              value={selected}
-              inputValue={inputValue}
-              open={inputValue.trim().length > 0}
-              onInputChange={(_, v) => {
-                const normalized = normalizeAtcInput(v);
-                setInputValue(normalized);
+          <Stack spacing={1.75}>
+            {searchField(false)}
 
-                // Varenummer (typed or pasted): resolve to the matching substance/ATC.
-                if (/^\d{4,7}$/.test(normalized.trim())) {
-                  applyVnr(normalized.trim());
-                  return;
-                }
-
-                const q = normalized.trim().toUpperCase();
-                // Auto-velg kun ved eksakt 7-tegns ATC. Ved kortere prefix (f.eks. C09AA)
-                // skal vi la dropdownen være åpen slik at bruker kan velge riktig kode.
-                if (!q || !isExactAtc7(q) || !index?.entities?.length) return;
-
-                // Finn eksakt ATC-match
-                const exactAtcMatches = index.entities.filter(
-                  (e) => e.kind !== "product" && (e.atc ?? "").toUpperCase() === q
-                );
-
-                if (exactAtcMatches.length !== 1) return;
-
-                const match = exactAtcMatches[0];
-
-                // Legg til hvis ikke allerede valgt
-                setSelected((prev) => {
-                  const id = getEntityId(match);
-                  const seen = new Set(prev.map((p) => getEntityId(p)));
-                  if (seen.has(id)) return prev;
-                  return [...prev, match];
-                });
-
-                // Tøm input så det føles som et “valg”
-                setInputValue("");
-              }}
-              onChange={(_, values) => {
-                // Dedupe by entity identity so preparatnavn can coexist with substance/ATC inputs
-                const seen = new Set<string>();
-                const deduped: InteractionEntity[] = [];
-                for (const e of values) {
-                  const id = getEntityId(e);
-                  if (seen.has(id)) continue;
-                  seen.add(id);
-                  deduped.push(e);
-                }
-                setSelected(deduped);
-              }}
-              isOptionEqualToValue={(a, b) => {
-                return getEntityId(a) === getEntityId(b);
-              }}
-              getOptionLabel={(o) => (o.kind === "product" ? o.label : o.atc ? `${o.label} (${o.atc})` : o.label)}
-              filterOptions={(options, state) => {
-                const q = state.inputValue.trim().toLowerCase();
-                if (!q) return [];
-                const starts = options.filter((o) => o.label.toLowerCase().startsWith(q));
-                const includes = options.filter(
-                  (o) =>
-                    !o.label.toLowerCase().startsWith(q) &&
-                    (o.label.toLowerCase().includes(q) ||
-                      (o.atc ? o.atc.toLowerCase().includes(q) : false))
-                );
-                return [...starts, ...includes].slice(0, 12);
-              }}
-              renderTags={() => null}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Velg legemiddel, virkestoff eller ATC-kode"
-                  placeholder={
-                    selected.length === 0 ? "Søk etter legemiddel, virkestoff eller ATC-kode" : ""
-                  }
-                  autoFocus
-                  inputRef={searchInputRef}
-                  onFocus={() => setIsSearchFocused(true)}
-                  onBlur={() => setIsSearchFocused(false)}
-                  onPaste={onVnrPaste}
-                  onKeyDown={(e) => {
-                    if (e.key === "Backspace" && inputValue.trim().length === 0) {
-                      // Prevent MUI Autocomplete from deleting the last selected option
-                      // when the input itself is empty.
-                      e.stopPropagation();
-                    }
-                  }}
-                />
-              )}
-            />
-
-            <Tooltip title="Når feltet er aktivt, slås kopiert varenummer automatisk opp og legges til i søket.">
-              <FormControlLabel
-                sx={{ m: 0, mt: 0.5 }}
-                control={
-                  <Switch
-                    size="small"
-                    checked={autoPasteVnr}
-                    onChange={(e) => setAutoPasteVnr(e.target.checked)}
-                  />
-                }
-                label={<Typography variant="caption">Auto vnr</Typography>}
-              />
-            </Tooltip>
-
-            <Box>
-              <TextField
-                fullWidth
-                size="small"
-                multiline
-                minRows={2}
-                label="Eller lim inn interaksjon"
-                placeholder="F.eks. «Bør unngås Escitalopram N06A B10 Ikke-selektive monoaminreopptakshemmere N06A A»"
-                value={pasteValue}
-                onChange={(e) => setPasteValue(e.target.value)}
-                onPaste={() => {
-                  // Manuell innliming: arm auto-tolk. onChange oppdaterer pasteValue
-                  // rett etter, og effekten kjører søket hvis innholdet gjenkjennes.
-                  autoTolkRef.current = true;
-                }}
-                onFocus={() => setIsPasteFocused(true)}
-                onBlur={() => setIsPasteFocused(false)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                    e.preventDefault();
-                    handlePasteSearch();
-                  }
-                }}
-              />
-              <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => handlePasteSearch()}
-                  disabled={!pasteValue.trim() || !index}
-                  sx={{
-                    fontWeight: 700,
-                    color: (t) => (t.palette.mode === "dark" ? "#E08A88" : "#A03A38"),
-                    borderColor: (t) =>
-                      t.palette.mode === "dark" ? "rgba(220,90,90,0.35)" : "rgba(176,68,66,0.3)",
-                  }}
-                >
-                  Tolk og søk
-                </Button>
-              </Box>
-            </Box>
-            {searchProgressLabel ? (
-              <Chip
-                size="small"
-                label={searchProgressLabel}
-                variant="outlined"
-                sx={{
-                  alignSelf: "flex-start",
-                  fontWeight: 700,
-                  borderColor: (t) => t.palette.mode === "dark" ? "rgba(220,90,90,0.45)" : "rgba(176,68,66,0.4)",
-                  color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
-                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.14)" : "rgba(255,94,91,0.07)",
-                }}
-              />
-            ) : null}
-            {showHistory ? (
-              <Box sx={{ pt: 1 }}>
-                <Divider sx={{ my: 2 }} />
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    mb: 1,
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography sx={{ fontWeight: 800, color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38" }}>Historikk</Typography>
-                    <Chip size="small" label={`${history.length}`} sx={{
-                      fontWeight: 700,
-                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.22)" : "rgba(200,70,70,0.1)",
-                      color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
-                      border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.3)" : "rgba(200,80,80,0.2)"}`,
-                    }} />
-                  </Stack>
-                </Box>
-
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 2,
-                    overflow: "hidden",
-                    borderColor: (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.2)" : "rgba(200,80,80,0.14)",
-                    bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FFF8F8",
-                    boxShadow: "none",
-                    mt: 1,
-                  }}
-                >
-                  <List disablePadding>
-                    {history.slice(0, 5).map((h) => (
-                      <React.Fragment key={h.id}>
-                        <ListItemButton
-                          onClick={() => {
-                            setSelected(h.selected);
-                            setInputValue("");
-                            setActiveLinkedStdId(null);
-                            setExpanded({});
-                            setCreateOpen(false);
-                            setEditOpen(false);
-                          }}
-                          sx={{ py: 1.5, alignItems: "flex-start" }}
-                        >
-                          <ListItemText
-                            primary={
-                              <Typography sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                                {h.title}
-                              </Typography>
-                            }
-                            secondary={
-                              h.subtitle ? (
-                                <Typography
-                                  color="text.secondary"
-                                  sx={{
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: "vertical",
-                                    overflow: "hidden",
-                                    mt: 0.25,
-                                  }}
-                                >
-                                  {h.subtitle}
-                                </Typography>
-                              ) : null
-                            }
-                          />
-                        </ListItemButton>
-                        <Divider />
-                      </React.Fragment>
-                    ))}
-                  </List>
-                </Paper>
-
-                <Typography color="text.secondary" sx={{ mt: 1, fontSize: 13 }}>
-                  Historikk skjules når du begynner å søke.
-                </Typography>
-              </Box>
-            ) : null}
-            {selected.length > 0 ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 1,
-                }}
-              >
-                {selected.map((option) => {
-                  const key = getEntityId(option);
-                  const label = option.kind === "product" ? option.label : option.atc ? `${option.label} ${option.atc}` : option.label;
-
-                  return (
-                    <Chip
-                      key={key}
-                      label={label}
-                      onDelete={() =>
-                        setSelected((prev) =>
-                          prev.filter((p) => getEntityId(p) !== key)
-                        )
-                      }
-                      size="medium"
-                      sx={{
-                        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
-                        color: "text.primary",
-                        border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.14)"}`,
-                        borderRadius: 999,
-                        px: 0.5,
-                        "& .MuiChip-label": { px: 1 },
-                        "& .MuiChip-deleteIcon": { opacity: 0.5 },
-                        "& .MuiChip-deleteIcon:hover": { opacity: 0.9 },
-                      }}
-                    />
-                  );
-                })}
-              </Box>
-            ) : null}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 1.5,
-                pt: 1,
-              }}
-            >
-              <Button
-                variant="text"
-                onClick={handleReset}
-                disabled={selected.length === 0}
-                sx={{
-                  fontWeight: 700,
-                  color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
-                  "&:hover": {
-                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.12)" : "rgba(200,70,70,0.07)",
-                  },
-                  "&.Mui-disabled": { color: "text.disabled" },
-                }}
-              >
-                NULLSTILL
-              </Button>
-            </Box>
-
-            {/* Treff-liste (under søkekortet) */}
-            {index && results.length > 0 ? (
-              <Box sx={{ pt: 1 }}>
-                <Divider sx={{ my: 2 }} />
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    mb: 1,
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography sx={{ fontWeight: 800, color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38" }}>Treff</Typography>
-                    <Chip
-                      size="small"
-                      label={`${results.length} treff`}
-                      sx={{
-                        fontWeight: 700,
-                        ml: 1,
-                        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.22)" : "rgba(200,70,70,0.1)",
-                        color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
-                        border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.3)" : "rgba(200,80,80,0.2)"}`,
-                      }}
-                    />
-                  </Stack>
-                </Box>
-
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 2,
-                    overflow: "hidden",
-                    borderColor: (t) => t.palette.mode === "dark" ? "rgba(200,80,80,0.2)" : "rgba(200,80,80,0.14)",
-                    bgcolor: (t) => t.palette.mode === "dark" ? "#0F1213" : "#FFF8F8",
-                    boxShadow: "none",
-                    mt: 2,
-                  }}
-                >
-                  <List disablePadding>
-                    {results.map((r, i) => {
-                      const it = index.interactions[r.interactionIndex];
-                      const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
-                      const gB = it.substansgrupper?.[r.matchedGroups?.[1]];
-                      const kind = relevanceKind(it.relevansV, it.relevansDn);
-
-                      const nameFromGroup = (g?: any) => {
-                        if (!g) return "";
-                        // Prioriter gruppenavn hvis det finnes
-                        if (g.navn) return g.navn;
-                        // Fallback: bruk substans-navn (første substans i gruppen)
-                        const subst = g.substanser?.[0]?.substans;
-                        return subst || "";
-                      };
-
-                      const titleA = nameFromGroup(gA);
-                      const titleB = nameFromGroup(gB);
-
-                      const label = [titleA, titleB].filter(Boolean).join(" × ") || "Interaksjon";
-
-                      return (
-                        <React.Fragment key={`hit:${r.interactionIndex}:${i}`}>
-                          <ListItemButton
-                            selected={i === activeResult}
-                            onClick={() => {
-                              setActiveResult(i);
-                              setActiveLinkedStdId(null);
-                              pushHistory(r);
-                            }}
-                            sx={{
-                              display: "grid",
-                              gridTemplateColumns: kind ? "1fr auto" : "1fr",
-                              py: { xs: 1.5, md: 1.75 },
-                              alignItems: "flex-start",
-                              gap: 1,
-                              minHeight: { xs: 112, md: 128 },
-                              "&.Mui-selected": {
-                                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.2)" : "rgba(255,94,91,0.08)",
-                              },
-                              "&.Mui-selected:hover": {
-                                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.28)" : "rgba(255,94,91,0.14)",
-                              },
-                              "&:hover": {
-                                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.1)" : "rgba(255,94,91,0.05)",
-                              },
-                            }}
-                          >
-                            <Typography
-                              sx={{
-                                fontWeight: 800,
-                                lineHeight: 1.2,
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                                gridColumn: "1 / 2",
-                              }}
-                            >
-                              {label}
-                            </Typography>
-                            {kind ? (
-                              <Chip
-                                size="small"
-                                icon={<RelevanceIcon kind={kind} />}
-                                label={it.relevansDn ?? ""}
-                                variant="outlined"
-                                sx={{
-                                  mt: 0.25,
-                                  fontWeight: 700,
-                                  maxWidth: 180,
-                                  gridColumn: "2 / 3",
-                                  justifySelf: "end",
-                                  "& .MuiChip-label": {
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  },
-                                }}
-                              />
-                            ) : null}
-                            {it.kliniskKonsekvens ? (
-                              <Typography
-                                color="text.secondary"
-                                sx={{
-                                  gridColumn: "1 / -1",
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: { xs: 3, md: 4 },
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                  mt: 0.25,
-                                }}
-                              >
-                                {it.kliniskKonsekvens}
-                              </Typography>
-                            ) : null}
-                          </ListItemButton>
-                          {i !== results.length - 1 ? <Divider /> : null}
-                        </React.Fragment>
-                      );
-                    })}
-                  </List>
-                </Paper>
-              </Box>
-            ) : null}
-
-            {selected.length === 1 ? (
-              <Typography color="text.secondary" sx={{ pt: 1 }}>
-                Velg ett legemiddel til for å søke etter interaksjoner.
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, px: 0.5 }}>
+              <Typography color="text.secondary" sx={{ fontSize: 13 }}>
+                {selected.length === 1
+                  ? "Legg til minst ett legemiddel til for å se interaksjoner."
+                  : `${selected.length} valgt`}
               </Typography>
-            ) : null}
+              {autoToggle}
+            </Box>
+
+            {noticeAlert}
+
+            {resultsView}
 
             {selected.length >= 2 && results.length === 0 ? (
-              <Typography color="text.secondary" sx={{ pt: 1 }}>
-                Ingen treff.
+              <Typography color="text.secondary" sx={{ pt: 1, px: 0.5 }}>
+                Ingen interaksjoner å unngå mellom de valgte.
               </Typography>
             ) : null}
           </Stack>
@@ -1416,79 +1264,29 @@ export default function InteraksjonerPage() {
             border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.22)" : "rgba(200,80,80,0.14)"}`,
           }}
         >
-          {selected.length === 0 ? (
+          {results.length === 0 ? (
             <Box
               sx={{
+                height: "100%",
+                minHeight: { xs: 160, md: 320 },
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                minHeight: { xs: 420, md: 620 },
+                textAlign: "center",
+                gap: 1,
+                color: "text.secondary",
                 px: 2,
-                py: { xs: 4, md: 6 },
               }}
             >
-              {/* Icon badge */}
-              <Box
-                sx={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "16px",
-                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(200,70,70,0.18)" : "rgba(255,94,91,0.1)",
-                  border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(220,90,90,0.28)" : "rgba(200,80,80,0.18)"}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  mb: 2.5,
-                }}
-              >
-                <CompareArrowsIcon sx={{ fontSize: 28, color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#B04442" }} />
-              </Box>
-
-              {/* Title */}
-              <Typography
-                variant="h2"
-                sx={{
-                  fontWeight: 800,
-                  textAlign: "center",
-                  mb: 0.5,
-                  color: (t) => t.palette.mode === "dark" ? "#E08A88" : "#A03A38",
-                }}
-              >
-                Interaksjonssøk
+              <CompareArrowsIcon sx={{ fontSize: 36, opacity: 0.4 }} />
+              <Typography sx={{ fontWeight: 700, color: "text.primary" }}>
+                {selected.length === 1 ? "Legg til ett legemiddel til" : "Ingen interaksjoner å unngå"}
               </Typography>
-
-              {/* Cat image */}
-              <Box
-                component="img"
-                alt="Venter"
-                src="/img/imwaiting.gif"
-                loading="lazy"
-                decoding="async"
-                sx={{
-                  width: 300,
-                  maxWidth: "82%",
-                  borderRadius: "14px",
-                  border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(200,80,80,0.18)" : "rgba(200,80,80,0.1)"}`,
-                  boxShadow: (t) => t.palette.mode === "dark"
-                    ? "0 10px 36px rgba(180,50,50,0.13), 0 2px 10px rgba(0,0,0,0.45)"
-                    : "0 8px 28px rgba(200,80,80,0.09), 0 2px 8px rgba(0,0,0,0.05)",
-                  mt: 3.5,
-                  mb: 3,
-                  display: "block",
-                }}
-              />
-
-              {/* Subtitle */}
-              <Typography
-                sx={{
-                  textAlign: "center",
-                  fontSize: 17,
-                  fontWeight: 500,
-                  color: (t) => t.palette.mode === "dark" ? "#A86A68" : "#B87A78",
-                }}
-              >
-                Kom igjen. Jeg har ikke hele dagen.
+              <Typography sx={{ fontSize: 14, maxWidth: 360 }}>
+                {selected.length === 1
+                  ? "Interaksjoner vises når minst to legemidler eller virkestoff er valgt."
+                  : "Det finnes ingen «bør unngås»-interaksjon mellom de valgte. Prøv å legge til eller bytte ut ett."}
               </Typography>
             </Box>
           ) : null}
@@ -2125,6 +1923,7 @@ export default function InteraksjonerPage() {
           ) : null}
         </Paper>
       </Box>
+      )}
       <Box
         sx={{
           mt: 1.5,
