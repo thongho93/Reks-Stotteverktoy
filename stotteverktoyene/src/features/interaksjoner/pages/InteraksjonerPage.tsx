@@ -7,17 +7,16 @@ import {
   Box,
   Button,
   ButtonBase,
-  Chip,
+  IconButton,
   Paper,
   Stack,
   Typography,
   LinearProgress,
   Tooltip,
   Snackbar,
-  Switch,
-  FormControlLabel,
 } from "@mui/material";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import ContentPasteRoundedIcon from "@mui/icons-material/ContentPasteRounded";
 
 import {
   CreateStandardtekstDialog,
@@ -791,14 +790,23 @@ export default function InteraksjonerPage() {
   );
 
   const autoToggle = (
-    <Tooltip title="Når feltet er aktivt, limes kopiert varenummer, navn eller ATC-kode automatisk inn og søkes opp.">
-      <FormControlLabel
-        sx={{ m: 0, flexShrink: 0 }}
-        control={
-          <Switch size="small" checked={autoPasteVnr} onChange={(e) => setAutoPasteVnr(e.target.checked)} />
-        }
-        label={<Typography variant="caption">Auto-lim inn</Typography>}
-      />
+    <Tooltip
+      title={`Auto-lim inn: ${autoPasteVnr ? "på" : "av"}. Når feltet er aktivt, limes kopiert varenummer, navn eller ATC-kode automatisk inn og søkes opp.`}
+    >
+      <IconButton
+        size="small"
+        aria-label="Auto-lim inn"
+        aria-pressed={autoPasteVnr}
+        onClick={() => setAutoPasteVnr(!autoPasteVnr)}
+        sx={(t) => ({
+          flexShrink: 0,
+          color: autoPasteVnr ? accentText(t) : t.palette.text.disabled,
+          bgcolor: autoPasteVnr ? alpha(t.palette.primary.main, 0.12) : "transparent",
+          "&:hover": { bgcolor: alpha(t.palette.primary.main, autoPasteVnr ? 0.18 : 0.08) },
+        })}
+      >
+        <ContentPasteRoundedIcon fontSize="small" />
+      </IconButton>
     </Tooltip>
   );
 
@@ -889,7 +897,7 @@ export default function InteraksjonerPage() {
 
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, px: 0.5 }}>
           <Typography color="text.secondary" sx={{ fontSize: 13.5 }}>
-            Skriv, eller lim inn legemiddel, virkestoff, ATC-kode, varenummer – eller en hel interaksjonslinje fra FEST.
+            Skriv et navn, eller lim inn ATC-kode, varenummer eller en hel FEST-linje.
           </Typography>
           {autoToggle}
         </Box>
@@ -993,22 +1001,12 @@ export default function InteraksjonerPage() {
     </Paper>
   );
 
+  // Ett treff vises rett i detaljpanelet – listen trengs først når man må velge mellom flere.
   const resultsView =
-    index && results.length > 0 ? (
+    index && results.length > 1 ? (
       <Box sx={{ pt: 0.5 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.25 }}>
-          <Typography sx={{ fontWeight: 800, color: accentText }}>Treff</Typography>
-          <Chip
-            size="small"
-            label={`${results.length}`}
-            sx={{
-              fontWeight: 700,
-              bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(200,70,70,0.22)" : "rgba(200,70,70,0.1)"),
-              color: accentText,
-            }}
-          />
-        </Box>
-        <Stack spacing={1}>
+        <Typography sx={{ fontWeight: 800, color: accentText, mb: 1 }}>{results.length} treff</Typography>
+        <Stack spacing={0.75}>
           {results.map((r, i) => {
             const it = index.interactions[r.interactionIndex];
             const gA = it.substansgrupper?.[r.matchedGroups?.[0]];
@@ -1028,54 +1026,30 @@ export default function InteraksjonerPage() {
                   pushHistory(r);
                 }}
                 sx={(t) => ({
-                  display: "block",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 1,
                   width: "100%",
                   minWidth: 0,
                   textAlign: "left",
-                  px: 1.75,
-                  py: 1.5,
-                  borderRadius: "14px",
+                  px: 1.5,
+                  py: 1.1,
+                  borderRadius: "12px",
                   border: `1px solid ${active ? alpha(t.palette.primary.main, 0.7) : t.palette.divider}`,
                   bgcolor: active ? alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.16 : 0.07) : "transparent",
-                  boxShadow: active ? `0 0 0 3px ${alpha(t.palette.primary.main, 0.12)}` : "none",
-                  transition: "background-color 120ms ease, border-color 120ms ease",
-                  "&:hover": {
-                    bgcolor: alpha(t.palette.primary.main, active ? 0.1 : 0.05),
-                  },
+                  "&:hover": { bgcolor: alpha(t.palette.primary.main, active ? 0.1 : 0.05) },
                 })}
               >
                 {kind ? (
-                  <Chip
-                    size="small"
-                    icon={<RelevanceIcon kind={kind} />}
-                    label={it.relevansDn ?? ""}
-                    variant="outlined"
-                    sx={{
-                      mb: 0.75,
-                      maxWidth: "100%",
-                      fontWeight: 700,
-                      "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-                    }}
-                  />
+                  <Tooltip title={it.relevansDn ?? ""}>
+                    <Box component="span" sx={{ display: "inline-flex", mt: "1px" }}>
+                      <RelevanceIcon kind={kind} />
+                    </Box>
+                  </Tooltip>
                 ) : null}
-                <Typography sx={{ fontWeight: 800, lineHeight: 1.25, overflowWrap: "break-word" }}>
+                <Typography sx={{ fontWeight: 700, fontSize: 14, lineHeight: 1.35, overflowWrap: "break-word", minWidth: 0 }}>
                   {label}
                 </Typography>
-                {it.kliniskKonsekvens ? (
-                  <Typography
-                    color="text.secondary"
-                    sx={{
-                      mt: 0.5,
-                      fontSize: 14,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {it.kliniskKonsekvens}
-                  </Typography>
-                ) : null}
               </ButtonBase>
             );
           })}
@@ -1151,12 +1125,7 @@ export default function InteraksjonerPage() {
             {searchField(false)}
 
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, px: 0.5 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, flexWrap: "wrap" }}>
-                <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-                  {selected.length === 1
-                    ? "Legg til minst ett legemiddel til."
-                    : `${selected.length} valgt`}
-                </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
                 <Tooltip title="Fjern alle valgte og start på nytt (Esc)">
                   <Button
                     size="small"
@@ -1172,23 +1141,13 @@ export default function InteraksjonerPage() {
                     }}
                   >
                     Nullstill
-                    <Box
-                      component="kbd"
-                      sx={{
-                        ml: 0.75,
-                        px: 0.6,
-                        borderRadius: "5px",
-                        border: (t) => `1px solid ${t.palette.divider}`,
-                        fontFamily: "inherit",
-                        fontSize: 10.5,
-                        fontWeight: 600,
-                        color: "text.secondary",
-                      }}
-                    >
-                      Esc
-                    </Box>
                   </Button>
                 </Tooltip>
+                {selected.length === 1 ? (
+                  <Typography color="text.secondary" sx={{ fontSize: 13 }}>
+                    Legg til ett til …
+                  </Typography>
+                ) : null}
               </Box>
               {autoToggle}
             </Box>
