@@ -23,6 +23,7 @@ import { FEEDBACK_ACCENT, useReadableColor } from "../components/feedbackUtils";
 import { hasNewForAuthor, useFeedbackUpdates } from "../hooks/useFeedbackUpdates";
 import { feedbackApi } from "../services/feedbackApi";
 import { FEEDBACK_STATUSES, FEEDBACK_STATUS_COLOR, feedbackPageLabel, type Feedback } from "../types";
+import { pageFrameSx } from "../../../app/pageLayout";
 
 type Scope = "alle" | "mine";
 
@@ -184,11 +185,9 @@ export default function InnspillPage() {
             flex: "1 1 auto",
             minHeight: 0,
             overflow: "auto",
-            px: { xs: 1, sm: 2 },
-            py: { xs: 1, sm: 2 },
           }}
         >
-          <Box sx={{ maxWidth: 1240, mx: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+          <Box sx={{ ...pageFrameSx, display: "flex", flexDirection: "column", gap: 3 }}>
             <Typography variant="h2" gutterBottom={false} sx={{ m: 0 }}>
               Innspill
             </Typography>

@@ -36,7 +36,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 
-import styles from "../../../styles/app.module.css";
+import { pageFrameSx } from "../../../app/pageLayout";
 import { AccentSelection } from "../../../styles/AccentSelection";
 
 import { OMEQRow, type OMEQRowValue } from "../components/OMEQRow";
@@ -537,7 +537,7 @@ export default function OMEQPage() {
         ? "linear-gradient(160deg, rgba(41,161,255,0.1) 0%, rgba(41,161,255,0.04) 100%)"
         : "linear-gradient(160deg, rgba(41,161,255,0.08) 0%, rgba(41,161,255,0.03) 100%)",
     })} />
-    <Container maxWidth={false} className={styles.appContainer}>
+    <Container maxWidth={false} sx={pageFrameSx}>
       {/* Topp: tittel + rolige verktøy */}
       <Box
         sx={{

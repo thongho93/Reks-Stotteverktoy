@@ -80,6 +80,7 @@ import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../queryKeys";
+import { PAGE_GUTTER_X, PAGE_GUTTER_Y, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
 
 type AdviceProduct = {
   id: string;
@@ -128,7 +129,6 @@ const NUMERIC_QUERY_RE = /^\d+$/;
 const VNR_PASTE_RE = /^\d{1,6}$/;
 const ATC_CODE_RE = /^[A-Z][0-9]{2}[A-Z]{2}[0-9]{2}$/;
 const MAX_RENDERED_RESULTS = 120;
-const PAGE_MAX_WIDTH = 1500;
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
 const ATC_INGREDIENT: Record<string, string> = {
   A02BC01: "Omeprazol",
@@ -978,13 +978,15 @@ export default function ProduktOgRadPage() {
       />
       <Box
         sx={{
-          px: { xs: 2, md: 4 },
-          py: { xs: 1.2, md: 1.6 },
+          maxWidth: PAGE_MAX_WIDTH,
+          mx: "auto",
+          px: PAGE_GUTTER_X,
+          pt: PAGE_GUTTER_Y,
+          pb: { xs: 1.2, md: 1.6 },
         }}
       >
         <Box
           sx={{
-            maxWidth: PAGE_MAX_WIDTH,
             mx: "auto",
             borderRadius: 0,
             px: 0,
@@ -1144,7 +1146,7 @@ export default function ProduktOgRadPage() {
       </Box>
 
       {activeTab === 0 ? (
-        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 2, md: 3 }, py: 1.5 }}>
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 1.5 }}>
           {query ? (
             <>
               <Typography sx={{ fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#A880A0" : "#7E5B74", fontWeight: 600, textAlign: "center" }}>
@@ -1496,11 +1498,11 @@ export default function ProduktOgRadPage() {
           )}
         </Box>
       ) : activeTab === 2 ? (
-        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 1, md: 1.5 }, py: 0.75 }}>
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 0.75 }}>
           <TilbakemeldingPage />
         </Box>
       ) : (
-        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: { xs: 1, md: 1.5 }, py: 0.75 }}>
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 0.75 }}>
           <Paper
             elevation={0}
             sx={{

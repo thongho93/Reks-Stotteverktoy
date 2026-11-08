@@ -12,6 +12,7 @@ import {
 import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import { AccentSelection } from "../../styles/AccentSelection";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import { pageFrameSx } from "../../app/pageLayout";
 
 type TabKey = "produktskjema" | "anbruddOversikt";
 const ANBRUDD_SURFACE = "#FFF7EC";
@@ -229,7 +230,7 @@ export default function AndbruddPage() {
       />
       <Box
         sx={{
-          p: { xs: 1.5, sm: 2.5 },
+          ...pageFrameSx,
           color: ANBRUDD_TEXT_PRIMARY,
           display: "flex",
           flexDirection: "column",
