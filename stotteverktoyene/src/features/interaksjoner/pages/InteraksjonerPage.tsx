@@ -34,6 +34,7 @@ import {
   type MatchResult,
 } from "../../fest/mappers/interactionsToIndex";
 import { resolveSearchInput } from "../utils/resolveSearchInput";
+import { lookupBrand } from "../utils/brandLookup";
 import InteractionSearchField from "../components/InteractionSearchField";
 import InteractionDetails from "../components/InteractionDetails";
 import { generateKundetekst } from "../services/claudeService";
@@ -1357,6 +1358,41 @@ export default function InteraksjonerPage() {
                   matchTerms.flatMap(substanceWords).map(normalizeSubstanceName).filter(Boolean),
                 );
 
+                // Preparatnavn regnes som treff når de har samme virkestoff (eller ATC) som det
+                // man har søkt på: «Cipralex» treffer når man har valgt «Escitalopram».
+                // Funnet ord gir tilbake søkeordets normaliserte form, så poengberegningen
+                // under er den samme som for direkte navnetreff.
+                const selectedProfiles = selected
+                  .map((s) => {
+                    const labelNorms = substanceWords(cleanMatchTerm(s.label)).map(normalizeSubstanceName);
+                    const keyNorms = substanceWords(s.key).map(normalizeSubstanceName);
+                    return {
+                      atc: s.atc,
+                      rep: labelNorms.find((n) => candidateNorms.has(n)) ?? null,
+                      aliases: new Set([...labelNorms, ...keyNorms]),
+                    };
+                  })
+                  .filter((p) => p.rep);
+
+                const matchNorm = (word: string): string | null => {
+                  const direct = normalizeSubstanceName(word);
+                  if (candidateNorms.has(direct)) return direct;
+
+                  const wordNorms = new Set([direct]);
+                  const brandAtcs: string[] = [];
+                  for (const b of lookupBrand(index, word)) {
+                    for (const kw of substanceWords(b.key)) wordNorms.add(normalizeSubstanceName(kw));
+                    if (b.atc) brandAtcs.push(b.atc);
+                  }
+
+                  for (const p of selectedProfiles) {
+                    if ([...wordNorms].some((n) => p.aliases.has(n))) return p.rep;
+                    // Samme ATC, eller preparatet tilhører en valgt ATC-gruppe (f.eks. N06AA).
+                    if (p.atc && brandAtcs.some((a) => a.startsWith(p.atc!))) return p.rep;
+                  }
+                  return null;
+                };
+
                 const linkedWithScore = linkedStandardtekster.map((s) => {
                   const title = normalizeStandardtekstTitle(s);
                   const copyText =
@@ -1372,16 +1408,16 @@ export default function InteraksjonerPage() {
                   const matchedTitleWords: string[] = [];
                   const matchedNorms = new Set<string>();
                   for (const w of substanceWords(title)) {
-                    const n = normalizeSubstanceName(w);
-                    if (candidateNorms.has(n)) {
+                    const n = matchNorm(w);
+                    if (n) {
                       matchedTitleWords.push(w);
                       matchedNorms.add(n);
                     }
                   }
                   // Body-treff (uten tittel-treff) surfacer relevante tekster lavere.
                   for (const w of substanceWords(copyText)) {
-                    const n = normalizeSubstanceName(w);
-                    if (candidateNorms.has(n)) matchedNorms.add(n);
+                    const n = matchNorm(w);
+                    if (n) matchedNorms.add(n);
                   }
 
                   let score = matchedTitleWords.length * 12;
