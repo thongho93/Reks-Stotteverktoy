@@ -317,7 +317,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   // Kollapset meny: undermenyen vises som en liten flyout til høyre når man holder
   // musen over ikonet, slik at man kan gå rett til en undereside uten å utvide menyen.
   const [flyout, setFlyout] = React.useState<{ path: string; anchor: HTMLElement } | null>(null);
-  const flyoutCloseTimer = React.useRef<ReturnType<typeof setTimeout>>();
+  const flyoutCloseTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const openFlyout = (path: string, anchor: HTMLElement) => {
     clearTimeout(flyoutCloseTimer.current);
     setFlyout({ path, anchor });

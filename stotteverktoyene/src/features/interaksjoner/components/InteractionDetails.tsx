@@ -189,7 +189,7 @@ export default function InteractionDetails({
   const [mechOpen, setMechOpen] = React.useState(false);
   const [copiedKey, setCopiedKey] = React.useState<"std" | "ai" | null>(null);
   const [infoAnchor, setInfoAnchor] = React.useState<HTMLElement | null>(null);
-  const copiedTimer = React.useRef<ReturnType<typeof setTimeout>>();
+  const copiedTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   React.useEffect(() => () => clearTimeout(copiedTimer.current), []);
 
   const aiHasContent = ai.loading || Boolean(ai.text) || Boolean(ai.error);
