@@ -11,8 +11,6 @@ import {
 import { alpha, createTheme, useTheme, ThemeProvider, type Theme } from "@mui/material/styles";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import FullscreenRoundedIcon from "@mui/icons-material/FullscreenRounded";
-import FullscreenExitRoundedIcon from "@mui/icons-material/FullscreenExitRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import SellRoundedIcon from "@mui/icons-material/SellRounded";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
@@ -153,8 +151,9 @@ export default function AndbruddPage() {
 
   const location = useLocation();
   const navigate = useNavigate();
+  // Produktskjema er standardvisningen (/anbrudd). Oversikten åpnes med ?tab=oversikt.
   const tabFromSearch = (search: string): TabKey =>
-    new URLSearchParams(search).get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+    new URLSearchParams(search).get("tab") === "oversikt" ? "anbruddOversikt" : "produktskjema";
   const [tab, setTab] = useState<TabKey>(() => tabFromSearch(location.search));
 
   const [refreshKey, setRefreshKey] = useState<Record<TabKey, number>>({ produktskjema: 0, anbruddOversikt: 0 });
@@ -163,14 +162,13 @@ export default function AndbruddPage() {
     anbruddOversikt: false,
   });
   const [hasVisited, setHasVisited] = useState<Record<TabKey, boolean>>({
-    produktskjema: false,
-    anbruddOversikt: true,
+    produktskjema: true,
+    anbruddOversikt: false,
   });
   const [lastLoadedAt, setLastLoadedAt] = useState<Record<TabKey, string | null>>({
     produktskjema: null,
     anbruddOversikt: null,
   });
-  const [fullscreen, setFullscreen] = useState(false);
 
   // Adressen (?tab=…) er sannhetskilden, slik at sidemenyen og fanene alltid er i takt.
   useEffect(() => {
@@ -206,32 +204,23 @@ export default function AndbruddPage() {
     return () => links.forEach((link) => link.remove());
   }, []);
 
-  // Varm opp produktskjemaet i bakgrunnen, så fanebyttet føles umiddelbart.
+  // Varm opp oversikten i bakgrunnen, så fanebyttet føles umiddelbart.
   useEffect(() => {
-    if (!produktskjemaEmbedUrl || hasVisited.produktskjema) return;
+    if (!sharepointEmbedUrl || hasVisited.anbruddOversikt) return;
     const timer = window.setTimeout(() => {
-      setHasVisited((prev) => (prev.produktskjema ? prev : { ...prev, produktskjema: true }));
+      setHasVisited((prev) => (prev.anbruddOversikt ? prev : { ...prev, anbruddOversikt: true }));
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [hasVisited.produktskjema]);
+  }, [hasVisited.anbruddOversikt]);
 
   const refresh = useCallback((target: TabKey) => {
     setRefreshKey((prev) => ({ ...prev, [target]: Date.now() }));
     setIframeLoaded((prev) => ({ ...prev, [target]: false }));
   }, []);
 
-  useEffect(() => {
-    if (!fullscreen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFullscreen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen]);
-
   const selectTab = (next: TabKey) => {
     if (next === tab) return;
-    navigate({ pathname: "/anbrudd", search: next === "produktskjema" ? "?tab=produktskjema" : "" });
+    navigate({ pathname: "/anbrudd", search: next === "anbruddOversikt" ? "?tab=oversikt" : "" });
   };
 
   const views: Record<
@@ -377,8 +366,8 @@ export default function AndbruddPage() {
               border: `1px solid ${alpha(t.palette.primary.main, 0.4)}`,
             })}
           >
-            {segment("anbruddOversikt")}
             {segment("produktskjema")}
+            {segment("anbruddOversikt")}
           </Box>
 
           <Box sx={{ flex: 1 }} />
@@ -412,21 +401,14 @@ export default function AndbruddPage() {
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Fullskjerm">
-            <IconButton size="small" aria-label="Fullskjerm" sx={iconButtonSx} onClick={() => setFullscreen(true)}>
-              <FullscreenRoundedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
         </Box>
 
         {/* Excel-/skjemavisningen fyller alt som er igjen, helt ut til kantene */}
         <Box
           sx={(t) => ({
-            position: fullscreen ? "fixed" : "relative",
-            inset: fullscreen ? 0 : "auto",
-            zIndex: fullscreen ? t.zIndex.modal : 0,
+            position: "relative",
             flex: 1,
-            minHeight: fullscreen ? 0 : 320,
+            minHeight: 320,
             overflow: "hidden",
             bgcolor: t.palette.background.paper,
           })}
@@ -453,35 +435,13 @@ export default function AndbruddPage() {
                   </Box>
                 </>
               )}
-              {oversiktSrc && renderFrame("anbruddOversikt", oversiktSrc, "SharePoint Excel", EXCEL_EMBED_TOP_CROP, EXCEL_EMBED_BOTTOM_CROP)}
               {hasVisited.produktskjema && produktskjemaSrc && renderFrame("produktskjema", produktskjemaSrc, "Produktskjema")}
+              {hasVisited.anbruddOversikt && oversiktSrc && renderFrame("anbruddOversikt", oversiktSrc, "SharePoint Excel", EXCEL_EMBED_TOP_CROP, EXCEL_EMBED_BOTTOM_CROP)}
             </>
           ) : (
             <Box sx={{ p: 3 }}>
               <Typography color="error">{current.missing}</Typography>
             </Box>
-          )}
-
-          {fullscreen && (
-            <Tooltip title="Avslutt fullskjerm (Esc)">
-              <IconButton
-                aria-label="Avslutt fullskjerm"
-                onClick={() => setFullscreen(false)}
-                sx={(t) => ({
-                  position: "absolute",
-                  top: 12,
-                  right: 12,
-                  zIndex: 3,
-                  bgcolor: alpha(t.palette.background.paper, 0.92),
-                  border: `1px solid ${alpha(t.palette.primary.main, 0.45)}`,
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
-                  color: accentText(t),
-                  "&:hover": { bgcolor: t.palette.background.paper },
-                })}
-              >
-                <FullscreenExitRoundedIcon />
-              </IconButton>
-            </Tooltip>
           )}
         </Box>
       </Box>

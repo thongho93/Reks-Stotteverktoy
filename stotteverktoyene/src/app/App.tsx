@@ -136,8 +136,8 @@ const MAIN_ITEMS: SidebarItem[] = [
     Icon: PackageXIcon,
     ...NAV_COLORS.anbrudd,
     subItems: [
-      { label: "Anbruddsoversikt", search: "" },
-      { label: "Produktskjema", search: "?tab=produktskjema" },
+      { label: "Produktskjema", search: "" },
+      { label: "Anbruddsoversikt", search: "?tab=oversikt" },
     ],
   },
   { label: "Notater", path: "/tilbakemelding", Icon: SquarePenIcon, ...NAV_COLORS.notater },
@@ -252,7 +252,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       if (params.has(FAGLIG_DOC_QUERY_KEY)) return 1;
       return 0;
     }
-    if (path === "/anbrudd") return params.get("tab") === "produktskjema" ? 1 : 0;
+    if (path === "/anbrudd") return params.get("tab") === "oversikt" ? 1 : 0;
     if (path === "/tilbakemelding") return params.get("tab") === "meldeskjema" ? 1 : 0;
     return 0;
   };
