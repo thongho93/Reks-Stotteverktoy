@@ -96,13 +96,13 @@ function ShortcutLink({ label, href, icon, primary = false }: ShortcutLinkProps)
           alignItems: "center",
           justifyContent: "center",
           gap: 0.75,
-          height: 32,
-          width: { xs: 32, lg: "auto" },
-          px: { xs: 0, lg: 1.5 },
+          height: 38,
+          width: { xs: 38, lg: "auto" },
+          px: { xs: 0, lg: 2 },
           flexShrink: 0,
           boxSizing: "border-box",
           borderRadius: 999,
-          fontSize: 13,
+          fontSize: 15,
           fontWeight: 700,
           whiteSpace: "nowrap",
           transition: "background-color 160ms ease, border-color 160ms ease",
@@ -115,7 +115,7 @@ function ShortcutLink({ label, href, icon, primary = false }: ShortcutLinkProps)
                 "&:hover": { bgcolor: alpha(ACCENT, 0.14), borderColor: alpha(ACCENT, 0.7) },
               }),
           "&:focus-visible": { outline: `2px solid ${alpha(ACCENT, 0.9)}`, outlineOffset: 2 },
-          "& svg": { fontSize: 17 },
+          "& svg": { fontSize: 21 },
         })}
       >
         {icon}
@@ -283,10 +283,10 @@ export default function AndbruddPage() {
         aria-selected={active}
         onClick={() => selectTab(key)}
         sx={(t) => ({
-          height: 28,
-          px: 1.75,
+          height: 34,
+          px: 2.25,
           borderRadius: 999,
-          fontSize: 13,
+          fontSize: 15,
           fontWeight: 700,
           whiteSpace: "nowrap",
           color: active ? "#2A1A00" : t.palette.text.secondary,
@@ -302,8 +302,8 @@ export default function AndbruddPage() {
   };
 
   const iconButtonSx = (t: Theme) => ({
-    width: 32,
-    height: 32,
+    width: 38,
+    height: 38,
     color: t.palette.text.secondary,
     "&:hover": { color: accentText(t), bgcolor: alpha(t.palette.primary.main, 0.12) },
   });
@@ -321,7 +321,7 @@ export default function AndbruddPage() {
             flexWrap: "wrap",
             columnGap: 1.5,
             rowGap: 1,
-            minHeight: 52,
+            minHeight: 64,
             px: 2,
             py: 0.75,
             flexShrink: 0,
@@ -333,20 +333,29 @@ export default function AndbruddPage() {
           <Box
             sx={(t) => ({
               flexShrink: 0,
-              width: 32,
-              height: 32,
-              borderRadius: "10px",
+              width: 40,
+              height: 40,
+              borderRadius: "12px",
               display: "grid",
               placeItems: "center",
               bgcolor: alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.18 : 0.14),
               border: `1px solid ${alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.32 : 0.34)}`,
             })}
           >
-            <PackageXIcon sx={{ fontSize: 19, color: accentText }} />
+            <PackageXIcon sx={{ fontSize: 24, color: accentText }} />
           </Box>
           <Typography
             component="h1"
-            sx={{ fontWeight: 800, color: accentText, fontSize: 17, lineHeight: 1.2, whiteSpace: "nowrap" }}
+            sx={{
+              // Tittelen vises bare når det er plass; sidemenyen viser allerede hvilken side du er på.
+              display: "none",
+              "@media (min-width: 1000px)": { display: "block" },
+              fontWeight: 800,
+              color: accentText,
+              fontSize: 21,
+              lineHeight: 1.2,
+              whiteSpace: "nowrap",
+            }}
           >
             Innkjøp og anbrudd
           </Typography>
@@ -373,7 +382,7 @@ export default function AndbruddPage() {
           {tab === "anbruddOversikt" && (
             <>
               <ShortcutLink label="Meld anbrudd" href={anbruddSkjemaOpenUrl} primary icon={<EditNoteRoundedIcon />} />
-              <ShortcutLink label="Etikettliste" href={anbruddEtikettOpenUrl} icon={<SellRoundedIcon />} />
+              <ShortcutLink label="Etikett" href={anbruddEtikettOpenUrl} icon={<SellRoundedIcon />} />
               <ShortcutLink label="Hele oversikten" href={anbruddOversiktOpenUrl} icon={<TableChartRoundedIcon />} />
 
               <Box
@@ -385,7 +394,7 @@ export default function AndbruddPage() {
 
           <Tooltip title={loadedTime ? `Last på nytt (oppdatert ${loadedTime})` : "Last på nytt"}>
             <IconButton size="small" aria-label="Last på nytt" sx={iconButtonSx} onClick={() => refresh(tab)}>
-              <RefreshRoundedIcon fontSize="small" />
+              <RefreshRoundedIcon fontSize="medium" />
             </IconButton>
           </Tooltip>
         </Box>
