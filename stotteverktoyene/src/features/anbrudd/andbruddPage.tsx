@@ -369,14 +369,19 @@ export default function AndbruddPage() {
 
           <Box sx={{ flex: 1 }} />
 
-          <ShortcutLink label="Meld anbrudd" href={anbruddSkjemaOpenUrl} primary icon={<EditNoteRoundedIcon />} />
-          <ShortcutLink label="Etikettliste" href={anbruddEtikettOpenUrl} icon={<SellRoundedIcon />} />
-          <ShortcutLink label="Hele oversikten" href={anbruddOversiktOpenUrl} icon={<TableChartRoundedIcon />} />
+          {/* Snarveiene hører til oversikten og vises bare der */}
+          {tab === "anbruddOversikt" && (
+            <>
+              <ShortcutLink label="Meld anbrudd" href={anbruddSkjemaOpenUrl} primary icon={<EditNoteRoundedIcon />} />
+              <ShortcutLink label="Etikettliste" href={anbruddEtikettOpenUrl} icon={<SellRoundedIcon />} />
+              <ShortcutLink label="Hele oversikten" href={anbruddOversiktOpenUrl} icon={<TableChartRoundedIcon />} />
 
-          <Box
-            aria-hidden
-            sx={(t) => ({ width: "1px", height: 20, flexShrink: 0, bgcolor: t.palette.mode === "dark" ? t.palette.divider : "#E6D8C3" })}
-          />
+              <Box
+                aria-hidden
+                sx={(t) => ({ width: "1px", height: 20, flexShrink: 0, bgcolor: t.palette.mode === "dark" ? t.palette.divider : "#E6D8C3" })}
+              />
+            </>
+          )}
 
           <Tooltip title={loadedTime ? `Last på nytt (oppdatert ${loadedTime})` : "Last på nytt"}>
             <IconButton size="small" aria-label="Last på nytt" sx={iconButtonSx} onClick={() => refresh(tab)}>
