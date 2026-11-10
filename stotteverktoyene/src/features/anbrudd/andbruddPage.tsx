@@ -1,29 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   ButtonBase,
-  Button,
-  CircularProgress,
   IconButton,
+  LinearProgress,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
-import { AccentSelection } from "../../styles/AccentSelection";
+import { alpha, createTheme, useTheme, ThemeProvider, type Theme } from "@mui/material/styles";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
-import { pageFrameSx } from "../../app/pageLayout";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import FullscreenRoundedIcon from "@mui/icons-material/FullscreenRounded";
+import FullscreenExitRoundedIcon from "@mui/icons-material/FullscreenExitRounded";
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import SellRoundedIcon from "@mui/icons-material/SellRounded";
+import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
+import { AccentSelection } from "../../styles/AccentSelection";
+import { PackageXIcon } from "../../app/navIcons";
 
 type TabKey = "produktskjema" | "anbruddOversikt";
-const ANBRUDD_SURFACE = "#FFF7EC";
-const ANBRUDD_SURFACE_SOFT = "#FDF1E1";
-const ANBRUDD_SURFACE_ELEVATED = "#FFFFFF";
-const ANBRUDD_HOVER_SURFACE = "#F9E4CA";
-const ANBRUDD_TEXT_PRIMARY = "#2E241A";
-const ANBRUDD_TEXT_SECONDARY = "#584530";
-const ANBRUDD_ACCENT_TEXT = "#8F5523";
-const ANBRUDD_TAB_ACTIVE_BG = "#FFE8CC";
-const ANBRUDD_ICON = "#7A5331";
+
+const ACCENT = "#FFA726";
+// Excel for the web reserverer en tom stripe (px) over kolonneoverskriftene i embed-visningen.
+// Vi klipper den bort. Justér hvis Microsoft endrer høyden.
+const EXCEL_EMBED_TOP_CROP = 38;
+// Nederst ligger en hvit stripe (ca. 18 px) og så den mørke statuslinjen (ca. 20 px). Begge klippes bort,
+// så arkfanene ender helt nederst i rammen. Sett til 0 for å få statuslinjen tilbake.
+const EXCEL_EMBED_BOTTOM_CROP = 38;
 
 const produktskjemaEmbedUrl = import.meta.env.VITE_OFFICE_FORM_URL as string | undefined;
 const anbruddSkjemaOpenUrl = (import.meta.env.VITE_ANBRUDD_OFFICE_FORM_URL ??
@@ -40,7 +44,7 @@ const anbruddOversiktOpenUrl = (import.meta.env.VITE_ANBRUDD_OVERSIKT_OPEN_URL ?
   | undefined;
 const sharepointEmbedUrl = (import.meta.env.VITE_ANBRUDD_SHAREPOINT_EMBED_URL ??
   import.meta.env.VITE_ANBRUDD_SHAREPOINT_URL ??
-  "https://farmasietno.sharepoint.com/sites/Reseptekspedisjon827/_layouts/15/Doc.aspx?sourcedoc={f72d9b90-2515-46ec-8290-9cc65f16515d}&action=embedview&wdAllowInteractivity=False&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True&edaebf=rslc0") as
+  "https://farmasietno.sharepoint.com/sites/Reseptekspedisjon827/_layouts/15/Doc.aspx?sourcedoc={f72d9b90-2515-46ec-8290-9cc65f16515d}&action=embedview&AllowTyping=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True") as
   | string
   | undefined;
 
@@ -51,21 +55,15 @@ const withRefreshParam = (src: string | undefined, refreshKey?: number) => {
   return `${src}${separator}reks_refresh=${refreshKey}`;
 };
 
-const formatRefreshTime = (value: string | null) => {
-  if (!value) return "Ikke oppdatert ennå";
-
+const formatLoadedTime = (value: string | null) => {
+  if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Ikke oppdatert ennå";
-
-  return new Intl.DateTimeFormat("nb-NO", {
-    dateStyle: "short",
-    timeStyle: "medium",
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("nb-NO", { timeStyle: "short" }).format(date);
 };
 
 const toOrigin = (url: string | undefined) => {
   if (!url) return null;
-
   try {
     return new URL(url).origin;
   } catch {
@@ -73,19 +71,93 @@ const toOrigin = (url: string | undefined) => {
   }
 };
 
+const isWebUrl = (url: string) => /^https?:/i.test(url);
+
+type ShortcutLinkProps = {
+  label: string;
+  href: string | undefined;
+  icon: React.ReactNode;
+  primary?: boolean;
+};
+
+/**
+ * Snarvei til en ekstern fil i toppbaren. En ekte lenke, så den kan åpnes med høyreklikk/midtklikk.
+ * Under «lg» vises bare ikonet (navnet står i hjelpeteksten), så toppbaren holder seg på én linje.
+ */
+function ShortcutLink({ label, href, icon, primary = false }: ShortcutLinkProps) {
+  if (!href) return null;
+  const web = isWebUrl(href);
+  return (
+    <Tooltip title={label}>
+      <ButtonBase
+        component="a"
+        href={href}
+        aria-label={label}
+        {...(web ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        sx={(t) => ({
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 0.75,
+          height: 32,
+          width: { xs: 32, lg: "auto" },
+          px: { xs: 0, lg: 1.5 },
+          flexShrink: 0,
+          boxSizing: "border-box",
+          borderRadius: 999,
+          fontSize: 13,
+          fontWeight: 700,
+          whiteSpace: "nowrap",
+          transition: "background-color 160ms ease, border-color 160ms ease",
+          ...(primary
+            ? { bgcolor: ACCENT, color: "#2A1A00", "&:hover": { bgcolor: "#FFB74D" } }
+            : {
+                bgcolor: t.palette.background.paper,
+                color: t.palette.mode === "dark" ? "#FFC47A" : "#8F5523",
+                border: `1px solid ${alpha(t.palette.mode === "dark" ? "#FFC47A" : "#8F5523", 0.3)}`,
+                "&:hover": { bgcolor: alpha(ACCENT, 0.14), borderColor: alpha(ACCENT, 0.7) },
+              }),
+          "&:focus-visible": { outline: `2px solid ${alpha(ACCENT, 0.9)}`, outlineOffset: 2 },
+          "& svg": { fontSize: 17 },
+        })}
+      >
+        {icon}
+        <Box component="span" sx={{ display: { xs: "none", lg: "inline" } }}>
+          {label}
+        </Box>
+      </ButtonBase>
+    </Tooltip>
+  );
+}
+
 export default function AndbruddPage() {
   const baseTheme = useTheme();
-  const isDark = baseTheme.palette.mode === "dark";
-  const ORANGE = "#FFA726";
-  const orangeTheme = useMemo(() => createTheme(baseTheme, { palette: { primary: baseTheme.palette.augmentColor({ color: { main: ORANGE } }) } }), [baseTheme]);
+  const theme = useMemo(
+    () =>
+      createTheme(baseTheme, {
+        palette: {
+          primary: baseTheme.palette.augmentColor({ color: { main: ACCENT } }),
+          // Mørk modus: én varm, nøytral palett for hele siden (temaets blålige flater passer ikke med oransje aksent).
+          ...(baseTheme.palette.mode === "dark"
+            ? {
+                background: { default: "#14110C", paper: "#1D1912" },
+                text: { primary: "#F6EFE4", secondary: "#D2C5B0", disabled: "#A89A84" },
+                divider: "rgba(255,196,122,0.18)",
+              }
+            : {}),
+        },
+      }),
+    [baseTheme],
+  );
+  const accentText = (t: Theme) => (t.palette.mode === "dark" ? "#FFC47A" : "#8F5523");
 
   const location = useLocation();
-  const [tab, setTab] = useState<TabKey>(() => {
-    const params = new URLSearchParams(location.search);
-    return params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
-  });
+  const navigate = useNavigate();
+  const tabFromSearch = (search: string): TabKey =>
+    new URLSearchParams(search).get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+  const [tab, setTab] = useState<TabKey>(() => tabFromSearch(location.search));
 
-  const [oversiktRefreshKey, setOversiktRefreshKey] = useState(0);
+  const [refreshKey, setRefreshKey] = useState<Record<TabKey, number>>({ produktskjema: 0, anbruddOversikt: 0 });
   const [iframeLoaded, setIframeLoaded] = useState<Record<TabKey, boolean>>({
     produktskjema: false,
     anbruddOversikt: false,
@@ -98,372 +170,321 @@ export default function AndbruddPage() {
     produktskjema: null,
     anbruddOversikt: null,
   });
+  const [fullscreen, setFullscreen] = useState(false);
 
+  // Adressen (?tab=…) er sannhetskilden, slik at sidemenyen og fanene alltid er i takt.
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const next = params.get("tab") === "produktskjema" ? "produktskjema" : "anbruddOversikt";
+    const next = tabFromSearch(location.search);
     setTab(next);
     setHasVisited((prev) => (prev[next] ? prev : { ...prev, [next]: true }));
   }, [location.search]);
-  const produktskjemaSrc = produktskjemaEmbedUrl;
+
   const oversiktSrc = useMemo(
-    () => withRefreshParam(sharepointEmbedUrl, oversiktRefreshKey),
-    [oversiktRefreshKey]
+    () => withRefreshParam(sharepointEmbedUrl, refreshKey.anbruddOversikt),
+    [refreshKey.anbruddOversikt],
+  );
+  const produktskjemaSrc = useMemo(
+    () => withRefreshParam(produktskjemaEmbedUrl, refreshKey.produktskjema),
+    [refreshKey.produktskjema],
   );
 
   useEffect(() => {
-    const resources = [produktskjemaSrc, sharepointEmbedUrl]
-      .map(toOrigin)
-      .filter((origin): origin is string => Boolean(origin));
-    const uniqueOrigins = Array.from(new Set(resources));
+    const origins = Array.from(
+      new Set([produktskjemaEmbedUrl, sharepointEmbedUrl].map(toOrigin).filter((o): o is string => Boolean(o))),
+    );
     const links: HTMLLinkElement[] = [];
-
-    uniqueOrigins.forEach((origin) => {
-      const dnsPrefetch = document.createElement("link");
-      dnsPrefetch.rel = "dns-prefetch";
-      dnsPrefetch.href = origin;
-      document.head.appendChild(dnsPrefetch);
-      links.push(dnsPrefetch);
-
-      const preconnect = document.createElement("link");
-      preconnect.rel = "preconnect";
-      preconnect.href = origin;
-      preconnect.crossOrigin = "anonymous";
-      document.head.appendChild(preconnect);
-      links.push(preconnect);
+    origins.forEach((origin) => {
+      (["dns-prefetch", "preconnect"] as const).forEach((rel) => {
+        const link = document.createElement("link");
+        link.rel = rel;
+        link.href = origin;
+        if (rel === "preconnect") link.crossOrigin = "anonymous";
+        document.head.appendChild(link);
+        links.push(link);
+      });
     });
+    return () => links.forEach((link) => link.remove());
+  }, []);
 
-    return () => {
-      links.forEach((link) => link.remove());
-    };
-  }, [produktskjemaSrc]);
-
+  // Varm opp produktskjemaet i bakgrunnen, så fanebyttet føles umiddelbart.
   useEffect(() => {
-    if (!produktskjemaSrc || hasVisited.produktskjema) return;
-
-    const warmupTimer = window.setTimeout(() => {
+    if (!produktskjemaEmbedUrl || hasVisited.produktskjema) return;
+    const timer = window.setTimeout(() => {
       setHasVisited((prev) => (prev.produktskjema ? prev : { ...prev, produktskjema: true }));
     }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [hasVisited.produktskjema]);
 
-    return () => {
-      window.clearTimeout(warmupTimer);
+  const refresh = useCallback((target: TabKey) => {
+    setRefreshKey((prev) => ({ ...prev, [target]: Date.now() }));
+    setIframeLoaded((prev) => ({ ...prev, [target]: false }));
+  }, []);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
     };
-  }, [hasVisited.produktskjema, produktskjemaSrc]);
-  const current = tab === "produktskjema"
-    ? {
-        src: produktskjemaSrc,
-        editUrl: produktskjemaSrc,
-        missing: "Office Form URL mangler (VITE_OFFICE_FORM_URL)",
-        iframeTitle: "Produktskjema",
-        height: 860,
-      }
-    : {
-        src: oversiktSrc,
-        editUrl: anbruddOversiktOpenUrl,
-        missing:
-          "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
-        iframeTitle: "SharePoint Excel",
-        height: 860,
-      };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
 
-  const activateTab = (nextTab: TabKey) => {
-    setTab(nextTab);
-    setHasVisited((prev) => (prev[nextTab] ? prev : { ...prev, [nextTab]: true }));
+  const selectTab = (next: TabKey) => {
+    if (next === tab) return;
+    navigate({ pathname: "/anbrudd", search: next === "produktskjema" ? "?tab=produktskjema" : "" });
   };
 
-  const refreshOversikt = () => {
-    activateTab("anbruddOversikt");
-    setOversiktRefreshKey(Date.now());
-    setIframeLoaded((prev) => ({ ...prev, anbruddOversikt: false }));
-  };
-  const showOversiktControls = tab === "anbruddOversikt";
-  const actionButtonSx = {
-    textTransform: "none",
-    fontWeight: 650,
-    borderRadius: 999,
-    borderColor: alpha(ANBRUDD_ACCENT_TEXT, 0.35),
-    color: ANBRUDD_ACCENT_TEXT,
-    backgroundColor: alpha(ANBRUDD_SURFACE_ELEVATED, 0.82),
-    backdropFilter: "blur(2px)",
-    px: 1.8,
-    py: 0.65,
-    transition: "all 180ms ease",
-    "&:hover": {
-      borderColor: ANBRUDD_ACCENT_TEXT,
-      backgroundColor: ANBRUDD_HOVER_SURFACE,
-      transform: "translateY(-1px)",
+  const views: Record<
+    TabKey,
+    { label: string; src: string | undefined; openUrl: string | undefined; missing: string; loading: string }
+  > = {
+    anbruddOversikt: {
+      label: "Anbruddsoversikt",
+      src: oversiktSrc,
+      openUrl: anbruddOversiktOpenUrl,
+      missing: "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
+      loading: "Henter oversikten fra SharePoint …",
+    },
+    produktskjema: {
+      label: "Produktskjema",
+      src: produktskjemaSrc,
+      openUrl: produktskjemaEmbedUrl,
+      missing: "Office Form URL mangler (VITE_OFFICE_FORM_URL)",
+      loading: "Henter skjemaet fra Microsoft Forms …",
     },
   };
-  const viewCardSx = (active: boolean) => ({
-    width: "100%",
-    textAlign: "left",
-    p: { xs: 1.25, sm: 1.5 },
-    borderRadius: 2.5,
-    border: `1px solid ${active ? alpha(ANBRUDD_ACCENT_TEXT, 0.45) : alpha(ANBRUDD_ACCENT_TEXT, 0.2)}`,
-    backgroundColor: active ? ANBRUDD_TAB_ACTIVE_BG : alpha(ANBRUDD_SURFACE_ELEVATED, 0.9),
-    boxShadow: active
-      ? `0 10px 18px ${alpha(ANBRUDD_ACCENT_TEXT, 0.15)}`
-      : `0 4px 12px ${alpha(ANBRUDD_ACCENT_TEXT, 0.08)}`,
-    transition: "all 180ms ease",
-    "&:hover": {
-      backgroundColor: active ? ANBRUDD_TAB_ACTIVE_BG : ANBRUDD_HOVER_SURFACE,
-      borderColor: alpha(ANBRUDD_ACCENT_TEXT, 0.45),
-      transform: "translateY(-1px)",
-    },
-    "&:focus-visible": {
-      outline: `2px solid ${alpha(ANBRUDD_ACCENT_TEXT, 0.45)}`,
-      outlineOffset: 2,
-    },
+  const current = views[tab];
+  const loaded = iframeLoaded[tab];
+  const loadedTime = formatLoadedTime(lastLoadedAt[tab]);
+
+  const renderFrame = (key: TabKey, src: string | undefined, title: string, cropTop = 0, cropBottom = 0) => (
+    <Box
+      component="iframe"
+      key={`${key}-${refreshKey[key]}`}
+      title={title}
+      src={src}
+      onLoad={() => {
+        setIframeLoaded((prev) => ({ ...prev, [key]: true }));
+        setLastLoadedAt((prev) => ({ ...prev, [key]: new Date().toISOString() }));
+      }}
+      onError={() => setIframeLoaded((prev) => ({ ...prev, [key]: true }))}
+      frameBorder={0}
+      scrolling="no"
+      loading="eager"
+      allowFullScreen
+      style={{
+        position: "absolute",
+        // cropTop/cropBottom gjør iframen høyere enn rammen og klipper bort kantene av den innebygde visningen.
+        top: -cropTop,
+        left: 0,
+        width: "100%",
+        height: `calc(100% + ${cropTop + cropBottom}px)`,
+        border: 0,
+        display: "block",
+        background: "#fff",
+        visibility: tab === key ? "visible" : "hidden",
+        pointerEvents: tab === key ? "auto" : "none",
+      }}
+    />
+  );
+
+  const segment = (key: TabKey) => {
+    const active = tab === key;
+    return (
+      <ButtonBase
+        key={key}
+        role="tab"
+        aria-selected={active}
+        onClick={() => selectTab(key)}
+        sx={(t) => ({
+          height: 28,
+          px: 1.75,
+          borderRadius: 999,
+          fontSize: 13,
+          fontWeight: 700,
+          whiteSpace: "nowrap",
+          color: active ? "#2A1A00" : t.palette.text.secondary,
+          bgcolor: active ? ACCENT : "transparent",
+          transition: "background-color 160ms ease, color 160ms ease",
+          "&:hover": { bgcolor: active ? ACCENT : alpha(t.palette.primary.main, 0.12) },
+          "&:focus-visible": { outline: `2px solid ${alpha(ACCENT, 0.9)}`, outlineOffset: 2 },
+        })}
+      >
+        {views[key].label}
+      </ButtonBase>
+    );
+  };
+
+  const iconButtonSx = (t: Theme) => ({
+    width: 32,
+    height: 32,
+    color: t.palette.text.secondary,
+    "&:hover": { color: accentText(t), bgcolor: alpha(t.palette.primary.main, 0.12) },
   });
 
   return (
-    <ThemeProvider theme={orangeTheme}>
+    <ThemeProvider theme={theme}>
       <AccentSelection />
-      <Box
-        sx={{
-          position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none",
-          bgcolor: isDark ? "#0F1108" : "#FFF7EC",
-          backgroundImage: isDark
-            ? "radial-gradient(circle at 8% -12%, rgba(180,100,0,0.12) 0%, rgba(180,100,0,0) 40%), radial-gradient(circle at 94% -4%, rgba(140,80,0,0.10) 0%, rgba(140,80,0,0) 34%)"
-            : "radial-gradient(circle at 8% -12%, rgba(255,167,38,0.2) 0%, rgba(255,167,38,0) 40%), radial-gradient(circle at 94% -4%, rgba(230,130,0,0.14) 0%, rgba(230,130,0,0) 34%)",
-        }}
-      />
-      <Box
-        sx={{
-          ...pageFrameSx,
-          color: ANBRUDD_TEXT_PRIMARY,
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          minHeight: 0,
-        }}
-      >
-      <Box sx={{ position: "relative", zIndex: 1 }}>
-        <Box role="tablist" aria-label="Skjema tabs" sx={{ mb: 2 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, color: "text.primary" }}>
+        {/* Smal toppbar: tittel, faner, snarveier og verktøy på én linje */}
+        <Box
+          component="header"
+          sx={(t) => ({
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            columnGap: 1.5,
+            rowGap: 1,
+            minHeight: 52,
+            px: 2,
+            py: 0.75,
+            flexShrink: 0,
+            boxSizing: "border-box",
+            bgcolor: t.palette.mode === "dark" ? "#1D1912" : "#FFFBF5",
+            borderBottom: `1px solid ${t.palette.mode === "dark" ? t.palette.divider : "#F0DFC8"}`,
+          })}
+        >
           <Box
-            sx={{
+            sx={(t) => ({
+              flexShrink: 0,
+              width: 32,
+              height: 32,
+              borderRadius: "10px",
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
-              gap: 1,
-              maxWidth: 760,
-            }}
+              placeItems: "center",
+              bgcolor: alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.18 : 0.14),
+              border: `1px solid ${alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.32 : 0.34)}`,
+            })}
           >
-            <ButtonBase
-              role="tab"
-              aria-selected={tab === "anbruddOversikt"}
-              onClick={() => activateTab("anbruddOversikt")}
-              sx={viewCardSx(tab === "anbruddOversikt")}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2.5 }}>
-                <Typography sx={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
-                  Anbruddsoversikt
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", pl: 2 }}>
-                  <Tooltip title="Oppdater oversikten">
-                    <IconButton
-                      size="small"
-                      aria-label="Oppdater anbruddsoversikt"
-                      sx={{
-                        color: ANBRUDD_ICON,
-                        bgcolor: alpha(ANBRUDD_SURFACE_ELEVATED, 0.7),
-                        "&:hover": { backgroundColor: ANBRUDD_HOVER_SURFACE },
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        refreshOversikt();
-                      }}
-                    >
-                      <RefreshRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-            </ButtonBase>
-
-            <ButtonBase
-              role="tab"
-              aria-selected={tab === "produktskjema"}
-              onClick={() => activateTab("produktskjema")}
-              sx={viewCardSx(tab === "produktskjema")}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", minHeight: 48 }}>
-                <Typography sx={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: ANBRUDD_TEXT_PRIMARY, lineHeight: 1.2 }}>
-                  Produktskjema
-                </Typography>
-              </Box>
-            </ButtonBase>
+            <PackageXIcon sx={{ fontSize: 19, color: accentText }} />
           </Box>
+          <Typography
+            component="h1"
+            sx={{ fontWeight: 800, color: accentText, fontSize: 17, lineHeight: 1.2, whiteSpace: "nowrap" }}
+          >
+            Innkjøp og anbrudd
+          </Typography>
+
+          <Box
+            role="tablist"
+            aria-label="Visning"
+            sx={(t) => ({
+              display: "flex",
+              gap: 0.25,
+              p: 0.375,
+              borderRadius: 999,
+              bgcolor: t.palette.background.paper,
+              border: `1px solid ${alpha(t.palette.primary.main, 0.4)}`,
+            })}
+          >
+            {segment("anbruddOversikt")}
+            {segment("produktskjema")}
+          </Box>
+
+          <Box sx={{ flex: 1 }} />
+
+          <ShortcutLink label="Meld anbrudd" href={anbruddSkjemaOpenUrl} primary icon={<EditNoteRoundedIcon />} />
+          <ShortcutLink label="Etikettliste" href={anbruddEtikettOpenUrl} icon={<SellRoundedIcon />} />
+          <ShortcutLink label="Hele oversikten" href={anbruddOversiktOpenUrl} icon={<TableChartRoundedIcon />} />
+
+          <Box
+            aria-hidden
+            sx={(t) => ({ width: "1px", height: 20, flexShrink: 0, bgcolor: t.palette.mode === "dark" ? t.palette.divider : "#E6D8C3" })}
+          />
+
+          <Tooltip title={loadedTime ? `Last på nytt (oppdatert ${loadedTime})` : "Last på nytt"}>
+            <IconButton size="small" aria-label="Last på nytt" sx={iconButtonSx} onClick={() => refresh(tab)}>
+              <RefreshRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {current.openUrl && (
+            <Tooltip title="Åpne i ny fane">
+              <IconButton
+                size="small"
+                aria-label="Åpne i ny fane"
+                component="a"
+                href={current.openUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={iconButtonSx}
+              >
+                <OpenInNewRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Fullskjerm">
+            <IconButton size="small" aria-label="Fullskjerm" sx={iconButtonSx} onClick={() => setFullscreen(true)}>
+              <FullscreenRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
 
-        {showOversiktControls && (
-          <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, mb: 1.75 }}>
-            {anbruddSkjemaOpenUrl && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={actionButtonSx}
-                onClick={() => window.open(anbruddSkjemaOpenUrl, "_blank", "noopener,noreferrer")}
-              >
-                Skjema
-              </Button>
-            )}
-            {anbruddEtikettOpenUrl && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={actionButtonSx}
-                onClick={() => window.open(anbruddEtikettOpenUrl, "_blank", "noopener,noreferrer")}
-              >
-                Etikett
-              </Button>
-            )}
-            {current.editUrl && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={actionButtonSx}
-                onClick={() => window.open(current.editUrl, "_blank", "noopener,noreferrer")}
-              >
-                Oversikt
-              </Button>
-            )}
-          </Box>
-        )}
-
-        {showOversiktControls && (
-          <Box sx={{ mb: 2 }}>
-            <Box
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 1,
-                px: 1.4,
-                py: 0.7,
-                borderRadius: 999,
-                bgcolor: alpha(ANBRUDD_ACCENT_TEXT, 0.1),
-                border: `1px solid ${alpha(ANBRUDD_ACCENT_TEXT, 0.22)}`,
-              }}
-            >
-              <Typography variant="body2" sx={{ color: ANBRUDD_TEXT_SECONDARY, fontWeight: 600 }}>
-                Sist oppdatert visning: {formatRefreshTime(lastLoadedAt[tab])}
-              </Typography>
+        {/* Excel-/skjemavisningen fyller alt som er igjen, helt ut til kantene */}
+        <Box
+          sx={(t) => ({
+            position: fullscreen ? "fixed" : "relative",
+            inset: fullscreen ? 0 : "auto",
+            zIndex: fullscreen ? t.zIndex.modal : 0,
+            flex: 1,
+            minHeight: fullscreen ? 0 : 320,
+            overflow: "hidden",
+            bgcolor: t.palette.background.paper,
+          })}
+        >
+          {current.src ? (
+            <>
+              {!loaded && (
+                <>
+                  <LinearProgress sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, zIndex: 2 }} />
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 1,
+                      display: "grid",
+                      placeItems: "center",
+                      bgcolor: "background.paper",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                      {current.loading}
+                    </Typography>
+                  </Box>
+                </>
+              )}
+              {oversiktSrc && renderFrame("anbruddOversikt", oversiktSrc, "SharePoint Excel", EXCEL_EMBED_TOP_CROP, EXCEL_EMBED_BOTTOM_CROP)}
+              {hasVisited.produktskjema && produktskjemaSrc && renderFrame("produktskjema", produktskjemaSrc, "Produktskjema")}
+            </>
+          ) : (
+            <Box sx={{ p: 3 }}>
+              <Typography color="error">{current.missing}</Typography>
             </Box>
-          </Box>
-        )}
-      </Box>
+          )}
 
-      {current.src ? (
-        <>
-          <Box
-            sx={{
-              position: "relative",
-              flex: 1,
-              minHeight: 0,
-              borderRadius: "2px",
-              overflow: "hidden",
-            }}
-          >
-            {!iframeLoaded[tab] && (
-              <Box
-                sx={{
+          {fullscreen && (
+            <Tooltip title="Avslutt fullskjerm (Esc)">
+              <IconButton
+                aria-label="Avslutt fullskjerm"
+                onClick={() => setFullscreen(false)}
+                sx={(t) => ({
                   position: "absolute",
-                  inset: 0,
-                  display: "grid",
-                  placeItems: "center",
-                  gap: 1.5,
-                  background: `linear-gradient(180deg, ${ANBRUDD_SURFACE} 0%, ${ANBRUDD_SURFACE_SOFT} 100%)`,
-                  backdropFilter: "blur(2px)",
-                  zIndex: 1,
-                  textAlign: "center",
-                  pointerEvents: "none",
-                }}
+                  top: 12,
+                  right: 12,
+                  zIndex: 3,
+                  bgcolor: alpha(t.palette.background.paper, 0.92),
+                  border: `1px solid ${alpha(t.palette.primary.main, 0.45)}`,
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
+                  color: accentText(t),
+                  "&:hover": { bgcolor: t.palette.background.paper },
+                })}
               >
-                <Box>
-                  <CircularProgress size={28} sx={{ color: ANBRUDD_ACCENT_TEXT }} />
-                  <Typography sx={{ mt: 1.5, fontWeight: 700, color: ANBRUDD_TEXT_PRIMARY }}>
-                    {tab === "produktskjema"
-                      ? "Laster produktskjema ..."
-                      : "Laster anbruddsoversikt ..."}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: ANBRUDD_TEXT_SECONDARY }}>
-                    {tab === "anbruddOversikt"
-                      ? "Oversikten hentes fra SharePoint."
-                      : "Selve skjemaet hentes fra Microsoft Forms."}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-
-            {oversiktSrc && (
-              <Box
-                component="iframe"
-                title="SharePoint Excel"
-                src={oversiktSrc}
-                onLoad={() => {
-                  setIframeLoaded((prev) => ({ ...prev, anbruddOversikt: true }));
-                  setLastLoadedAt((prev) => ({
-                    ...prev,
-                    anbruddOversikt: new Date().toISOString(),
-                  }));
-                }}
-                onError={() => {
-                  setIframeLoaded((prev) => ({ ...prev, anbruddOversikt: true }));
-                }}
-                frameBorder={0}
-                scrolling="no"
-                loading="eager"
-                allowFullScreen
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  border: 0,
-                  display: "block",
-                  visibility: tab === "anbruddOversikt" ? "visible" : "hidden",
-                  pointerEvents: tab === "anbruddOversikt" ? "auto" : "none",
-                  position: tab === "anbruddOversikt" ? "relative" : "absolute",
-                  inset: tab === "anbruddOversikt" ? "auto" : 0,
-                }}
-              />
-            )}
-
-            {hasVisited.produktskjema && produktskjemaSrc && (
-              <Box
-                component="iframe"
-                title="Produktskjema"
-                src={produktskjemaSrc}
-                onLoad={() => {
-                  setIframeLoaded((prev) => ({ ...prev, produktskjema: true }));
-                  setLastLoadedAt((prev) => ({
-                    ...prev,
-                    produktskjema: new Date().toISOString(),
-                  }));
-                }}
-                onError={() => {
-                  setIframeLoaded((prev) => ({ ...prev, produktskjema: true }));
-                }}
-                frameBorder={0}
-                scrolling="no"
-                loading="eager"
-                allowFullScreen
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  border: 0,
-                  display: "block",
-                  visibility: tab === "produktskjema" ? "visible" : "hidden",
-                  pointerEvents: tab === "produktskjema" ? "auto" : "none",
-                  position: tab === "produktskjema" ? "relative" : "absolute",
-                  inset: tab === "produktskjema" ? "auto" : 0,
-                }}
-              />
-            )}
-          </Box>
-        </>
-      ) : (
-        <Typography color="error">{current.missing}</Typography>
-      )}
-    </Box>
+                <FullscreenExitRoundedIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      </Box>
     </ThemeProvider>
   );
 }
