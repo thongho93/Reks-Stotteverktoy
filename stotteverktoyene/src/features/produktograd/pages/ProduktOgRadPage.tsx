@@ -22,6 +22,9 @@ import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import TryggmammaTab from "../components/TryggmammaTab";
 import MelkeerstatningTab from "../components/MelkeerstatningTab";
 import TilbakemeldingPage from "../../tilbakemelding/pages/TilbakemeldingPage";
+import AdviceGroupList from "../components/AdviceGroupList";
+import AdviceStartView from "../components/AdviceStartView";
+import { ATC_INGREDIENT, brandLabel, groupByAtc, type AdviceProduct } from "../data/adviceProducts";
 import {
   Alert,
   Box,
@@ -32,7 +35,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Menu,
   MenuItem,
   List,
@@ -50,7 +52,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import { AccentSelection } from "../../../styles/AccentSelection";
 import {
   addDoc,
@@ -81,18 +83,6 @@ import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../queryKeys";
 import { PAGE_GUTTER_X, PAGE_GUTTER_Y, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
-
-type AdviceProduct = {
-  id: string;
-  name: string;
-  atcCode: string;
-  farmaloggNumber: string;
-  sku: string;
-  advicePoints: string[];
-  searchBlob: string;
-  farmaloggDigits: string;
-  skuDigits: string;
-};
 
 type AdviceProductRow = {
   id: string;
@@ -128,46 +118,7 @@ const NUMERIC_QUERY_RE = /^\d+$/;
 // Auto-paste recognition: a varenummer is pure digits (max 6), an ATC-code is L NN LL NN.
 const VNR_PASTE_RE = /^\d{1,6}$/;
 const ATC_CODE_RE = /^[A-Z][0-9]{2}[A-Z]{2}[0-9]{2}$/;
-const MAX_RENDERED_RESULTS = 120;
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
-const ATC_INGREDIENT: Record<string, string> = {
-  A02BC01: "Omeprazol",
-  A02BC02: "Pantoprazol",
-  A02BC03: "Lansoprazol",
-  A02BC04: "Rabeprazol",
-  A02BC05: "Esomeprazol",
-  A07EC02: "Mesalazin",
-  A11CC05: "Kolekalsiferol",
-  B01AB05: "Enoksaparin",
-  B01AC24: "Tikagrelol",
-  B01AF01: "Rivaroksaban",
-  B01AF02: "Apixaban",
-  C09CA06: "Kandesartan",
-  C09DA03: "Valsartan+HCTZ",
-  G03AA12: "Drospirenon+EE",
-  G04BE03: "Sildenafil",
-  G04BE08: "Tadalafil",
-  H02AB02: "Deksametason",
-  H03AA01: "Levotyroksin",
-  J01CA04: "Amoksicillin",
-  J01CA08: "Pivmecillinam",
-  J02AC01: "Flukonazol",
-  M01AB05: "Diklofenak",
-  M01AE01: "Ibuprofen",
-  M01AH05: "Etorikoksib",
-  N02AJ06: "Kodein+paracet",
-  N02BE01: "Paracetamol",
-  N02CC01: "Sumatriptan",
-  N05AH04: "Quetiapin",
-  N06AB06: "Sertralin",
-  N06AB10: "Escitalopram",
-  N06AX11: "Mirtazapin",
-  R03AK06: "Salmeterol+flut",
-  R03AK07: "Budesonid+form",
-  R03BA02: "Budesonid",
-  R05CB01: "Acetylcystein",
-  S01ED51: "Timolol komb.",
-};
 
 const IFRAME_SRC_RE = /src\s*=\s*["']([^"']+)["']/i;
 const IFRAME_TITLE_RE = /title\s*=\s*["']([^"']+)["']/i;
@@ -289,6 +240,41 @@ function SortableSidebarItem({ id, children }: { id: string; children: React.Rea
   );
 }
 
+const searchProducts = (list: AdviceProduct[], query: string): AdviceProduct[] => {
+  const normalizedQuery = normalizeSearch(query);
+  if (!normalizedQuery) return list;
+
+  const numericOnly = NUMERIC_QUERY_RE.test(normalizedQuery);
+  if (numericOnly) {
+    const digits = toDigits(normalizedQuery);
+    // Strip leading zeros so "060387" matches stored "60387"
+    const digitsNorm = digits.replace(/^0+/, "") || digits;
+    const exact = list.filter(
+      (product) =>
+        product.farmaloggDigits === digits ||
+        product.farmaloggDigits === digitsNorm ||
+        product.skuDigits === digits ||
+        product.skuDigits === digitsNorm
+    );
+    if (exact.length > 0) return exact;
+
+    return list.filter(
+      (product) =>
+        product.farmaloggDigits.startsWith(digits) ||
+        product.farmaloggDigits.startsWith(digitsNorm) ||
+        product.skuDigits.startsWith(digits) ||
+        product.skuDigits.startsWith(digitsNorm) ||
+        product.farmaloggDigits.includes(digits) ||
+        product.farmaloggDigits.includes(digitsNorm) ||
+        product.skuDigits.includes(digits) ||
+        product.skuDigits.includes(digitsNorm)
+    );
+  }
+
+  const terms = normalizedQuery.split(" ").filter(Boolean);
+  return list.filter((product) => matchesQuery(product, terms));
+};
+
 export default function ProduktOgRadPage() {
   const { user } = useAuthUser();
   const theme = useTheme();
@@ -309,7 +295,9 @@ export default function ProduktOgRadPage() {
     return 0;
   });
   const [query, setQuery] = useState("");
-  const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
+  const [onlyWithAdvice, setOnlyWithAdvice] = useState<boolean>(() => {
+    try { return localStorage.getItem("produktograd-kun-med-rad") !== "false"; } catch { return true; }
+  });
 
   // Sync active tab from URL params (priority) or location.state (command palette / explicit navigation)
   useEffect(() => {
@@ -356,7 +344,6 @@ export default function ProduktOgRadPage() {
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
-  const [expandedAdviceIds, setExpandedAdviceIds] = useState<Set<string>>(() => new Set());
   const [fagligSearch, setFagligSearch] = useState("");
   const [fagligDocs, setFagligDocs] = useState<FagligDocument[]>([]);
   const [isFagligLoading, setIsFagligLoading] = useState(true);
@@ -447,53 +434,36 @@ export default function ProduktOgRadPage() {
     };
   }, []);
 
-  const filtered = useMemo(() => {
-    const normalizedQuery = normalizeSearch(query);
-    if (!normalizedQuery) return products;
-
-    const numericOnly = NUMERIC_QUERY_RE.test(normalizedQuery);
-    if (numericOnly) {
-      const digits = toDigits(normalizedQuery);
-      // Strip leading zeros so "060387" matches stored "60387"
-      const digitsNorm = digits.replace(/^0+/, "") || digits;
-      const exact = products.filter(
-        (product) =>
-          product.farmaloggDigits === digits ||
-          product.farmaloggDigits === digitsNorm ||
-          product.skuDigits === digits ||
-          product.skuDigits === digitsNorm
-      );
-      if (exact.length > 0) return exact;
-
-      return products.filter(
-        (product) =>
-          product.farmaloggDigits.startsWith(digits) ||
-          product.farmaloggDigits.startsWith(digitsNorm) ||
-          product.skuDigits.startsWith(digits) ||
-          product.skuDigits.startsWith(digitsNorm) ||
-          product.farmaloggDigits.includes(digits) ||
-          product.farmaloggDigits.includes(digitsNorm) ||
-          product.skuDigits.includes(digits) ||
-          product.skuDigits.includes(digitsNorm)
-      );
-    }
-
-    const terms = normalizedQuery.split(" ").filter(Boolean);
-    return products.filter((product) => matchesQuery(product, terms));
-  }, [products, query]);
-
-  const visibleProducts = useMemo(() => filtered.slice(0, renderLimit), [filtered, renderLimit]);
-  const showFullCards = filtered.length <= 2;
+  const productsWithAdvice = useMemo(() => products.filter((product) => product.advicePoints.length > 0), [products]);
+  const searchPool = onlyWithAdvice ? productsWithAdvice : products;
+  const filtered = useMemo(() => searchProducts(searchPool, query), [searchPool, query]);
+  const groups = useMemo(() => (query.trim() ? groupByAtc(filtered) : []), [filtered, query]);
+  const substanceCount = useMemo(() => new Set(groups.map((group) => group.atcCode || group.key)).size, [groups]);
+  const searchKind = (() => {
+    const trimmed = query.trim();
+    if (!trimmed) return null;
+    if (ATC_CODE_RE.test(trimmed.toUpperCase())) return "ATC-kode";
+    if (NUMERIC_QUERY_RE.test(trimmed)) return "varenr./SKU";
+    return null;
+  })();
+  // Treff som skjules av «Kun produkter med råd» – brukes til å tilby «Vis alle».
+  const hiddenMatchCount = useMemo(
+    () => (onlyWithAdvice && query.trim() && filtered.length === 0 ? searchProducts(products, query).length : 0),
+    [onlyWithAdvice, products, query, filtered.length]
+  );
 
   const topAtcCodes = useMemo(() => {
-    const counts = new Map<string, number>();
+    const byCode = new Map<string, string[]>();
     for (const p of products) {
-      if (p.atcCode) counts.set(p.atcCode, (counts.get(p.atcCode) ?? 0) + 1);
+      if (!p.atcCode) continue;
+      const names = byCode.get(p.atcCode);
+      if (names) names.push(p.name);
+      else byCode.set(p.atcCode, [p.name]);
     }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
+    return [...byCode.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
       .slice(0, 10)
-      .map(([code, count]) => ({ code, count }));
+      .map(([code, names]) => ({ code, title: ATC_INGREDIENT[code] ?? (brandLabel(names) || code), count: names.length }));
   }, [products]);
   const filteredFagligDocs = useMemo(() => {
     const normalized = normalizeSearch(fagligSearch);
@@ -574,9 +544,8 @@ export default function ProduktOgRadPage() {
   }, [fagligSidebarCollapsed]);
 
   useEffect(() => {
-    setRenderLimit(MAX_RENDERED_RESULTS);
-    setExpandedAdviceIds(new Set());
-  }, [query]);
+    try { localStorage.setItem("produktograd-kun-med-rad", String(onlyWithAdvice)); } catch { /* ignore */ }
+  }, [onlyWithAdvice]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -610,6 +579,15 @@ export default function ProduktOgRadPage() {
           input.focus();
           input.select();
         });
+        return;
+      }
+
+      // Mellomrom setter markøren i søkefeltet – men bare når ingenting annet har fokus,
+      // slik at mellomrom fortsatt aktiverer knapper og fungerer i dialoger og tekstfelt.
+      if (event.key === " " && activeTab === 0 && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        if (event.target !== document.body) return;
+        event.preventDefault();
+        searchInputRef.current?.focus();
         return;
       }
 
@@ -696,13 +674,10 @@ export default function ProduktOgRadPage() {
     if (ok) setCopiedMessage(`${label} kopiert: ${value}`);
   };
 
-  const toggleExpandedAdvice = (productId: string) => {
-    setExpandedAdviceIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
-      return next;
-    });
+  const handleCopyText = async (text: string, message: string) => {
+    if (!text) return;
+    const ok = await copyPlainText(text);
+    if (ok) setCopiedMessage(message);
   };
 
   const addTextDocument = async () => {
@@ -1097,68 +1072,131 @@ export default function ProduktOgRadPage() {
           </Tabs>
 
           {activeTab === 0 ? (
-            <Paper
-              elevation={0}
-              sx={{
-                mt: 3,
-                mx: "auto",
-                width: "100%",
-                maxWidth: 560,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                px: 1.6,
-                py: 1,
-                borderRadius: 2.5,
-                border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.4)" : "rgba(233,155,198,0.5)"}`,
-                bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC",
-              }}
-            >
-              <SearchRoundedIcon sx={{ fontSize: 19, color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#9E4F7D" }} />
-              <InputBase
-                inputRef={searchInputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onFocus={() => void handleSearchAutoPaste()}
-                placeholder="Søk med varenummer, SKU, varenavn eller ATC-kode"
+            <Box sx={{ mt: 3, mx: "auto", width: "100%", maxWidth: 980, display: "grid", gap: 1.5 }}>
+              <Paper
+                elevation={0}
                 sx={{
-                  flex: 1,
-                  fontSize: { xs: 13, md: 14 },
-                  color: (theme) => theme.palette.mode === "dark" ? "#E2D0DC" : "#412039",
-                  "& input": { textAlign: "center" },
-                  "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#8A6880" : "#9C6F89", opacity: 1, textAlign: "center" },
-                  "& input:focus::placeholder": { opacity: 0 },
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  px: 2.5,
+                  height: { xs: 52, md: 58 },
+                  borderRadius: "14px",
+                  border: (theme) => `1.5px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.5)" : "#D79BBB"}`,
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFFFFF",
+                  boxShadow: (theme) => theme.palette.mode === "dark" ? "none" : "0 6px 24px rgba(168,31,102,0.08)",
+                  "&:focus-within": { borderColor: (theme) => theme.palette.mode === "dark" ? "#E8609A" : "#A81F66" },
                 }}
-              />
-              {query ? (
-                <IconButton
-                  aria-label="Tøm søk"
-                  size="small"
-                  onClick={() => setQuery("")}
-                  sx={{ color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#A05C82" }}
-                >
-                  <CloseRoundedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              ) : null}
-            </Paper>
+              >
+                <SearchRoundedIcon sx={{ fontSize: 22, color: (theme) => theme.palette.mode === "dark" ? "#E8609A" : "#A81F66" }} />
+                <InputBase
+                  inputRef={searchInputRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onFocus={() => void handleSearchAutoPaste()}
+                  placeholder="Varenummer, SKU, produktnavn eller ATC-kode"
+                  inputProps={{ "aria-label": "Søk i produkter og råd" }}
+                  sx={{
+                    flex: 1,
+                    fontSize: { xs: 15, md: 17 },
+                    color: (theme) => theme.palette.mode === "dark" ? "#F2EDF0" : "#2D1727",
+                    "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#8A6880" : "#8A6A7E", opacity: 1 },
+                  }}
+                />
+                {searchKind ? (
+                  <Box
+                    component="span"
+                    sx={{
+                      display: { xs: "none", sm: "inline-block" },
+                      px: 1.25,
+                      py: 0.4,
+                      borderRadius: "8px",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: (theme) => theme.palette.mode === "dark" ? "#F5B8DC" : "#A81F66",
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.24)" : "#FCE7F2",
+                    }}
+                  >
+                    Gjenkjent: {searchKind}
+                  </Box>
+                ) : null}
+                {query ? (
+                  <IconButton
+                    aria-label="Tøm søk"
+                    size="small"
+                    onClick={() => setQuery("")}
+                    sx={{ color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#6B5262" }}
+                  >
+                    <CloseRoundedIcon sx={{ fontSize: 20 }} />
+                  </IconButton>
+                ) : (
+                  <Box
+                    component="kbd"
+                    aria-hidden
+                    sx={{
+                      display: { xs: "none", md: "flex" },
+                      alignItems: "center",
+                      justifyContent: "center",
+                      px: 1,
+                      height: 28,
+                      borderRadius: 2,
+                      fontFamily: "inherit",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#6B5262",
+                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.5)" : "#D9BCCD"}`,
+                    }}
+                  >
+                    Space
+                  </Box>
+                )}
+              </Paper>
+
+              <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.25 }}>
+                {[
+                  { value: true, label: "Kun produkter med råd" },
+                  { value: false, label: "Alle produkter" },
+                ].map((option) => {
+                  const selected = onlyWithAdvice === option.value;
+                  return (
+                    <Chip
+                      key={String(option.value)}
+                      clickable
+                      aria-pressed={selected}
+                      onClick={() => setOnlyWithAdvice(option.value)}
+                      label={option.label}
+                      sx={{
+                        height: 36,
+                        borderRadius: "10px",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: (theme) => selected ? "#FFFFFF" : theme.palette.mode === "dark" ? "#E2D0DC" : "#4A3342",
+                        bgcolor: (theme) => selected ? (theme.palette.mode === "dark" ? "#B83A82" : "#A81F66") : theme.palette.mode === "dark" ? "#161B22" : "#FFFFFF",
+                        border: (theme) => `1px solid ${selected ? "transparent" : theme.palette.mode === "dark" ? "rgba(160,90,130,0.4)" : "#E3C6D8"}`,
+                        "&:hover": {
+                          bgcolor: (theme) => selected ? (theme.palette.mode === "dark" ? "#B83A82" : "#A81F66") : theme.palette.mode === "dark" ? "rgba(180,40,100,0.18)" : "#FCE7F2",
+                        },
+                      }}
+                    />
+                  );
+                })}
+                <Box sx={{ flex: 1 }} />
+                {query.trim() && !isLoading ? (
+                  <Typography sx={{ fontSize: 13.5, color: (theme) => theme.palette.mode === "dark" ? "#B79AAE" : "#6B5262" }}>
+                    <Box component="b" sx={{ color: (theme) => theme.palette.mode === "dark" ? "#F09AC0" : "#A81F66" }}>
+                      {substanceCount} virkestoff
+                    </Box>{" "}
+                    · {filtered.length} {filtered.length === 1 ? "produkt" : "produkter"}
+                  </Typography>
+                ) : null}
+              </Box>
+            </Box>
           ) : null}
         </Box>
       </Box>
 
       {activeTab === 0 ? (
-        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 1.5 }}>
-          {query ? (
-            <>
-              <Typography sx={{ fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#A880A0" : "#7E5B74", fontWeight: 600, textAlign: "center" }}>
-                Treff:{" "}
-                <Box component="span" sx={{ color: (theme) => theme.palette.mode === "dark" ? "#E8609A" : "#C93586", fontWeight: 800 }}>
-                  {filtered.length}
-                </Box>
-              </Typography>
-              <Divider sx={{ mt: 1.25, mb: 2.25, borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(140,70,110,0.3)" : alpha("#D79BBB", 0.45), maxWidth: 980, mx: "auto" }} />
-            </>
-          ) : null}
-
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, pt: 1, pb: 4 }}>
           {isLoading ? (
             <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
               <CircularProgress size={34} />
@@ -1168,333 +1206,40 @@ export default function ProduktOgRadPage() {
             <Paper sx={{ p: 2, borderRadius: 2.5, border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`, bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC" }}>
               <Typography sx={{ fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#E08AB0" : "#8E2E67" }}>{error}</Typography>
             </Paper>
-          ) : !query ? (
-            <Box
+          ) : !query.trim() ? (
+            <AdviceStartView popular={topAtcCodes} products={productsWithAdvice} onPick={setQuery} />
+          ) : filtered.length === 0 ? (
+            <Paper
+              elevation={0}
               sx={{
-                maxWidth: 860,
+                maxWidth: 980,
                 mx: "auto",
-                textAlign: "center",
-                py: 2,
-                mt: 4,
-                "@keyframes atcIn": {
-                  from: { opacity: 0, transform: "scale(0.5) translateY(24px)" },
-                  to:   { opacity: 1, transform: "scale(1)   translateY(0px)" },
-                },
-                "@keyframes atcFloat": {
-                  "0%,100%": { transform: "translateY(0px) rotate(-0.4deg)" },
-                  "30%":     { transform: "translateY(-7px) rotate(0.6deg)" },
-                  "65%":     { transform: "translateY(-3px) rotate(-0.2deg)" },
-                },
-                "@keyframes atcGlow": {
-                  "0%,100%": { boxShadow: "0 0 0px rgba(200,80,160,0)" },
-                  "50%":     { boxShadow: "0 0 18px rgba(200,80,160,0.45), 0 0 38px rgba(200,80,160,0.18)" },
-                },
-                "@keyframes atcTitleShimmer": {
-                  "0%":   { backgroundPosition: "0% 50%" },
-                  "50%":  { backgroundPosition: "100% 50%" },
-                  "100%": { backgroundPosition: "0% 50%" },
-                },
-                "@keyframes orbitSpin": {
-                  from: { transform: "rotate(0deg)"   },
-                  to:   { transform: "rotate(360deg)" },
-                },
+                p: 2.5,
+                borderRadius: "12px",
+                border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`,
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC",
               }}
             >
-              <Typography sx={{
-                mb: 2.5,
-                fontSize: { xs: 13, md: 14 },
-                fontWeight: 800,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                background: (theme) => theme.palette.mode === "dark"
-                  ? "linear-gradient(90deg, #D46FAE, #F0A0D0, #B84490, #F0A0D0, #D46FAE)"
-                  : "linear-gradient(90deg, #9D2070, #D44898, #7B1A5A, #D44898, #9D2070)",
-                backgroundSize: "300% 300%",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                animation: "atcTitleShimmer 4s ease infinite",
-              }}>
-                Vanlige ATC-koder
-              </Typography>
-
-              {/* Chip cloud */}
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2.5, justifyContent: "center" }}>
-                {topAtcCodes.map(({ code }, index) => {
-                  const floatDuration = 3.2 + (index % 5) * 0.45;
-                  const glowDuration  = 2.6 + (index % 4) * 0.55;
-                  const entranceDelay = index * 0.07;
-                  const floatDelay    = index * 0.31;
-                  return (
-                    <Chip
-                      key={code}
-                      label={
-                        <Box component="span" sx={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.2, py: 0.6 }}>
-                          <Box component="span" sx={{ fontWeight: 800, fontSize: 15 }}>{code}</Box>
-                          {ATC_INGREDIENT[code] ? (
-                            <Box component="span" sx={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#8A3A6A",
-                              opacity: 0.85,
-                            }}>{ATC_INGREDIENT[code]}</Box>
-                          ) : null}
-                        </Box>
-                      }
-                      onClick={() => setQuery(code)}
-                      sx={{
-                        height: "auto",
-                        minWidth: 150,
-                        borderRadius: 2.5,
-                        px: 0.5,
-                        cursor: "pointer",
-                        opacity: 0,
-                        "& .MuiChip-label": { px: 1.8 },
-                        bgcolor: (theme) => theme.palette.mode === "dark"
-                          ? index === 0 ? "rgba(160,40,110,0.45)" : "rgba(110,30,80,0.32)"
-                          : index === 0 ? "#FFE0F4"                : "#FFF0FA",
-                        color: (theme) => theme.palette.mode === "dark" ? "#F5B8DC" : "#8D1F60",
-                        border: (theme) => `1px solid ${theme.palette.mode === "dark"
-                          ? index === 0 ? "rgba(220,90,160,0.7)" : "rgba(180,70,130,0.45)"
-                          : index === 0 ? "#E898CC"              : "#F2C0DC"}`,
-                        animation: [
-                          `atcIn ${0.42}s cubic-bezier(0.34,1.56,0.64,1) ${entranceDelay}s both`,
-                          `atcFloat ${floatDuration}s ease-in-out ${floatDelay}s infinite`,
-                          `atcGlow  ${glowDuration}s ease-in-out  ${floatDelay}s infinite`,
-                        ].join(", "),
-                        transition: "background-color 160ms, border-color 160ms, transform 160ms",
-                        "&:hover": {
-                          animationPlayState: "paused",
-                          transform: "translateY(-5px) scale(1.1)",
-                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(190,60,130,0.55)" : "#FFD4EE",
-                          border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(240,110,180,0.8)" : "#DC70B8"}`,
-                          boxShadow: (theme) => theme.palette.mode === "dark"
-                            ? "0 8px 28px rgba(200,60,140,0.5), 0 0 0 1px rgba(220,100,170,0.4)"
-                            : "0 8px 24px rgba(180,50,120,0.28), 0 0 0 1px rgba(200,80,150,0.3)",
-                          zIndex: 1,
-                        },
-                      }}
-                    />
-                  );
-                })}
-              </Box>
-
-              <Typography sx={{
-                mt: 3,
-                fontSize: 12.5,
-                color: (theme) => theme.palette.mode === "dark" ? "#6A5060" : "#BBA0B0",
-                fontStyle: "italic",
-              }}>
-                Klikk på en ATC-kode for å filtrere produkter
-              </Typography>
-            </Box>
-          ) : filtered.length === 0 ? (
-            <Paper sx={{ p: 2.5, borderRadius: 2.5, border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`, bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC" }}>
               <Typography sx={{ fontSize: 18, fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#D4A0C0" : "#854265" }}>
-                Ingen treff på søket ditt.
+                {hiddenMatchCount > 0 ? "Ingen produkter med råd matcher søket." : "Ingen treff på søket ditt."}
               </Typography>
               <Typography sx={{ mt: 0.5, fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#9A7890" : "#8E6A82" }}>
-                Prøv å søke på ATC-kode, varenummer, SKU eller deler av varenavn.
+                {hiddenMatchCount > 0
+                  ? `${hiddenMatchCount} ${hiddenMatchCount === 1 ? "produkt" : "produkter"} uten registrert råd matcher søket.`
+                  : "Prøv å søke på ATC-kode, varenummer, SKU eller deler av varenavn."}
               </Typography>
+              {hiddenMatchCount > 0 ? (
+                <Button
+                  variant="outlined"
+                  onClick={() => setOnlyWithAdvice(false)}
+                  sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2.5, minHeight: 40 }}
+                >
+                  Vis alle produkter
+                </Button>
+              ) : null}
             </Paper>
           ) : (
-            <Box
-              sx={{
-                display: "grid",
-                gap: 1.25,
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  lg: "repeat(2, minmax(0, 1fr))",
-                },
-                alignItems: "start",
-              }}
-            >
-              {visibleProducts.map((product) => {
-                const isExpanded = showFullCards || expandedAdviceIds.has(product.id);
-
-                return (
-                  <Paper
-                    key={product.id}
-                    elevation={0}
-                    sx={{
-                      p: { xs: 1.4, md: 1.7 },
-                      borderRadius: 1.5,
-                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.25)" : "#ECD3E1"}`,
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFFFFF",
-                      boxShadow: (theme) => theme.palette.mode === "dark" ? "0 4px 14px rgba(0,0,0,0.35)" : "0 8px 20px rgba(94,21,71,0.08)",
-                      display: "grid",
-                      gap: 0.95,
-                      minHeight: showFullCards ? 0 : { xs: 250, lg: 270 },
-                      height: showFullCards ? "auto" : isExpanded ? "auto" : { xs: 250, lg: 270 },
-                      gridTemplateRows: "auto 1fr auto",
-                    }}
-                  >
-                    <Stack direction="column" alignItems="flex-start" spacing={0.8}>
-                      <Typography
-                        sx={{
-                          fontSize: { xs: 17, md: 18 },
-                          fontWeight: 700,
-                          color: (theme) => theme.palette.mode === "dark" ? "#F2EDF0" : "#31192C",
-                          lineHeight: 1.3,
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {product.name}
-                      </Typography>
-                      <Stack direction="row" spacing={0.8} flexWrap="wrap">
-                        {product.atcCode ? (
-                          <Chip
-                            label={product.atcCode}
-                            size="small"
-                            onClick={() => { void handleCopyNumber(product.atcCode, "ATC"); }}
-                            sx={{
-                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.22)" : "#FFE7F4",
-                              color: (theme) => theme.palette.mode === "dark" ? "#F09AC0" : "#9D1D66",
-                              fontWeight: 800,
-                              fontSize: 11,
-                              borderRadius: 999,
-                              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(200,80,140,0.4)" : "#F2B9DA"}`,
-                              height: 26,
-                              cursor: "pointer",
-                              transition: "transform 120ms ease, background-color 120ms ease",
-                              "&:hover": {
-                                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.35)" : "#FFDAF0",
-                                transform: "translateY(-1px)",
-                              },
-                            }}
-                          />
-                        ) : null}
-                        <Chip
-                          label={`Vnr ${product.farmaloggNumber || "-"}`}
-                          size="small"
-                          onClick={() => {
-                            void handleCopyNumber(product.farmaloggNumber, "Vnr");
-                          }}
-                          sx={{
-                            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.18)" : "#FAF1F7",
-                            color: (theme) => theme.palette.mode === "dark" ? "#C4A0B8" : "#6F4D64",
-                            fontWeight: 600,
-                            fontSize: 11,
-                            borderRadius: 999,
-                            border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.3)" : "#EBD6E3"}`,
-                            height: 26,
-                            cursor: toDigits(product.farmaloggNumber) ? "pointer" : "default",
-                            transition: "transform 120ms ease, background-color 120ms ease",
-                            "&:hover": {
-                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.30)" : "#F7E7F1",
-                              transform: "translateY(-1px)",
-                            },
-                          }}
-                        />
-                        <Chip
-                          label={`SKU ${product.sku || "-"}`}
-                          size="small"
-                          onClick={() => {
-                            void handleCopyNumber(product.sku, "SKU");
-                          }}
-                          sx={{
-                            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.18)" : "#FAF1F7",
-                            color: (theme) => theme.palette.mode === "dark" ? "#C4A0B8" : "#6F4D64",
-                            fontWeight: 600,
-                            fontSize: 11,
-                            borderRadius: 999,
-                            border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.3)" : "#EBD6E3"}`,
-                            height: 26,
-                            cursor: toDigits(product.sku) ? "pointer" : "default",
-                            transition: "transform 120ms ease, background-color 120ms ease",
-                            "&:hover": {
-                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.30)" : "#F7E7F1",
-                              transform: "translateY(-1px)",
-                            },
-                          }}
-                        />
-                      </Stack>
-                    </Stack>
-
-                    {product.advicePoints.length > 0 ? (
-                      <Box
-                        component="ul"
-                        sx={{
-                          mt: 0,
-                          mb: 0,
-                          pl: 2.1,
-                          display: "grid",
-                          gap: 0.18,
-                          overflow: "hidden",
-                          alignContent: "start",
-                          justifyContent: "start",
-                          "& li": {
-                            color: (theme) => theme.palette.mode === "dark" ? "#E8DDE4" : "#3D2A36",
-                            fontSize: { xs: 13.5, md: 14 },
-                            lineHeight: 1.34,
-                          },
-                          "& li::marker": {
-                            color: "#D24D94",
-                            fontSize: "1em",
-                          },
-                        }}
-                      >
-                        {(isExpanded ? product.advicePoints : product.advicePoints.slice(0, 3)).map((point, idx) => (
-                          <li key={`${product.id}-${idx}`}>{point}</li>
-                        ))}
-                      </Box>
-                    ) : (
-                      <Typography sx={{ mt: 0.25, color: (theme) => theme.palette.mode === "dark" ? "#A89098" : "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
-                        Ingen farmasøytisk råd registrert for dette produktet.
-                      </Typography>
-                    )}
-                    {!showFullCards && product.advicePoints.length > 3 ? (
-                      <Button
-                        size="small"
-                        variant="text"
-                        onClick={() => toggleExpandedAdvice(product.id)}
-                        sx={{
-                          width: "fit-content",
-                          minWidth: 0,
-                          mt: 0.1,
-                          px: 0,
-                          color: (theme) => theme.palette.mode === "dark" ? "#D070A0" : "#9D1D66",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          textTransform: "none",
-                        }}
-                      >
-                        {isExpanded ? "Vis færre" : `Vis mer (${product.advicePoints.length})`}
-                      </Button>
-                    ) : null}
-                  </Paper>
-                );
-              })}
-              {filtered.length > visibleProducts.length ? (
-                <Box sx={{ pt: 0.25 }}>
-                  <Typography sx={{ fontSize: 13, color: (theme) => theme.palette.mode === "dark" ? "#907080" : "#8A6380", mb: 0.75 }}>
-                    Flere treff tilgjengelig
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => setRenderLimit((prev) => prev + MAX_RENDERED_RESULTS)}
-                    sx={{
-                      borderRadius: 2.5,
-                      px: 1.4,
-                      py: 0.4,
-                      fontSize: 13,
-                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,130,0.45)" : "#E1B8CF"}`,
-                      color: (theme) => theme.palette.mode === "dark" ? "#D080B0" : "#8D2F67",
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,50,100,0.12)" : "#FFF7FB",
-                      "&:hover": {
-                        border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(180,90,140,0.6)" : "#DDA8C5"}`,
-                        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,50,100,0.22)" : "#FDEDF7",
-                      },
-                    }}
-                  >
-                    Vis flere
-                  </Button>
-                </Box>
-              ) : null}
-            </Box>
+            <AdviceGroupList key={query} groups={groups} onCopyNumber={handleCopyNumber} onCopyText={handleCopyText} />
           )}
         </Box>
       ) : activeTab === 2 ? (
