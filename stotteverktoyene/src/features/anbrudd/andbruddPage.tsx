@@ -10,7 +10,6 @@ import {
 } from "@mui/material";
 import { alpha, createTheme, useTheme, ThemeProvider, type Theme } from "@mui/material/styles";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
-import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import SellRoundedIcon from "@mui/icons-material/SellRounded";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
@@ -225,19 +224,17 @@ export default function AndbruddPage() {
 
   const views: Record<
     TabKey,
-    { label: string; src: string | undefined; openUrl: string | undefined; missing: string; loading: string }
+    { label: string; src: string | undefined; missing: string; loading: string }
   > = {
     anbruddOversikt: {
       label: "Anbruddsoversikt",
       src: oversiktSrc,
-      openUrl: anbruddOversiktOpenUrl,
       missing: "SharePoint URL mangler (VITE_ANBRUDD_SHAREPOINT_EMBED_URL / VITE_ANBRUDD_SHAREPOINT_URL)",
       loading: "Henter oversikten fra SharePoint …",
     },
     produktskjema: {
       label: "Produktskjema",
       src: produktskjemaSrc,
-      openUrl: produktskjemaEmbedUrl,
       missing: "Office Form URL mangler (VITE_OFFICE_FORM_URL)",
       loading: "Henter skjemaet fra Microsoft Forms …",
     },
@@ -386,21 +383,6 @@ export default function AndbruddPage() {
               <RefreshRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          {current.openUrl && (
-            <Tooltip title="Åpne i ny fane">
-              <IconButton
-                size="small"
-                aria-label="Åpne i ny fane"
-                component="a"
-                href={current.openUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                sx={iconButtonSx}
-              >
-                <OpenInNewRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
         </Box>
 
         {/* Excel-/skjemavisningen fyller alt som er igjen, helt ut til kantene */}
