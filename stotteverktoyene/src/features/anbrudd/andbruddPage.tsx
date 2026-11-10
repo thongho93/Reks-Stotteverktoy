@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -25,6 +25,11 @@ const EXCEL_EMBED_TOP_CROP = 38;
 // Nederst ligger en hvit stripe (ca. 18 px) og så den mørke statuslinjen (ca. 20 px). Begge klippes bort,
 // så arkfanene ender helt nederst i rammen. Sett til 0 for å få statuslinjen tilbake.
 const EXCEL_EMBED_BOTTOM_CROP = 38;
+
+// Auto-oppdatering av Anbruddsoversikt (se refreshOversiktIfStale).
+const AUTO_REFRESH_RETURN_MS = 5 * 60_000; // lastes på nytt når man kommer tilbake og visningen er eldre enn dette
+const AUTO_REFRESH_OPEN_MS = 10 * 60_000; // lastes på nytt mens den er åpen og eldre enn dette
+const AUTO_REFRESH_CHECK_MS = 60_000; // hvor ofte alderen sjekkes mens den er åpen
 
 const produktskjemaEmbedUrl = import.meta.env.VITE_OFFICE_FORM_URL as string | undefined;
 const anbruddSkjemaOpenUrl = (import.meta.env.VITE_ANBRUDD_OFFICE_FORM_URL ??
@@ -217,6 +222,57 @@ export default function AndbruddPage() {
     setIframeLoaded((prev) => ({ ...prev, [target]: false }));
   }, []);
 
+  // Auto-oppdatering, kun for Anbruddsoversikt (Produktskjema er et tomt skjema og trenger det ikke).
+  // Siden holdes montert når man går til andre sider, så uten dette ville oversikten bli stående utdatert.
+  // - Tilbake etter AUTO_REFRESH_RETURN_MS: lastes på nytt når man kommer tilbake til oversikten
+  //   (bytter fane i nettleseren, går tilbake til siden eller til fanen Anbruddsoversikt).
+  // - Mens oversikten er åpen: sjekkes hvert minutt, og lastes på nytt etter AUTO_REFRESH_OPEN_MS.
+  //   Hoppes over mens man jobber inne i regnearket (iframen har fokus), så man ikke mister plassen sin.
+  const oversiktActive = location.pathname === "/anbrudd" && tab === "anbruddOversikt";
+  const oversiktLoadedMs = lastLoadedAt.anbruddOversikt ? Date.parse(lastLoadedAt.anbruddOversikt) : null;
+  const autoState = useRef({ active: false, loaded: false, loadedMs: null as number | null });
+  autoState.current = {
+    active: oversiktActive,
+    loaded: iframeLoaded.anbruddOversikt,
+    loadedMs: oversiktLoadedMs !== null && !Number.isNaN(oversiktLoadedMs) ? oversiktLoadedMs : null,
+  };
+
+  const refreshOversiktIfStale = useCallback(
+    (maxAgeMs: number, skipWhenWorkingInSheet: boolean) => {
+      const s = autoState.current;
+      if (!s.active || !s.loaded || s.loadedMs === null) return; // ikke synlig, eller laster fortsatt
+      if (Date.now() - s.loadedMs < maxAgeMs) return;
+      const workingInSheet = document.hasFocus() && document.activeElement instanceof HTMLIFrameElement;
+      if (skipWhenWorkingInSheet && workingInSheet) return;
+      refresh("anbruddOversikt");
+    },
+    [refresh],
+  );
+
+  // Tilbake til nettleserfanen.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshOversiktIfStale(AUTO_REFRESH_RETURN_MS, false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshOversiktIfStale]);
+
+  // Tilbake til siden/fanen Anbruddsoversikt (siden lever videre mens man er andre steder i appen).
+  useEffect(() => {
+    if (oversiktActive) refreshOversiktIfStale(AUTO_REFRESH_RETURN_MS, false);
+  }, [oversiktActive, refreshOversiktIfStale]);
+
+  // Mens oversikten er åpen.
+  useEffect(() => {
+    if (!oversiktActive) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      refreshOversiktIfStale(AUTO_REFRESH_OPEN_MS, true);
+    }, AUTO_REFRESH_CHECK_MS);
+    return () => window.clearInterval(id);
+  }, [oversiktActive, refreshOversiktIfStale]);
+
   const selectTab = (next: TabKey) => {
     if (next === tab) return;
     navigate({ pathname: "/anbrudd", search: next === "anbruddOversikt" ? "?tab=oversikt" : "" });
@@ -392,7 +448,12 @@ export default function AndbruddPage() {
             </>
           )}
 
-          <Tooltip title={loadedTime ? `Last på nytt (oppdatert ${loadedTime})` : "Last på nytt"}>
+          <Tooltip
+            title={
+              (loadedTime ? `Last på nytt (oppdatert ${loadedTime})` : "Last på nytt") +
+              (tab === "anbruddOversikt" ? " – oppdateres også automatisk" : "")
+            }
+          >
             <IconButton size="small" aria-label="Last på nytt" sx={iconButtonSx} onClick={() => refresh(tab)}>
               <RefreshRoundedIcon fontSize="medium" />
             </IconButton>
