@@ -1,27 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import {
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import { arrayMove } from "@dnd-kit/sortable";
 import { useLocation } from "react-router-dom";
 import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import TryggmammaTab from "../components/TryggmammaTab";
 import MelkeerstatningTab from "../components/MelkeerstatningTab";
 import TilbakemeldingPage from "../../tilbakemelding/pages/TilbakemeldingPage";
+import FagligDocView from "../components/FagligDocView";
+import FagligTabBar, {
+  PRODUCT_TAB_KEY,
+  ROUTINES_TAB_KEY,
+  type FagligTabBarHandle,
+  type FagligTabItem,
+} from "../components/FagligTabBar";
+import { fitToPageBottom } from "../fitToPageBottom";
 import AdviceGroupList from "../components/AdviceGroupList";
 import AdviceStartView from "../components/AdviceStartView";
 import { ATC_INGREDIENT, brandLabel, groupByAtc, type AdviceProduct } from "../data/adviceProducts";
@@ -37,8 +30,6 @@ import {
   DialogTitle,
   Menu,
   MenuItem,
-  List,
-  ListItemButton,
   ListItemText,
   Popover,
   IconButton,
@@ -46,10 +37,7 @@ import {
   Paper,
   Snackbar,
   Stack,
-  Tab,
-  Tabs,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
@@ -68,21 +56,14 @@ import {
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
-import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
-import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../queryKeys";
-import { PAGE_GUTTER_X, PAGE_GUTTER_Y, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
+import { PAGE_GUTTER_X, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
 
 type AdviceProductRow = {
   id: string;
@@ -201,44 +182,13 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
 
 const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__melkeerstatning__", "__tryggmamma__", "__knuse__"] as const;
 
-function SortableSidebarItem({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  return (
-    <Box
-      ref={setNodeRef}
-      sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.45 : 1,
-        display: "flex",
-        alignItems: "center",
-        mb: 0.5,
-        "&:hover .drag-handle": { opacity: 1 },
-      }}
-    >
-      <Box
-        className="drag-handle"
-        {...attributes}
-        {...listeners}
-        sx={{
-          opacity: 0,
-          cursor: "grab",
-          display: "flex",
-          alignItems: "center",
-          color: "rgba(235,175,211,0.5)",
-          flexShrink: 0,
-          px: 0.3,
-          transition: "opacity 150ms",
-          touchAction: "none",
-          "&:active": { cursor: "grabbing" },
-        }}
-      >
-        <DragIndicatorRoundedIcon sx={{ fontSize: 15 }} />
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
-    </Box>
-  );
-}
+const VIRTUAL_TAB_LABELS: Record<string, string> = {
+  __nutrition__: "Næringsmidler",
+  __melkeerstatning__: "Melkeerstatning",
+  __tryggmamma__: "Tryggmamma",
+  __knuse__: "Knuse-/delelisten",
+};
+
 
 const searchProducts = (list: AdviceProduct[], query: string): AdviceProduct[] => {
   const normalizedQuery = normalizeSearch(query);
@@ -284,7 +234,8 @@ export default function ProduktOgRadPage() {
   const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastAutoPastedRef = useRef<string | null>(null);
-  const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const tabBarRef = useRef<FagligTabBarHandle | null>(null);
+  const fillRef = useMemo(() => fitToPageBottom(8), []);
   const fagligTitleInputRef = useRef<HTMLInputElement | null>(null);
   const textSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeTab, setActiveTab] = useState(() => {
@@ -328,7 +279,6 @@ export default function ProduktOgRadPage() {
       if (stateSelectedFagligDocId) {
         setSelectedFagligDocId(stateSelectedFagligDocId);
       }
-      setTimeout(() => fagligSearchInputRef.current?.focus(), 100);
     } else {
       setActiveTab(0);
     }
@@ -344,7 +294,6 @@ export default function ProduktOgRadPage() {
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
-  const [fagligSearch, setFagligSearch] = useState("");
   const [fagligDocs, setFagligDocs] = useState<FagligDocument[]>([]);
   const [isFagligLoading, setIsFagligLoading] = useState(true);
   const [selectedFagligDocId, setSelectedFagligDocId] = useState<string | null>("__nutrition__");
@@ -354,15 +303,21 @@ export default function ProduktOgRadPage() {
   const [fagligEmojiTargetId, setFagligEmojiTargetId] = useState<string | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameDialogValue, setRenameDialogValue] = useState("");
-  const [fagligSidebarCollapsed, setFagligSidebarCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem("faglig-sidebar-collapsed") === "true";
-  });
   const [renameDialogTargetId, setRenameDialogTargetId] = useState<string | null>(null);
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [embedDialogUrl, setEmbedDialogUrl] = useState("");
   const [embedDialogTitle, setEmbedDialogTitle] = useState("");
   const [sidebarOrder, setSidebarOrder] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("faglig-sidebar-order") ?? "[]"); } catch { return []; }
+  });
+  // Faner brukeren selv har flyttet til «Flere».
+  const [moreTabIds, setMoreTabIds] = useState<string[]>(() => {
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem("faglig-tabs-more") ?? "[]");
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
@@ -465,55 +420,25 @@ export default function ProduktOgRadPage() {
       .slice(0, 10)
       .map(([code, names]) => ({ code, title: ATC_INGREDIENT[code] ?? (brandLabel(names) || code), count: names.length }));
   }, [products]);
-  const filteredFagligDocs = useMemo(() => {
-    const normalized = normalizeSearch(fagligSearch);
-    if (!normalized) return fagligDocs;
-    return fagligDocs.filter((doc) => {
-      const titleMatch = normalizeSearch(doc.title).includes(normalized);
-      if (titleMatch) return true;
-      if (doc.kind === "text") {
-        return normalizeSearch(doc.content).includes(normalized);
-      }
-      return false;
-    });
-  }, [fagligDocs, fagligSearch]);
-
   const selectedFagligDoc = useMemo(() => {
     if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return null;
     if (selectedFagligDocId) {
       const exact = fagligDocs.find((doc) => doc.id === selectedFagligDocId);
       if (exact) return exact;
     }
-    return filteredFagligDocs[0] ?? null;
-  }, [fagligDocs, filteredFagligDocs, selectedFagligDocId]);
+    return fagligDocs[0] ?? null;
+  }, [fagligDocs, selectedFagligDocId]);
   const fagligDocById = useMemo(() => new Map(fagligDocs.map((doc) => [doc.id, doc])), [fagligDocs]);
 
-  const sortedSidebarIds = useMemo(() => {
-    const docIds = filteredFagligDocs.map((d) => d.id);
-    if (sidebarOrder.length === 0) return [...VIRTUAL_SIDEBAR_IDS, ...docIds];
-    const validDocIds = sidebarOrder.filter((id) => docIds.includes(id));
-    const newDocIds = docIds.filter((id) => !sidebarOrder.includes(id));
-    return [...VIRTUAL_SIDEBAR_IDS, ...validDocIds, ...newDocIds];
-  }, [filteredFagligDocs, sidebarOrder]);
-
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  function handleSidebarDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setSidebarOrder((prev) => {
-      const base = prev.length > 0 ? prev : sortedSidebarIds;
-      const oldIdx = base.indexOf(active.id as string);
-      const newIdx = base.indexOf(over.id as string);
-      if (oldIdx === -1 || newIdx === -1) return prev;
-      const next = arrayMove(base, oldIdx, newIdx);
-      localStorage.setItem("faglig-sidebar-order", JSON.stringify(next));
-      return next;
-    });
-  }
+  // Rekkefølgen på alle dokumentfaner (faste og egne). Faste faner som mangler i en gammel lagret
+  // rekkefølge settes først, nye dokumenter sist.
+  const orderedTabIds = useMemo(() => {
+    const allIds: string[] = [...VIRTUAL_SIDEBAR_IDS, ...fagligDocs.map((doc) => doc.id)];
+    const saved = sidebarOrder.filter((id) => allIds.includes(id));
+    const missingBuiltIn = VIRTUAL_SIDEBAR_IDS.filter((id) => !saved.includes(id));
+    const missingDocs = allIds.filter((id) => !saved.includes(id) && !missingBuiltIn.includes(id as never));
+    return [...missingBuiltIn, ...saved, ...missingDocs];
+  }, [fagligDocs, sidebarOrder]);
 
   const fagligDocMenuOpen = Boolean(fagligDocMenuAnchorEl);
   const fagligEmojiPopoverOpen = Boolean(fagligEmojiAnchorEl);
@@ -540,10 +465,6 @@ export default function ProduktOgRadPage() {
   }, [fagligDocs, isFagligLoading, selectedFagligDocId]);
 
   useEffect(() => {
-    localStorage.setItem("faglig-sidebar-collapsed", String(fagligSidebarCollapsed));
-  }, [fagligSidebarCollapsed]);
-
-  useEffect(() => {
     try { localStorage.setItem("produktograd-kun-med-rad", String(onlyWithAdvice)); } catch { /* ignore */ }
   }, [onlyWithAdvice]);
 
@@ -565,10 +486,7 @@ export default function ProduktOgRadPage() {
 
         event.preventDefault();
         if (activeTab === 1) {
-          const input = fagligSearchInputRef.current;
-          if (!input) return;
-          input.focus();
-          input.select();
+          tabBarRef.current?.openAllTabs();
           return;
         }
 
@@ -714,40 +632,6 @@ export default function ProduktOgRadPage() {
     }
   };
 
-  const createChildDocument = async (parent: FagligDocument) => {
-    if (!user?.uid) {
-      setCopiedMessage("Du må være innlogget for å opprette dokument.");
-      return;
-    }
-
-    try {
-      const now = Date.now();
-      const ref = await addDoc(collection(db, "fagligDocuments"), {
-        title: `${parent.title} - underfane`,
-        kind: "text",
-        content: "",
-        parentId: parent.id,
-        emoji: null,
-        updatedAtMs: now,
-        createdAtMs: now,
-        createdByUid: user.uid,
-        updatedByUid: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      setSelectedFagligDocId(ref.id);
-      setCopiedMessage("Underfane opprettet");
-      requestAnimationFrame(() => {
-        const input = fagligTitleInputRef.current;
-        if (!input) return;
-        input.focus();
-        input.select();
-      });
-    } catch (err) {
-      setCopiedMessage(mapFirebaseError(err, "Kunne ikke opprette underfane."));
-    }
-  };
-
   const isDescendantOf = (doc: FagligDocument, parentId: string, byId: Map<string, FagligDocument>) => {
     let current: FagligDocument | undefined = doc;
     while (current?.parentId) {
@@ -768,12 +652,6 @@ export default function ProduktOgRadPage() {
     setFagligDocMenuTargetId(docId);
   };
 
-  const handleAddFagligSubtab = async () => {
-    if (!fagligDocMenuTarget) return;
-    await createChildDocument(fagligDocMenuTarget);
-    closeFagligDocMenu();
-  };
-
   const handleDeleteFagligDoc = async () => {
     if (!fagligDocMenuTarget || !user?.uid) return;
     const targetId = fagligDocMenuTarget.id;
@@ -790,7 +668,7 @@ export default function ProduktOgRadPage() {
         await deleteDoc(docRef(db, "fagligDocuments", removeId));
       }
       if (selectedFagligDocId && removeIds.has(selectedFagligDocId)) {
-        setSelectedFagligDocId(null);
+        setSelectedFagligDocId("__nutrition__");
       }
       setCopiedMessage("Dokument slettet");
     } catch (err) {
@@ -888,6 +766,63 @@ export default function ProduktOgRadPage() {
     }, 350);
   };
 
+  const isBuiltInSelected = (VIRTUAL_SIDEBAR_IDS as readonly string[]).includes(selectedFagligDocId ?? "");
+  const activeTabKey =
+    activeTab === 0
+      ? PRODUCT_TAB_KEY
+      : activeTab === 2
+        ? ROUTINES_TAB_KEY
+        : isBuiltInSelected && selectedFagligDocId
+          ? selectedFagligDocId
+          : selectedFagligDoc?.id ?? "__nutrition__";
+
+  const fagligTabItems = useMemo<FagligTabItem[]>(
+    () =>
+      orderedTabIds.flatMap((id): FagligTabItem[] => {
+        const label = VIRTUAL_TAB_LABELS[id];
+        if (label) return [{ id, label, hasMenu: false }];
+        const doc = fagligDocById.get(id);
+        return doc ? [{ id, label: doc.title, emoji: doc.emoji, hasMenu: true }] : [];
+      }),
+    [orderedTabIds, fagligDocById]
+  );
+
+  const handleSelectTab = (key: string) => {
+    if (key === PRODUCT_TAB_KEY) {
+      setActiveTab(0);
+      return;
+    }
+    if (key === ROUTINES_TAB_KEY) {
+      setActiveTab(2);
+      return;
+    }
+    setSelectedFagligDocId(key);
+    setActiveTab(1);
+  };
+
+  const handleTabReorder = (activeId: string, overId: string) => {
+    const oldIndex = orderedTabIds.indexOf(activeId);
+    const newIndex = orderedTabIds.indexOf(overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const next = arrayMove(orderedTabIds, oldIndex, newIndex);
+    setSidebarOrder(next);
+    try { localStorage.setItem("faglig-sidebar-order", JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const updateMoreTabIds = (next: string[]) => {
+    setMoreTabIds(next);
+    try { localStorage.setItem("faglig-tabs-more", JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const handlePinTab = (id: string) => updateMoreTabIds(moreTabIds.filter((existing) => existing !== id));
+
+  const handleMoveTargetToMore = () => {
+    if (!fagligDocMenuTarget) return;
+    const id = fagligDocMenuTarget.id;
+    if (!moreTabIds.includes(id)) updateMoreTabIds([...moreTabIds, id]);
+    closeFagligDocMenu();
+  };
+
   const addEmbeddedDocument = () => {
     if (!user?.uid) {
       setCopiedMessage("Du må være innlogget for å legge til dokument.");
@@ -956,7 +891,8 @@ export default function ProduktOgRadPage() {
           maxWidth: PAGE_MAX_WIDTH,
           mx: "auto",
           px: PAGE_GUTTER_X,
-          pt: PAGE_GUTTER_Y,
+          // Fanene skal ligge tett under toppen av siden; Layout har allerede egen marg.
+          pt: 0,
           pb: { xs: 1.2, md: 1.6 },
         }}
       >
@@ -971,108 +907,21 @@ export default function ProduktOgRadPage() {
             boxShadow: "none",
           }}
         >
-          <Tabs
-            value={activeTab}
-            onChange={(_, newValue: number) => setActiveTab(newValue)}
-            variant="fullWidth"
-            sx={{
-              mt: 0.15,
-              mx: "auto",
-              width: "100%",
-              maxWidth: 980,
-              minHeight: { xs: 38, md: 44 },
-              p: 0.25,
-              borderRadius: 3,
-              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(120,50,102,0.40)" : "rgba(120,50,102,0.22)",
-              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,130,0.45)" : "rgba(116,44,100,0.26)"}`,
-              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
-              "& .MuiTabs-indicator": {
-                display: "none",
-              },
-            }}
-          >
-            <Tab
-              disableRipple
-              label="Produkt og råd"
-              sx={{
-                minHeight: { xs: 36, md: 42 },
-                textTransform: "none",
-                borderRadius: 2.5,
-                fontSize: { xs: 14, md: 17 },
-                fontWeight: 800,
-                letterSpacing: "0.01em",
-                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
-                bgcolor: "transparent",
-                border: "none",
-                transition: "all 160ms ease",
-                "&:hover": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
-                  bgcolor: "rgba(255,255,255,0.08)",
-                },
-                "&.Mui-selected": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                  fontWeight: 800,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
-                },
-              }}
-            />
-            <Tab
-              disableRipple
-              label="Faglig innhold"
-              sx={{
-                minHeight: { xs: 36, md: 42 },
-                textTransform: "none",
-                borderRadius: 2.5,
-                fontSize: { xs: 14, md: 17 },
-                fontWeight: 800,
-                letterSpacing: "0.01em",
-                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
-                bgcolor: "transparent",
-                border: "none",
-                transition: "all 160ms ease",
-                "&:hover": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
-                  bgcolor: "rgba(255,255,255,0.08)",
-                },
-                "&.Mui-selected": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                  fontWeight: 800,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
-                },
-              }}
-            />
-            <Tab
-              disableRipple
-              label="Rutiner"
-              sx={{
-                minHeight: { xs: 36, md: 42 },
-                textTransform: "none",
-                borderRadius: 2.5,
-                fontSize: { xs: 14, md: 17 },
-                fontWeight: 800,
-                letterSpacing: "0.01em",
-                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
-                bgcolor: "transparent",
-                border: "none",
-                transition: "all 160ms ease",
-                "&:hover": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
-                  bgcolor: "rgba(255,255,255,0.08)",
-                },
-                "&.Mui-selected": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                  fontWeight: 800,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
-                },
-              }}
-            />
-          </Tabs>
+          <FagligTabBar
+            ref={tabBarRef}
+            items={fagligTabItems}
+            activeKey={activeTabKey}
+            moreIds={moreTabIds}
+            onSelect={handleSelectTab}
+            onReorder={handleTabReorder}
+            onAddEmbedded={addEmbeddedDocument}
+            onAddText={addTextDocument}
+            onOpenMenu={openFagligDocMenu}
+            onPin={handlePinTab}
+          />
 
           {activeTab === 0 ? (
-            <Box sx={{ mt: 3, mx: "auto", width: "100%", maxWidth: 980, display: "grid", gap: 1.5 }}>
+            <Box sx={{ mt: 2, mx: "auto", width: "100%", maxWidth: 980, display: "grid", gap: 1.25 }}>
               <Paper
                 elevation={0}
                 sx={{
@@ -1196,7 +1045,7 @@ export default function ProduktOgRadPage() {
       </Box>
 
       {activeTab === 0 ? (
-        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, pt: 1, pb: 4 }}>
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, pt: 1, pb: 1 }}>
           {isLoading ? (
             <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
               <CircularProgress size={34} />
@@ -1248,603 +1097,73 @@ export default function ProduktOgRadPage() {
         </Box>
       ) : (
         <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 0.75 }}>
-          <Paper
-            elevation={0}
+          <Box
+            ref={fillRef}
             sx={{
-              borderRadius: 1.5,
-              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "rgba(140,80,120,0.2)"}`,
-              bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FDFBFF",
-              overflow: "hidden",
-              boxShadow: (theme) => theme.palette.mode === "dark" ? "0 16px 34px rgba(0,0,0,0.32)" : "0 10px 28px rgba(101,56,92,0.14)",
               display: "flex",
               flexDirection: "column",
-              height: "calc(100vh - 115px)",
+              minHeight: 320,
+              borderRadius: "14px",
+              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "#EAD2E1"}`,
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FDFBFF",
+              overflow: "hidden",
+              boxShadow: (theme) => theme.palette.mode === "dark" ? "0 16px 34px rgba(0,0,0,0.32)" : "0 10px 30px rgba(94,21,71,0.07)",
             }}
           >
             <Box
               sx={{
-                p: 1,
-                borderBottom: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.3)" : "rgba(140,80,120,0.2)"}`,
-                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(22,27,34,0.97)" : "rgba(247,238,246,0.98)",
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexWrap: "wrap",
-                justifyContent: "space-between",
-              }}
-            >
-              <Stack direction="row" spacing={1}>
-                <Button
-                  size="small"
-                  startIcon={<PictureAsPdfRoundedIcon />}
-                  variant="contained"
-                  onClick={addEmbeddedDocument}
-                  sx={{
-                    borderRadius: 2,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                    color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0" },
-                  }}
-                >
-                  Bygg inn dokument
-                </Button>
-                <Button
-                  size="small"
-                  startIcon={<AddRoundedIcon />}
-                  variant="outlined"
-                  onClick={addTextDocument}
-                  sx={{
-                    borderRadius: 2,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    color: (theme) => theme.palette.mode === "dark" ? "#F5DDF0" : "#6E2C55",
-                    borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(240,184,220,0.44)" : "rgba(140,80,120,0.35)",
-                    "&:hover": {
-                      borderColor: "#F2A2D0",
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.1)" : "rgba(242,162,208,0.14)",
-                    },
-                  }}
-                >
-                  Legg til dokument
-                </Button>
-              </Stack>
-              <Paper
-                elevation={0}
-                sx={{
-                  px: 1,
-                  py: 0.4,
-                  minWidth: { xs: "100%", md: 260 },
-                  maxWidth: 360,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                  borderRadius: 2,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(13,17,23,0.95)" : "rgba(255,255,255,0.95)",
-                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "rgba(140,80,120,0.28)"}`,
-                }}
-              >
-                <SearchRoundedIcon sx={{ color: (theme) => theme.palette.mode === "dark" ? "#D28DB7" : "#9C4D77", fontSize: 18 }} />
-                <InputBase
-                  inputRef={fagligSearchInputRef}
-                  value={fagligSearch}
-                  onChange={(event) => setFagligSearch(event.target.value)}
-                  placeholder="Søk i faglige dokumenter"
-                  sx={{
-                    flex: 1,
-                    fontSize: 14,
-                    color: (theme) => theme.palette.mode === "dark" ? "#F2E7EF" : "#44263A",
-                    "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#AFA0B2" : "#8D7790", opacity: 1 },
-                  }}
-                />
-              </Paper>
-            </Box>
-
-            <Box
-              sx={{
-                display: "flex",
                 flex: 1,
-                overflow: "hidden",
+                minWidth: 0,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto",
               }}
             >
-              {/* ── Collapsible Dokumentfaner sidebar ── */}
-              <Box
-                sx={{
-                  width: fagligSidebarCollapsed ? 44 : 220,
-                  minWidth: fagligSidebarCollapsed ? 44 : 220,
-                  transition: "width 200ms ease, min-width 200ms ease",
-                  borderRight: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.25)" : "rgba(140,80,120,0.2)"}`,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(13,17,23,0.9)" : "rgba(251,245,251,0.95)",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                  flexShrink: 0,
-                }}
-              >
-                {/* Header row */}
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent={fagligSidebarCollapsed ? "center" : "space-between"}
-                  sx={{ px: fagligSidebarCollapsed ? 0.5 : 1.2, py: 0.7, flexShrink: 0 }}
-                >
-                  {!fagligSidebarCollapsed && (
-                    <>
-                      <Typography sx={{ fontSize: 16, fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#EED5E8" : "#5A2A49", whiteSpace: "nowrap" }}>
-                        Dokumentfaner
-                      </Typography>
-                    </>
-                  )}
-                  <Tooltip title={fagligSidebarCollapsed ? "Vis Dokumentfaner" : "Skjul Dokumentfaner"} placement="right">
-                    <IconButton
-                      size="small"
-                      onClick={() => setFagligSidebarCollapsed((v) => !v)}
-                      sx={{
-                        color: (theme) => theme.palette.mode === "dark" ? "rgba(235,175,211,0.8)" : "rgba(115,56,92,0.85)",
-                        ml: fagligSidebarCollapsed ? 0 : 0.5,
-                        "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.15)" : "rgba(242,162,208,0.18)", color: "#F2A2D0" },
-                      }}
-                    >
-                      {fagligSidebarCollapsed
-                        ? <ChevronRightRoundedIcon sx={{ fontSize: 20 }} />
-                        : <ChevronLeftRoundedIcon sx={{ fontSize: 20 }} />}
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-
-                {/* Collapsed icon strip */}
-                {fagligSidebarCollapsed && (
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, py: 0.5 }}>
-                    {[
-                      { id: "__nutrition__",        emoji: "🥗", label: "Næringsmidler",    activeColor: "rgba(34,197,94,0.35)",   activeBorder: "rgba(34,197,94,0.6)"   },
-                      { id: "__melkeerstatning__",  emoji: "🍼", label: "Melkeerstatning", activeColor: "rgba(168,139,201,0.35)", activeBorder: "rgba(168,139,201,0.65)" },
-                      { id: "__tryggmamma__",  emoji: "🤰", label: "Tryggmamma",         activeColor: "rgba(236,72,153,0.35)", activeBorder: "rgba(236,72,153,0.6)" },
-                      { id: "__knuse__",            emoji: "💊", label: "Knuse-/delelisten", activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
-                    ].map(({ id, emoji, label, activeColor, activeBorder }) => {
-                      const active = selectedFagligDocId === id;
-                      return (
-                        <Tooltip key={id} title={label} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                          <Box
-                            onClick={() => setSelectedFagligDocId(id)}
-                            sx={{
-                              width: 34, height: 34,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              borderRadius: 2,
-                              fontSize: 18,
-                              cursor: "pointer",
-                              bgcolor: active ? activeColor : "transparent",
-                              border: active ? `1.5px solid ${activeBorder}` : "1.5px solid transparent",
-                              transition: "background 120ms ease, border-color 120ms ease",
-                              "&:hover": { bgcolor: activeColor, borderColor: activeBorder },
-                            }}
-                          >
-                            {emoji}
-                          </Box>
-                        </Tooltip>
-                      );
-                    })}
-                    {filteredFagligDocs.map((doc) => {
-                      const active = selectedFagligDoc?.id === doc.id;
-                      return (
-                        <Tooltip key={doc.id} title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                          <Box
-                            onClick={() => setSelectedFagligDocId(doc.id)}
-                            sx={{
-                              width: 34, height: 34,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              borderRadius: 2,
-                              cursor: "pointer",
-                              bgcolor: active ? "rgba(242,162,208,0.22)" : "transparent",
-                              border: active ? "1.5px solid rgba(242,162,208,0.55)" : "1.5px solid transparent",
-                              transition: "background 120ms ease, border-color 120ms ease",
-                              "&:hover": { bgcolor: "rgba(242,162,208,0.15)", borderColor: "rgba(242,162,208,0.4)" },
-                            }}
-                          >
-                            {doc.emoji ? (
-                              <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
-                            ) : doc.kind === "pdf" ? (
-                              <PictureAsPdfRoundedIcon sx={{ fontSize: 18, color: active ? "#F9C8E4" : "#F0A1CF" }} />
-                            ) : (
-                              <DescriptionRoundedIcon sx={{ fontSize: 18, color: active ? "#BDE7FF" : "#9ED9FF" }} />
-                            )}
-                          </Box>
-                        </Tooltip>
-                      );
-                    })}
-                  </Box>
-                )}
-
-                {/* Sidebar content — hidden when collapsed */}
-                <Box sx={{ flex: 1, overflowY: "auto", display: fagligSidebarCollapsed ? "none" : "block", p: 1.15 }}>
-                {isFagligLoading ? (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.8, py: 1.1 }}>
-                    <CircularProgress size={18} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#E8B7D5" : "#A55A84" }} />
-                    <Typography sx={{ fontSize: 13, color: (theme) => theme.palette.mode === "dark" ? "#D8B4CA" : "#7A4A67" }}>Laster dokumenter...</Typography>
-                  </Box>
-                ) : null}
-                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleSidebarDragEnd}>
-                  <SortableContext items={sortedSidebarIds} strategy={verticalListSortingStrategy}>
-                    <List sx={{ mt: 0.5, pt: 0 }}>
-                      {sortedSidebarIds.map((id) => {
-                        if (id === "__nutrition__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Næringsmidler" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__nutrition__"}
-                                onClick={() => setSelectedFagligDocId("__nutrition__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(34,197,94,0.12)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)", boxShadow: "0 8px 16px rgba(34,197,94,0.18)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
-                                <ListItemText primary="Næringsmidler" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? (isDark ? "#BBF7D0" : "#166534") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        if (id === "__melkeerstatning__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Melkeerstatning" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__melkeerstatning__"}
-                                onClick={() => setSelectedFagligDocId("__melkeerstatning__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__melkeerstatning__" ? "rgba(168,139,201,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(168,139,201,0.13)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(168,139,201,0.24)", borderColor: "rgba(168,139,201,0.50)", boxShadow: "0 8px 16px rgba(124,92,167,0.22)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(168,139,201,0.30)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🍼</Typography>
-                                <ListItemText primary="Melkeerstatning" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__melkeerstatning__" ? 800 : 600, color: selectedFagligDocId === "__melkeerstatning__" ? (isDark ? "#E6D8F5" : "#5B3A77") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        if (id === "__knuse__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Knuse-/delelisten" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__knuse__"}
-                                onClick={() => setSelectedFagligDocId("__knuse__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__knuse__" ? "rgba(139,92,246,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(139,92,246,0.13)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(139,92,246,0.24)", borderColor: "rgba(139,92,246,0.50)", boxShadow: "0 8px 16px rgba(139,92,246,0.2)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(139,92,246,0.30)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>💊</Typography>
-                                <ListItemText primary="Knuse-/delelisten" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__knuse__" ? 800 : 600, color: selectedFagligDocId === "__knuse__" ? (isDark ? "#DDD6FE" : "#5B3A77") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        if (id === "__tryggmamma__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Tryggmamma" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__tryggmamma__"}
-                                onClick={() => setSelectedFagligDocId("__tryggmamma__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__tryggmamma__" ? "rgba(236,72,153,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(236,72,153,0.13)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(236,72,153,0.24)", borderColor: "rgba(236,72,153,0.50)", boxShadow: "0 8px 16px rgba(236,72,153,0.2)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(236,72,153,0.30)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🤰</Typography>
-                                <ListItemText primary="Tryggmamma" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__tryggmamma__" ? 800 : 600, color: selectedFagligDocId === "__tryggmamma__" ? (isDark ? "#FBCFE8" : "#9D1D62") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        const doc = fagligDocById.get(id);
-                        if (!doc) return null;
-                        let depth = 0;
-                        let cursor = doc;
-                        while (cursor.parentId && depth < 8) {
-                          const parent = fagligDocById.get(cursor.parentId);
-                          if (!parent) break;
-                          depth += 1;
-                          cursor = parent;
-                        }
-                        return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <ListItemButton
-                              selected={selectedFagligDoc?.id === doc.id}
-                              onClick={() => setSelectedFagligDocId(doc.id)}
-                              sx={{
-                                borderRadius: "999px",
-                                minHeight: 54,
-                                mb: 0.75,
-                                pl: 1.25 + depth * 1.6,
-                                pr: 0.85,
-                                border: selectedFagligDoc?.id === doc.id ? ((theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(242,162,208,0.45)" : "rgba(186,95,148,0.4)"}`) : "1px solid transparent",
-                                bgcolor: selectedFagligDoc?.id === doc.id ? "rgba(242,162,208,0.18)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.72)" : "rgba(255,255,255,0.7)"),
-                                backdropFilter: "blur(8px)",
-                                WebkitBackdropFilter: "blur(8px)",
-                                boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.22)" : "0 6px 14px rgba(92,45,79,0.08)",
-                                transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.12)" : "rgba(242,162,208,0.1)", transform: "translateY(-1px)" },
-                                "&.Mui-selected": { bgcolor: "rgba(242,162,208,0.2)", borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.45)" : "rgba(186,95,148,0.4)" },
-                                "&.Mui-selected:hover": { bgcolor: "rgba(242,162,208,0.26)", transform: "translateY(-1px)" },
-                              }}
-                            >
-                              {doc.emoji ? (
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
-                              ) : doc.kind === "pdf" ? (
-                                <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: (theme) => theme.palette.mode === "dark" ? "#F0A1CF" : "#B54B87" }} />
-                              ) : (
-                                <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: (theme) => theme.palette.mode === "dark" ? "#9ED9FF" : "#2E6FA6" }} />
-                              )}
-                              <Tooltip title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                                <ListItemText
-                                  primary={doc.title}
-                                  primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600, color: selectedFagligDoc?.id === doc.id ? (isDark ? "#FFD8ED" : "#6E2D58") : (isDark ? "#E4DCE7" : "#5A2E4D") }}
-                                />
-                              </Tooltip>
-                              <IconButton
-                                size="small"
-                                onClick={(event) => openFagligDocMenu(event, doc.id)}
-                                sx={{ ml: 0.5, color: (theme) => theme.palette.mode === "dark" ? "rgba(235,175,211,0.95)" : "rgba(150,72,115,0.95)", "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.18)" : "rgba(242,162,208,0.16)" } }}
-                              >
-                                <MoreVertIcon sx={{ fontSize: 18 }} />
-                              </IconButton>
-                            </ListItemButton>
-                          </SortableSidebarItem>
-                        );
-                      })}
-                    </List>
-                  </SortableContext>
-                </DndContext>
-
-                {filteredFagligDocs.length === 0 ? (
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      mt: 1,
-                      p: 1.2,
-                      borderRadius: 2,
-                      bgcolor: "rgba(13,17,23,0.92)",
-                      border: "1px dashed rgba(242,162,208,0.35)",
-                    }}
-                  >
-                    <Typography sx={{ fontSize: 13, color: "#CCB5C4" }}>
-                      Ingen dokumenter funnet. Legg til innebygd dokument eller opprett tekstdokument.
+              {selectedFagligDocId === "__nutrition__" ? (
+                <NutritionProductFinder catalogProducts={products} />
+              ) : selectedFagligDocId === "__melkeerstatning__" ? (
+                <MelkeerstatningTab />
+              ) : selectedFagligDocId === "__knuse__" ? (
+                <KnuseDelisteTab />
+              ) : selectedFagligDocId === "__tryggmamma__" ? (
+                <TryggmammaTab />
+              ) : selectedFagligDoc ? (
+                <FagligDocView doc={selectedFagligDoc} titleInputRef={fagligTitleInputRef} onChangeText={updateSelectedTextDoc} />
+              ) : (
+                <Box sx={{ flex: 1, display: "grid", placeItems: "center", p: 3, textAlign: "center" }}>
+                  <Box>
+                    <Typography sx={{ fontSize: 18, fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#F1DAE9" : "#2D1727" }}>
+                      {isFagligLoading ? "Laster dokumenter ..." : "Ingen dokumenter ennå"}
                     </Typography>
-                  </Paper>
-                ) : null}
-                </Box>{/* end inner content Box */}
-              </Box>{/* end collapsible sidebar Box */}
-
-              <Box sx={{ bgcolor: "#0D1117", p: (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") ? 0 : 1, overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto", display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-                {selectedFagligDocId === "__nutrition__" ? (
-                  <NutritionProductFinder catalogProducts={products} />
-                ) : selectedFagligDocId === "__melkeerstatning__" ? (
-                  <MelkeerstatningTab />
-                ) : selectedFagligDocId === "__knuse__" ? (
-                  <KnuseDelisteTab />
-                ) : selectedFagligDocId === "__tryggmamma__" ? (
-                  <TryggmammaTab />
-                ) : selectedFagligDoc ? (
-                  selectedFagligDoc.kind === "pdf" ? (
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: "100%",
-                        borderRadius: 0,
-                        border: "none",
-                        bgcolor: "#0D1117",
-                        overflow: "hidden",
-                        display: "grid",
-                        gridTemplateRows: "auto 1fr",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          px: 1.25,
-                          py: 0.9,
-                          borderBottom: "1px solid rgba(140,80,120,0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 1,
-                          bgcolor: "rgba(22,27,34,0.97)",
-                        }}
-                      >
-                        <Stack direction="row" alignItems="center" spacing={0.9} sx={{ minWidth: 0 }}>
-                          <PictureAsPdfRoundedIcon sx={{ color: "#F0A1CF", fontSize: 20 }} />
-                          <Typography sx={{ color: "#F6E9F1", fontSize: 16, fontWeight: 700 }} noWrap>
-                            {selectedFagligDoc.title}
-                          </Typography>
-                        </Stack>
-                        <Chip
-                          size="small"
-                          label="PDF"
-                          sx={{
-                            bgcolor: "rgba(242,162,208,0.2)",
-                            color: "#F5C3E1",
-                            fontWeight: 700,
-                            border: "1px solid rgba(242,162,208,0.44)",
-                          }}
-                        />
-                      </Box>
-                      <Box sx={{ height: "100%", bgcolor: "#161B22" }}>
-                        <iframe
-                          title={selectedFagligDoc.title}
-                          src={selectedFagligDoc.url ?? undefined}
-                          style={{ border: 0, width: "100%", height: "100%" }}
-                        />
-                      </Box>
-                    </Paper>
-                  ) : (
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: "100%",
-                        borderRadius: 2.5,
-                        border: "1px solid rgba(140,80,120,0.25)",
-                        bgcolor: "#161B22",
-                        overflow: "hidden",
-                        display: "grid",
-                        gridTemplateRows: "auto 1fr auto",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          px: 1.25,
-                          py: 0.9,
-                          borderBottom: "1px solid rgba(140,80,120,0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 1,
-                          bgcolor: "rgba(22,27,34,0.97)",
-                        }}
-                      >
-                        <Stack direction="row" alignItems="center" spacing={0.9} sx={{ minWidth: 0, flex: 1 }}>
-                          <DescriptionRoundedIcon sx={{ color: "#F0A1CF", fontSize: 20 }} />
-                          <InputBase
-                            inputRef={fagligTitleInputRef}
-                            value={selectedFagligDoc.title}
-                            onChange={(event) => updateSelectedTextDoc({ title: event.target.value })}
-                            sx={{
-                              flex: 1,
-                              fontSize: 20,
-                              fontWeight: 800,
-                              color: "#F2E7EF",
-                              "& input::placeholder": {
-                                color: "#AFA0B2",
-                                opacity: 1,
-                              },
-                            }}
-                            placeholder="Tittel"
-                          />
-                        </Stack>
-                        <Chip
-                          size="small"
-                          label="Tekst"
-                          sx={{
-                            bgcolor: "rgba(242,162,208,0.2)",
-                            color: "#F5C3E1",
-                            fontWeight: 700,
-                            border: "1px solid rgba(242,162,208,0.44)",
-                          }}
-                        />
-                      </Box>
-                      <Box sx={{ p: 1.1 }}>
-                        <InputBase
-                          multiline
-                          minRows={18}
-                          value={selectedFagligDoc.content}
-                          onChange={(event) => updateSelectedTextDoc({ content: event.target.value })}
-                          placeholder="Skriv faglig innhold her..."
-                          sx={{
-                            width: "100%",
-                            p: 1.1,
-                            borderRadius: 1.8,
-                            border: "1px solid rgba(140,80,120,0.25)",
-                            bgcolor: "rgba(13,17,23,0.84)",
-                            color: "#F2E7EF",
-                            fontSize: 17,
-                            lineHeight: 1.6,
-                            "& textarea::placeholder": {
-                              color: "#AFA0B2",
-                              opacity: 1,
-                            },
-                          }}
-                        />
-                      </Box>
-                      <Box
-                        sx={{
-                          px: 1.25,
-                          py: 0.75,
-                          borderTop: "1px solid rgba(140,80,120,0.25)",
-                          bgcolor: "rgba(22,27,34,0.97)",
-                          display: "flex",
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        <Typography sx={{ fontSize: 12.5, color: "#C4A0B8" }}>
-                          Endringer lagres lokalt automatisk
-                        </Typography>
-                      </Box>
-                    </Paper>
-                  )
-                ) : (
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      height: "100%",
-                      borderRadius: 2.5,
-                      border: "1px dashed rgba(242,162,208,0.36)",
-                      bgcolor: "rgba(13,17,23,0.92)",
-                      display: "grid",
-                      placeItems: "center",
-                      p: 2,
-                    }}
-                  >
-                    <Stack spacing={0.9} alignItems="center">
-                      <DescriptionRoundedIcon sx={{ fontSize: 48, color: "#DFA0C7" }} />
-                      <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#F1DAE9", textAlign: "center" }}>
-                        Legg til innebygd dokument eller opprett nytt tekstdokument
+                    {!isFagligLoading ? (
+                      <Typography sx={{ mt: 0.5, fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#BCA6B8" : "#6B5262" }}>
+                        Bruk + i fanelinjen for å bygge inn et dokument eller lage et tekstdokument.
                       </Typography>
-                      <Typography sx={{ fontSize: 13.5, color: "#BCA6B8", textAlign: "center", maxWidth: 480 }}>
-                        Lim inn SharePoint iframe/URL for visning i appen, eller skriv tekstdokumenter direkte.
-                      </Typography>
-                    </Stack>
-                  </Paper>
-                )}
-              </Box>
+                    ) : null}
+                  </Box>
+                </Box>
+              )}
             </Box>
-          </Paper>
+          </Box>
           <Menu
             anchorEl={fagligDocMenuAnchorEl}
             open={fagligDocMenuOpen}
             onClose={closeFagligDocMenu}
             PaperProps={{
               sx: {
-                borderRadius: 2.5,
-                border: "1px solid rgba(242,162,208,0.35)",
-                bgcolor: "#161B22",
-                color: "#F3E7F0",
+                borderRadius: "12px",
+                border: isDark ? "1px solid rgba(242,162,208,0.35)" : "1px solid #E3C6D8",
+                bgcolor: isDark ? "#161B22" : "#FFFFFF",
+                color: isDark ? "#F3E7F0" : "#2D1727",
                 minWidth: 230,
-                boxShadow: "0 18px 36px rgba(5,10,20,0.45)",
+                boxShadow: isDark ? "0 18px 36px rgba(5,10,20,0.45)" : "0 18px 44px rgba(94,21,71,0.2)",
               },
             }}
           >
-            <MenuItem onClick={handleAddFagligSubtab} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
-              <AddRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
-              <ListItemText primary="Legg til en underfane" primaryTypographyProps={{ fontSize: "0.84rem" }} />
+            <MenuItem onClick={handleMoveTargetToMore} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
+              <KeyboardArrowDownRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
+              <ListItemText primary="Flytt til «Flere»" primaryTypographyProps={{ fontSize: "0.84rem" }} />
             </MenuItem>
             <MenuItem onClick={handleDeleteFagligDoc} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
               <DeleteOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
@@ -1873,10 +1192,10 @@ export default function ProduktOgRadPage() {
               sx: {
                 p: 1.1,
                 width: 260,
-                borderRadius: 2.5,
-                border: "1px solid rgba(242,162,208,0.35)",
-                bgcolor: "#161B22",
-                color: "#F3E7F0",
+                borderRadius: "12px",
+                border: isDark ? "1px solid rgba(242,162,208,0.35)" : "1px solid #E3C6D8",
+                bgcolor: isDark ? "#161B22" : "#FFFFFF",
+                color: isDark ? "#F3E7F0" : "#2D1727",
               },
             }}
           >

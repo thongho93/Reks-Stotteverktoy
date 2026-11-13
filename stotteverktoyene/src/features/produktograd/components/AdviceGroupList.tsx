@@ -11,8 +11,8 @@ const INITIAL_GROUP_LIMIT = 40;
 const GROUP_LIMIT_STEP = 40;
 // Under denne bredden (md) ligger liste og panel under hverandre, og siden får rulle som vanlig.
 const SIDE_BY_SIDE_QUERY = "(min-width: 900px)";
-// Luft under kortene innenfor siden (inkluderer bunnmargen i sidens beholder).
-const PAGE_BOTTOM_RESERVE = 48;
+// Liten sikkerhetsmargin under kortene, i tillegg til bunnmargen i beholderne rundt.
+const PAGE_BOTTOM_RESERVE = 8;
 const MIN_PANEL_HEIGHT = 240;
 
 type CopyLabel = "Vnr" | "SKU" | "ATC";
@@ -54,24 +54,37 @@ export default function AdviceGroupList({ groups, onCopyNumber, onCopyText }: Pr
     const apply = () => {
       const root = rootRef.current;
       if (!root) return;
+      // Finn rullebeholderen, og summer bunnmargen/-padding i beholderne mellom kortene og den –
+      // den tar også plass nederst og ville ellers gitt rulling på siden.
       let scroller: HTMLElement | null = root.parentElement;
+      let belowSpace = 0;
       while (scroller) {
-        const overflowY = getComputedStyle(scroller).overflowY;
-        if (overflowY === "auto" || overflowY === "scroll") break;
+        const style = getComputedStyle(scroller);
+        if (style.overflowY === "auto" || style.overflowY === "scroll") break;
+        belowSpace += (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.marginBottom) || 0);
         scroller = scroller.parentElement;
       }
       const scrollTop = scroller?.scrollTop ?? 0;
       const viewportBottom = scroller ? scroller.getBoundingClientRect().bottom : window.innerHeight;
       const naturalTop = root.getBoundingClientRect().top + scrollTop;
-      const available = Math.max(MIN_PANEL_HEIGHT, Math.floor(viewportBottom - naturalTop - PAGE_BOTTOM_RESERVE));
+      const available = Math.max(MIN_PANEL_HEIGHT, Math.floor(viewportBottom - naturalTop - belowSpace - PAGE_BOTTOM_RESERVE));
       const sideBySide = window.matchMedia(SIDE_BY_SIDE_QUERY).matches;
       for (const el of [navRef.current, panelRef.current]) {
         if (el) el.style.maxHeight = sideBySide ? `${available}px` : "";
       }
     };
     apply();
-    window.addEventListener("resize", apply);
-    return () => window.removeEventListener("resize", apply);
+    // Vent til layouten har satt seg etter endret vindusstørrelse før høyden måles.
+    let frame = 0;
+    const onResize = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(apply);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", onResize);
+    };
   }, [groups]);
 
   const c = useMemo(
