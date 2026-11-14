@@ -1,27 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import {
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import { arrayMove } from "@dnd-kit/sortable";
 import { useLocation } from "react-router-dom";
 import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import TryggmammaTab from "../components/TryggmammaTab";
 import MelkeerstatningTab from "../components/MelkeerstatningTab";
 import TilbakemeldingPage from "../../tilbakemelding/pages/TilbakemeldingPage";
+import FagligDocView from "../components/FagligDocView";
+import FagligTabBar, {
+  PRODUCT_TAB_KEY,
+  ROUTINES_TAB_KEY,
+  type FagligTabBarHandle,
+  type FagligTabItem,
+} from "../components/FagligTabBar";
+import { fitToPageBottom } from "../fitToPageBottom";
+import AdviceGroupList from "../components/AdviceGroupList";
+import AdviceStartView from "../components/AdviceStartView";
+import { ATC_INGREDIENT, brandLabel, groupByAtc, type AdviceProduct } from "../data/adviceProducts";
 import {
   Alert,
   Box,
@@ -32,11 +28,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Menu,
   MenuItem,
-  List,
-  ListItemButton,
   ListItemText,
   Popover,
   IconButton,
@@ -44,13 +37,10 @@ import {
   Paper,
   Snackbar,
   Stack,
-  Tab,
-  Tabs,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import { alpha, createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
+import { createTheme, useTheme, ThemeProvider } from "@mui/material/styles";
 import { AccentSelection } from "../../../styles/AccentSelection";
 import {
   addDoc,
@@ -66,33 +56,14 @@ import {
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
-import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
-import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../queryKeys";
-import { PAGE_GUTTER_X, PAGE_GUTTER_Y, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
-
-type AdviceProduct = {
-  id: string;
-  name: string;
-  atcCode: string;
-  farmaloggNumber: string;
-  sku: string;
-  advicePoints: string[];
-  searchBlob: string;
-  farmaloggDigits: string;
-  skuDigits: string;
-};
+import { PAGE_GUTTER_X, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
 
 type AdviceProductRow = {
   id: string;
@@ -128,46 +99,7 @@ const NUMERIC_QUERY_RE = /^\d+$/;
 // Auto-paste recognition: a varenummer is pure digits (max 6), an ATC-code is L NN LL NN.
 const VNR_PASTE_RE = /^\d{1,6}$/;
 const ATC_CODE_RE = /^[A-Z][0-9]{2}[A-Z]{2}[0-9]{2}$/;
-const MAX_RENDERED_RESULTS = 120;
 const FAGLIG_EMOJI_OPTIONS = ["😀", "📄", "📌", "🚚", "💊", "🧾", "⚠️", "✅", "⭐", "📝", "🔗", "🧠"];
-const ATC_INGREDIENT: Record<string, string> = {
-  A02BC01: "Omeprazol",
-  A02BC02: "Pantoprazol",
-  A02BC03: "Lansoprazol",
-  A02BC04: "Rabeprazol",
-  A02BC05: "Esomeprazol",
-  A07EC02: "Mesalazin",
-  A11CC05: "Kolekalsiferol",
-  B01AB05: "Enoksaparin",
-  B01AC24: "Tikagrelol",
-  B01AF01: "Rivaroksaban",
-  B01AF02: "Apixaban",
-  C09CA06: "Kandesartan",
-  C09DA03: "Valsartan+HCTZ",
-  G03AA12: "Drospirenon+EE",
-  G04BE03: "Sildenafil",
-  G04BE08: "Tadalafil",
-  H02AB02: "Deksametason",
-  H03AA01: "Levotyroksin",
-  J01CA04: "Amoksicillin",
-  J01CA08: "Pivmecillinam",
-  J02AC01: "Flukonazol",
-  M01AB05: "Diklofenak",
-  M01AE01: "Ibuprofen",
-  M01AH05: "Etorikoksib",
-  N02AJ06: "Kodein+paracet",
-  N02BE01: "Paracetamol",
-  N02CC01: "Sumatriptan",
-  N05AH04: "Quetiapin",
-  N06AB06: "Sertralin",
-  N06AB10: "Escitalopram",
-  N06AX11: "Mirtazapin",
-  R03AK06: "Salmeterol+flut",
-  R03AK07: "Budesonid+form",
-  R03BA02: "Budesonid",
-  R05CB01: "Acetylcystein",
-  S01ED51: "Timolol komb.",
-};
 
 const IFRAME_SRC_RE = /src\s*=\s*["']([^"']+)["']/i;
 const IFRAME_TITLE_RE = /title\s*=\s*["']([^"']+)["']/i;
@@ -250,44 +182,48 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
 
 const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__melkeerstatning__", "__tryggmamma__", "__knuse__"] as const;
 
-function SortableSidebarItem({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  return (
-    <Box
-      ref={setNodeRef}
-      sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.45 : 1,
-        display: "flex",
-        alignItems: "center",
-        mb: 0.5,
-        "&:hover .drag-handle": { opacity: 1 },
-      }}
-    >
-      <Box
-        className="drag-handle"
-        {...attributes}
-        {...listeners}
-        sx={{
-          opacity: 0,
-          cursor: "grab",
-          display: "flex",
-          alignItems: "center",
-          color: "rgba(235,175,211,0.5)",
-          flexShrink: 0,
-          px: 0.3,
-          transition: "opacity 150ms",
-          touchAction: "none",
-          "&:active": { cursor: "grabbing" },
-        }}
-      >
-        <DragIndicatorRoundedIcon sx={{ fontSize: 15 }} />
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
-    </Box>
-  );
-}
+const VIRTUAL_TAB_LABELS: Record<string, string> = {
+  __nutrition__: "Næringsmidler",
+  __melkeerstatning__: "Melkeerstatning",
+  __tryggmamma__: "Tryggmamma",
+  __knuse__: "Knuse-/delelisten",
+};
+
+
+const searchProducts = (list: AdviceProduct[], query: string): AdviceProduct[] => {
+  const normalizedQuery = normalizeSearch(query);
+  if (!normalizedQuery) return list;
+
+  const numericOnly = NUMERIC_QUERY_RE.test(normalizedQuery);
+  if (numericOnly) {
+    const digits = toDigits(normalizedQuery);
+    // Strip leading zeros so "060387" matches stored "60387"
+    const digitsNorm = digits.replace(/^0+/, "") || digits;
+    const exact = list.filter(
+      (product) =>
+        product.farmaloggDigits === digits ||
+        product.farmaloggDigits === digitsNorm ||
+        product.skuDigits === digits ||
+        product.skuDigits === digitsNorm
+    );
+    if (exact.length > 0) return exact;
+
+    return list.filter(
+      (product) =>
+        product.farmaloggDigits.startsWith(digits) ||
+        product.farmaloggDigits.startsWith(digitsNorm) ||
+        product.skuDigits.startsWith(digits) ||
+        product.skuDigits.startsWith(digitsNorm) ||
+        product.farmaloggDigits.includes(digits) ||
+        product.farmaloggDigits.includes(digitsNorm) ||
+        product.skuDigits.includes(digits) ||
+        product.skuDigits.includes(digitsNorm)
+    );
+  }
+
+  const terms = normalizedQuery.split(" ").filter(Boolean);
+  return list.filter((product) => matchesQuery(product, terms));
+};
 
 export default function ProduktOgRadPage() {
   const { user } = useAuthUser();
@@ -298,7 +234,8 @@ export default function ProduktOgRadPage() {
   const location = useLocation();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastAutoPastedRef = useRef<string | null>(null);
-  const fagligSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const tabBarRef = useRef<FagligTabBarHandle | null>(null);
+  const fillRef = useMemo(() => fitToPageBottom(8), []);
   const fagligTitleInputRef = useRef<HTMLInputElement | null>(null);
   const textSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeTab, setActiveTab] = useState(() => {
@@ -309,7 +246,9 @@ export default function ProduktOgRadPage() {
     return 0;
   });
   const [query, setQuery] = useState("");
-  const [renderLimit, setRenderLimit] = useState(MAX_RENDERED_RESULTS);
+  const [onlyWithAdvice, setOnlyWithAdvice] = useState<boolean>(() => {
+    try { return localStorage.getItem("produktograd-kun-med-rad") !== "false"; } catch { return true; }
+  });
 
   // Sync active tab from URL params (priority) or location.state (command palette / explicit navigation)
   useEffect(() => {
@@ -340,7 +279,6 @@ export default function ProduktOgRadPage() {
       if (stateSelectedFagligDocId) {
         setSelectedFagligDocId(stateSelectedFagligDocId);
       }
-      setTimeout(() => fagligSearchInputRef.current?.focus(), 100);
     } else {
       setActiveTab(0);
     }
@@ -356,8 +294,6 @@ export default function ProduktOgRadPage() {
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<AdviceProduct[]>([]);
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
-  const [expandedAdviceIds, setExpandedAdviceIds] = useState<Set<string>>(() => new Set());
-  const [fagligSearch, setFagligSearch] = useState("");
   const [fagligDocs, setFagligDocs] = useState<FagligDocument[]>([]);
   const [isFagligLoading, setIsFagligLoading] = useState(true);
   const [selectedFagligDocId, setSelectedFagligDocId] = useState<string | null>("__nutrition__");
@@ -367,15 +303,21 @@ export default function ProduktOgRadPage() {
   const [fagligEmojiTargetId, setFagligEmojiTargetId] = useState<string | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameDialogValue, setRenameDialogValue] = useState("");
-  const [fagligSidebarCollapsed, setFagligSidebarCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem("faglig-sidebar-collapsed") === "true";
-  });
   const [renameDialogTargetId, setRenameDialogTargetId] = useState<string | null>(null);
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [embedDialogUrl, setEmbedDialogUrl] = useState("");
   const [embedDialogTitle, setEmbedDialogTitle] = useState("");
   const [sidebarOrder, setSidebarOrder] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("faglig-sidebar-order") ?? "[]"); } catch { return []; }
+  });
+  // Faner brukeren selv har flyttet til «Flere».
+  const [moreTabIds, setMoreTabIds] = useState<string[]>(() => {
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem("faglig-tabs-more") ?? "[]");
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
@@ -447,103 +389,56 @@ export default function ProduktOgRadPage() {
     };
   }, []);
 
-  const filtered = useMemo(() => {
-    const normalizedQuery = normalizeSearch(query);
-    if (!normalizedQuery) return products;
-
-    const numericOnly = NUMERIC_QUERY_RE.test(normalizedQuery);
-    if (numericOnly) {
-      const digits = toDigits(normalizedQuery);
-      // Strip leading zeros so "060387" matches stored "60387"
-      const digitsNorm = digits.replace(/^0+/, "") || digits;
-      const exact = products.filter(
-        (product) =>
-          product.farmaloggDigits === digits ||
-          product.farmaloggDigits === digitsNorm ||
-          product.skuDigits === digits ||
-          product.skuDigits === digitsNorm
-      );
-      if (exact.length > 0) return exact;
-
-      return products.filter(
-        (product) =>
-          product.farmaloggDigits.startsWith(digits) ||
-          product.farmaloggDigits.startsWith(digitsNorm) ||
-          product.skuDigits.startsWith(digits) ||
-          product.skuDigits.startsWith(digitsNorm) ||
-          product.farmaloggDigits.includes(digits) ||
-          product.farmaloggDigits.includes(digitsNorm) ||
-          product.skuDigits.includes(digits) ||
-          product.skuDigits.includes(digitsNorm)
-      );
-    }
-
-    const terms = normalizedQuery.split(" ").filter(Boolean);
-    return products.filter((product) => matchesQuery(product, terms));
-  }, [products, query]);
-
-  const visibleProducts = useMemo(() => filtered.slice(0, renderLimit), [filtered, renderLimit]);
-  const showFullCards = filtered.length <= 2;
+  const productsWithAdvice = useMemo(() => products.filter((product) => product.advicePoints.length > 0), [products]);
+  const searchPool = onlyWithAdvice ? productsWithAdvice : products;
+  const filtered = useMemo(() => searchProducts(searchPool, query), [searchPool, query]);
+  const groups = useMemo(() => (query.trim() ? groupByAtc(filtered) : []), [filtered, query]);
+  const substanceCount = useMemo(() => new Set(groups.map((group) => group.atcCode || group.key)).size, [groups]);
+  const searchKind = (() => {
+    const trimmed = query.trim();
+    if (!trimmed) return null;
+    if (ATC_CODE_RE.test(trimmed.toUpperCase())) return "ATC-kode";
+    if (NUMERIC_QUERY_RE.test(trimmed)) return "varenr./SKU";
+    return null;
+  })();
+  // Treff som skjules av «Kun produkter med råd» – brukes til å tilby «Vis alle».
+  const hiddenMatchCount = useMemo(
+    () => (onlyWithAdvice && query.trim() && filtered.length === 0 ? searchProducts(products, query).length : 0),
+    [onlyWithAdvice, products, query, filtered.length]
+  );
 
   const topAtcCodes = useMemo(() => {
-    const counts = new Map<string, number>();
+    const byCode = new Map<string, string[]>();
     for (const p of products) {
-      if (p.atcCode) counts.set(p.atcCode, (counts.get(p.atcCode) ?? 0) + 1);
+      if (!p.atcCode) continue;
+      const names = byCode.get(p.atcCode);
+      if (names) names.push(p.name);
+      else byCode.set(p.atcCode, [p.name]);
     }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
+    return [...byCode.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
       .slice(0, 10)
-      .map(([code, count]) => ({ code, count }));
+      .map(([code, names]) => ({ code, title: ATC_INGREDIENT[code] ?? (brandLabel(names) || code), count: names.length }));
   }, [products]);
-  const filteredFagligDocs = useMemo(() => {
-    const normalized = normalizeSearch(fagligSearch);
-    if (!normalized) return fagligDocs;
-    return fagligDocs.filter((doc) => {
-      const titleMatch = normalizeSearch(doc.title).includes(normalized);
-      if (titleMatch) return true;
-      if (doc.kind === "text") {
-        return normalizeSearch(doc.content).includes(normalized);
-      }
-      return false;
-    });
-  }, [fagligDocs, fagligSearch]);
-
   const selectedFagligDoc = useMemo(() => {
     if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return null;
     if (selectedFagligDocId) {
       const exact = fagligDocs.find((doc) => doc.id === selectedFagligDocId);
       if (exact) return exact;
     }
-    return filteredFagligDocs[0] ?? null;
-  }, [fagligDocs, filteredFagligDocs, selectedFagligDocId]);
+    return fagligDocs[0] ?? null;
+  }, [fagligDocs, selectedFagligDocId]);
   const fagligDocById = useMemo(() => new Map(fagligDocs.map((doc) => [doc.id, doc])), [fagligDocs]);
 
-  const sortedSidebarIds = useMemo(() => {
-    const docIds = filteredFagligDocs.map((d) => d.id);
-    if (sidebarOrder.length === 0) return [...VIRTUAL_SIDEBAR_IDS, ...docIds];
-    const validDocIds = sidebarOrder.filter((id) => docIds.includes(id));
-    const newDocIds = docIds.filter((id) => !sidebarOrder.includes(id));
-    return [...VIRTUAL_SIDEBAR_IDS, ...validDocIds, ...newDocIds];
-  }, [filteredFagligDocs, sidebarOrder]);
-
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  function handleSidebarDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setSidebarOrder((prev) => {
-      const base = prev.length > 0 ? prev : sortedSidebarIds;
-      const oldIdx = base.indexOf(active.id as string);
-      const newIdx = base.indexOf(over.id as string);
-      if (oldIdx === -1 || newIdx === -1) return prev;
-      const next = arrayMove(base, oldIdx, newIdx);
-      localStorage.setItem("faglig-sidebar-order", JSON.stringify(next));
-      return next;
-    });
-  }
+  // Rekkefølgen på alle dokumentfaner (faste og egne). Faste faner som mangler i en gammel lagret
+  // rekkefølge settes først, nye dokumenter sist.
+  const orderedTabIds = useMemo(() => {
+    const allIds: string[] = [...VIRTUAL_SIDEBAR_IDS, ...fagligDocs.map((doc) => doc.id)];
+    const saved = sidebarOrder.filter((id) => allIds.includes(id));
+    const missingBuiltIn = VIRTUAL_SIDEBAR_IDS.filter((id) => !saved.includes(id));
+    const missingDocs = allIds.filter((id) => !saved.includes(id) && !missingBuiltIn.includes(id as never));
+    return [...missingBuiltIn, ...saved, ...missingDocs];
+  }, [fagligDocs, sidebarOrder]);
 
   const fagligDocMenuOpen = Boolean(fagligDocMenuAnchorEl);
   const fagligEmojiPopoverOpen = Boolean(fagligEmojiAnchorEl);
@@ -570,13 +465,8 @@ export default function ProduktOgRadPage() {
   }, [fagligDocs, isFagligLoading, selectedFagligDocId]);
 
   useEffect(() => {
-    localStorage.setItem("faglig-sidebar-collapsed", String(fagligSidebarCollapsed));
-  }, [fagligSidebarCollapsed]);
-
-  useEffect(() => {
-    setRenderLimit(MAX_RENDERED_RESULTS);
-    setExpandedAdviceIds(new Set());
-  }, [query]);
+    try { localStorage.setItem("produktograd-kun-med-rad", String(onlyWithAdvice)); } catch { /* ignore */ }
+  }, [onlyWithAdvice]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -596,10 +486,7 @@ export default function ProduktOgRadPage() {
 
         event.preventDefault();
         if (activeTab === 1) {
-          const input = fagligSearchInputRef.current;
-          if (!input) return;
-          input.focus();
-          input.select();
+          tabBarRef.current?.openAllTabs();
           return;
         }
 
@@ -610,6 +497,15 @@ export default function ProduktOgRadPage() {
           input.focus();
           input.select();
         });
+        return;
+      }
+
+      // Mellomrom setter markøren i søkefeltet – men bare når ingenting annet har fokus,
+      // slik at mellomrom fortsatt aktiverer knapper og fungerer i dialoger og tekstfelt.
+      if (event.key === " " && activeTab === 0 && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        if (event.target !== document.body) return;
+        event.preventDefault();
+        searchInputRef.current?.focus();
         return;
       }
 
@@ -696,13 +592,10 @@ export default function ProduktOgRadPage() {
     if (ok) setCopiedMessage(`${label} kopiert: ${value}`);
   };
 
-  const toggleExpandedAdvice = (productId: string) => {
-    setExpandedAdviceIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
-      return next;
-    });
+  const handleCopyText = async (text: string, message: string) => {
+    if (!text) return;
+    const ok = await copyPlainText(text);
+    if (ok) setCopiedMessage(message);
   };
 
   const addTextDocument = async () => {
@@ -739,40 +632,6 @@ export default function ProduktOgRadPage() {
     }
   };
 
-  const createChildDocument = async (parent: FagligDocument) => {
-    if (!user?.uid) {
-      setCopiedMessage("Du må være innlogget for å opprette dokument.");
-      return;
-    }
-
-    try {
-      const now = Date.now();
-      const ref = await addDoc(collection(db, "fagligDocuments"), {
-        title: `${parent.title} - underfane`,
-        kind: "text",
-        content: "",
-        parentId: parent.id,
-        emoji: null,
-        updatedAtMs: now,
-        createdAtMs: now,
-        createdByUid: user.uid,
-        updatedByUid: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      setSelectedFagligDocId(ref.id);
-      setCopiedMessage("Underfane opprettet");
-      requestAnimationFrame(() => {
-        const input = fagligTitleInputRef.current;
-        if (!input) return;
-        input.focus();
-        input.select();
-      });
-    } catch (err) {
-      setCopiedMessage(mapFirebaseError(err, "Kunne ikke opprette underfane."));
-    }
-  };
-
   const isDescendantOf = (doc: FagligDocument, parentId: string, byId: Map<string, FagligDocument>) => {
     let current: FagligDocument | undefined = doc;
     while (current?.parentId) {
@@ -793,12 +652,6 @@ export default function ProduktOgRadPage() {
     setFagligDocMenuTargetId(docId);
   };
 
-  const handleAddFagligSubtab = async () => {
-    if (!fagligDocMenuTarget) return;
-    await createChildDocument(fagligDocMenuTarget);
-    closeFagligDocMenu();
-  };
-
   const handleDeleteFagligDoc = async () => {
     if (!fagligDocMenuTarget || !user?.uid) return;
     const targetId = fagligDocMenuTarget.id;
@@ -815,7 +668,7 @@ export default function ProduktOgRadPage() {
         await deleteDoc(docRef(db, "fagligDocuments", removeId));
       }
       if (selectedFagligDocId && removeIds.has(selectedFagligDocId)) {
-        setSelectedFagligDocId(null);
+        setSelectedFagligDocId("__nutrition__");
       }
       setCopiedMessage("Dokument slettet");
     } catch (err) {
@@ -913,6 +766,63 @@ export default function ProduktOgRadPage() {
     }, 350);
   };
 
+  const isBuiltInSelected = (VIRTUAL_SIDEBAR_IDS as readonly string[]).includes(selectedFagligDocId ?? "");
+  const activeTabKey =
+    activeTab === 0
+      ? PRODUCT_TAB_KEY
+      : activeTab === 2
+        ? ROUTINES_TAB_KEY
+        : isBuiltInSelected && selectedFagligDocId
+          ? selectedFagligDocId
+          : selectedFagligDoc?.id ?? "__nutrition__";
+
+  const fagligTabItems = useMemo<FagligTabItem[]>(
+    () =>
+      orderedTabIds.flatMap((id): FagligTabItem[] => {
+        const label = VIRTUAL_TAB_LABELS[id];
+        if (label) return [{ id, label, hasMenu: false }];
+        const doc = fagligDocById.get(id);
+        return doc ? [{ id, label: doc.title, emoji: doc.emoji, hasMenu: true }] : [];
+      }),
+    [orderedTabIds, fagligDocById]
+  );
+
+  const handleSelectTab = (key: string) => {
+    if (key === PRODUCT_TAB_KEY) {
+      setActiveTab(0);
+      return;
+    }
+    if (key === ROUTINES_TAB_KEY) {
+      setActiveTab(2);
+      return;
+    }
+    setSelectedFagligDocId(key);
+    setActiveTab(1);
+  };
+
+  const handleTabReorder = (activeId: string, overId: string) => {
+    const oldIndex = orderedTabIds.indexOf(activeId);
+    const newIndex = orderedTabIds.indexOf(overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const next = arrayMove(orderedTabIds, oldIndex, newIndex);
+    setSidebarOrder(next);
+    try { localStorage.setItem("faglig-sidebar-order", JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const updateMoreTabIds = (next: string[]) => {
+    setMoreTabIds(next);
+    try { localStorage.setItem("faglig-tabs-more", JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const handlePinTab = (id: string) => updateMoreTabIds(moreTabIds.filter((existing) => existing !== id));
+
+  const handleMoveTargetToMore = () => {
+    if (!fagligDocMenuTarget) return;
+    const id = fagligDocMenuTarget.id;
+    if (!moreTabIds.includes(id)) updateMoreTabIds([...moreTabIds, id]);
+    closeFagligDocMenu();
+  };
+
   const addEmbeddedDocument = () => {
     if (!user?.uid) {
       setCopiedMessage("Du må være innlogget for å legge til dokument.");
@@ -981,7 +891,8 @@ export default function ProduktOgRadPage() {
           maxWidth: PAGE_MAX_WIDTH,
           mx: "auto",
           px: PAGE_GUTTER_X,
-          pt: PAGE_GUTTER_Y,
+          // Fanene skal ligge tett under toppen av siden; Layout har allerede egen marg.
+          pt: 0,
           pb: { xs: 1.2, md: 1.6 },
         }}
       >
@@ -996,169 +907,145 @@ export default function ProduktOgRadPage() {
             boxShadow: "none",
           }}
         >
-          <Tabs
-            value={activeTab}
-            onChange={(_, newValue: number) => setActiveTab(newValue)}
-            variant="fullWidth"
-            sx={{
-              mt: 0.15,
-              mx: "auto",
-              width: "100%",
-              maxWidth: 980,
-              minHeight: { xs: 38, md: 44 },
-              p: 0.25,
-              borderRadius: 3,
-              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(120,50,102,0.40)" : "rgba(120,50,102,0.22)",
-              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,130,0.45)" : "rgba(116,44,100,0.26)"}`,
-              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
-              "& .MuiTabs-indicator": {
-                display: "none",
-              },
-            }}
-          >
-            <Tab
-              disableRipple
-              label="Produkt og råd"
-              sx={{
-                minHeight: { xs: 36, md: 42 },
-                textTransform: "none",
-                borderRadius: 2.5,
-                fontSize: { xs: 14, md: 17 },
-                fontWeight: 800,
-                letterSpacing: "0.01em",
-                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
-                bgcolor: "transparent",
-                border: "none",
-                transition: "all 160ms ease",
-                "&:hover": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
-                  bgcolor: "rgba(255,255,255,0.08)",
-                },
-                "&.Mui-selected": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                  fontWeight: 800,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
-                },
-              }}
-            />
-            <Tab
-              disableRipple
-              label="Faglig innhold"
-              sx={{
-                minHeight: { xs: 36, md: 42 },
-                textTransform: "none",
-                borderRadius: 2.5,
-                fontSize: { xs: 14, md: 17 },
-                fontWeight: 800,
-                letterSpacing: "0.01em",
-                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
-                bgcolor: "transparent",
-                border: "none",
-                transition: "all 160ms ease",
-                "&:hover": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
-                  bgcolor: "rgba(255,255,255,0.08)",
-                },
-                "&.Mui-selected": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                  fontWeight: 800,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
-                },
-              }}
-            />
-            <Tab
-              disableRipple
-              label="Rutiner"
-              sx={{
-                minHeight: { xs: 36, md: 42 },
-                textTransform: "none",
-                borderRadius: 2.5,
-                fontSize: { xs: 14, md: 17 },
-                fontWeight: 800,
-                letterSpacing: "0.01em",
-                color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#4F2648",
-                bgcolor: "transparent",
-                border: "none",
-                transition: "all 160ms ease",
-                "&:hover": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#EDD4E8" : "#3B1A35",
-                  bgcolor: "rgba(255,255,255,0.08)",
-                },
-                "&.Mui-selected": {
-                  color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                  fontWeight: 800,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                  boxShadow: "0 8px 18px rgba(62,11,52,0.24)",
-                },
-              }}
-            />
-          </Tabs>
+          <FagligTabBar
+            ref={tabBarRef}
+            items={fagligTabItems}
+            activeKey={activeTabKey}
+            moreIds={moreTabIds}
+            onSelect={handleSelectTab}
+            onReorder={handleTabReorder}
+            onAddEmbedded={addEmbeddedDocument}
+            onAddText={addTextDocument}
+            onOpenMenu={openFagligDocMenu}
+            onPin={handlePinTab}
+          />
 
           {activeTab === 0 ? (
-            <Paper
-              elevation={0}
-              sx={{
-                mt: 3,
-                mx: "auto",
-                width: "100%",
-                maxWidth: 560,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                px: 1.6,
-                py: 1,
-                borderRadius: 2.5,
-                border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.4)" : "rgba(233,155,198,0.5)"}`,
-                bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC",
-              }}
-            >
-              <SearchRoundedIcon sx={{ fontSize: 19, color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#9E4F7D" }} />
-              <InputBase
-                inputRef={searchInputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onFocus={() => void handleSearchAutoPaste()}
-                placeholder="Søk med varenummer, SKU, varenavn eller ATC-kode"
+            <Box sx={{ mt: 2, mx: "auto", width: "100%", maxWidth: 980, display: "grid", gap: 1.25 }}>
+              <Paper
+                elevation={0}
                 sx={{
-                  flex: 1,
-                  fontSize: { xs: 13, md: 14 },
-                  color: (theme) => theme.palette.mode === "dark" ? "#E2D0DC" : "#412039",
-                  "& input": { textAlign: "center" },
-                  "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#8A6880" : "#9C6F89", opacity: 1, textAlign: "center" },
-                  "& input:focus::placeholder": { opacity: 0 },
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  px: 2.5,
+                  height: { xs: 52, md: 58 },
+                  borderRadius: "14px",
+                  border: (theme) => `1.5px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.5)" : "#D79BBB"}`,
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFFFFF",
+                  boxShadow: (theme) => theme.palette.mode === "dark" ? "none" : "0 6px 24px rgba(168,31,102,0.08)",
+                  "&:focus-within": { borderColor: (theme) => theme.palette.mode === "dark" ? "#E8609A" : "#A81F66" },
                 }}
-              />
-              {query ? (
-                <IconButton
-                  aria-label="Tøm søk"
-                  size="small"
-                  onClick={() => setQuery("")}
-                  sx={{ color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#A05C82" }}
-                >
-                  <CloseRoundedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              ) : null}
-            </Paper>
+              >
+                <SearchRoundedIcon sx={{ fontSize: 22, color: (theme) => theme.palette.mode === "dark" ? "#E8609A" : "#A81F66" }} />
+                <InputBase
+                  inputRef={searchInputRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onFocus={() => void handleSearchAutoPaste()}
+                  placeholder="Varenummer, SKU, produktnavn eller ATC-kode"
+                  inputProps={{ "aria-label": "Søk i produkter og råd" }}
+                  sx={{
+                    flex: 1,
+                    fontSize: { xs: 15, md: 17 },
+                    color: (theme) => theme.palette.mode === "dark" ? "#F2EDF0" : "#2D1727",
+                    "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#8A6880" : "#8A6A7E", opacity: 1 },
+                  }}
+                />
+                {searchKind ? (
+                  <Box
+                    component="span"
+                    sx={{
+                      display: { xs: "none", sm: "inline-block" },
+                      px: 1.25,
+                      py: 0.4,
+                      borderRadius: "8px",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: (theme) => theme.palette.mode === "dark" ? "#F5B8DC" : "#A81F66",
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.24)" : "#FCE7F2",
+                    }}
+                  >
+                    Gjenkjent: {searchKind}
+                  </Box>
+                ) : null}
+                {query ? (
+                  <IconButton
+                    aria-label="Tøm søk"
+                    size="small"
+                    onClick={() => setQuery("")}
+                    sx={{ color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#6B5262" }}
+                  >
+                    <CloseRoundedIcon sx={{ fontSize: 20 }} />
+                  </IconButton>
+                ) : (
+                  <Box
+                    component="kbd"
+                    aria-hidden
+                    sx={{
+                      display: { xs: "none", md: "flex" },
+                      alignItems: "center",
+                      justifyContent: "center",
+                      px: 1,
+                      height: 28,
+                      borderRadius: 2,
+                      fontFamily: "inherit",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: (theme) => theme.palette.mode === "dark" ? "#C490AE" : "#6B5262",
+                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.5)" : "#D9BCCD"}`,
+                    }}
+                  >
+                    Space
+                  </Box>
+                )}
+              </Paper>
+
+              <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.25 }}>
+                {[
+                  { value: true, label: "Kun produkter med råd" },
+                  { value: false, label: "Alle produkter" },
+                ].map((option) => {
+                  const selected = onlyWithAdvice === option.value;
+                  return (
+                    <Chip
+                      key={String(option.value)}
+                      clickable
+                      aria-pressed={selected}
+                      onClick={() => setOnlyWithAdvice(option.value)}
+                      label={option.label}
+                      sx={{
+                        height: 36,
+                        borderRadius: "10px",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: (theme) => selected ? "#FFFFFF" : theme.palette.mode === "dark" ? "#E2D0DC" : "#4A3342",
+                        bgcolor: (theme) => selected ? (theme.palette.mode === "dark" ? "#B83A82" : "#A81F66") : theme.palette.mode === "dark" ? "#161B22" : "#FFFFFF",
+                        border: (theme) => `1px solid ${selected ? "transparent" : theme.palette.mode === "dark" ? "rgba(160,90,130,0.4)" : "#E3C6D8"}`,
+                        "&:hover": {
+                          bgcolor: (theme) => selected ? (theme.palette.mode === "dark" ? "#B83A82" : "#A81F66") : theme.palette.mode === "dark" ? "rgba(180,40,100,0.18)" : "#FCE7F2",
+                        },
+                      }}
+                    />
+                  );
+                })}
+                <Box sx={{ flex: 1 }} />
+                {query.trim() && !isLoading ? (
+                  <Typography sx={{ fontSize: 13.5, color: (theme) => theme.palette.mode === "dark" ? "#B79AAE" : "#6B5262" }}>
+                    <Box component="b" sx={{ color: (theme) => theme.palette.mode === "dark" ? "#F09AC0" : "#A81F66" }}>
+                      {substanceCount} virkestoff
+                    </Box>{" "}
+                    · {filtered.length} {filtered.length === 1 ? "produkt" : "produkter"}
+                  </Typography>
+                ) : null}
+              </Box>
+            </Box>
           ) : null}
         </Box>
       </Box>
 
       {activeTab === 0 ? (
-        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 1.5 }}>
-          {query ? (
-            <>
-              <Typography sx={{ fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#A880A0" : "#7E5B74", fontWeight: 600, textAlign: "center" }}>
-                Treff:{" "}
-                <Box component="span" sx={{ color: (theme) => theme.palette.mode === "dark" ? "#E8609A" : "#C93586", fontWeight: 800 }}>
-                  {filtered.length}
-                </Box>
-              </Typography>
-              <Divider sx={{ mt: 1.25, mb: 2.25, borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(140,70,110,0.3)" : alpha("#D79BBB", 0.45), maxWidth: 980, mx: "auto" }} />
-            </>
-          ) : null}
-
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, pt: 1, pb: 1 }}>
           {isLoading ? (
             <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
               <CircularProgress size={34} />
@@ -1168,333 +1055,40 @@ export default function ProduktOgRadPage() {
             <Paper sx={{ p: 2, borderRadius: 2.5, border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`, bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC" }}>
               <Typography sx={{ fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#E08AB0" : "#8E2E67" }}>{error}</Typography>
             </Paper>
-          ) : !query ? (
-            <Box
+          ) : !query.trim() ? (
+            <AdviceStartView popular={topAtcCodes} products={productsWithAdvice} onPick={setQuery} />
+          ) : filtered.length === 0 ? (
+            <Paper
+              elevation={0}
               sx={{
-                maxWidth: 860,
+                maxWidth: 980,
                 mx: "auto",
-                textAlign: "center",
-                py: 2,
-                mt: 4,
-                "@keyframes atcIn": {
-                  from: { opacity: 0, transform: "scale(0.5) translateY(24px)" },
-                  to:   { opacity: 1, transform: "scale(1)   translateY(0px)" },
-                },
-                "@keyframes atcFloat": {
-                  "0%,100%": { transform: "translateY(0px) rotate(-0.4deg)" },
-                  "30%":     { transform: "translateY(-7px) rotate(0.6deg)" },
-                  "65%":     { transform: "translateY(-3px) rotate(-0.2deg)" },
-                },
-                "@keyframes atcGlow": {
-                  "0%,100%": { boxShadow: "0 0 0px rgba(200,80,160,0)" },
-                  "50%":     { boxShadow: "0 0 18px rgba(200,80,160,0.45), 0 0 38px rgba(200,80,160,0.18)" },
-                },
-                "@keyframes atcTitleShimmer": {
-                  "0%":   { backgroundPosition: "0% 50%" },
-                  "50%":  { backgroundPosition: "100% 50%" },
-                  "100%": { backgroundPosition: "0% 50%" },
-                },
-                "@keyframes orbitSpin": {
-                  from: { transform: "rotate(0deg)"   },
-                  to:   { transform: "rotate(360deg)" },
-                },
+                p: 2.5,
+                borderRadius: "12px",
+                border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`,
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC",
               }}
             >
-              <Typography sx={{
-                mb: 2.5,
-                fontSize: { xs: 13, md: 14 },
-                fontWeight: 800,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                background: (theme) => theme.palette.mode === "dark"
-                  ? "linear-gradient(90deg, #D46FAE, #F0A0D0, #B84490, #F0A0D0, #D46FAE)"
-                  : "linear-gradient(90deg, #9D2070, #D44898, #7B1A5A, #D44898, #9D2070)",
-                backgroundSize: "300% 300%",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                animation: "atcTitleShimmer 4s ease infinite",
-              }}>
-                Vanlige ATC-koder
-              </Typography>
-
-              {/* Chip cloud */}
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2.5, justifyContent: "center" }}>
-                {topAtcCodes.map(({ code }, index) => {
-                  const floatDuration = 3.2 + (index % 5) * 0.45;
-                  const glowDuration  = 2.6 + (index % 4) * 0.55;
-                  const entranceDelay = index * 0.07;
-                  const floatDelay    = index * 0.31;
-                  return (
-                    <Chip
-                      key={code}
-                      label={
-                        <Box component="span" sx={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.2, py: 0.6 }}>
-                          <Box component="span" sx={{ fontWeight: 800, fontSize: 15 }}>{code}</Box>
-                          {ATC_INGREDIENT[code] ? (
-                            <Box component="span" sx={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: (theme) => theme.palette.mode === "dark" ? "#D4A8C4" : "#8A3A6A",
-                              opacity: 0.85,
-                            }}>{ATC_INGREDIENT[code]}</Box>
-                          ) : null}
-                        </Box>
-                      }
-                      onClick={() => setQuery(code)}
-                      sx={{
-                        height: "auto",
-                        minWidth: 150,
-                        borderRadius: 2.5,
-                        px: 0.5,
-                        cursor: "pointer",
-                        opacity: 0,
-                        "& .MuiChip-label": { px: 1.8 },
-                        bgcolor: (theme) => theme.palette.mode === "dark"
-                          ? index === 0 ? "rgba(160,40,110,0.45)" : "rgba(110,30,80,0.32)"
-                          : index === 0 ? "#FFE0F4"                : "#FFF0FA",
-                        color: (theme) => theme.palette.mode === "dark" ? "#F5B8DC" : "#8D1F60",
-                        border: (theme) => `1px solid ${theme.palette.mode === "dark"
-                          ? index === 0 ? "rgba(220,90,160,0.7)" : "rgba(180,70,130,0.45)"
-                          : index === 0 ? "#E898CC"              : "#F2C0DC"}`,
-                        animation: [
-                          `atcIn ${0.42}s cubic-bezier(0.34,1.56,0.64,1) ${entranceDelay}s both`,
-                          `atcFloat ${floatDuration}s ease-in-out ${floatDelay}s infinite`,
-                          `atcGlow  ${glowDuration}s ease-in-out  ${floatDelay}s infinite`,
-                        ].join(", "),
-                        transition: "background-color 160ms, border-color 160ms, transform 160ms",
-                        "&:hover": {
-                          animationPlayState: "paused",
-                          transform: "translateY(-5px) scale(1.1)",
-                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(190,60,130,0.55)" : "#FFD4EE",
-                          border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(240,110,180,0.8)" : "#DC70B8"}`,
-                          boxShadow: (theme) => theme.palette.mode === "dark"
-                            ? "0 8px 28px rgba(200,60,140,0.5), 0 0 0 1px rgba(220,100,170,0.4)"
-                            : "0 8px 24px rgba(180,50,120,0.28), 0 0 0 1px rgba(200,80,150,0.3)",
-                          zIndex: 1,
-                        },
-                      }}
-                    />
-                  );
-                })}
-              </Box>
-
-              <Typography sx={{
-                mt: 3,
-                fontSize: 12.5,
-                color: (theme) => theme.palette.mode === "dark" ? "#6A5060" : "#BBA0B0",
-                fontStyle: "italic",
-              }}>
-                Klikk på en ATC-kode for å filtrere produkter
-              </Typography>
-            </Box>
-          ) : filtered.length === 0 ? (
-            <Paper sx={{ p: 2.5, borderRadius: 2.5, border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,120,0.3)" : "#EFCFE1"}`, bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFF8FC" }}>
               <Typography sx={{ fontSize: 18, fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#D4A0C0" : "#854265" }}>
-                Ingen treff på søket ditt.
+                {hiddenMatchCount > 0 ? "Ingen produkter med råd matcher søket." : "Ingen treff på søket ditt."}
               </Typography>
               <Typography sx={{ mt: 0.5, fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#9A7890" : "#8E6A82" }}>
-                Prøv å søke på ATC-kode, varenummer, SKU eller deler av varenavn.
+                {hiddenMatchCount > 0
+                  ? `${hiddenMatchCount} ${hiddenMatchCount === 1 ? "produkt" : "produkter"} uten registrert råd matcher søket.`
+                  : "Prøv å søke på ATC-kode, varenummer, SKU eller deler av varenavn."}
               </Typography>
+              {hiddenMatchCount > 0 ? (
+                <Button
+                  variant="outlined"
+                  onClick={() => setOnlyWithAdvice(false)}
+                  sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2.5, minHeight: 40 }}
+                >
+                  Vis alle produkter
+                </Button>
+              ) : null}
             </Paper>
           ) : (
-            <Box
-              sx={{
-                display: "grid",
-                gap: 1.25,
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  lg: "repeat(2, minmax(0, 1fr))",
-                },
-                alignItems: "start",
-              }}
-            >
-              {visibleProducts.map((product) => {
-                const isExpanded = showFullCards || expandedAdviceIds.has(product.id);
-
-                return (
-                  <Paper
-                    key={product.id}
-                    elevation={0}
-                    sx={{
-                      p: { xs: 1.4, md: 1.7 },
-                      borderRadius: 1.5,
-                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.25)" : "#ECD3E1"}`,
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "#161B22" : "#FFFFFF",
-                      boxShadow: (theme) => theme.palette.mode === "dark" ? "0 4px 14px rgba(0,0,0,0.35)" : "0 8px 20px rgba(94,21,71,0.08)",
-                      display: "grid",
-                      gap: 0.95,
-                      minHeight: showFullCards ? 0 : { xs: 250, lg: 270 },
-                      height: showFullCards ? "auto" : isExpanded ? "auto" : { xs: 250, lg: 270 },
-                      gridTemplateRows: "auto 1fr auto",
-                    }}
-                  >
-                    <Stack direction="column" alignItems="flex-start" spacing={0.8}>
-                      <Typography
-                        sx={{
-                          fontSize: { xs: 17, md: 18 },
-                          fontWeight: 700,
-                          color: (theme) => theme.palette.mode === "dark" ? "#F2EDF0" : "#31192C",
-                          lineHeight: 1.3,
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {product.name}
-                      </Typography>
-                      <Stack direction="row" spacing={0.8} flexWrap="wrap">
-                        {product.atcCode ? (
-                          <Chip
-                            label={product.atcCode}
-                            size="small"
-                            onClick={() => { void handleCopyNumber(product.atcCode, "ATC"); }}
-                            sx={{
-                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.22)" : "#FFE7F4",
-                              color: (theme) => theme.palette.mode === "dark" ? "#F09AC0" : "#9D1D66",
-                              fontWeight: 800,
-                              fontSize: 11,
-                              borderRadius: 999,
-                              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(200,80,140,0.4)" : "#F2B9DA"}`,
-                              height: 26,
-                              cursor: "pointer",
-                              transition: "transform 120ms ease, background-color 120ms ease",
-                              "&:hover": {
-                                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(180,40,100,0.35)" : "#FFDAF0",
-                                transform: "translateY(-1px)",
-                              },
-                            }}
-                          />
-                        ) : null}
-                        <Chip
-                          label={`Vnr ${product.farmaloggNumber || "-"}`}
-                          size="small"
-                          onClick={() => {
-                            void handleCopyNumber(product.farmaloggNumber, "Vnr");
-                          }}
-                          sx={{
-                            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.18)" : "#FAF1F7",
-                            color: (theme) => theme.palette.mode === "dark" ? "#C4A0B8" : "#6F4D64",
-                            fontWeight: 600,
-                            fontSize: 11,
-                            borderRadius: 999,
-                            border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.3)" : "#EBD6E3"}`,
-                            height: 26,
-                            cursor: toDigits(product.farmaloggNumber) ? "pointer" : "default",
-                            transition: "transform 120ms ease, background-color 120ms ease",
-                            "&:hover": {
-                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.30)" : "#F7E7F1",
-                              transform: "translateY(-1px)",
-                            },
-                          }}
-                        />
-                        <Chip
-                          label={`SKU ${product.sku || "-"}`}
-                          size="small"
-                          onClick={() => {
-                            void handleCopyNumber(product.sku, "SKU");
-                          }}
-                          sx={{
-                            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.18)" : "#FAF1F7",
-                            color: (theme) => theme.palette.mode === "dark" ? "#C4A0B8" : "#6F4D64",
-                            fontWeight: 600,
-                            fontSize: 11,
-                            borderRadius: 999,
-                            border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,90,130,0.3)" : "#EBD6E3"}`,
-                            height: 26,
-                            cursor: toDigits(product.sku) ? "pointer" : "default",
-                            transition: "transform 120ms ease, background-color 120ms ease",
-                            "&:hover": {
-                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,80,120,0.30)" : "#F7E7F1",
-                              transform: "translateY(-1px)",
-                            },
-                          }}
-                        />
-                      </Stack>
-                    </Stack>
-
-                    {product.advicePoints.length > 0 ? (
-                      <Box
-                        component="ul"
-                        sx={{
-                          mt: 0,
-                          mb: 0,
-                          pl: 2.1,
-                          display: "grid",
-                          gap: 0.18,
-                          overflow: "hidden",
-                          alignContent: "start",
-                          justifyContent: "start",
-                          "& li": {
-                            color: (theme) => theme.palette.mode === "dark" ? "#E8DDE4" : "#3D2A36",
-                            fontSize: { xs: 13.5, md: 14 },
-                            lineHeight: 1.34,
-                          },
-                          "& li::marker": {
-                            color: "#D24D94",
-                            fontSize: "1em",
-                          },
-                        }}
-                      >
-                        {(isExpanded ? product.advicePoints : product.advicePoints.slice(0, 3)).map((point, idx) => (
-                          <li key={`${product.id}-${idx}`}>{point}</li>
-                        ))}
-                      </Box>
-                    ) : (
-                      <Typography sx={{ mt: 0.25, color: (theme) => theme.palette.mode === "dark" ? "#A89098" : "#8C647D", fontSize: 12.5, fontStyle: "italic" }}>
-                        Ingen farmasøytisk råd registrert for dette produktet.
-                      </Typography>
-                    )}
-                    {!showFullCards && product.advicePoints.length > 3 ? (
-                      <Button
-                        size="small"
-                        variant="text"
-                        onClick={() => toggleExpandedAdvice(product.id)}
-                        sx={{
-                          width: "fit-content",
-                          minWidth: 0,
-                          mt: 0.1,
-                          px: 0,
-                          color: (theme) => theme.palette.mode === "dark" ? "#D070A0" : "#9D1D66",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          textTransform: "none",
-                        }}
-                      >
-                        {isExpanded ? "Vis færre" : `Vis mer (${product.advicePoints.length})`}
-                      </Button>
-                    ) : null}
-                  </Paper>
-                );
-              })}
-              {filtered.length > visibleProducts.length ? (
-                <Box sx={{ pt: 0.25 }}>
-                  <Typography sx={{ fontSize: 13, color: (theme) => theme.palette.mode === "dark" ? "#907080" : "#8A6380", mb: 0.75 }}>
-                    Flere treff tilgjengelig
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => setRenderLimit((prev) => prev + MAX_RENDERED_RESULTS)}
-                    sx={{
-                      borderRadius: 2.5,
-                      px: 1.4,
-                      py: 0.4,
-                      fontSize: 13,
-                      border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(160,80,130,0.45)" : "#E1B8CF"}`,
-                      color: (theme) => theme.palette.mode === "dark" ? "#D080B0" : "#8D2F67",
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,50,100,0.12)" : "#FFF7FB",
-                      "&:hover": {
-                        border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(180,90,140,0.6)" : "#DDA8C5"}`,
-                        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(140,50,100,0.22)" : "#FDEDF7",
-                      },
-                    }}
-                  >
-                    Vis flere
-                  </Button>
-                </Box>
-              ) : null}
-            </Box>
+            <AdviceGroupList key={query} groups={groups} onCopyNumber={handleCopyNumber} onCopyText={handleCopyText} />
           )}
         </Box>
       ) : activeTab === 2 ? (
@@ -1503,603 +1097,73 @@ export default function ProduktOgRadPage() {
         </Box>
       ) : (
         <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 0.75 }}>
-          <Paper
-            elevation={0}
+          <Box
+            ref={fillRef}
             sx={{
-              borderRadius: 1.5,
-              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "rgba(140,80,120,0.2)"}`,
-              bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FDFBFF",
-              overflow: "hidden",
-              boxShadow: (theme) => theme.palette.mode === "dark" ? "0 16px 34px rgba(0,0,0,0.32)" : "0 10px 28px rgba(101,56,92,0.14)",
               display: "flex",
               flexDirection: "column",
-              height: "calc(100vh - 115px)",
+              minHeight: 320,
+              borderRadius: "14px",
+              border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "#EAD2E1"}`,
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "#0D1117" : "#FDFBFF",
+              overflow: "hidden",
+              boxShadow: (theme) => theme.palette.mode === "dark" ? "0 16px 34px rgba(0,0,0,0.32)" : "0 10px 30px rgba(94,21,71,0.07)",
             }}
           >
             <Box
               sx={{
-                p: 1,
-                borderBottom: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.3)" : "rgba(140,80,120,0.2)"}`,
-                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(22,27,34,0.97)" : "rgba(247,238,246,0.98)",
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexWrap: "wrap",
-                justifyContent: "space-between",
-              }}
-            >
-              <Stack direction="row" spacing={1}>
-                <Button
-                  size="small"
-                  startIcon={<PictureAsPdfRoundedIcon />}
-                  variant="contained"
-                  onClick={addEmbeddedDocument}
-                  sx={{
-                    borderRadius: 2,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0",
-                    color: (theme) => theme.palette.mode === "dark" ? "#FFE8F4" : "#2B1129",
-                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7A3660" : "#E9A4D0" },
-                  }}
-                >
-                  Bygg inn dokument
-                </Button>
-                <Button
-                  size="small"
-                  startIcon={<AddRoundedIcon />}
-                  variant="outlined"
-                  onClick={addTextDocument}
-                  sx={{
-                    borderRadius: 2,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    color: (theme) => theme.palette.mode === "dark" ? "#F5DDF0" : "#6E2C55",
-                    borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(240,184,220,0.44)" : "rgba(140,80,120,0.35)",
-                    "&:hover": {
-                      borderColor: "#F2A2D0",
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.1)" : "rgba(242,162,208,0.14)",
-                    },
-                  }}
-                >
-                  Legg til dokument
-                </Button>
-              </Stack>
-              <Paper
-                elevation={0}
-                sx={{
-                  px: 1,
-                  py: 0.4,
-                  minWidth: { xs: "100%", md: 260 },
-                  maxWidth: 360,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                  borderRadius: 2,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(13,17,23,0.95)" : "rgba(255,255,255,0.95)",
-                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.35)" : "rgba(140,80,120,0.28)"}`,
-                }}
-              >
-                <SearchRoundedIcon sx={{ color: (theme) => theme.palette.mode === "dark" ? "#D28DB7" : "#9C4D77", fontSize: 18 }} />
-                <InputBase
-                  inputRef={fagligSearchInputRef}
-                  value={fagligSearch}
-                  onChange={(event) => setFagligSearch(event.target.value)}
-                  placeholder="Søk i faglige dokumenter"
-                  sx={{
-                    flex: 1,
-                    fontSize: 14,
-                    color: (theme) => theme.palette.mode === "dark" ? "#F2E7EF" : "#44263A",
-                    "& input::placeholder": { color: (theme) => theme.palette.mode === "dark" ? "#AFA0B2" : "#8D7790", opacity: 1 },
-                  }}
-                />
-              </Paper>
-            </Box>
-
-            <Box
-              sx={{
-                display: "flex",
                 flex: 1,
-                overflow: "hidden",
+                minWidth: 0,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto",
               }}
             >
-              {/* ── Collapsible Dokumentfaner sidebar ── */}
-              <Box
-                sx={{
-                  width: fagligSidebarCollapsed ? 44 : 220,
-                  minWidth: fagligSidebarCollapsed ? 44 : 220,
-                  transition: "width 200ms ease, min-width 200ms ease",
-                  borderRight: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(140,80,120,0.25)" : "rgba(140,80,120,0.2)"}`,
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(13,17,23,0.9)" : "rgba(251,245,251,0.95)",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                  flexShrink: 0,
-                }}
-              >
-                {/* Header row */}
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent={fagligSidebarCollapsed ? "center" : "space-between"}
-                  sx={{ px: fagligSidebarCollapsed ? 0.5 : 1.2, py: 0.7, flexShrink: 0 }}
-                >
-                  {!fagligSidebarCollapsed && (
-                    <>
-                      <Typography sx={{ fontSize: 16, fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#EED5E8" : "#5A2A49", whiteSpace: "nowrap" }}>
-                        Dokumentfaner
-                      </Typography>
-                    </>
-                  )}
-                  <Tooltip title={fagligSidebarCollapsed ? "Vis Dokumentfaner" : "Skjul Dokumentfaner"} placement="right">
-                    <IconButton
-                      size="small"
-                      onClick={() => setFagligSidebarCollapsed((v) => !v)}
-                      sx={{
-                        color: (theme) => theme.palette.mode === "dark" ? "rgba(235,175,211,0.8)" : "rgba(115,56,92,0.85)",
-                        ml: fagligSidebarCollapsed ? 0 : 0.5,
-                        "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.15)" : "rgba(242,162,208,0.18)", color: "#F2A2D0" },
-                      }}
-                    >
-                      {fagligSidebarCollapsed
-                        ? <ChevronRightRoundedIcon sx={{ fontSize: 20 }} />
-                        : <ChevronLeftRoundedIcon sx={{ fontSize: 20 }} />}
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-
-                {/* Collapsed icon strip */}
-                {fagligSidebarCollapsed && (
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, py: 0.5 }}>
-                    {[
-                      { id: "__nutrition__",        emoji: "🥗", label: "Næringsmidler",    activeColor: "rgba(34,197,94,0.35)",   activeBorder: "rgba(34,197,94,0.6)"   },
-                      { id: "__melkeerstatning__",  emoji: "🍼", label: "Melkeerstatning", activeColor: "rgba(168,139,201,0.35)", activeBorder: "rgba(168,139,201,0.65)" },
-                      { id: "__tryggmamma__",  emoji: "🤰", label: "Tryggmamma",         activeColor: "rgba(236,72,153,0.35)", activeBorder: "rgba(236,72,153,0.6)" },
-                      { id: "__knuse__",            emoji: "💊", label: "Knuse-/delelisten", activeColor: "rgba(139,92,246,0.35)", activeBorder: "rgba(139,92,246,0.6)" },
-                    ].map(({ id, emoji, label, activeColor, activeBorder }) => {
-                      const active = selectedFagligDocId === id;
-                      return (
-                        <Tooltip key={id} title={label} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                          <Box
-                            onClick={() => setSelectedFagligDocId(id)}
-                            sx={{
-                              width: 34, height: 34,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              borderRadius: 2,
-                              fontSize: 18,
-                              cursor: "pointer",
-                              bgcolor: active ? activeColor : "transparent",
-                              border: active ? `1.5px solid ${activeBorder}` : "1.5px solid transparent",
-                              transition: "background 120ms ease, border-color 120ms ease",
-                              "&:hover": { bgcolor: activeColor, borderColor: activeBorder },
-                            }}
-                          >
-                            {emoji}
-                          </Box>
-                        </Tooltip>
-                      );
-                    })}
-                    {filteredFagligDocs.map((doc) => {
-                      const active = selectedFagligDoc?.id === doc.id;
-                      return (
-                        <Tooltip key={doc.id} title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                          <Box
-                            onClick={() => setSelectedFagligDocId(doc.id)}
-                            sx={{
-                              width: 34, height: 34,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              borderRadius: 2,
-                              cursor: "pointer",
-                              bgcolor: active ? "rgba(242,162,208,0.22)" : "transparent",
-                              border: active ? "1.5px solid rgba(242,162,208,0.55)" : "1.5px solid transparent",
-                              transition: "background 120ms ease, border-color 120ms ease",
-                              "&:hover": { bgcolor: "rgba(242,162,208,0.15)", borderColor: "rgba(242,162,208,0.4)" },
-                            }}
-                          >
-                            {doc.emoji ? (
-                              <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
-                            ) : doc.kind === "pdf" ? (
-                              <PictureAsPdfRoundedIcon sx={{ fontSize: 18, color: active ? "#F9C8E4" : "#F0A1CF" }} />
-                            ) : (
-                              <DescriptionRoundedIcon sx={{ fontSize: 18, color: active ? "#BDE7FF" : "#9ED9FF" }} />
-                            )}
-                          </Box>
-                        </Tooltip>
-                      );
-                    })}
-                  </Box>
-                )}
-
-                {/* Sidebar content — hidden when collapsed */}
-                <Box sx={{ flex: 1, overflowY: "auto", display: fagligSidebarCollapsed ? "none" : "block", p: 1.15 }}>
-                {isFagligLoading ? (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.8, py: 1.1 }}>
-                    <CircularProgress size={18} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#E8B7D5" : "#A55A84" }} />
-                    <Typography sx={{ fontSize: 13, color: (theme) => theme.palette.mode === "dark" ? "#D8B4CA" : "#7A4A67" }}>Laster dokumenter...</Typography>
-                  </Box>
-                ) : null}
-                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleSidebarDragEnd}>
-                  <SortableContext items={sortedSidebarIds} strategy={verticalListSortingStrategy}>
-                    <List sx={{ mt: 0.5, pt: 0 }}>
-                      {sortedSidebarIds.map((id) => {
-                        if (id === "__nutrition__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Næringsmidler" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__nutrition__"}
-                                onClick={() => setSelectedFagligDocId("__nutrition__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__nutrition__" ? "rgba(34,197,94,0.18)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(34,197,94,0.12)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.45)", boxShadow: "0 8px 16px rgba(34,197,94,0.18)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(34,197,94,0.26)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🥗</Typography>
-                                <ListItemText primary="Næringsmidler" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__nutrition__" ? 800 : 600, color: selectedFagligDocId === "__nutrition__" ? (isDark ? "#BBF7D0" : "#166534") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        if (id === "__melkeerstatning__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Melkeerstatning" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__melkeerstatning__"}
-                                onClick={() => setSelectedFagligDocId("__melkeerstatning__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__melkeerstatning__" ? "rgba(168,139,201,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(168,139,201,0.13)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(168,139,201,0.24)", borderColor: "rgba(168,139,201,0.50)", boxShadow: "0 8px 16px rgba(124,92,167,0.22)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(168,139,201,0.30)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🍼</Typography>
-                                <ListItemText primary="Melkeerstatning" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__melkeerstatning__" ? 800 : 600, color: selectedFagligDocId === "__melkeerstatning__" ? (isDark ? "#E6D8F5" : "#5B3A77") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        if (id === "__knuse__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Knuse-/delelisten" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__knuse__"}
-                                onClick={() => setSelectedFagligDocId("__knuse__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__knuse__" ? "rgba(139,92,246,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(139,92,246,0.13)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(139,92,246,0.24)", borderColor: "rgba(139,92,246,0.50)", boxShadow: "0 8px 16px rgba(139,92,246,0.2)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(139,92,246,0.30)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>💊</Typography>
-                                <ListItemText primary="Knuse-/delelisten" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__knuse__" ? 800 : 600, color: selectedFagligDocId === "__knuse__" ? (isDark ? "#DDD6FE" : "#5B3A77") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        if (id === "__tryggmamma__") return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <Tooltip title="Tryggmamma" placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                              <ListItemButton
-                                selected={selectedFagligDocId === "__tryggmamma__"}
-                                onClick={() => setSelectedFagligDocId("__tryggmamma__")}
-                                sx={{
-                                  borderRadius: "999px", pl: 1.25, pr: 0.85, minHeight: 58, mb: 0.85,
-                                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(140,80,120,0.2)"}`,
-                                  bgcolor: selectedFagligDocId === "__tryggmamma__" ? "rgba(236,72,153,0.2)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.88)" : "rgba(255,255,255,0.76)"),
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.25)" : "0 6px 14px rgba(92,45,79,0.10)",
-                                  transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                  "&:hover": { bgcolor: "rgba(236,72,153,0.13)", transform: "translateY(-1px)" },
-                                  "&.Mui-selected": { bgcolor: "rgba(236,72,153,0.24)", borderColor: "rgba(236,72,153,0.50)", boxShadow: "0 8px 16px rgba(236,72,153,0.2)" },
-                                  "&.Mui-selected:hover": { bgcolor: "rgba(236,72,153,0.30)", transform: "translateY(-1px)" },
-                                }}
-                              >
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>🤰</Typography>
-                                <ListItemText primary="Tryggmamma" primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDocId === "__tryggmamma__" ? 800 : 600, color: selectedFagligDocId === "__tryggmamma__" ? (isDark ? "#FBCFE8" : "#9D1D62") : (isDark ? "#E4DCE7" : "#5A2E4D") }} />
-                              </ListItemButton>
-                            </Tooltip>
-                          </SortableSidebarItem>
-                        );
-                        const doc = fagligDocById.get(id);
-                        if (!doc) return null;
-                        let depth = 0;
-                        let cursor = doc;
-                        while (cursor.parentId && depth < 8) {
-                          const parent = fagligDocById.get(cursor.parentId);
-                          if (!parent) break;
-                          depth += 1;
-                          cursor = parent;
-                        }
-                        return (
-                          <SortableSidebarItem key={id} id={id}>
-                            <ListItemButton
-                              selected={selectedFagligDoc?.id === doc.id}
-                              onClick={() => setSelectedFagligDocId(doc.id)}
-                              sx={{
-                                borderRadius: "999px",
-                                minHeight: 54,
-                                mb: 0.75,
-                                pl: 1.25 + depth * 1.6,
-                                pr: 0.85,
-                                border: selectedFagligDoc?.id === doc.id ? ((theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(242,162,208,0.45)" : "rgba(186,95,148,0.4)"}`) : "1px solid transparent",
-                                bgcolor: selectedFagligDoc?.id === doc.id ? "rgba(242,162,208,0.18)" : ((theme) => theme.palette.mode === "dark" ? "rgba(35,43,54,0.72)" : "rgba(255,255,255,0.7)"),
-                                backdropFilter: "blur(8px)",
-                                WebkitBackdropFilter: "blur(8px)",
-                                boxShadow: (theme) => theme.palette.mode === "dark" ? "0 6px 14px rgba(0,0,0,0.22)" : "0 6px 14px rgba(92,45,79,0.08)",
-                                transition: "all 180ms cubic-bezier(.2,.8,.2,1)",
-                                "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.12)" : "rgba(242,162,208,0.1)", transform: "translateY(-1px)" },
-                                "&.Mui-selected": { bgcolor: "rgba(242,162,208,0.2)", borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.45)" : "rgba(186,95,148,0.4)" },
-                                "&.Mui-selected:hover": { bgcolor: "rgba(242,162,208,0.26)", transform: "translateY(-1px)" },
-                              }}
-                            >
-                              {doc.emoji ? (
-                                <Typography sx={{ mr: 1, fontSize: 18, lineHeight: 1 }}>{doc.emoji}</Typography>
-                              ) : doc.kind === "pdf" ? (
-                                <PictureAsPdfRoundedIcon sx={{ mr: 1, fontSize: 20, color: (theme) => theme.palette.mode === "dark" ? "#F0A1CF" : "#B54B87" }} />
-                              ) : (
-                                <DescriptionRoundedIcon sx={{ mr: 1, fontSize: 20, color: (theme) => theme.palette.mode === "dark" ? "#9ED9FF" : "#2E6FA6" }} />
-                              )}
-                              <Tooltip title={doc.title} placement="right" enterDelay={0} enterTouchDelay={0} arrow>
-                                <ListItemText
-                                  primary={doc.title}
-                                  primaryTypographyProps={{ noWrap: true, fontSize: 14, fontWeight: selectedFagligDoc?.id === doc.id ? 800 : 600, color: selectedFagligDoc?.id === doc.id ? (isDark ? "#FFD8ED" : "#6E2D58") : (isDark ? "#E4DCE7" : "#5A2E4D") }}
-                                />
-                              </Tooltip>
-                              <IconButton
-                                size="small"
-                                onClick={(event) => openFagligDocMenu(event, doc.id)}
-                                sx={{ ml: 0.5, color: (theme) => theme.palette.mode === "dark" ? "rgba(235,175,211,0.95)" : "rgba(150,72,115,0.95)", "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(242,162,208,0.18)" : "rgba(242,162,208,0.16)" } }}
-                              >
-                                <MoreVertIcon sx={{ fontSize: 18 }} />
-                              </IconButton>
-                            </ListItemButton>
-                          </SortableSidebarItem>
-                        );
-                      })}
-                    </List>
-                  </SortableContext>
-                </DndContext>
-
-                {filteredFagligDocs.length === 0 ? (
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      mt: 1,
-                      p: 1.2,
-                      borderRadius: 2,
-                      bgcolor: "rgba(13,17,23,0.92)",
-                      border: "1px dashed rgba(242,162,208,0.35)",
-                    }}
-                  >
-                    <Typography sx={{ fontSize: 13, color: "#CCB5C4" }}>
-                      Ingen dokumenter funnet. Legg til innebygd dokument eller opprett tekstdokument.
+              {selectedFagligDocId === "__nutrition__" ? (
+                <NutritionProductFinder catalogProducts={products} />
+              ) : selectedFagligDocId === "__melkeerstatning__" ? (
+                <MelkeerstatningTab />
+              ) : selectedFagligDocId === "__knuse__" ? (
+                <KnuseDelisteTab />
+              ) : selectedFagligDocId === "__tryggmamma__" ? (
+                <TryggmammaTab />
+              ) : selectedFagligDoc ? (
+                <FagligDocView doc={selectedFagligDoc} titleInputRef={fagligTitleInputRef} onChangeText={updateSelectedTextDoc} />
+              ) : (
+                <Box sx={{ flex: 1, display: "grid", placeItems: "center", p: 3, textAlign: "center" }}>
+                  <Box>
+                    <Typography sx={{ fontSize: 18, fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#F1DAE9" : "#2D1727" }}>
+                      {isFagligLoading ? "Laster dokumenter ..." : "Ingen dokumenter ennå"}
                     </Typography>
-                  </Paper>
-                ) : null}
-                </Box>{/* end inner content Box */}
-              </Box>{/* end collapsible sidebar Box */}
-
-              <Box sx={{ bgcolor: "#0D1117", p: (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") ? 0 : 1, overflowY: selectedFagligDocId === "__knuse__" ? "hidden" : "auto", display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-                {selectedFagligDocId === "__nutrition__" ? (
-                  <NutritionProductFinder catalogProducts={products} />
-                ) : selectedFagligDocId === "__melkeerstatning__" ? (
-                  <MelkeerstatningTab />
-                ) : selectedFagligDocId === "__knuse__" ? (
-                  <KnuseDelisteTab />
-                ) : selectedFagligDocId === "__tryggmamma__" ? (
-                  <TryggmammaTab />
-                ) : selectedFagligDoc ? (
-                  selectedFagligDoc.kind === "pdf" ? (
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: "100%",
-                        borderRadius: 0,
-                        border: "none",
-                        bgcolor: "#0D1117",
-                        overflow: "hidden",
-                        display: "grid",
-                        gridTemplateRows: "auto 1fr",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          px: 1.25,
-                          py: 0.9,
-                          borderBottom: "1px solid rgba(140,80,120,0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 1,
-                          bgcolor: "rgba(22,27,34,0.97)",
-                        }}
-                      >
-                        <Stack direction="row" alignItems="center" spacing={0.9} sx={{ minWidth: 0 }}>
-                          <PictureAsPdfRoundedIcon sx={{ color: "#F0A1CF", fontSize: 20 }} />
-                          <Typography sx={{ color: "#F6E9F1", fontSize: 16, fontWeight: 700 }} noWrap>
-                            {selectedFagligDoc.title}
-                          </Typography>
-                        </Stack>
-                        <Chip
-                          size="small"
-                          label="PDF"
-                          sx={{
-                            bgcolor: "rgba(242,162,208,0.2)",
-                            color: "#F5C3E1",
-                            fontWeight: 700,
-                            border: "1px solid rgba(242,162,208,0.44)",
-                          }}
-                        />
-                      </Box>
-                      <Box sx={{ height: "100%", bgcolor: "#161B22" }}>
-                        <iframe
-                          title={selectedFagligDoc.title}
-                          src={selectedFagligDoc.url ?? undefined}
-                          style={{ border: 0, width: "100%", height: "100%" }}
-                        />
-                      </Box>
-                    </Paper>
-                  ) : (
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: "100%",
-                        borderRadius: 2.5,
-                        border: "1px solid rgba(140,80,120,0.25)",
-                        bgcolor: "#161B22",
-                        overflow: "hidden",
-                        display: "grid",
-                        gridTemplateRows: "auto 1fr auto",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          px: 1.25,
-                          py: 0.9,
-                          borderBottom: "1px solid rgba(140,80,120,0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 1,
-                          bgcolor: "rgba(22,27,34,0.97)",
-                        }}
-                      >
-                        <Stack direction="row" alignItems="center" spacing={0.9} sx={{ minWidth: 0, flex: 1 }}>
-                          <DescriptionRoundedIcon sx={{ color: "#F0A1CF", fontSize: 20 }} />
-                          <InputBase
-                            inputRef={fagligTitleInputRef}
-                            value={selectedFagligDoc.title}
-                            onChange={(event) => updateSelectedTextDoc({ title: event.target.value })}
-                            sx={{
-                              flex: 1,
-                              fontSize: 20,
-                              fontWeight: 800,
-                              color: "#F2E7EF",
-                              "& input::placeholder": {
-                                color: "#AFA0B2",
-                                opacity: 1,
-                              },
-                            }}
-                            placeholder="Tittel"
-                          />
-                        </Stack>
-                        <Chip
-                          size="small"
-                          label="Tekst"
-                          sx={{
-                            bgcolor: "rgba(242,162,208,0.2)",
-                            color: "#F5C3E1",
-                            fontWeight: 700,
-                            border: "1px solid rgba(242,162,208,0.44)",
-                          }}
-                        />
-                      </Box>
-                      <Box sx={{ p: 1.1 }}>
-                        <InputBase
-                          multiline
-                          minRows={18}
-                          value={selectedFagligDoc.content}
-                          onChange={(event) => updateSelectedTextDoc({ content: event.target.value })}
-                          placeholder="Skriv faglig innhold her..."
-                          sx={{
-                            width: "100%",
-                            p: 1.1,
-                            borderRadius: 1.8,
-                            border: "1px solid rgba(140,80,120,0.25)",
-                            bgcolor: "rgba(13,17,23,0.84)",
-                            color: "#F2E7EF",
-                            fontSize: 17,
-                            lineHeight: 1.6,
-                            "& textarea::placeholder": {
-                              color: "#AFA0B2",
-                              opacity: 1,
-                            },
-                          }}
-                        />
-                      </Box>
-                      <Box
-                        sx={{
-                          px: 1.25,
-                          py: 0.75,
-                          borderTop: "1px solid rgba(140,80,120,0.25)",
-                          bgcolor: "rgba(22,27,34,0.97)",
-                          display: "flex",
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        <Typography sx={{ fontSize: 12.5, color: "#C4A0B8" }}>
-                          Endringer lagres lokalt automatisk
-                        </Typography>
-                      </Box>
-                    </Paper>
-                  )
-                ) : (
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      height: "100%",
-                      borderRadius: 2.5,
-                      border: "1px dashed rgba(242,162,208,0.36)",
-                      bgcolor: "rgba(13,17,23,0.92)",
-                      display: "grid",
-                      placeItems: "center",
-                      p: 2,
-                    }}
-                  >
-                    <Stack spacing={0.9} alignItems="center">
-                      <DescriptionRoundedIcon sx={{ fontSize: 48, color: "#DFA0C7" }} />
-                      <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#F1DAE9", textAlign: "center" }}>
-                        Legg til innebygd dokument eller opprett nytt tekstdokument
+                    {!isFagligLoading ? (
+                      <Typography sx={{ mt: 0.5, fontSize: 14, color: (theme) => theme.palette.mode === "dark" ? "#BCA6B8" : "#6B5262" }}>
+                        Bruk + i fanelinjen for å bygge inn et dokument eller lage et tekstdokument.
                       </Typography>
-                      <Typography sx={{ fontSize: 13.5, color: "#BCA6B8", textAlign: "center", maxWidth: 480 }}>
-                        Lim inn SharePoint iframe/URL for visning i appen, eller skriv tekstdokumenter direkte.
-                      </Typography>
-                    </Stack>
-                  </Paper>
-                )}
-              </Box>
+                    ) : null}
+                  </Box>
+                </Box>
+              )}
             </Box>
-          </Paper>
+          </Box>
           <Menu
             anchorEl={fagligDocMenuAnchorEl}
             open={fagligDocMenuOpen}
             onClose={closeFagligDocMenu}
             PaperProps={{
               sx: {
-                borderRadius: 2.5,
-                border: "1px solid rgba(242,162,208,0.35)",
-                bgcolor: "#161B22",
-                color: "#F3E7F0",
+                borderRadius: "12px",
+                border: isDark ? "1px solid rgba(242,162,208,0.35)" : "1px solid #E3C6D8",
+                bgcolor: isDark ? "#161B22" : "#FFFFFF",
+                color: isDark ? "#F3E7F0" : "#2D1727",
                 minWidth: 230,
-                boxShadow: "0 18px 36px rgba(5,10,20,0.45)",
+                boxShadow: isDark ? "0 18px 36px rgba(5,10,20,0.45)" : "0 18px 44px rgba(94,21,71,0.2)",
               },
             }}
           >
-            <MenuItem onClick={handleAddFagligSubtab} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
-              <AddRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
-              <ListItemText primary="Legg til en underfane" primaryTypographyProps={{ fontSize: "0.84rem" }} />
+            <MenuItem onClick={handleMoveTargetToMore} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
+              <KeyboardArrowDownRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
+              <ListItemText primary="Flytt til «Flere»" primaryTypographyProps={{ fontSize: "0.84rem" }} />
             </MenuItem>
             <MenuItem onClick={handleDeleteFagligDoc} sx={{ minHeight: 34, py: 0.4, px: 1.1 }}>
               <DeleteOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />
@@ -2128,10 +1192,10 @@ export default function ProduktOgRadPage() {
               sx: {
                 p: 1.1,
                 width: 260,
-                borderRadius: 2.5,
-                border: "1px solid rgba(242,162,208,0.35)",
-                bgcolor: "#161B22",
-                color: "#F3E7F0",
+                borderRadius: "12px",
+                border: isDark ? "1px solid rgba(242,162,208,0.35)" : "1px solid #E3C6D8",
+                bgcolor: isDark ? "#161B22" : "#FFFFFF",
+                color: isDark ? "#F3E7F0" : "#2D1727",
               },
             }}
           >
