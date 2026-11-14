@@ -1583,7 +1583,7 @@ export function GlobalSearch({ open, onClose }: Props) {
     selectIntEntity, navigateWithIntSelected, navigateWithIntResult, selectOmeqSuggestion, commitOmeqRow, navigateWithOmeqSelection, navigateWithFagligSelection, navigateWithTilbakemeldingSelection,
   ]);
 
-  const shortcutLabel = "Space";
+  const shortcutLabel = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌃ Space" : "Ctrl Space";
 
   return (
     <Dialog

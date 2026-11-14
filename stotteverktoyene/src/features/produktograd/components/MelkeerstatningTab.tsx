@@ -1,17 +1,36 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, ButtonBase, Typography, Tabs, Tab } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import { Hl, MatchBanner, SearchHeader, SearchResults, SearchTrigger, SuggestionsPanel } from "./melkeSearch";
+import {
+  HIT_BG,
+  HIT_NOW_BG,
+  HIT_NOW_SHADOW,
+  countHits,
+  normalizeText,
+  parseTokens,
+  rankProducts,
+  type SearchField,
+  type SearchMode,
+  type SearchProductInfo,
+} from "./melkeSearchCore";
 
-// Merkelappene får hver sin dempede fargetone (alle med kontrast over 4,5:1 mot bakgrunnen).
-const BADGE_TONES = [
-  { bg: "#E8F0FE", fg: "#1E4FA3" },
-  { bg: "#E6F4EA", fg: "#1B6B3A" },
-  { bg: "#FFF0E5", fg: "#9A3F00" },
-  { bg: "#FFF6DB", fg: "#7A5200" },
-  { bg: "#F1EAFE", fg: "#5B3A9E" },
-];
+/**
+ * Egenskapene i produkthodet deles i grupper så det blir lett å skanne:
+ * hovedtype (få, uthevet), «fri for», «tilsatt» og øvrige – i stedet for mange like merkelapper.
+ */
+function groupBadges(product: { badges: { label: string }[] }) {
+  const labels = product.badges.map((b) => b.label);
+  const primary = labels.filter((l) => /^(Hydrolysert|Aminosyrebasert)$/.test(l) || /komplett|^Tilskudd/i.test(l));
+  const fri = labels.filter((l) => /^(Glutenfri|Laktosefri|Kostfiberfri)$/.test(l));
+  const tilsatt = labels.filter((l) => /^Med /.test(l)).map((l) => l.replace(/^Med /, ""));
+  const sertifisert = labels
+    .filter((l) => !primary.includes(l) && !fri.includes(l) && !/^Med /.test(l))
+    .map((l) => l.replace(/sertifisert$/i, "").trim());
+  return { primary, fri, tilsatt, sertifisert };
+}
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const D = {
@@ -805,10 +824,8 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
   );
 }
 
-function OversiktTab({ product }: { product: Product }) {
-  // Produktbeskrivelsen er første fordel (med mindre den allerede står i listen).
-  const beskrivelse = `${product.tagline} ${product.description}`.trim();
-  const fordeler = product.fordeler.some((f) => f.includes(product.tagline)) ? product.fordeler : [beskrivelse, ...product.fordeler];
+function OversiktTab({ product, terms }: { product: Product; terms: string[] }) {
+  const fordeler = fordelerList(product);
   const card = { bgcolor: D.surfaceAlt, borderRadius: "12px", p: 2.25, display: "grid", gap: 1.25, alignContent: "start" } as const;
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3.5, alignItems: "flex-start" }}>
@@ -821,7 +838,7 @@ function OversiktTab({ product }: { product: Product }) {
               <Box aria-hidden sx={{ flex: "0 0 28px", height: 28, borderRadius: "50%", bgcolor: D.blueLight, color: D.purple, fontSize: 14, fontWeight: 800, display: "grid", placeItems: "center" }}>
                 {i + 1}
               </Box>
-              <Typography sx={{ fontSize: 15.5, color: D.text, lineHeight: 1.55, pt: "2px" }}>{f}</Typography>
+              <Typography sx={{ fontSize: 15.5, color: D.text, lineHeight: 1.55, pt: "2px" }}><Hl text={f} terms={terms} /></Typography>
             </Box>
           ))}
         </Box>
@@ -832,7 +849,7 @@ function OversiktTab({ product }: { product: Product }) {
         <Box sx={card}>
           <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Bruksområder</Typography>
           {product.bruksomraader.map((b, i) => (
-            <Typography key={i} sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.5 }}>{b}</Typography>
+            <Typography key={i} sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.5 }}><Hl text={b} terms={terms} /></Typography>
           ))}
         </Box>
 
@@ -842,7 +859,7 @@ function OversiktTab({ product }: { product: Product }) {
           {product.viktigAVite.map((v, i) => (
             <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
               <CheckIcon color={D.purple} size={14} />
-              <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.5 }}>{v}</Typography>
+              <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.5 }}><Hl text={v} terms={terms} /></Typography>
             </Box>
           ))}
         </Box>
@@ -859,8 +876,12 @@ const labelSx = {
   color: D.textMuted,
 } as const;
 
-function NæringsinnholdTab({ product }: { product: Product }) {
-  const [sectionIndex, setSectionIndex] = useState(0);
+function NæringsinnholdTab({ product, terms }: { product: Product; terms: string[] }) {
+  // Åpner den delen av tabellen som har treff på søkeordene.
+  const [sectionIndex, setSectionIndex] = useState(() => {
+    const hit = product.nutrition.sections.findIndex((sec) => sec.rows.some((row) => countHits(row.label, terms) > 0));
+    return hit >= 0 ? hit : 0;
+  });
   const { macros, nokkel } = product;
   const sections = product.nutrition.sections;
   const section = sections[sectionIndex] ?? sections[0];
@@ -894,8 +915,8 @@ function NæringsinnholdTab({ product }: { product: Product }) {
               <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
                 <Box sx={{ flex: "0 0 10px", height: 10, borderRadius: "3px", mt: "5px", bgcolor: m.color }} />
                 <Box>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: D.textSub, lineHeight: 1.3 }}>{m.label}</Typography>
-                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: D.text }}>{m.amount}</Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: D.textSub, lineHeight: 1.3 }}><Hl text={m.label} terms={terms} /></Typography>
+                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: D.text }}><Hl text={m.amount} terms={terms} /></Typography>
                 </Box>
               </Box>
             ))}
@@ -907,8 +928,8 @@ function NæringsinnholdTab({ product }: { product: Product }) {
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
         {nokkel.map((n, i) => (
           <Box key={i} sx={{ display: "flex", alignItems: "baseline", gap: 1, px: 1.5, py: 0.9, borderRadius: "10px", border: `1px solid ${D.border}`, bgcolor: "#FFFAFD" }}>
-            <Typography sx={{ fontSize: 13, color: D.textMuted }}>{n.label}</Typography>
-            <Typography sx={{ fontSize: 14, fontWeight: 700, color: D.text }}>{n.value}</Typography>
+            <Typography sx={{ fontSize: 13, color: D.textMuted }}><Hl text={n.label} terms={terms} /></Typography>
+            <Typography sx={{ fontSize: 14, fontWeight: 700, color: D.text }}><Hl text={n.value} terms={terms} /></Typography>
           </Box>
         ))}
       </Box>
@@ -943,7 +964,7 @@ function NæringsinnholdTab({ product }: { product: Product }) {
             return (
               <Box key={i} sx={{ display: "grid", gridTemplateColumns: columns, gap: 1.5, px: 2, py: 1, bgcolor: i % 2 === 1 ? D.surfaceAlt : "transparent" }}>
                 <Typography sx={{ fontSize: 14, color: sub ? D.textSub : D.text, fontWeight: sub ? 400 : 600, pl: sub ? 2.25 : 0 }}>
-                  {row.label}
+                  <Hl text={row.label} terms={terms} />
                   {row.unit ? <Box component="span" sx={{ ml: 0.75, fontSize: 12, fontWeight: 400, color: D.textMuted }}>{row.unit}</Box> : null}
                 </Typography>
                 <Typography sx={{ fontSize: 14, color: D.text, textAlign: "right" }}>{row.per100gPulver}</Typography>
@@ -957,7 +978,7 @@ function NæringsinnholdTab({ product }: { product: Product }) {
   );
 }
 
-function TilberedningTab({ product }: { product: Product }) {
+function TilberedningTab({ product, terms }: { product: Product; terms: string[] }) {
   const first = product.mixingTable[0];
   const card = { bgcolor: D.surfaceAlt, borderRadius: "12px", p: 2, display: "grid", gap: 0.75, alignContent: "start" } as const;
   const columns = "repeat(5, minmax(0, 1fr))";
@@ -972,7 +993,7 @@ function TilberedningTab({ product }: { product: Product }) {
               <Box aria-hidden sx={{ flex: "0 0 28px", height: 28, borderRadius: "50%", bgcolor: D.blueLight, color: D.purple, fontSize: 14, fontWeight: 800, display: "grid", placeItems: "center" }}>
                 {i + 1}
               </Box>
-              <Typography sx={{ fontSize: 15.5, color: D.text, lineHeight: 1.55, pt: "2px" }}>{step}</Typography>
+              <Typography sx={{ fontSize: 15.5, color: D.text, lineHeight: 1.55, pt: "2px" }}><Hl text={step} terms={terms} /></Typography>
             </Box>
           ))}
         </Box>
@@ -1030,13 +1051,13 @@ function TilberedningTab({ product }: { product: Product }) {
           {product.dosering ? (
             <Box sx={{ ...card, flex: "1 1 220px" }}>
               <Typography component="h2" sx={{ fontWeight: 800, fontSize: 15, color: D.text }}>Dosering</Typography>
-              <Typography sx={{ fontSize: 14, lineHeight: 1.55, color: D.text }}>{product.dosering}</Typography>
+              <Typography sx={{ fontSize: 14, lineHeight: 1.55, color: D.text }}><Hl text={product.dosering} terms={terms} /></Typography>
             </Box>
           ) : null}
           {product.holdbarhet ? (
             <Box sx={{ ...card, flex: "1 1 220px" }}>
               <Typography component="h2" sx={{ fontWeight: 800, fontSize: 15, color: D.text }}>Holdbarhet</Typography>
-              <Typography sx={{ fontSize: 14, lineHeight: 1.55, color: D.text }}>{product.holdbarhet}</Typography>
+              <Typography sx={{ fontSize: 14, lineHeight: 1.55, color: D.text }}><Hl text={product.holdbarhet} terms={terms} /></Typography>
             </Box>
           ) : null}
         </Box>
@@ -1050,34 +1071,32 @@ type Dokument = { title: string; url: string; sizeLabel: string; color?: string 
 const INGR_EGENSKAPER_STANDARD = ["Glutenfri", "Inneholder fiskolje", "Inneholder laktose"];
 const INGR_EGENSKAPER_NEOCATE_LCP = ["Glutenfri", "Kostfiberfri", "Laktosefri"];
 
-function IngrediensTab({ product }: { product: Product }) {
-  const egenskaper = product.id === "neocate-lcp" ? INGR_EGENSKAPER_NEOCATE_LCP : INGR_EGENSKAPER_STANDARD;
+function IngrediensTab({ product, terms }: { product: Product; terms: string[] }) {
+  const egenskaper = ingrEgenskaper(product);
   return (
     <Box sx={{ display: "grid", gap: 2.5, maxWidth: 860 }}>
       <Box sx={{ display: "grid", gap: 1.25 }}>
         <Typography component="h2" sx={{ fontWeight: 800, fontSize: 18, color: D.text }}>Ingredienser</Typography>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-          {egenskaper.map((label, i) => {
-            const tone = BADGE_TONES[i % BADGE_TONES.length];
-            return (
-              <Box key={label} sx={{ px: 1.25, py: 0.5, borderRadius: "6px", bgcolor: tone.bg, color: tone.fg, fontSize: 12.5, fontWeight: 600, lineHeight: 1.3 }}>
-                {label}
-              </Box>
-            );
-          })}
+          {egenskaper.map((label) => (
+            <Box key={label} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 1.25, py: 0.5, borderRadius: "6px", border: `1px solid ${D.borderMed}`, color: D.textSub, fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>
+              <CheckRoundedIcon sx={{ fontSize: 15, color: "#1B6B3A" }} />
+              <Hl text={label} terms={terms} />
+            </Box>
+          ))}
         </Box>
       </Box>
 
       <Box sx={{ bgcolor: D.surfaceAlt, borderRadius: "12px", p: { xs: 2, md: 2.75 }, display: "grid", gap: 1.25 }}>
         <Typography sx={labelSx}>Ingrediensliste</Typography>
-        <Typography sx={{ fontSize: 15, color: D.text, lineHeight: 1.75 }}>{product.ingredienser}</Typography>
+        <Typography sx={{ fontSize: 15, color: D.text, lineHeight: 1.75 }}><Hl text={product.ingredienser} terms={terms} /></Typography>
       </Box>
 
     </Box>
   );
 }
 
-function CopyRow({ label, value }: { label: string; value: string }) {
+function CopyRow({ label, value, terms }: { label: string; value: string; terms: string[] }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     void navigator.clipboard?.writeText(value).then(() => {
@@ -1088,7 +1107,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1.1, borderTop: `1px solid ${D.border}` }}>
       <Typography sx={{ flex: "0 0 120px", fontSize: 14, color: D.textMuted }}>{label}</Typography>
-      <Typography sx={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: D.text }}>{value}</Typography>
+      <Typography sx={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: D.text }}><Hl text={value} terms={terms} /></Typography>
       <ButtonBase
         onClick={copy}
         aria-label={`Kopier ${label.toLowerCase()} ${value}`}
@@ -1101,7 +1120,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BestillingOgDokumenterTab({ product, dokumenter }: { product: Product; dokumenter: Dokument[] }) {
+function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Product; dokumenter: Dokument[]; terms: string[] }) {
   const row = product.bestilling[0];
   const card = { bgcolor: D.surfaceAlt, borderRadius: "12px", p: 2.25, display: "grid", gap: 1, alignContent: "start" } as const;
   return (
@@ -1120,11 +1139,11 @@ function BestillingOgDokumenterTab({ product, dokumenter }: { product: Product; 
           </Box>
           {row ? (
             <>
-              <CopyRow label="Bestillingsnr." value={row.bestillingsnr} />
-              <CopyRow label="Varenr." value={row.varenr} />
+              <CopyRow label="Bestillingsnr." value={row.bestillingsnr} terms={terms} />
+              <CopyRow label="Varenr." value={row.varenr} terms={terms} />
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1.1, borderTop: `1px solid ${D.border}` }}>
                 <Typography sx={{ flex: "0 0 120px", fontSize: 14, color: D.textMuted }}>Salgsenhet</Typography>
-                <Typography sx={{ flex: 1, fontSize: 15, fontWeight: 700, color: D.text }}>{row.salgsenhet}</Typography>
+                <Typography sx={{ flex: 1, fontSize: 15, fontWeight: 700, color: D.text }}><Hl text={row.salgsenhet} terms={terms} /></Typography>
               </Box>
             </>
           ) : null}
@@ -1134,12 +1153,12 @@ function BestillingOgDokumenterTab({ product, dokumenter }: { product: Product; 
           <Box sx={{ ...card, bgcolor: "#FFF5FA", border: "1px solid #F2CFE3" }}>
             <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: "#8C1A59" }}>Viktig informasjon</Typography>
             {product.forsiktighetsregler ? (
-              <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.6 }}>{product.forsiktighetsregler}</Typography>
+              <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.6 }}><Hl text={product.forsiktighetsregler} terms={terms} /></Typography>
             ) : null}
             {product.kontraindikasjon ? (
               <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.6 }}>
                 <Box component="span" sx={{ fontWeight: 700 }}>Kontraindikasjon: </Box>
-                {product.kontraindikasjon}
+                <Hl text={product.kontraindikasjon} terms={terms} />
               </Typography>
             ) : null}
           </Box>
@@ -1169,7 +1188,7 @@ function BestillingOgDokumenterTab({ product, dokumenter }: { product: Product; 
                   PDF
                 </Box>
                 <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography sx={{ fontSize: 14.5, fontWeight: 700, color: D.text, lineHeight: 1.3 }}>{doc.title}</Typography>
+                  <Typography sx={{ fontSize: 14.5, fontWeight: 700, color: D.text, lineHeight: 1.3 }}><Hl text={doc.title} terms={terms} /></Typography>
                   <Typography sx={{ fontSize: 12.5, color: D.textMuted }}>PDF · {doc.sizeLabel}</Typography>
                 </Box>
                 <OpenInNewRoundedIcon sx={{ fontSize: 18, color: D.textMuted }} />
@@ -1197,6 +1216,84 @@ function BestillingOgDokumenterTab({ product, dokumenter }: { product: Product; 
   );
 }
 
+// ─── Søk: hva som vises og hva som kan søkes i ────────────────────────────────
+const DOKUMENT_MAP: Record<string, Dokument[]> = {
+  "pepticate-1": [{ title: "Produktark Pepticate", url: "/dokumenter/pepticate-1-produktark.pdf", sizeLabel: "344 KB" }],
+  "pepticate-plus-2": [{ title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" }],
+  "neocate-lcp": [{ title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" }],
+  "neocate-spoon": [{ title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" }],
+};
+
+/** Produktbeskrivelsen er første fordel (med mindre den allerede står i listen). */
+function fordelerList(product: Product): string[] {
+  const beskrivelse = `${product.tagline} ${product.description}`.trim();
+  return product.fordeler.some((f) => f.includes(product.tagline)) ? product.fordeler : [beskrivelse, ...product.fordeler];
+}
+
+const ingrEgenskaper = (product: Product): string[] =>
+  product.id === "neocate-lcp" ? INGR_EGENSKAPER_NEOCATE_LCP : INGR_EGENSKAPER_STANDARD;
+
+/** Det som vises i produkthodet. Brukes både til visning og til søk, så de alltid er like. */
+function heroInfo(product: Product) {
+  const g = groupBadges(product);
+  const smak = product.smaksvarianter ? product.smaksvarianter.replace(/\.$/, "") : "";
+  const tiles = [
+    // Alderen står allerede ved siden av navnet, så den trenger ikke egen rute.
+    ...product.summary.filter((s) => s.label !== "Alder").map((s) => ({ label: s.label, value: s.value, span: 1 })),
+    // «Fri for» + «Gluten» leses som «Fri for gluten».
+    { label: "Fri for", value: g.fri.filter((l) => l !== "Laktosefri").map((l) => l.replace(/fri$/i, "")).join(" · "), span: 1 },
+    { label: "Tilsatt", value: g.tilsatt.join(" · "), span: 3 },
+  ].filter((t) => t.value);
+  return { primary: g.primary, smak, tiles };
+}
+
+/** Alle tekster som vises for et produkt, gruppert etter hvor de står. `tab` -1 er produkthodet. */
+function buildSearchFields(product: Product): SearchField[] {
+  const fields: SearchField[] = [];
+  const add = (tab: number, label: string, text: string) => {
+    if (text) fields.push({ tab, label, text });
+  };
+  const hero = heroInfo(product);
+  add(-1, "Produkt", product.name);
+  add(-1, "Alder", product.age);
+  hero.primary.forEach((text) => add(-1, "Egenskaper", text));
+  add(-1, "Smak", hero.smak);
+  hero.tiles.forEach((t) => add(-1, "Nøkkeltall", `${t.label}: ${t.value}`));
+
+  fordelerList(product).forEach((text) => add(0, "Fordeler", text));
+  product.bruksomraader.forEach((text) => add(0, "Bruksområder", text));
+  product.viktigAVite.forEach((text) => add(0, "Viktig å vite", text));
+
+  product.macros.forEach((m) => add(1, "Næringsinnhold", `${m.label} ${m.amount}`));
+  product.nokkel.forEach((n) => add(1, "Næringsinnhold", `${n.label} ${n.value}`));
+  product.nutrition.sections.forEach((section) => section.rows.forEach((row) => add(1, "Næringsinnhold", row.label)));
+
+  product.tilberedning.forEach((text) => add(2, "Tilberedning", text));
+  add(2, "Dosering", product.dosering);
+  add(2, "Holdbarhet", product.holdbarhet);
+
+  ingrEgenskaper(product).forEach((text) => add(3, "Egenskaper", text));
+  add(3, "Ingredienser", product.ingredienser);
+
+  const order = product.bestilling[0];
+  if (order) {
+    add(4, "Bestilling", order.bestillingsnr);
+    add(4, "Bestilling", order.varenr);
+    add(4, "Bestilling", order.salgsenhet);
+  }
+  add(4, "Viktig informasjon", product.forsiktighetsregler);
+  add(4, "Viktig informasjon", product.kontraindikasjon);
+  (DOKUMENT_MAP[product.id] ?? []).forEach((doc) => add(4, "Dokumenter", doc.title));
+  return fields;
+}
+
+const PRODUCT_FIELDS: Record<string, SearchField[]> = Object.fromEntries(PRODUCTS.map((p) => [p.id, buildSearchFields(p)]));
+const SEARCHABLE = PRODUCTS.map((p) => ({ id: p.id, fields: PRODUCT_FIELDS[p.id] }));
+const PRODUCT_INFO: Record<string, SearchProductInfo> = Object.fromEntries(
+  PRODUCTS.map((p) => [p.id, { id: p.id, name: p.name, meta: `${p.age} · ${p.type}`, image: p.image }])
+);
+const TAB_COUNT = 5;
+
 // ─── Icon helpers ─────────────────────────────────────────────────────────────
 function BottleIcon({ size = 24, color = "currentColor" }: { size?: number; color?: string }) {
   return (
@@ -1222,119 +1319,309 @@ export default function MelkeerstatningTab() {
   const [selectedId, setSelectedId] = useState<string>(PRODUCTS[0].id);
   const [activeTab, setActiveTab] = useState(0);
 
+  // Søk: lukket til brukeren åpner det (knapp eller «/»).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [tokens, setTokens] = useState<string[]>([]);
+  const [pending, setPending] = useState("");
+  const [mode, setMode] = useState<SearchMode>("all");
+  const [view, setView] = useState<"results" | "product">("results");
+  const [cur, setCur] = useState(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const heroRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
   const product = PRODUCTS.find(p => p.id === selectedId) ?? PRODUCTS[0];
-
   const TABS = ["Oversikt", "Næringsinnhold", "Tilberedning & dosering", "Ingredienser", "Bestilling & dokumenter"];
-
-  const PEPTICATE_1_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Pepticate", url: "/dokumenter/pepticate-1-produktark.pdf", sizeLabel: "344 KB" },
-  ];
-  const PEPTICATE_PLUS_2_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" },
-  ];
-  const NEOCATE_LCP_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" },
-  ];
-  const NEOCATE_SPOON_DOKUMENTER: Dokument[] = [
-    { title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" },
-  ];
-  const DOKUMENT_MAP: Record<string, Dokument[]> = {
-    "pepticate-1": PEPTICATE_1_DOKUMENTER,
-    "pepticate-plus-2": PEPTICATE_PLUS_2_DOKUMENTER,
-    "neocate-lcp": NEOCATE_LCP_DOKUMENTER,
-    "neocate-spoon": NEOCATE_SPOON_DOKUMENTER,
-  };
   const aktiveDokumenter = DOKUMENT_MAP[product.id] ?? [];
+
+  const terms = useMemo(() => (searchOpen ? [...tokens, ...parseTokens(pending)] : []), [searchOpen, tokens, pending]);
+  const termsKey = terms.join("\u0001");
+  const matches = useMemo(() => rankProducts(SEARCHABLE, terms), [terms]);
+  const hasHit = (term: string) => SEARCHABLE.some((item) => item.fields.some((f) => countHits(f.text, [term]) > 0));
+
+  // Mellomrom åpner søket når ingenting annet har tekstfokus (Ctrl/Cmd + mellomrom er globalt søk).
+  // Fanges i capture-fasen og stoppes, slik at en fokusert knapp ikke også blir «klikket».
+  useEffect(() => {
+    if (searchOpen) return;
+    const isSpace = (event: KeyboardEvent) => (event.key === " " || event.code === "Space") && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    const typing = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
+    };
+    let swallowKeyUp = false;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isSpace(event) || typing(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+      swallowKeyUp = true;
+      setSearchOpen(true);
+      setView("results");
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (!swallowKeyUp || (event.key !== " " && event.code !== "Space")) return;
+      swallowKeyUp = false;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+    };
+  }, [searchOpen]);
+
+  const addTokens = (list: string[]) =>
+    setTokens((prev) => {
+      const next = [...prev];
+      for (const token of list) {
+        if (!next.some((existing) => normalizeText(existing) === normalizeText(token))) next.push(token);
+      }
+      return next;
+    });
+  const commit = () => {
+    addTokens(parseTokens(pending));
+    setPending("");
+  };
+  const handlePendingChange = (value: string) => {
+    // Mellomrom avslutter et ord (med mindre en «frase» er åpen).
+    if (/\s$/.test(value) && (value.match(/"/g) ?? []).length % 2 === 0) {
+      const list = parseTokens(value);
+      if (list.length > 0) {
+        addTokens(list);
+        setPending("");
+        return;
+      }
+    }
+    setPending(value);
+  };
+  const clearSearch = () => {
+    setTokens([]);
+    setPending("");
+    setView("results");
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setTokens([]);
+    setPending("");
+    setView("results");
+  };
+  const openProduct = (id: string) => {
+    const firstTab = PRODUCT_FIELDS[id]
+      .filter((f) => f.tab >= 0 && countHits(f.text, terms) > 0)
+      .map((f) => f.tab)
+      .sort((a, b) => a - b)[0];
+    setSelectedId(id);
+    setActiveTab(firstTab ?? 0);
+    setView("product");
+    setCur(0);
+  };
+
+  // Treff i valgt produkt: i produkthodet, og per undertab.
+  const productFields = PRODUCT_FIELDS[product.id];
+  const sumHits = (list: SearchField[]) => (terms.length ? list.reduce((sum, f) => sum + countHits(f.text, terms), 0) : 0);
+  const heroCount = sumHits(productFields.filter((f) => f.tab === -1));
+  const tabCounts = Array.from({ length: TAB_COUNT }, (_, t) => sumHits(productFields.filter((f) => f.tab === t)));
+  const totalHits = heroCount + tabCounts.reduce((a, b) => a + b, 0);
+  const termCounts = terms.map((term) => ({ term, count: productFields.reduce((sum, f) => sum + countHits(f.text, [term]), 0) }));
+  const position =
+    cur < heroCount
+      ? cur + 1
+      : heroCount + tabCounts.slice(0, activeTab).reduce((a, b) => a + b, 0) + (cur - heroCount) + 1;
+
+  const nextHit = () => {
+    if (cur + 1 < heroCount + tabCounts[activeTab]) {
+      setCur(cur + 1);
+      return;
+    }
+    const nextTab = tabCounts.findIndex((count, t) => t > activeTab && count > 0);
+    if (nextTab !== -1) {
+      setActiveTab(nextTab);
+      setCur(heroCount);
+      return;
+    }
+    const firstTab = tabCounts.findIndex((count) => count > 0);
+    if (firstTab !== -1 && heroCount === 0) setActiveTab(firstTab);
+    setCur(0);
+  };
+  const prevHit = () => {
+    if (cur > 0) {
+      setCur(cur - 1);
+      return;
+    }
+    let prevTab = -1;
+    tabCounts.forEach((count, t) => {
+      if (t < activeTab && count > 0) prevTab = t;
+    });
+    if (prevTab === -1) {
+      tabCounts.forEach((count, t) => {
+        if (count > 0) prevTab = t;
+      });
+    }
+    if (prevTab !== -1) {
+      setActiveTab(prevTab);
+      setCur(heroCount + tabCounts[prevTab] - 1);
+    }
+  };
+
+  // Marker aktivt treff og rull til det.
+  useEffect(() => {
+    if (!searchOpen || view !== "product") return;
+    const marks = [
+      ...(heroRef.current?.querySelectorAll<HTMLElement>("mark[data-hit]") ?? []),
+      ...(contentRef.current?.querySelectorAll<HTMLElement>("mark[data-hit]") ?? []),
+    ];
+    marks.forEach((mark, i) => {
+      mark.style.background = i === cur ? HIT_NOW_BG : HIT_BG;
+      mark.style.boxShadow = i === cur ? HIT_NOW_SHADOW : "none";
+    });
+    marks[cur]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [searchOpen, view, cur, activeTab, selectedId, termsKey]);
+
+  const showResults = searchOpen && (view === "results" || terms.length === 0);
+  const hero = heroInfo(product);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, bgcolor: D.surface, overflow: "hidden" }}>
-      {/* Produktvelger */}
-      <Box
-        sx={{
-          display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" }, gap: 1.25,
-          px: 2, py: 1.75, flexShrink: 0, bgcolor: "#FFFAFD", borderBottom: `1px solid ${D.border}`,
-        }}
-      >
-        {PRODUCTS.map(p => (
-          <ProductCard
-            key={p.id}
-            product={p}
-            selected={p.id === selectedId}
-            onClick={() => { setSelectedId(p.id); setActiveTab(0); }}
-          />
-        ))}
-      </Box>
-
-      {/* Produkthode */}
-      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 3, px: 3, py: 2.25, flexShrink: 0, borderBottom: `1px solid ${D.border}` }}>
-        <Box sx={{ width: 120, height: 140, flexShrink: 0, borderRadius: "12px", bgcolor: "#F6EEF7", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-          {product.image
-            ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 104, height: 124, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
-            : <BottleIcon size={56} color={D.purple} />}
-        </Box>
-
-        <Box sx={{ flex: "1 1 320px", minWidth: 0, display: "grid", gap: 1 }}>
-          <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 1.5 }}>
-            <Typography component="h1" sx={{ fontWeight: 800, fontSize: 28, color: D.text, lineHeight: 1.15 }}>{product.name}</Typography>
-            <Typography sx={{ fontSize: 15, color: D.textMuted, fontWeight: 600 }}>{product.age}</Typography>
+      {searchOpen ? (
+        <SearchHeader
+          tokens={tokens}
+          pending={pending}
+          mode={mode}
+          inputRef={inputRef}
+          onPendingChange={handlePendingChange}
+          onCommit={commit}
+          onRemoveToken={(index) => setTokens((prev) => prev.filter((_, i) => i !== index))}
+          onBackspaceEmpty={() => setTokens((prev) => prev.slice(0, -1))}
+          onClear={clearSearch}
+          onClose={closeSearch}
+          onModeChange={setMode}
+          onBack={view === "product" && terms.length > 0 ? () => setView("results") : undefined}
+          hint={terms.length === 0 ? "Søker i navn, egenskaper, fordeler, bruksområder, tilberedning, ingredienser, næringsinnhold og bestillingsinfo – også på varenr." : undefined}
+        />
+      ) : (
+        <Box sx={{ display: "flex", gap: 1.25, px: 2, py: 1.75, flexShrink: 0, bgcolor: "#FFFAFD", borderBottom: `1px solid ${D.border}` }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" }, gap: 1.25 }}>
+            {PRODUCTS.map(p => (
+              <ProductCard
+                key={p.id}
+                product={p}
+                selected={p.id === selectedId}
+                onClick={() => { setSelectedId(p.id); setActiveTab(0); }}
+              />
+            ))}
           </Box>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-            {[...product.badges.map((b) => b.label), ...(product.smaksvarianter ? [product.smaksvarianter.replace(/\.$/, "")] : [])].map((label, i) => {
-              const tone = BADGE_TONES[i % BADGE_TONES.length];
-              return (
-                <Box key={i} sx={{ px: 1.25, py: 0.5, borderRadius: "6px", bgcolor: tone.bg, color: tone.fg, fontSize: 12.5, fontWeight: 600, lineHeight: 1.3 }}>
-                  {label}
-                </Box>
-              );
-            })}
-          </Box>
+          <SearchTrigger onClick={() => { setSearchOpen(true); setView("results"); }} />
         </Box>
+      )}
 
-        <Box sx={{ flex: "1 1 300px", maxWidth: 380, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 1 }}>
-          {product.summary.map((s, i) => (
-            <Box key={i} sx={{ bgcolor: D.surfaceAlt, borderRadius: "10px", px: 1.25, py: 1, display: "grid", gap: 0.25, alignContent: "start" }}>
-              <Typography sx={{ fontSize: 11.5, color: D.textMuted, fontWeight: 600 }}>{s.label}</Typography>
-              <Typography sx={{ fontSize: 13.5, color: D.text, fontWeight: 700, lineHeight: 1.25 }}>{s.value}</Typography>
+      {showResults ? (
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+          {terms.length === 0 ? (
+            <SuggestionsPanel hasHit={hasHit} onPick={(list) => { addTokens(list); inputRef.current?.focus(); }} />
+          ) : (
+            <SearchResults matches={matches} info={PRODUCT_INFO} terms={terms} mode={mode} onOpen={openProduct} />
+          )}
+        </Box>
+      ) : (
+        <>
+          {searchOpen ? (
+            <MatchBanner productName={product.name} total={totalHits} termCounts={termCounts} position={position} onPrev={prevHit} onNext={nextHit} />
+          ) : null}
+
+          {/* Produkthode */}
+          <Box ref={heroRef} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 3, px: 3, py: 2.25, flexShrink: 0, borderBottom: `1px solid ${D.border}` }}>
+            <Box sx={{ width: 120, height: 140, flexShrink: 0, borderRadius: "12px", bgcolor: "#F6EEF7", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              {product.image
+                ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 104, height: 124, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
+                : <BottleIcon size={56} color={D.purple} />}
             </Box>
-          ))}
-        </Box>
-      </Box>
 
-      {/* Undertabber */}
-      <Box sx={{ px: 3, flexShrink: 0, borderBottom: `1px solid ${D.border}` }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
-          variant="scrollable"
-          scrollButtons="auto"
-          aria-label="Produktinformasjon"
-          sx={{
-            minHeight: 46,
-            "& .MuiTabs-flexContainer": { gap: 3.25 },
-            "& .MuiTabs-indicator": { bgcolor: D.purple, height: 3, borderRadius: "3px 3px 0 0" },
-            "& .MuiTab-root": {
-              minHeight: 46, minWidth: 0, px: 0.25, py: 1.25, fontSize: 14.5, fontWeight: 600, color: D.textMuted, textTransform: "none",
-              "&:hover": { color: D.text },
-              "&.Mui-selected": { color: D.purple, fontWeight: 700 },
-            },
-          }}
-        >
-          {TABS.map((label, i) => <Tab key={i} label={label} disableRipple />)}
-        </Tabs>
-      </Box>
+            <Box sx={{ flex: "1 1 320px", minWidth: 0, display: "grid", gap: 1 }}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 1.5 }}>
+                <Typography component="h1" sx={{ fontWeight: 800, fontSize: 28, color: D.text, lineHeight: 1.15 }}><Hl text={product.name} terms={terms} /></Typography>
+                <Typography sx={{ fontSize: 15, color: D.textMuted, fontWeight: 600 }}><Hl text={product.age} terms={terms} /></Typography>
+              </Box>
+              {hero.primary.length > 0 ? (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                  {hero.primary.map((label) => (
+                    <Box key={label} sx={{ px: 1.25, py: 0.5, borderRadius: "6px", bgcolor: "#FCE7F2", color: "#8C1A59", fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>
+                      <Hl text={label} terms={terms} />
+                    </Box>
+                  ))}
+                </Box>
+              ) : null}
+              {hero.smak ? (
+                <Typography sx={{ fontSize: 14.5, color: D.textSub }}>
+                  <Box component="span" sx={{ color: D.textMuted, fontWeight: 600, mr: 1 }}>Smak</Box>
+                  <Hl text={hero.smak} terms={terms} />
+                </Typography>
+              ) : null}
+            </Box>
 
-      {/* Innhold – eneste rullefelt */}
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 3, py: 2.75 }}>
-        {activeTab === 0 && <OversiktTab product={product} />}
-        {activeTab === 1 && <NæringsinnholdTab key={product.id} product={product} />}
-        {activeTab === 2 && <TilberedningTab product={product} />}
-        {activeTab === 3 && <IngrediensTab product={product} />}
-        {activeTab === 4 && <BestillingOgDokumenterTab product={product} dokumenter={aktiveDokumenter} />}
+            <Box sx={{ flex: "1 1 300px", maxWidth: 380, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gridAutoFlow: "row dense", gap: 1 }}>
+              {hero.tiles.map((t, i) => (
+                <Box key={i} sx={{ gridColumn: `span ${t.span}`, bgcolor: D.surfaceAlt, borderRadius: "10px", px: 1.25, py: 1, display: "grid", gap: 0.25, alignContent: "start" }}>
+                  <Typography sx={{ fontSize: 11.5, color: D.textMuted, fontWeight: 600 }}><Hl text={t.label} terms={terms} /></Typography>
+                  <Typography sx={{ fontSize: 13.5, color: D.text, fontWeight: 700, lineHeight: 1.25 }}><Hl text={t.value} terms={terms} /></Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
 
-        <Typography sx={{ mt: 3, fontSize: 12, color: D.textMuted, textAlign: "center" }}>
-          Nutricias produkter er registrerte næringsmidler til spesielle medisinske formål og skal brukes i samråd med helsepersonell.
-        </Typography>
-      </Box>
+          {/* Undertabber */}
+          <Box sx={{ px: 3, flexShrink: 0, borderBottom: `1px solid ${D.border}` }}>
+            <Tabs
+              value={activeTab}
+              onChange={(_, v) => { setActiveTab(v); setCur(0); }}
+              variant="scrollable"
+              scrollButtons="auto"
+              aria-label="Produktinformasjon"
+              sx={{
+                minHeight: 46,
+                "& .MuiTabs-flexContainer": { gap: 3.25 },
+                "& .MuiTabs-indicator": { bgcolor: D.purple, height: 3, borderRadius: "3px 3px 0 0" },
+                "& .MuiTab-root": {
+                  minHeight: 46, minWidth: 0, px: 0.25, py: 1.25, fontSize: 14.5, fontWeight: 600, color: D.textMuted, textTransform: "none",
+                  "&:hover": { color: D.text },
+                  "&.Mui-selected": { color: D.purple, fontWeight: 700 },
+                },
+              }}
+            >
+              {TABS.map((label, i) => (
+                <Tab
+                  key={i}
+                  disableRipple
+                  label={
+                    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.9 }}>
+                      {label}
+                      {searchOpen && tabCounts[i] > 0 ? (
+                        <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.75, boxSizing: "border-box", borderRadius: "10px", bgcolor: HIT_BG, color: D.text, fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                          {tabCounts[i]}
+                        </Box>
+                      ) : null}
+                    </Box>
+                  }
+                />
+              ))}
+            </Tabs>
+          </Box>
+
+          {/* Innhold – eneste rullefelt */}
+          <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 3, py: 2.75 }}>
+            {activeTab === 0 && <OversiktTab product={product} terms={terms} />}
+            {activeTab === 1 && <NæringsinnholdTab key={`${product.id}-${termsKey}`} product={product} terms={terms} />}
+            {activeTab === 2 && <TilberedningTab product={product} terms={terms} />}
+            {activeTab === 3 && <IngrediensTab product={product} terms={terms} />}
+            {activeTab === 4 && <BestillingOgDokumenterTab product={product} dokumenter={aktiveDokumenter} terms={terms} />}
+
+            <Typography sx={{ mt: 3, fontSize: 12, color: D.textMuted, textAlign: "center" }}>
+              Nutricias produkter er registrerte næringsmidler til spesielle medisinske formål og skal brukes i samråd med helsepersonell.
+            </Typography>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
