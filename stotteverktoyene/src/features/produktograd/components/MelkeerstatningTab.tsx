@@ -97,7 +97,7 @@ type Product = {
   dosering: string;
   mixingInfo: { konsentrasjon: string; scoopGram: string; anbefaltSkjeer?: number };
   mixingTable: { skjeer: number; pulver: string; vann: number; ferdig: number; energi: number }[];
-  doseringTabell?: { alder: string; vann: string; skjeer: string; maaltider: string; bokser: string }[];
+  doseringTabell?: { tittel: string; kolonner: string[]; rader: string[][] };
   holdbarhet: string;
   ingredienser: string;
   smaksvarianter: string;
@@ -1182,14 +1182,18 @@ const ALTHERA: Product = {
   mixingTable: [
     { skjeer: 3, pulver: "13,2", vann: 90, ferdig: 100, energi: 66 },
   ],
-  doseringTabell: [
-    { alder: "0–2 uker",      vann: "90",  skjeer: "3", maaltider: "6",   bokser: "6" },
-    { alder: "2–4 uker",      vann: "120", skjeer: "4", maaltider: "5",   bokser: "7" },
-    { alder: "1–2 måneder",   vann: "150", skjeer: "5", maaltider: "5",   bokser: "8–9" },
-    { alder: "2–4 måneder",   vann: "180", skjeer: "6", maaltider: "5",   bokser: "10" },
-    { alder: "4–6 måneder",   vann: "210", skjeer: "7", maaltider: "5",   bokser: "12" },
-    { alder: "Over 6 måneder", vann: "210", skjeer: "7", maaltider: "3–4", bokser: "7–9" },
-  ],
+  doseringTabell: {
+    tittel: "Dosering etter alder",
+    kolonner: ["Alder", "Vann (ml)", "Måleskjeer", "Måltider/døgn", "Bokser/mnd"],
+    rader: [
+      ["0–2 uker", "90", "3", "6", "6"],
+      ["2–4 uker", "120", "4", "5", "7"],
+      ["1–2 måneder", "150", "5", "5", "8–9"],
+      ["2–4 måneder", "180", "6", "5", "10"],
+      ["4–6 måneder", "210", "7", "5", "12"],
+      ["Over 6 måneder", "210", "7", "3–4", "7–9"],
+    ],
+  },
   holdbarhet: "Oppbevares svalt og tørt og brukes innen best før dato. Åpnet forpakning brukes innen 3 uker. Tilbered kun 1 flaske om gangen. Ikke spar på gjenværende blanding i flasken. Kast innholdet.",
   ingredienser: "Laktose, maltodekstrin, vegetabilske oljer (solsikke, raps, kokos), ekstensivt hydrolysert myseprotein (melk), mineraler (kalsiumglyserofosfat, kaliumfosfat, magnesiumklorid, kalsiumklorid, natriumklorid, mangansulfat, jernsulfat, kaliumjodid, natriumfosfat, sinksulfat, kaliumsitrat, kaliumklorid, natriumselenat, kobbersulfat), emulgator (E472c), fiber (2’-fukosyllaktose, lakto-N-neotetraose), olje fra Mortierella alpina (ARA), olje fra mikroalgen Schizochytrium sp. (DHA), surhetsregulerende middel (E330), kolindibartartrat, vitaminer (C, E, niacin, pantotensyre, riboflavin, A, tiamin, B6, folsyre, K, D, biotin, B12), L-arginin, L-histidin, taurin, inositol, L-karnitin. Glutenfri. Pakket i beskyttet atmosfære. Halal-sertifisert.",
   smaksvarianter: "Nøytral smak.",
@@ -1201,7 +1205,566 @@ const ALTHERA: Product = {
   ],
 };
 
-const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON, NEOCATE_JUNIOR, ALTHERA];
+const ALFARE: Product = {
+  id: "alfare",
+  manufacturer: "nestle",
+  name: "Alfaré",
+  age: "0–12 måneder",
+  tagline: "Hypoallergen spesialnæring med humane melkeoligosakkarider (HMO) for spedbarn med malabsorpsjon og samtidig kumelkproteinallergi.",
+  description: "Spesialtilpasset for diettbehandling av spedbarn med gastrointestinale lidelser og matallergi eller intoleranse. Ekstensivt hydrolysert myseprotein, 40 % MCT-fett og laktosefri. Lav osmolaritet (180 mOsm/L).",
+  image: "/nutrition/alfare.jpg",
+  thumb: "/nutrition/thumbs/alfare.png",
+  imageScale: 1,
+  type: "Hydrolysert",
+  badges: [
+    { label: "Hydrolysert",                           color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett 0–12 måneder", color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri",                             color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                            color: "#EA580C", icon: "gut"    },
+    { label: "Med HMO",                               color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                         color: "#D97706", icon: "drop"   },
+    { label: "Med MCT",                               color: "#D97706", icon: "drop"   },
+    { label: "Med nukleotider",                       color: "#A78BFA", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "0–12 måneder" },
+    { label: "Energitetthet", value: "0,67 kcal/ml" },
+    { label: "Protein",       value: "Ekstensivt hydrolysert myse" },
+    { label: "Kostfiber",     value: "HMO (0,15 g/100 ml)" },
+    { label: "Laktose",       value: "Nei" },
+  ],
+  fordeler: [
+    "Dokumentert sikker og veltolerert for spedbarn med kumelkproteinallergi og malabsorpsjon, for eksempel fettmalabsorpsjon. Kan også brukes ved andre mage-tarm-problemer.",
+    "Ekstensivt hydrolysert myseprotein med 98 % av peptidene under 1200 dalton.",
+    "40 % av fettet er lettabsorbert MCT-fett for god toleranse ved diaré.",
+    "Lav osmolaritet (180 mOsm/L) for best mulig toleranse ved diaré.",
+    "HMO støtter immunforsvaret, reduserer risiko for infeksjoner og fremmer en tarmflora mer lik den hos ammede barn.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_GUT2, ICON_DROP, ICON_DROP, ICON_MILK_BOTTLE],
+  bruksomraader: [
+    "Fullverdig næringsmiddel til spesielle medisinske formål for spedbarn 0–12 måneder med gastrointestinale lidelser og matallergi eller intoleranse, for eksempel kumelkproteinallergi.",
+    "Velegnet som eneste næringskilde fra fødselen og opp til 6 måneder. Fra 6 måneder suppleres Alfaré med melkefri kost.",
+    "Over 1 års alder kan Alfaré brukes som en viktig næringskilde sammen med mer variert melkefri kost.",
+  ],
+  fodmap: { laktose: "<0,01 g", gos: false, fos: false },
+  viktigAVite: [
+    "Mødre skal oppmuntres til å fortsette amming selv om barnet har kumelkproteinallergi.",
+    "Ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom.",
+    "Skal brukes under medisinsk tilsyn.",
+    "Kan foreskrives på blå resept.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Laktosefri",               icon: null },
+    { label: "Med HMO",                  icon: null },
+    { label: "Med DHA & ARA",            icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 67,
+  pulverPer100ml: "13,5 g pulver",
+  macros: [
+    { label: "Fett (44 E%)",        value: 44, color: "#7C3AED", amount: "3,4 g" },
+    { label: "Karbohydrat (44 E%)", value: 44, color: "#F97316", amount: "7,4 g" },
+    { label: "Protein (11 E%)",     value: 11, color: "#3B82F6", amount: "1,9 g" },
+    { label: "Kostfiber (1 E%)",    value: 1,  color: "#22C55E", amount: "0,15 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",      value: "<0,01 g"    },
+    { label: "MCT",          value: "1,3 g"      },
+    { label: "HMO",          value: "0,15 g"     },
+    { label: "DHA",          value: "18 mg"      },
+    { label: "ARA",          value: "18 mg"      },
+    { label: "Kalsium",      value: "71 mg"      },
+    { label: "Osmolaritet",  value: "180 mOsm/l" },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml utblandet (13,5 g pulver)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                  unit: "kJ",   per100gPulver: "2090",   per100mlUtblandet: "282" },
+          { label: "Energi (kcal)",                unit: "kcal", per100gPulver: "499",    per100mlUtblandet: "67" },
+          { label: "Fett (44 E%)",                 unit: "g",    per100gPulver: "25",     per100mlUtblandet: "3,4" },
+          { label: "– hvorav mettet",              unit: "g",    per100gPulver: "12",     per100mlUtblandet: "1,6" },
+          { label: "– MCT",                        unit: "g",    per100gPulver: "9,9",    per100mlUtblandet: "1,3" },
+          { label: "– hvorav enumettet",           unit: "g",    per100gPulver: "7,5",    per100mlUtblandet: "1,0" },
+          { label: "– hvorav flerumettet",         unit: "g",    per100gPulver: "4,3",    per100mlUtblandet: "0,58" },
+          { label: "– linolsyre",                  unit: "mg",   per100gPulver: "3400",   per100mlUtblandet: "459" },
+          { label: "– α-linolensyre",              unit: "mg",   per100gPulver: "440",    per100mlUtblandet: "59" },
+          { label: "– DHA",                        unit: "mg",   per100gPulver: "135",    per100mlUtblandet: "18" },
+          { label: "– ARA",                        unit: "mg",   per100gPulver: "135",    per100mlUtblandet: "18" },
+          { label: "Karbohydrat (44 E%)",          unit: "g",    per100gPulver: "55",     per100mlUtblandet: "7,4" },
+          { label: "– hvorav sukkerarter",         unit: "g",    per100gPulver: "2,0",    per100mlUtblandet: "0,27" },
+          { label: "– hvorav laktose",             unit: "g",    per100gPulver: "<0,05",  per100mlUtblandet: "<0,01" },
+          { label: "Kostfiber (1 E%)",             unit: "g",    per100gPulver: "1,1",    per100mlUtblandet: "0,15" },
+          { label: "– lakto-N-neotetraose",        unit: "g",    per100gPulver: "0,37",   per100mlUtblandet: "0,05" },
+          { label: "– 2’-fukosyllaktose",          unit: "g",    per100gPulver: "0,74",   per100mlUtblandet: "0,10" },
+          { label: "Protein (11 E%)",              unit: "g",    per100gPulver: "14,0",   per100mlUtblandet: "1,9" },
+          { label: "Salt",                         unit: "g",    per100gPulver: "0,63",   per100mlUtblandet: "0,084" },
+          { label: "Forhold n6:n3",                unit: "",     per100gPulver: "8:1",    per100mlUtblandet: "8:1" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "250",   per100mlUtblandet: "34" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "620",   per100mlUtblandet: "84" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "450",   per100mlUtblandet: "61" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "530",   per100mlUtblandet: "71" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "350",   per100mlUtblandet: "47" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "60",    per100mlUtblandet: "8,1" },
+          { label: "Jern",      unit: "mg", per100gPulver: "5,2",   per100mlUtblandet: "0,70" },
+          { label: "Sink",      unit: "mg", per100gPulver: "5,0",   per100mlUtblandet: "0,67" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,43",  per100mlUtblandet: "0,058" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,068", per100mlUtblandet: "0,0092" },
+          { label: "Selen",     unit: "µg", per100gPulver: "26",    per100mlUtblandet: "3,5" },
+          { label: "Jod",       unit: "µg", per100gPulver: "122",   per100mlUtblandet: "16" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg",         per100gPulver: "500",       per100mlUtblandet: "67" },
+          { label: "Vitamin D",    unit: "µg",         per100gPulver: "12",        per100mlUtblandet: "1,7" },
+          { label: "Vitamin E",    unit: "mg",         per100gPulver: "11",        per100mlUtblandet: "1,5" },
+          { label: "Vitamin K",    unit: "µg",         per100gPulver: "45",        per100mlUtblandet: "6,1" },
+          { label: "Vitamin C",    unit: "mg",         per100gPulver: "80",        per100mlUtblandet: "11" },
+          { label: "Niacin",       unit: "mg (mg NE)", per100gPulver: "7,0 (13)",  per100mlUtblandet: "0,94 (1,8)" },
+          { label: "Tiamin",       unit: "mg",         per100gPulver: "0,51",      per100mlUtblandet: "0,069" },
+          { label: "Riboflavin",   unit: "mg",         per100gPulver: "1,0",       per100mlUtblandet: "0,13" },
+          { label: "Vitamin B6",   unit: "mg",         per100gPulver: "0,40",      per100mlUtblandet: "0,054" },
+          { label: "Folsyre",      unit: "µg",         per100gPulver: "75",        per100mlUtblandet: "10" },
+          { label: "Folat",        unit: "µg DFE",     per100gPulver: "125",       per100mlUtblandet: "17" },
+          { label: "Vitamin B12",  unit: "µg",         per100gPulver: "1,4",       per100mlUtblandet: "0,19" },
+          { label: "Biotin",       unit: "µg",         per100gPulver: "12",        per100mlUtblandet: "1,6" },
+          { label: "Pantotensyre", unit: "mg",         per100gPulver: "3,3",       per100mlUtblandet: "0,45" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Taurin",       unit: "mg",           per100gPulver: "40",  per100mlUtblandet: "5,4" },
+          { label: "L-karnitin",   unit: "mg",           per100gPulver: "8,5", per100mlUtblandet: "1,15" },
+          { label: "Kolin",        unit: "mg",           per100gPulver: "145", per100mlUtblandet: "20" },
+          { label: "Inositol",     unit: "mg",           per100gPulver: "35",  per100mlUtblandet: "4,7" },
+          { label: "Nukleotider",  unit: "mg",           per100gPulver: "15",  per100mlUtblandet: "2,0" },
+          { label: "Osmolaritet",  unit: "mOsm/l",       per100gPulver: "—",   per100mlUtblandet: "180" },
+          { label: "Osmolalitet",  unit: "mOsm/kg H₂O",  per100gPulver: "—",   per100mlUtblandet: "200" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Bruk kokt vann og steriliserte flasker. Ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom.",
+    "Mål opp vann i flasken etter doseringstabellen.",
+    "Tilsett strøkne måleskjeer pulver. Bruk kun måleskjeen som følger med i forpakningen – en strøken måleskje gir 4,5 g.",
+    "90 ml vann + 3 strøkne måleskjeer pulver gir 100 ml ferdig blanding.",
+    "Tilbered kun én flaske om gangen. Ikke spar på gjenværende blanding i flasken – kast innholdet.",
+  ],
+  dosering: "Doseringstabellen er ment som en veiledning. Ansvarlig lege eller klinisk ernæringsfysiolog bør beregne passe døgninntak individuelt for hvert enkelt barn. En boks gir ca. 3,0 l ferdig blanding.",
+  mixingInfo: { konsentrasjon: "13,5", scoopGram: "4,5" },
+  mixingTable: [
+    { skjeer: 3, pulver: "13,5", vann: 90, ferdig: 100, energi: 67 },
+  ],
+  doseringTabell: {
+    tittel: "Dosering etter alder",
+    kolonner: ["Alder", "Vann (ml)", "Måleskjeer", "Måltider/døgn", "Bokser/mnd"],
+    rader: [
+      ["0–2 uker", "90", "3", "6", "6"],
+      ["2–4 uker", "120", "4", "5", "7"],
+      ["1–2 måneder", "150", "5", "5", "9"],
+      ["2–4 måneder", "180", "6", "5", "10"],
+      ["4–6 måneder", "210", "7", "5", "12"],
+      ["Over 6 måneder", "210", "7", "3–4", "7–10"],
+    ],
+  },
+  holdbarhet: "Oppbevares svalt og tørt til best før dato. Åpnet forpakning brukes innen 3 uker. Tilbered kun 1 flaske om gangen. Ikke spar på gjenværende blanding i flasken. Kast innholdet.",
+  ingredienser: "Maltodekstrin, ekstensivt hydrolysert myseprotein (melk), vegetabilske oljer (solsikke, raps, kokos), MCT-olje, stivelse, mineraler (kalsiumglyserofosfat, magnesiumklorid, kaliumfosfat, natriumfosfat, natriumklorid, kalsiumklorid, mangansulfat, kaliumjodid, jernsulfat, sinksulfat, natriumselenat, kaliumklorid, kobbersulfat), emulgator (E472c), fiber (2’-fukosyllaktose, lakto-N-neotetraose), olje fra Mortierella alpina (ARA), olje fra mikroalgen Schizochytrium sp. (DHA), surhetsregulerende middel (E330), vitaminer (C, E, niacin, pantotensyre, riboflavin, A, tiamin, B6, folsyre, K, D, biotin, B12), kolinbitartrat, aminosyrer (L-arginin, L-histidin), taurin, inositol, antioksidant (E307b, E304), nukleotider (cytidin 5’-monofosfat, uridin 5’-monofosfat, adenosin 5’-monofosfat, guanosin 5’-monofosfat), L-karnitin. Laktosefri. Glutenfri. Pakket i beskyttet atmosfære.",
+  smaksvarianter: "Nøytral smak.",
+  indikasjon: "Diettbehandling av spedbarn 0–12 måneder med gastrointestinale lidelser og matallergi eller intoleranse, for eksempel kumelkproteinallergi og malabsorpsjon (blant annet fettmalabsorpsjon). Egnet som eneste næringskilde fra fødselen og opp til 6 måneder.",
+  kontraindikasjon: "Galaktosemi og glukose-galaktose-malabsorpsjon.",
+  forsiktighetsregler: "Mødre skal oppmuntres til å fortsette amming selv om barnet har kumelkproteinallergi. Ved bruk av spesialnæring er det viktig å gi korrekte tilberedningsinstruksjoner: ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom. Skal brukes under medisinsk tilsyn. For helsepersonell.",
+  bestilling: [
+    { produktnavn: "Alfaré nøytral smak", bestillingsnr: "900694", varenr: "817598", salgsenhet: "1 x 400 g pulver" },
+  ],
+};
+
+const ALFAMINO: Product = {
+  id: "alfamino",
+  manufacturer: "nestle",
+  name: "Alfamino",
+  age: "0–12 måneder",
+  tagline: "Hypoallergen aminosyrebasert spesialnæring med humane melkeoligosakkarider (HMO) for spedbarn med alvorlig matallergi.",
+  description: "Inneholder MCT-fett, strukturerte lipider samt 2’FL og LNnT (ikke fra morsmelk). Spesielt tilpasset diettbehandling av spedbarn med alvorlig matallergi.",
+  image: "/nutrition/alfamino.jpg",
+  thumb: "/nutrition/thumbs/alfamino.png",
+  imageScale: 1,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",                       color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett 0–12 måneder", color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri",                             color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                            color: "#EA580C", icon: "gut"    },
+    { label: "Med HMO",                               color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                         color: "#D97706", icon: "drop"   },
+    { label: "Med MCT",                               color: "#D97706", icon: "drop"   },
+    { label: "Med strukturerte lipider",              color: "#A78BFA", icon: "star"   },
+    { label: "Halalsertifisert",                      color: "#D97706", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "0–12 måneder" },
+    { label: "Energitetthet", value: "0,66 kcal/ml" },
+    { label: "Protein",       value: "100 % frie aminosyrer" },
+    { label: "Kostfiber",     value: "HMO (0,15 g/100 ml)" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "Nei" },
+  ],
+  fordeler: [
+    "Klinisk bevist hypoallergen spesialnæring.",
+    "Basert på 100 % frie aminosyrer – helt fri for proteiner og peptider fra melk og soya.",
+    "Oligosakkaridene 2’FL og LNnT er strukturelt identiske med tilsvarende HMO i morsmelk, og har vist seg å øke mengden bifidobakterier og produksjonen av korte fettsyrer.",
+    "24 % lettabsorbert MCT-fett for god toleranse, og 4,5 % strukturerte lipider for godt fettopptak.",
+    "LC-PUFA (DHA:ARA-forhold 1:1) for normal utvikling av hjerne, syn og immunforsvar.",
+    "Nøytral og mild smak.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_DROP, ICON_GUT2, ICON_MILK_BOTTLE, ICON_DROP, ICON_MILK_BOTTLE],
+  bruksomraader: [
+    "Næringsmessig fullverdig næringsmiddel til spesielle medisinske formål for spedbarn 0–12 måneder med alvorlig matallergi.",
+    "Egnet som eneste næringskilde fra fødselen og opptil 6 måneder. Fra 6 måneder suppleres Alfamino med melkefri kost i kombinasjon med introduksjon av fast føde.",
+    "Over 1 års alder anbefales det å bytte til Alfamino Junior, som er spesielt tilpasset barn fra 1 år.",
+  ],
+  fodmap: { laktose: "<0,01 g", gos: false, fos: false },
+  viktigAVite: [
+    "Mødre skal oppmuntres til å fortsette amming selv om barnet har kumelkproteinallergi.",
+    "Ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom.",
+    "Skal brukes under medisinsk tilsyn.",
+    "Kan foreskrives på blå resept.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Laktosefri",               icon: null },
+    { label: "Halalsertifisert",         icon: null },
+    { label: "Med HMO",                  icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 66,
+  pulverPer100ml: "13,2 g pulver",
+  macros: [
+    { label: "Fett (44 E%)",                value: 44, color: "#7C3AED", amount: "3,3 g" },
+    { label: "Karbohydrat (44 E%)",         value: 44, color: "#F97316", amount: "7,3 g" },
+    { label: "Proteinekvivalent (11 E%)",   value: 11, color: "#3B82F6", amount: "1,8 g" },
+    { label: "Kostfiber (1 E%)",            value: 1,  color: "#22C55E", amount: "0,15 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",      value: "<0,01 g"    },
+    { label: "MCT",          value: "0,80 g"     },
+    { label: "HMO",          value: "0,15 g"     },
+    { label: "DHA",          value: "18 mg"      },
+    { label: "ARA",          value: "18 mg"      },
+    { label: "Kalsium",      value: "70 mg"      },
+    { label: "Osmolaritet",  value: "299 mOsm/l" },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml utblandet (13,2 g pulver)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                       unit: "kJ",   per100gPulver: "2083",   per100mlUtblandet: "277" },
+          { label: "Energi (kcal)",                     unit: "kcal", per100gPulver: "497",    per100mlUtblandet: "66" },
+          { label: "Fett (44 E%)",                      unit: "g",    per100gPulver: "24,6",   per100mlUtblandet: "3,3" },
+          { label: "– hvorav mettet",                   unit: "g",    per100gPulver: "8,5",    per100mlUtblandet: "1,1" },
+          { label: "– MCT",                             unit: "g",    per100gPulver: "6,0",    per100mlUtblandet: "0,80" },
+          { label: "– palmitinsyre i sn-2-posisjon",    unit: "g",    per100gPulver: "0,55",   per100mlUtblandet: "0,070" },
+          { label: "– hvorav enumettet",                unit: "g",    per100gPulver: "9,4",    per100mlUtblandet: "1,2" },
+          { label: "– hvorav flerumettet",              unit: "g",    per100gPulver: "5,2",    per100mlUtblandet: "0,69" },
+          { label: "– α-linolensyre",                   unit: "mg",   per100gPulver: "400",    per100mlUtblandet: "53" },
+          { label: "– linolsyre",                       unit: "mg",   per100gPulver: "4000",   per100mlUtblandet: "532" },
+          { label: "– DHA",                             unit: "mg",   per100gPulver: "135",    per100mlUtblandet: "18" },
+          { label: "– ARA",                             unit: "mg",   per100gPulver: "135",    per100mlUtblandet: "18" },
+          { label: "Forhold n6:n3",                     unit: "",     per100gPulver: "9:1",    per100mlUtblandet: "9:1" },
+          { label: "Karbohydrat (44 E%)",               unit: "g",    per100gPulver: "55,2",   per100mlUtblandet: "7,3" },
+          { label: "– hvorav sukkerarter",              unit: "g",    per100gPulver: "4,0",    per100mlUtblandet: "0,53" },
+          { label: "– hvorav laktose",                  unit: "g",    per100gPulver: "<0,05",  per100mlUtblandet: "<0,01" },
+          { label: "Kostfiber (1 E%)",                  unit: "g",    per100gPulver: "1,1",    per100mlUtblandet: "0,15" },
+          { label: "– lakto-N-neotetraose",             unit: "g",    per100gPulver: "0,38",   per100mlUtblandet: "0,050" },
+          { label: "– 2’-fukosyllaktose",               unit: "g",    per100gPulver: "0,75",   per100mlUtblandet: "0,10" },
+          { label: "Proteinekvivalent (11 E%)",         unit: "g",    per100gPulver: "13,3*",  per100mlUtblandet: "1,8*" },
+          { label: "Salt",                              unit: "g",    per100gPulver: "0,49",   per100mlUtblandet: "0,065" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "195",   per100mlUtblandet: "26" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "570",   per100mlUtblandet: "76" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "420",   per100mlUtblandet: "56" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "530",   per100mlUtblandet: "70" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "350",   per100mlUtblandet: "47" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "45",    per100mlUtblandet: "6,0" },
+          { label: "Jern",      unit: "mg", per100gPulver: "5,0",   per100mlUtblandet: "0,66" },
+          { label: "Sink",      unit: "mg", per100gPulver: "5,0",   per100mlUtblandet: "0,66" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,43",  per100mlUtblandet: "0,057" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,068", per100mlUtblandet: "0,0090" },
+          { label: "Selen",     unit: "µg", per100gPulver: "26",    per100mlUtblandet: "3,5" },
+          { label: "Jod",       unit: "µg", per100gPulver: "110",   per100mlUtblandet: "15" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg",         per100gPulver: "500",       per100mlUtblandet: "66" },
+          { label: "Vitamin D",    unit: "µg",         per100gPulver: "12",        per100mlUtblandet: "1,7" },
+          { label: "Vitamin E",    unit: "mg",         per100gPulver: "11",        per100mlUtblandet: "1,5" },
+          { label: "Vitamin K",    unit: "µg",         per100gPulver: "45",        per100mlUtblandet: "6,0" },
+          { label: "Vitamin C",    unit: "mg",         per100gPulver: "80",        per100mlUtblandet: "11" },
+          { label: "Niacin",       unit: "mg (mg NE)", per100gPulver: "7,0 (12)",  per100mlUtblandet: "0,93 (1,6)" },
+          { label: "Tiamin",       unit: "mg",         per100gPulver: "0,51",      per100mlUtblandet: "0,068" },
+          { label: "Riboflavin",   unit: "mg",         per100gPulver: "1,0",       per100mlUtblandet: "0,13" },
+          { label: "Vitamin B6",   unit: "mg",         per100gPulver: "0,40",      per100mlUtblandet: "0,053" },
+          { label: "Folsyre",      unit: "µg",         per100gPulver: "75",        per100mlUtblandet: "10" },
+          { label: "Folat",        unit: "µg DFE",     per100gPulver: "125",       per100mlUtblandet: "17" },
+          { label: "Vitamin B12",  unit: "µg",         per100gPulver: "1,5",       per100mlUtblandet: "0,20" },
+          { label: "Biotin",       unit: "µg",         per100gPulver: "12",        per100mlUtblandet: "1,6" },
+          { label: "Pantotensyre", unit: "mg",         per100gPulver: "3,3",       per100mlUtblandet: "0,44" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Taurin",       unit: "mg",           per100gPulver: "40",  per100mlUtblandet: "5,3" },
+          { label: "L-karnitin",   unit: "mg",           per100gPulver: "8,5", per100mlUtblandet: "1,1" },
+          { label: "Kolin",        unit: "mg",           per100gPulver: "145", per100mlUtblandet: "19" },
+          { label: "Inositol",     unit: "mg",           per100gPulver: "35",  per100mlUtblandet: "4,7" },
+          { label: "Osmolaritet",  unit: "mOsm/l",       per100gPulver: "—",   per100mlUtblandet: "299" },
+          { label: "Osmolalitet",  unit: "mOsm/kg H₂O",  per100gPulver: "—",   per100mlUtblandet: "333" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Bruk kokt vann og steriliserte flasker. Ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom.",
+    "Mål opp vann i flasken etter doseringstabellen.",
+    "Tilsett strøkne måleskjeer pulver. Bruk kun måleskjeen som medfølger i forpakningen – en strøken måleskje gir 4,4 g.",
+    "90 ml vann + 3 strøkne måleskjeer pulver gir 100 ml ferdig blanding.",
+    "Tilbered kun én flaske om gangen. Ikke spar på gjenværende blanding i flasken – kast innholdet.",
+  ],
+  dosering: "Doseringstabellen er ment som en veiledning. Ansvarlig lege/klinisk ernæringsfysiolog bør beregne egnet mengde som er tilpasset individuelt for hvert enkelt barn. En boks gir ca. 3,0 l ferdig blanding.",
+  mixingInfo: { konsentrasjon: "13,2", scoopGram: "4,4" },
+  mixingTable: [
+    { skjeer: 3, pulver: "13,2", vann: 90, ferdig: 100, energi: 66 },
+  ],
+  doseringTabell: {
+    tittel: "Dosering etter alder",
+    kolonner: ["Alder", "Vann (ml)", "Måleskjeer", "Måltider/døgn", "Bokser/mnd"],
+    rader: [
+      ["0–2 uker", "90", "3", "6", "6"],
+      ["2–4 uker", "120", "4", "5", "7"],
+      ["1–2 måneder", "150", "5", "5", "8–9"],
+      ["2–4 måneder", "180", "6", "5", "10"],
+      ["4–6 måneder", "210", "7", "5", "12"],
+      ["Over 6 måneder", "210", "7", "3–4", "7–10"],
+    ],
+  },
+  holdbarhet: "Oppbevares svalt og tørt til best før dato. Åpnet forpakning brukes innen 3 uker. Tilbered kun 1 flaske om gangen. Ikke spar på gjenværende blanding i flasken. Kast innholdet.",
+  ingredienser: "Glukosesirup, vegetabilske oljer (solsikke, raps, strukturert palmeolje), aminosyrer (L-lysinacetat, L-leucin, L-prolin, L-glutamin, L-arginin, L-valin, glycin, L-isoleucin, L-treonin, L-serin, L-fenylalanin, L-tyrosin, L-asparaginsyre, L-histidin, L-alanin, L-cystin, magnesium L-aspartat, L-tryptofan, L-metionin), MCT-olje, stivelse, mineraler (kalsiumglyserofosfat, kaliumklorid, natriumsitrat, kalsiumsitrat, kaliumsitrat, natriumfosfat, magnesiumoksid, jernsulfat, sinksulfat, kobbersulfat, mangansulfat, kaliumjodid, natriumselenat), emulgator (E472c), fiber (2’-fukosyllaktose, lakto-N-neotetraose), olje fra Mortierella alpina (ARA), olje fra mikroalgen Schizochytrium sp. (DHA), kolinbitartrat, vitaminer (C, E, niacin, pantotensyre, riboflavin, A, tiamin, B6, folsyre, K, D, biotin, B12), surhetsregulerende middel (E330), taurin, inositol, L-karnitin. Glutenfri. Laktosefri. Pakket i beskyttet atmosfære. Halal-sertifisert.",
+  smaksvarianter: "Nøytral smak.",
+  indikasjon: "Diettbehandling av spedbarn 0–12 måneder med alvorlig matallergi. Egnet som eneste næringskilde fra fødselen og opptil 6 måneder.",
+  kontraindikasjon: "Galaktosemi og glukose-galaktose-malabsorpsjon.",
+  forsiktighetsregler: "Mødre skal oppmuntres til å fortsette amming selv om barnet har kumelkproteinallergi. Ved bruk av spesialnæring er det viktig å gi korrekte tilberedningsinstruksjoner: ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom. Skal brukes under medisinsk tilsyn. Kun for helsepersonell.",
+  bestilling: [
+    { produktnavn: "Alfamino nøytral smak", bestillingsnr: "900693", varenr: "811637", salgsenhet: "1 x 400 g pulver" },
+  ],
+};
+
+const ALFAMINO_JUNIOR: Product = {
+  id: "alfamino-junior",
+  manufacturer: "nestle",
+  name: "Alfamino Junior",
+  age: "Fra 1 år",
+  tagline: "Hypoallergen aminosyrebasert spesialnæring med humane melkeoligosakkarider (HMO) for barn fra 1 år med alvorlig matallergi.",
+  description: "Inneholder MCT-fett, strukturerte lipider samt 2’FL og LNnT (ikke fra morsmelk). Kan drikkes som kosttilskudd, brukes som berikning, eller gis som eneste ernæring/sondeløsning. Kan også brukes som erstatning i mat og ved baking.",
+  image: "/nutrition/alfamino-junior.jpg",
+  thumb: "/nutrition/thumbs/alfamino-junior.png",
+  imageScale: 1,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",                   color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett fra 1 år", color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri",                         color: "#4ADE80", icon: "shield" },
+    { label: "Med HMO",                           color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                     color: "#D97706", icon: "drop"   },
+    { label: "Med MCT",                           color: "#D97706", icon: "drop"   },
+    { label: "Med strukturerte lipider",          color: "#A78BFA", icon: "star"   },
+    { label: "Halalsertifisert",                  color: "#D97706", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "Fra 1 år" },
+    { label: "Energitetthet", value: "1,05 kcal/ml" },
+    { label: "Protein",       value: "100 % frie aminosyrer" },
+    { label: "Kostfiber",     value: "HMO (0,048 g/100 ml)" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "<0,011 g/100 ml" },
+  ],
+  fordeler: [
+    "Klinisk bevist hypoallergen spesialnæring.",
+    "Basert på 100 % frie aminosyrer – helt fri for proteiner og peptider fra melk og soya.",
+    "Balansert aminosyreprofil i konsentrasjoner som fremmer tilvekst og utvikling hos barn med kumelkproteinallergi.",
+    "2’FL og LNnT er strukturelt identiske med HMO i morsmelk, og har vist seg å øke mengden bifidobakterier og produksjonen av korte fettsyrer.",
+    "24 % lettabsorbert MCT-fett for god toleranse, og strukturerte lipider for godt fettopptak.",
+    "LC-PUFA (DHA:ARA-forhold 1:1) for normal utvikling av hjerne, syn og immunforsvar.",
+    "Nøytral og mild smak for økt compliance.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_DROP, ICON_MILK_BOTTLE, ICON_GUT2, ICON_MILK_BOTTLE, ICON_DROP, ICON_SHIELD_STAR],
+  bruksomraader: [
+    "Kostholdsbehandling for barn med kumelkproteinallergi, soyaallergi, multiple matallergier og andre tilstander der spesialnæring anbefales.",
+    "Ernæringsmessig fullverdig og beregnet for barn fra 1 til 13 år. Egnet som eneste næringskilde.",
+    "Kan drikkes som kosttilskudd, brukes som berikning, gis som eneste ernæring/sondeløsning, eller brukes som erstatning i mat og ved baking.",
+  ],
+  fodmap: { laktose: "<0,011 g", gos: false, fos: false },
+  viktigAVite: [
+    "Skal brukes under medisinsk tilsyn.",
+    "Ikke for parenteralt (i.v.) bruk.",
+    "Ikke tilsett annen type mat eller legemidler dersom produktet gis via sonde.",
+    "Åpnet forpakning brukes innen 4 uker.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Halalsertifisert",         icon: null },
+    { label: "Med HMO",                  icon: null },
+    { label: "Med DHA & ARA",            icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 105,
+  pulverPer100ml: "21,8 g pulver",
+  macros: [
+    { label: "Fett (41 E%)",              value: 41, color: "#7C3AED", amount: "4,8 g" },
+    { label: "Karbohydrat (48 E%)",       value: 48, color: "#F97316", amount: "13 g" },
+    { label: "Proteinekvivalent (11 E%)", value: 11, color: "#3B82F6", amount: "3,0 g" },
+    { label: "Kostfiber (0 E%)",          value: 0,  color: "#22C55E", amount: "0,048 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",      value: "<0,011 g"   },
+    { label: "MCT",          value: "1,1 g"      },
+    { label: "HMO",          value: "0,048 g"    },
+    { label: "DHA",          value: "17 mg"      },
+    { label: "ARA",          value: "17 mg"      },
+    { label: "Kalsium",      value: "106 mg"     },
+    { label: "Osmolaritet",  value: "474 mOsm/l" },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml tilberedt (21,8 g pulver + 84 ml vann)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                       unit: "kJ",   per100gPulver: "2031",    per100mlUtblandet: "443" },
+          { label: "Energi (kcal)",                     unit: "kcal", per100gPulver: "485",     per100mlUtblandet: "105" },
+          { label: "Fett (41 E%)",                      unit: "g",    per100gPulver: "22",      per100mlUtblandet: "4,8" },
+          { label: "– hvorav mettet",                   unit: "g",    per100gPulver: "7,5",     per100mlUtblandet: "1,6" },
+          { label: "– MCT",                             unit: "g",    per100gPulver: "5,3",     per100mlUtblandet: "1,1" },
+          { label: "– palmitinsyre i sn-2-posisjon",    unit: "g",    per100gPulver: "0,50",    per100mlUtblandet: "0,11" },
+          { label: "– hvorav enumettet",                unit: "g",    per100gPulver: "8,2",     per100mlUtblandet: "1,8" },
+          { label: "– hvorav flerumettet",              unit: "g",    per100gPulver: "4,7",     per100mlUtblandet: "1,0" },
+          { label: "– α-linolensyre",                   unit: "mg",   per100gPulver: "360",     per100mlUtblandet: "78" },
+          { label: "– linolsyre",                       unit: "mg",   per100gPulver: "3600",    per100mlUtblandet: "785" },
+          { label: "– DHA",                             unit: "mg",   per100gPulver: "80",      per100mlUtblandet: "17" },
+          { label: "– ARA",                             unit: "mg",   per100gPulver: "80",      per100mlUtblandet: "17" },
+          { label: "Karbohydrat (48 E%)",               unit: "g",    per100gPulver: "57,9",    per100mlUtblandet: "13" },
+          { label: "– hvorav sukkerarter",              unit: "g",    per100gPulver: "4,5",     per100mlUtblandet: "0,98" },
+          { label: "– hvorav laktose",                  unit: "g",    per100gPulver: "<0,050",  per100mlUtblandet: "<0,011" },
+          { label: "Kostfiber (0 E%)",                  unit: "g",    per100gPulver: "0,22",    per100mlUtblandet: "0,048" },
+          { label: "– lakto-N-neotetraose",             unit: "g",    per100gPulver: "0,075",   per100mlUtblandet: "0,016" },
+          { label: "– 2’-fukosyllaktose",               unit: "g",    per100gPulver: "0,15",    per100mlUtblandet: "0,032" },
+          { label: "Proteinekvivalent (11 E%)",         unit: "g",    per100gPulver: "13,8*",   per100mlUtblandet: "3,0*" },
+          { label: "Salt",                              unit: "g",    per100gPulver: "0,50",    per100mlUtblandet: "0,11" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "200",  per100mlUtblandet: "44" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "631",  per100mlUtblandet: "138" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "410",  per100mlUtblandet: "89" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "485",  per100mlUtblandet: "106" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "320",  per100mlUtblandet: "70" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "96",   per100mlUtblandet: "21" },
+          { label: "Jern",      unit: "mg", per100gPulver: "7,7",  per100mlUtblandet: "1,7" },
+          { label: "Sink",      unit: "mg", per100gPulver: "3,3",  per100mlUtblandet: "0,72" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,39", per100mlUtblandet: "0,085" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,41", per100mlUtblandet: "0,089" },
+          { label: "Selen",     unit: "µg", per100gPulver: "25",   per100mlUtblandet: "5,4" },
+          { label: "Jod",       unit: "µg", per100gPulver: "53",   per100mlUtblandet: "12" },
+          { label: "Krom",      unit: "µg", per100gPulver: "18",   per100mlUtblandet: "3,9" },
+          { label: "Molybden",  unit: "µg", per100gPulver: "27",   per100mlUtblandet: "5,9" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg RE",      per100gPulver: "275",       per100mlUtblandet: "60" },
+          { label: "Vitamin D",    unit: "µg",         per100gPulver: "9,2",       per100mlUtblandet: "2,0" },
+          { label: "Vitamin E",    unit: "mg",         per100gPulver: "6,9",       per100mlUtblandet: "1,5" },
+          { label: "Vitamin K",    unit: "µg",         per100gPulver: "30",        per100mlUtblandet: "6,5" },
+          { label: "Vitamin C",    unit: "mg",         per100gPulver: "27",        per100mlUtblandet: "5,9" },
+          { label: "Niacin",       unit: "mg (mg NE)", per100gPulver: "3,8 (9,5)", per100mlUtblandet: "0,83 (2,1)" },
+          { label: "Tiamin",       unit: "mg",         per100gPulver: "0,48",      per100mlUtblandet: "0,10" },
+          { label: "Riboflavin",   unit: "mg",         per100gPulver: "0,80",      per100mlUtblandet: "0,17" },
+          { label: "Vitamin B6",   unit: "mg",         per100gPulver: "0,48",      per100mlUtblandet: "0,10" },
+          { label: "Folsyre",      unit: "µg",         per100gPulver: "99",        per100mlUtblandet: "21" },
+          { label: "Vitamin B12",  unit: "µg",         per100gPulver: "1,4",       per100mlUtblandet: "0,30" },
+          { label: "Biotin",       unit: "µg",         per100gPulver: "15",        per100mlUtblandet: "3,3" },
+          { label: "Pantotensyre", unit: "mg",         per100gPulver: "2,2",       per100mlUtblandet: "0,48" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Taurin",       unit: "mg",           per100gPulver: "17",  per100mlUtblandet: "3,7" },
+          { label: "L-karnitin",   unit: "mg",           per100gPulver: "17",  per100mlUtblandet: "3,7" },
+          { label: "Kolin",        unit: "mg",           per100gPulver: "165", per100mlUtblandet: "36" },
+          { label: "Inositol",     unit: "mg",           per100gPulver: "21",  per100mlUtblandet: "4,6" },
+          { label: "Osmolaritet",  unit: "mOsm/l",       per100gPulver: "—",   per100mlUtblandet: "474" },
+          { label: "Osmolalitet",  unit: "mOsm/kg H₂O",  per100gPulver: "—",   per100mlUtblandet: "565" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Mål opp vann etter doseringstabellen.",
+    "Tilsett strøkne måleskjeer pulver. Bruk kun måleskjeen som medfølger i forpakningen – en strøken måleskje gir 5,2 g.",
+    "100 ml ferdig blanding tilsvarer 21,8 g pulver + 84 ml vann.",
+    "Tilbered kun én flaske ad gangen. Ikke spar på gjenværende blanding i flasken – kast innholdet.",
+    "Ikke tilsett annen type mat eller legemidler dersom produktet gis via sonde.",
+  ],
+  dosering: "Egnet som eneste næringskilde. Doseringstabellen er ment som en veiledning. Behandlende lege bør beregne egnet døgninntak individuelt for hvert enkelt barn. En boks tilsvarer ca. 1,8 l ferdig blanding.",
+  mixingInfo: { konsentrasjon: "21,8", scoopGram: "5,2", anbefaltSkjeer: 8 },
+  mixingTable: [
+    { skjeer: 6,  pulver: "31,2", vann: 125, ferdig: 150,  energi: 150 },
+    { skjeer: 8,  pulver: "41,6", vann: 170, ferdig: 200,  energi: 200 },
+    { skjeer: 12, pulver: "62,4", vann: 250, ferdig: 300,  energi: 300 },
+    { skjeer: 21, pulver: "109",  vann: 420, ferdig: 500,  energi: 500 },
+    { skjeer: 42, pulver: "218",  vann: 840, ferdig: 1000, energi: 1000 },
+  ],
+  holdbarhet: "Oppbevares svalt og tørt og brukes innen best før dato. Åpnet forpakning brukes innen 4 uker. Tilbered kun én flaske ad gangen. Ikke spar på gjenværende blanding i flasken, kast innholdet.",
+  ingredienser: "Glukosesirup, aminosyrer (L-lysin, L-leucin, L-glutamin, L-prolin, L-arginin, L-valin, glycin, L-isoleucin, L-treonin, L-serin, L-fenylalanin, L-tyrosin, L-asparaginsyre, L-histidin, L-alanin, L-cystin, magnesium-L-aspartat, L-tryptofan, L-metionin), vegetabilske oljer (solsikkeolje, rapsolje, strukturert palmeolje), mineraler (kalsiumglyserofosfat, kaliumsitrat, kaliumklorid, kalsiumsitrat, natriumsitrat, natriumfosfat, magnesiumoksid, jernsulfat, sinksulfat, mangansulfat, kobbersulfat, kaliumjodid, natriummolybdat, natriumselenat, kromklorid), MCT-olje, stivelse, emulgeringsmiddel (E472c), kolinbitartrat, fiber (2’-fukosyllaktose, lakto-N-neotetraose), olje fra Mortierella alpina (ARA), olje fra mikroalgen Schizochytrium sp. (DHA), surhetsregulerende middel (E330), vitaminer (C, E, niacin, pantotensyre, riboflavin, B6, tiamin, A, folsyre, K, biotin, D, B12), inositol, taurin, L-karnitin. Glutenfri. Pakket i beskyttet atmosfære. Halal-sertifisert.",
+  smaksvarianter: "Nøytral smak.",
+  indikasjon: "Kostholdsbehandling for barn fra 1 år med kumelkproteinallergi, soyaallergi, multiple matallergier og andre tilstander der spesialnæring anbefales.",
+  kontraindikasjon: "Galaktosemi og glukose-galaktose-malabsorpsjon.",
+  forsiktighetsregler: "Skal brukes under medisinsk tilsyn. Ikke for parenteralt (i.v.) bruk. Ikke tilsett annen type mat eller legemidler dersom produktet gis via sonde. Kun for helsepersonell.",
+  bestilling: [
+    { produktnavn: "Alfamino Junior nøytral smak", bestillingsnr: "999720", varenr: "917508", salgsenhet: "1 x 400 g pulver" },
+  ],
+};
+
+const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON, NEOCATE_JUNIOR, ALTHERA, ALFARE, ALFAMINO, ALFAMINO_JUNIOR];
 const PRODUCT_GROUPS = (Object.keys(MANUFACTURERS) as ManufacturerId[])
   .map((id) => ({ id, label: MANUFACTURERS[id].label, short: MANUFACTURERS[id].short, products: PRODUCTS.filter((p) => p.manufacturer === id) }))
   .filter((group) => group.products.length > 0);
@@ -1475,18 +2038,17 @@ function TilberedningTab({ product, terms }: { product: Product; terms: string[]
         {/* Dosering etter alder */}
         {product.doseringTabell ? (
           <Box sx={{ display: "grid", gap: 1 }}>
-            <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Dosering etter alder</Typography>
+            <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>{product.doseringTabell.tittel}</Typography>
             <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", overflow: "hidden" }}>
-              <Box sx={{ display: "grid", gridTemplateColumns: "1.5fr repeat(4, minmax(0, 1fr))", gap: 1, px: 2, py: 1.25, bgcolor: "#F6E6EF" }}>
-                {["Alder", "Vann (ml)", "Måleskjeer", "Måltider/døgn", "Bokser/mnd"].map((h, i) => (
+              <Box sx={{ display: "grid", gridTemplateColumns: `1.5fr repeat(${product.doseringTabell.kolonner.length - 1}, minmax(0, 1fr))`, gap: 1, px: 2, py: 1.25, bgcolor: "#F6E6EF" }}>
+                {product.doseringTabell.kolonner.map((h, i) => (
                   <Typography key={h} sx={{ fontSize: 12.5, fontWeight: 700, color: D.textSub, textAlign: i === 0 ? "left" : "right" }}>{h}</Typography>
                 ))}
               </Box>
-              {product.doseringTabell.map((row, i) => (
-                <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1.5fr repeat(4, minmax(0, 1fr))", gap: 1, px: 2, py: 1.1, bgcolor: i % 2 === 1 ? D.surfaceAlt : "transparent" }}>
-                  <Typography sx={{ fontSize: 14.5, fontWeight: 700, color: D.text }}>{row.alder}</Typography>
-                  {[row.vann, row.skjeer, row.maaltider, row.bokser].map((val, j) => (
-                    <Typography key={j} sx={{ fontSize: 14.5, color: D.text, textAlign: "right" }}>{val}</Typography>
+              {product.doseringTabell.rader.map((row, i) => (
+                <Box key={i} sx={{ display: "grid", gridTemplateColumns: `1.5fr repeat(${row.length - 1}, minmax(0, 1fr))`, gap: 1, px: 2, py: 1.1, bgcolor: i % 2 === 1 ? D.surfaceAlt : "transparent" }}>
+                  {row.map((val, j) => (
+                    <Typography key={j} sx={{ fontSize: 14.5, color: D.text, textAlign: j === 0 ? "left" : "right", fontWeight: j === 0 ? 700 : 400 }}>{val}</Typography>
                   ))}
                 </Box>
               ))}
@@ -1519,6 +2081,9 @@ type Dokument = { title: string; url: string; sizeLabel: string; color?: string 
 const INGR_EGENSKAPER_STANDARD = ["Glutenfri", "Inneholder fiskolje", "Inneholder laktose"];
 const INGR_EGENSKAPER_NEOCATE_LCP = ["Glutenfri", "Kostfiberfri", "Laktosefri"];
 const INGR_EGENSKAPER_NEOCATE_SPOON = ["Glutenfri", "Laktosefri"];
+const INGR_EGENSKAPER_ALFAMINO_JUNIOR = ["Glutenfri", "Halalsertifisert"];
+const INGR_EGENSKAPER_ALFAMINO = ["Glutenfri", "Laktosefri", "Halalsertifisert"];
+const INGR_EGENSKAPER_ALFARE = ["Glutenfri", "Laktosefri"];
 const INGR_EGENSKAPER_ALTHERA = ["Glutenfri", "Inneholder laktose", "Halalsertifisert"];
 const INGR_EGENSKAPER_NEOCATE_JUNIOR = ["Glutenfri", "Laktosefri", "Melkeproteinfri", "Kostfiberfri"];
 
@@ -1682,6 +2247,9 @@ const DOKUMENT_MAP: Record<string, Dokument[]> = {
   "pepticate-plus-2": [{ title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" }],
   "neocate-lcp": [{ title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" }],
   "neocate-spoon": [{ title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" }],
+  "alfamino-junior": [{ title: "Produktark Alfamino Junior", url: "/dokumenter/Alfamino-Junior.pdf", sizeLabel: "331 KB" }],
+  "alfamino": [{ title: "Produktark Alfamino", url: "/dokumenter/Alfamino.pdf", sizeLabel: "272 KB" }],
+  "alfare": [{ title: "Produktark Alfaré", url: "/dokumenter/Alfare.pdf", sizeLabel: "309 KB" }],
   "althera": [{ title: "Produktark Althéra", url: "/dokumenter/Althera.pdf", sizeLabel: "303 KB" }],
   "neocate-junior": [{ title: "Produktark Neocate Junior", url: "/dokumenter/Neocate-Junior-2026.pdf", sizeLabel: "1,1 MB" }],
 };
@@ -1697,6 +2265,9 @@ const ingrEgenskaper = (product: Product): string[] => {
   if (product.id === "neocate-spoon") return INGR_EGENSKAPER_NEOCATE_SPOON;
   if (product.id === "neocate-junior") return INGR_EGENSKAPER_NEOCATE_JUNIOR;
   if (product.id === "althera") return INGR_EGENSKAPER_ALTHERA;
+  if (product.id === "alfare") return INGR_EGENSKAPER_ALFARE;
+  if (product.id === "alfamino") return INGR_EGENSKAPER_ALFAMINO;
+  if (product.id === "alfamino-junior") return INGR_EGENSKAPER_ALFAMINO_JUNIOR;
   return INGR_EGENSKAPER_STANDARD;
 };
 

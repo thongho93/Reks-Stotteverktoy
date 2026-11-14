@@ -122,11 +122,11 @@ export function rankProducts(items: SearchableProduct[], terms: string[]): Produ
 export type SearchProductInfo = { id: string; name: string; meta: string; image?: string };
 
 export const SUGGESTION_GROUPS: { label: string; words: string[] }[] = [
-  { label: "Egenskap", words: ["Laktosefri", "Glutenfri", "Hydrolysert", "Aminosyrebasert", "Halal", "Kosher", "GOS/FOS", "DHA", "Nukleotider", "HMO"] },
+  { label: "Egenskap", words: ["Laktosefri", "Glutenfri", "Hydrolysert", "Aminosyrebasert", "Halal", "Kosher", "GOS/FOS", "DHA", "Nukleotider", "HMO", "MCT"] },
   { label: "Produsent", words: ["Nutricia", "Nestlé"] },
   { label: "Alder", words: ["0–6 måneder", "fra 6 måneder", "0–12 måneder", "0–1 år", "fra 1 år", "fast føde"] },
   { label: "Bruk", words: ["Sondeernæring", "Matlaging", "Eneste næringskilde", "Tilskudd", "Tåteflaske"] },
-  { label: "Tilstand", words: ["Kumelkallergi", "Multimatvareallergi", "Refluks", "Tarm", "Malabsorpsjon", "Parenteral"] },
+  { label: "Tilstand", words: ["Kumelkallergi", "Multimatvareallergi", "Refluks", "Diaré", "Tarm", "Malabsorpsjon", "Parenteral"] },
 ];
 
 export const SUGGESTION_EXAMPLES = ["laktosefri sonde", "hydrolysert glutenfri", "refluks", "halal", "840659"];
