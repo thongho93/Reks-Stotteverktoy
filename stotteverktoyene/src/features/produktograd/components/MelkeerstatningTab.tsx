@@ -806,6 +806,9 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
 }
 
 function OversiktTab({ product }: { product: Product }) {
+  // Produktbeskrivelsen er første fordel (med mindre den allerede står i listen).
+  const beskrivelse = `${product.tagline} ${product.description}`.trim();
+  const fordeler = product.fordeler.some((f) => f.includes(product.tagline)) ? product.fordeler : [beskrivelse, ...product.fordeler];
   const card = { bgcolor: D.surfaceAlt, borderRadius: "12px", p: 2.25, display: "grid", gap: 1.25, alignContent: "start" } as const;
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3.5, alignItems: "flex-start" }}>
@@ -813,7 +816,7 @@ function OversiktTab({ product }: { product: Product }) {
       <Box sx={{ flex: "1.5 1 420px", minWidth: 0, display: "grid", gap: 1.75 }}>
         <Typography component="h2" sx={{ fontWeight: 800, fontSize: 18, color: D.text }}>Fordeler med {product.name}</Typography>
         <Box component="ol" sx={{ m: 0, p: 0, listStyle: "none", display: "grid", gap: 1.75 }}>
-          {product.fordeler.map((f, i) => (
+          {fordeler.map((f, i) => (
             <Box component="li" key={i} sx={{ display: "flex", gap: 1.75, alignItems: "flex-start" }}>
               <Box aria-hidden sx={{ flex: "0 0 28px", height: 28, borderRadius: "50%", bgcolor: D.blueLight, color: D.purple, fontSize: 14, fontWeight: 800, display: "grid", placeItems: "center" }}>
                 {i + 1}
@@ -1070,12 +1073,6 @@ function IngrediensTab({ product }: { product: Product }) {
         <Typography sx={{ fontSize: 15, color: D.text, lineHeight: 1.75 }}>{product.ingredienser}</Typography>
       </Box>
 
-      {product.smaksvarianter ? (
-        <Box sx={{ display: "flex", alignItems: "baseline", gap: 1.25, px: 0.5 }}>
-          <Typography sx={labelSx}>Smak</Typography>
-          <Typography sx={{ fontSize: 15, color: D.text }}>{product.smaksvarianter}</Typography>
-        </Box>
-      ) : null}
     </Box>
   );
 }
@@ -1281,15 +1278,12 @@ export default function MelkeerstatningTab() {
             <Typography component="h1" sx={{ fontWeight: 800, fontSize: 28, color: D.text, lineHeight: 1.15 }}>{product.name}</Typography>
             <Typography sx={{ fontSize: 15, color: D.textMuted, fontWeight: 600 }}>{product.age}</Typography>
           </Box>
-          <Typography sx={{ fontSize: 15, color: D.textSub, lineHeight: 1.5 }}>
-            {product.tagline} {product.description}
-          </Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-            {product.badges.map((b, i) => {
+            {[...product.badges.map((b) => b.label), ...(product.smaksvarianter ? [product.smaksvarianter.replace(/\.$/, "")] : [])].map((label, i) => {
               const tone = BADGE_TONES[i % BADGE_TONES.length];
               return (
                 <Box key={i} sx={{ px: 1.25, py: 0.5, borderRadius: "6px", bgcolor: tone.bg, color: tone.fg, fontSize: 12.5, fontWeight: 600, lineHeight: 1.3 }}>
-                  {b.label}
+                  {label}
                 </Box>
               );
             })}
