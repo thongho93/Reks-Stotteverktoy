@@ -41,7 +41,19 @@ import {
   WarehouseIcon,
   WrenchIcon,
 } from "./navIcons";
-import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../features/produktograd/queryKeys";
+import {
+  FAGLIG_DOC_QUERY_KEY,
+  ROUTINE_TAB_QUERY_KEY,
+  ROUTINE_DOC_QUERY_KEY,
+  NUTRITION_TAB_ID,
+} from "../features/produktograd/queryKeys";
+import {
+  VIRTUAL_TAB_LABELS,
+  orderTabIds,
+  readSavedTabOrder,
+  useFagligDocTitles,
+  type FagligDocTitle,
+} from "../features/produktograd/fagligTabs";
 import { NavigationGuardProvider, useGuardedNavigate } from "../shared/hooks/useNavigationGuard";
 
 
@@ -98,7 +110,8 @@ function getIsoWeekNumber(date: Date): number {
   return Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
-type SidebarSubItem = { label: string; search: string };
+// `id` er fane-id-en i Produkt og råd (brukes til å finne aktiv undermeny).
+type SidebarSubItem = { label: string; search: string; id?: string };
 
 type SidebarItem = {
   label: string;
@@ -124,9 +137,9 @@ const MAIN_ITEMS: SidebarItem[] = [
     path: "/produkt-og-rad",
     Icon: PillIcon,
     ...NAV_COLORS.produkt,
+    // Fanene mellom disse to hentes dynamisk i Sidebar (se produktSubItems).
     subItems: [
       { label: "Produkt og råd", search: "" },
-      { label: "Faglig innhold", search: "?fagdoc=" },
       { label: "Rutiner", search: "?tab=rutiner" },
     ],
   },
@@ -142,6 +155,21 @@ const MAIN_ITEMS: SidebarItem[] = [
   },
   { label: "Notater", path: "/tilbakemelding", Icon: SquarePenIcon, ...NAV_COLORS.notater },
 ];
+
+// Undermenyen til Produkt og råd speiler fanelinjen på siden: Produkt og råd, alle
+// dokumentfaner (faste og egne, i brukerens rekkefølge) og Rutiner.
+function produktSubItems(docs: FagligDocTitle[]): SidebarSubItem[] {
+  const titles = new Map(docs.map((doc) => [doc.id, doc.title]));
+  const tabs = orderTabIds(
+    docs.map((doc) => doc.id),
+    readSavedTabOrder()
+  ).map((id) => ({
+    id,
+    label: VIRTUAL_TAB_LABELS[id] ?? titles.get(id) ?? "Dokument",
+    search: `?${FAGLIG_DOC_QUERY_KEY}=${encodeURIComponent(id)}`,
+  }));
+  return [{ label: "Produkt og råd", search: "" }, ...tabs, { label: "Rutiner", search: "?tab=rutiner" }];
+}
 
 function pathToUsagePage(pathname: string): UsagePage {
   if (pathname === "/") return "home";
@@ -203,7 +231,11 @@ function RouteLoader() {
 }
 
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const { isOwner, isAdmin, isRekspert, role } = useAuthUser();
+  const { user, isOwner, isAdmin, isRekspert, role } = useAuthUser();
+  const fagligDocs = useFagligDocTitles(user?.uid);
+  const mainItems = MAIN_ITEMS.map((item) =>
+    item.path === "/produkt-og-rad" ? { ...item, subItems: produktSubItems(fagligDocs) } : item
+  );
   const hasRekspertAccess = Boolean(isRekspert) || role === "rekspert" || Boolean(isOwner);
   // Tekststatistikk leser usage_daily, som firestore.rules kun åpner for isAdmin().
   const hasAdminAccess = Boolean(isAdmin) || Boolean(isOwner);
@@ -245,11 +277,19 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   };
 
   // Hvilken undermeny som er aktiv, ut fra søkeparametrene i adressen.
-  const activeSubIndex = (path: string): number => {
+  const activeSubIndex = (item: SidebarItem): number => {
     const params = new URLSearchParams(location.search);
+    const path = item.path;
     if (path === "/produkt-og-rad") {
-      if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) return 2;
-      if (params.has(FAGLIG_DOC_QUERY_KEY)) return 1;
+      const subs = item.subItems ?? [];
+      if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) {
+        return subs.length - 1;
+      }
+      if (params.has(FAGLIG_DOC_QUERY_KEY)) {
+        // Tom verdi (gammel «Faglig innhold»-lenke) åpner Næringsmidler.
+        const docId = params.get(FAGLIG_DOC_QUERY_KEY) || NUTRITION_TAB_ID;
+        return subs.findIndex((sub) => sub.id === docId);
+      }
       return 0;
     }
     if (path === "/anbrudd") return params.get("tab") === "oversikt" ? 1 : 0;
@@ -369,7 +409,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
               {item.label}
             </Typography>
             {item.subItems.map((sub, i) => {
-              const subActive = selected && activeSubIndex(item.path) === i;
+              const subActive = selected && activeSubIndex(item) === i;
               return (
                 <ListItemButton
                   key={sub.label}
@@ -528,7 +568,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
               }}
             >
               {item.subItems?.map((sub, i) => {
-                const subActive = selected && activeSubIndex(item.path) === i;
+                const subActive = selected && activeSubIndex(item) === i;
                 return (
                   <ListItemButton
                     key={sub.label}
@@ -680,7 +720,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       )}
 
       <Box component="nav" aria-label="Hovedmeny" sx={{ display: "flex", flexDirection: "column", gap: collapsed ? 0.75 : 0.25, pb: 1 }}>
-        {MAIN_ITEMS.map(renderItem)}
+        {mainItems.map(renderItem)}
 
         {adminItems.length > 0 && (
           <>

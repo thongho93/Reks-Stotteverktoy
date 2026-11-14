@@ -7,7 +7,7 @@ import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import TryggmammaTab from "../components/TryggmammaTab";
 import MelkeerstatningTab from "../components/MelkeerstatningTab";
 import TilbakemeldingPage from "../../tilbakemelding/pages/TilbakemeldingPage";
-import FagligDocView from "../components/FagligDocView";
+import FagligDocView, { type FagligDocViewDoc } from "../components/FagligDocView";
 import FagligTabBar, {
   PRODUCT_TAB_KEY,
   ROUTINES_TAB_KEY,
@@ -63,6 +63,7 @@ import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatis
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
 import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../queryKeys";
+import { MIGRENE_TAB_ID, VIRTUAL_TAB_LABELS, isVirtualTabId, orderTabIds } from "../fagligTabs";
 import { PAGE_GUTTER_X, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
 
 type AdviceProductRow = {
@@ -180,15 +181,17 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
   }
 };
 
-const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__melkeerstatning__", "__tryggmamma__", "__knuse__"] as const;
 
-const VIRTUAL_TAB_LABELS: Record<string, string> = {
-  __nutrition__: "Næringsmidler",
-  __melkeerstatning__: "Melkeerstatning",
-  __tryggmamma__: "Tryggmamma",
-  __knuse__: "Knuse-/delelisten",
+
+
+// Fast fane: PDF-en følger appen (public/dokumenter) og trenger ikke Firestore.
+const MIGRENE_DOC: FagligDocViewDoc = {
+  id: MIGRENE_TAB_ID,
+  title: "Legemidler ved migrenebehandling",
+  kind: "pdf",
+  content: "",
+  url: "/dokumenter/Legemidler%20ved%20migrenebehandling.pdf",
 };
-
 
 const searchProducts = (list: AdviceProduct[], query: string): AdviceProduct[] => {
   const normalizedQuery = normalizeSearch(query);
@@ -259,6 +262,10 @@ export default function ProduktOgRadPage() {
     }
     if (params.has(FAGLIG_DOC_QUERY_KEY)) {
       setActiveTab(1);
+      // Sidemenyen lenker direkte til en fane (fast eller eget dokument). Ukjente id-er
+      // rettes opp av effekten som velger første dokument når listen er lastet.
+      const docId = params.get(FAGLIG_DOC_QUERY_KEY);
+      if (docId) setSelectedFagligDocId(docId);
       return;
     }
     // No URL params: use location.state (command palette) or default to tab 0
@@ -421,7 +428,7 @@ export default function ProduktOgRadPage() {
       .map(([code, names]) => ({ code, title: ATC_INGREDIENT[code] ?? (brandLabel(names) || code), count: names.length }));
   }, [products]);
   const selectedFagligDoc = useMemo(() => {
-    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return null;
+    if (isVirtualTabId(selectedFagligDocId)) return null;
     if (selectedFagligDocId) {
       const exact = fagligDocs.find((doc) => doc.id === selectedFagligDocId);
       if (exact) return exact;
@@ -432,13 +439,10 @@ export default function ProduktOgRadPage() {
 
   // Rekkefølgen på alle dokumentfaner (faste og egne). Faste faner som mangler i en gammel lagret
   // rekkefølge settes først, nye dokumenter sist.
-  const orderedTabIds = useMemo(() => {
-    const allIds: string[] = [...VIRTUAL_SIDEBAR_IDS, ...fagligDocs.map((doc) => doc.id)];
-    const saved = sidebarOrder.filter((id) => allIds.includes(id));
-    const missingBuiltIn = VIRTUAL_SIDEBAR_IDS.filter((id) => !saved.includes(id));
-    const missingDocs = allIds.filter((id) => !saved.includes(id) && !missingBuiltIn.includes(id as never));
-    return [...missingBuiltIn, ...saved, ...missingDocs];
-  }, [fagligDocs, sidebarOrder]);
+  const orderedTabIds = useMemo(
+    () => orderTabIds(fagligDocs.map((doc) => doc.id), sidebarOrder),
+    [fagligDocs, sidebarOrder]
+  );
 
   const fagligDocMenuOpen = Boolean(fagligDocMenuAnchorEl);
   const fagligEmojiPopoverOpen = Boolean(fagligEmojiAnchorEl);
@@ -454,7 +458,7 @@ export default function ProduktOgRadPage() {
   useEffect(() => {
     if (isFagligLoading) return;
     // Built-in virtual tabs — never auto-replace them
-    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return;
+    if (isVirtualTabId(selectedFagligDocId)) return;
     if (fagligDocs.length === 0) {
       setSelectedFagligDocId(null);
       return;
@@ -766,7 +770,7 @@ export default function ProduktOgRadPage() {
     }, 350);
   };
 
-  const isBuiltInSelected = (VIRTUAL_SIDEBAR_IDS as readonly string[]).includes(selectedFagligDocId ?? "");
+  const isBuiltInSelected = isVirtualTabId(selectedFagligDocId);
   const activeTabKey =
     activeTab === 0
       ? PRODUCT_TAB_KEY
@@ -1128,6 +1132,12 @@ export default function ProduktOgRadPage() {
                 <KnuseDelisteTab />
               ) : selectedFagligDocId === "__tryggmamma__" ? (
                 <TryggmammaTab />
+              ) : selectedFagligDocId === MIGRENE_TAB_ID ? (
+                <FagligDocView
+                  doc={MIGRENE_DOC}
+                  titleInputRef={fagligTitleInputRef}
+                  onChangeText={updateSelectedTextDoc}
+                />
               ) : selectedFagligDoc ? (
                 <FagligDocView doc={selectedFagligDoc} titleInputRef={fagligTitleInputRef} onChangeText={updateSelectedTextDoc} />
               ) : (

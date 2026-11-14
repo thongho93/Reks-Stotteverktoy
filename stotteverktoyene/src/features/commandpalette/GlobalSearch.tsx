@@ -273,6 +273,12 @@ const BUILTIN_FAGLIG_TABS: FagligTabOption[] = [
     emoji: "💊",
     keywords: ["knuse", "dele", "tablett", "kapsel"],
   },
+  {
+    id: "__migrene__",
+    label: "Migrene",
+    emoji: "🧠",
+    keywords: ["migrene", "hodepine", "triptan", "legemidler"],
+  },
 ];
 
 type OmeqSelectedMedication = {
