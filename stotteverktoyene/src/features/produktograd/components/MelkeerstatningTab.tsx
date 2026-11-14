@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, ButtonBase, Typography, Tabs, Tab, Chip } from "@mui/material";
+import { Box, ButtonBase, Typography, Tabs, Tab } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
@@ -86,13 +86,14 @@ const PEPTICATE_1: Product = {
   id: "pepticate-1",
   name: "Pepticate 1",
   age: "0–6 måneder",
-  tagline: "Mysebasert, høygradig hydrolysert morsmelkerstatning for spedbarn med kumelkallergi.",
-  description: "Ernæringsmessig komplett og kan brukes som eneste næringskilde.",
+  tagline: "Mysebasert, høygradig hydrolysert morsmelkerstatning for barn 0–1 år med kumelkallergi.",
+  description: "Ernæringsmessig komplett og hypoallergen.",
   image: "/nutrition/pepticate-1.png",
   type: "Hydrolysert",
   badges: [
     { label: "Hydrolysert",                    color: "#3B82F6", icon: "drop"   },
     { label: "Ernæringsmessig komplett 0–1 år", color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri", color: "#4ADE80", icon: "shield" },
     { label: "Med GOS/FOS",                    color: "#EA580C", icon: "gut"    },
     { label: "Med DHA & ARA",                  color: "#D97706", icon: "drop"   },
     { label: "Med nukleotider",                color: "#A78BFA", icon: "star"   },
@@ -103,7 +104,7 @@ const PEPTICATE_1: Product = {
     { label: "Protein",      value: "100% myse (hydrolysert)" },
     { label: "Kostfiber",    value: "GOS/FOS (0,8g/100ml)" },
     { label: "Halal",        value: "Nei" },
-    { label: "Laktose",      value: "21,1g/100ml" },
+    { label: "Laktose",      value: "Ja" },
   ],
   fordeler: [
     "Inneholder en unik, veldokumentert blanding av prebiotiske kostfibre GOS/FOS som støtter tarmfloraen og immunforsvaret.",
@@ -113,15 +114,14 @@ const PEPTICATE_1: Product = {
   ],
   fordelerIcons: [ICON_GUT, ICON_MILK_BOTTLE, ICON_DROP, ICON_SHIELD_STAR],
   bruksomraader: [
-    "Til kostbehandling av spedbarn 0–1 år med kumelkallergi og andre indikasjoner hvor elementalkost er anbefalt.",
-    "Kan brukes som eneste næringskilde eller i kombinasjon med amming.",
+    "Til kostbehandling av spedbarn 0–1 år med kumelkallergi.",
+    "Ernæringsmessig komplett for spedbarn 0–1 år og kan brukes som tilskudd til barn over 1 år.",
     "Kan brukes som erstatning for melk ved matlaging og baking.",
   ],
   fodmap: { laktose: "21,1 g", gos: true, fos: true },
   viktigAVite: [
     "Morsmelk er det beste for spedbarn.",
-    "Pepticate er et næringsmiddel til spesielle medisinske formål.",
-    "Skal brukes under medisinsk tilsyn etter nøye vurdering.",
+    "Skal brukes etter anbefaling fra lege eller klinisk ernæringsfysiolog, og først etter vurdering av øvrig kostbehandling inklusiv amming.",
     "Tilbered alltid bare ett måltid om gangen.",
   ],
   hurtiginfo: [
@@ -203,6 +203,7 @@ const PEPTICATE_1: Product = {
           { label: "Vitamin A",       unit: "µg",        per100gPulver: "426",       per100mlUtblandet: "58" },
           { label: "Vitamin D",       unit: "µg",        per100gPulver: "12",        per100mlUtblandet: "1,7" },
           { label: "Vitamin E",       unit: "mg (mg TE)", per100gPulver: "10 (8,9)", per100mlUtblandet: "1,4 (1,2)" },
+          { label: "Vitamin C",       unit: "mg",         per100gPulver: "67",        per100mlUtblandet: "9,1" },
           { label: "Vitamin K",       unit: "µg",        per100gPulver: "33",        per100mlUtblandet: "4,4" },
           { label: "Tiamin",          unit: "mg",        per100gPulver: "0,49",      per100mlUtblandet: "0,07" },
           { label: "Riboflavin",      unit: "mg",        per100gPulver: "1,0",       per100mlUtblandet: "0,14" },
@@ -246,7 +247,7 @@ const PEPTICATE_1: Product = {
     { skjeer: 5, pulver: "22,5", vann: 150, ferdig: 165, energi: 109 },
   ],
   holdbarhet: "18 måneder fra produksjonsdato. Holdbarhetsdato på pakningen. Tilbered alltid bare ett måltid om gangen. Tilberedt Pepticate som ikke drikkes innen en time skal kastes. Ved sondeernæring er maks hengetid 4 timer. Uåpnet boks oppbevares i romtemperatur. Åpnet boks oppbevares med lokk, på et svalt og tørt sted. Brukes innen 1 måned. Skal ikke oppbevares i kjøleskap.",
-  ingredienser: "Myseproteinhydrolysat (fra kumelk), maltodekstrin, vegetabilske oljer (palmeolje, kokosolje, rapsolje, oljesyrerik solsikkeolje, solsikkeolje), galaktooligosakkarider (fra kumelk), kalsiumfosfat, emulgator (sitronsyreestere av mono- og diglycerider av fettsyrer), fruktooligosakkarider, fiskeolje, kaliumklorid, olje fra Mortierella alpina, kolinklklorid, kaliumsitat, natriumklorid, magnesiumklorid, L-tyrosin, L-askorbinsyre, inositol, magnesiumhydrogenfosfat, taurin, natrium-L-askorbat, sinksulfat, L-karnitin, jernsulfat, DL-α-tokoferylacelat, uridin-5'-monofosfatnatrium salt, cytidin-5'-monofosfat, kalsium-D-pantotenate, adenosin-5'-monofosfat, inosin-5'-monofosfatnatriumsalt, nikotinamid, guanosin-5'-monofosfatnatriumsalt, kobbersulfat, DL-α-tokoferol, retinylpalmitat, riboflavin, tiaminhydroklorid, pyridoksinhydroklorid, manganisulfat, kaliumjodid, pteroylmonoglutaminsyre, retinylasetat, natriumselenitt, fytomenadion, D-biotin, kolekalsiferol, cyanokobalamin. Glutenfri.",
+  ingredienser: "Myseproteinhydrolysat (fra kumelk), maltodekstrin, vegetabilske oljer (palmeolje, kokosolje, rapsolje, oljesyrerik solsikkeolje, solsikkeolje), galaktooligosakkarider (fra kumelk), kalsiumfosfat, emulgator (sitronsyreestere av mono- og diglyserider av fettsyrer), fruktooligosakkarider, fiskeolje, kaliumklorid, olje fra Mortierella alpina, kolinklorid, kaliumsitrat, natriumklorid, magnesiumklorid, L-tyrosin, L-askorbinsyre, inositol, magnesiumhydrogenfosfat, taurin, natrium-L-askorbat, sinksulfat, L-karnitin, jernsulfat, DL-α-tokoferylacetat, uridin-5'-monofosfatnatriumsalt, cytidin-5'-monofosfat, kalsium-D-pantotenat, adenosin-5'-monofosfat, inosin-5'-monofosfatnatriumsalt, nikotinamid, guanosin-5'-monofosfatnatriumsalt, kobbersulfat, DL-α-tokoferol, retinylpalmitat, riboflavin, tiaminhydroklorid, pyridoksinhydroklorid, mangansulfat, kaliumjodid, pteroylmonoglutaminsyre, retinylacetat, natriumselenitt, fytomenadion, D-biotin, kolekalsiferol, cyanokobalamin. Glutenfri.",
   smaksvarianter: "Nøytral smak.",
   indikasjon: "Til kostbehandling av barn med kumelkallergi. Ernæringsmessig komplett for spedbarn 0–1 år. Kan brukes som tilskudd til barn over 1 år.",
   kontraindikasjon: "Galaktosemi. Intoleranse mot et eller flere av produktets ingredienser.",
@@ -268,6 +269,7 @@ const PEPTICATE_PLUS_2: Product = {
   badges: [
     { label: "Hydrolysert",          color: "#3B82F6", icon: "drop"   },
     { label: "Tilskudd fra 6 mnd",   color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri", color: "#4ADE80", icon: "shield" },
     { label: "Med GOS/FOS",          color: "#EA580C", icon: "gut"    },
     { label: "Med DHA & ARA",        color: "#D97706", icon: "drop"   },
     { label: "Med nukleotider",      color: "#A78BFA", icon: "star"   },
@@ -278,7 +280,7 @@ const PEPTICATE_PLUS_2: Product = {
     { label: "Protein",      value: "100% myse (hydrolysert)" },
     { label: "Kostfiber",    value: "GOS/FOS (0,6g/100ml)" },
     { label: "Halal",        value: "Nei" },
-    { label: "Laktose",      value: "20,6g/100ml" },
+    { label: "Laktose",      value: "Ja" },
   ],
   fordeler: [
     "Bygger på 30 års forskning på morsmelk og er dokumentert velfungerende for barn med kumelkallergi.",
@@ -444,6 +446,7 @@ const NEOCATE_LCP: Product = {
   badges: [
     { label: "Aminosyrebasert",                 color: "#3B82F6", icon: "drop"   },
     { label: "Ernæringsmessig komplett 0–1 år", color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri", color: "#4ADE80", icon: "shield" },
     { label: "Laktosefri",                      color: "#EA580C", icon: "gut"    },
     { label: "Med DHA & ARA",                   color: "#D97706", icon: "drop"   },
     { label: "Med nukleotider",                 color: "#A78BFA", icon: "star"   },
@@ -454,7 +457,7 @@ const NEOCATE_LCP: Product = {
     { label: "Protein",       value: "Frie aminosyrer" },
     { label: "Kostfiber",     value: "Ikke tilsatt" },
     { label: "Halal",         value: "Ja" },
-    { label: "Laktose",       value: "0 g" },
+    { label: "Laktose",       value: "Nei" },
   ],
   fordeler: [
     "Inneholder alle næringsstoffer et spedbarn trenger og kan brukes som eneste ernæringskilde.",
@@ -628,7 +631,7 @@ const NEOCATE_SPOON: Product = {
     { label: "Protein",       value: "Enkle aminosyrer" },
     { label: "Kostfiber",     value: "Ikke tilsatt" },
     { label: "Halal",         value: "Ja" },
-    { label: "Laktose",       value: "0 g" },
+    { label: "Laktose",       value: "Nei" },
   ],
   fordeler: [
     "Hypoallergen og basert på frie aminosyrer som gir svært lav risiko for allergisk reaksjon.",
@@ -846,34 +849,6 @@ function OversiktTab({ product }: { product: Product }) {
               <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.5 }}>{v}</Typography>
             </Box>
           ))}
-        </Box>
-
-        {/* FODMAP */}
-        <Box sx={card}>
-          <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>FODMAP pr. 100 ml</Typography>
-          <Box>
-            {[
-              { label: "Laktose", value: product.fodmap.laktose },
-              { label: "GOS*",    value: product.fodmap.gos ? "Ja" : "Nei" },
-              { label: "FOS**",   value: product.fodmap.fos ? "Ja" : "Nei" },
-            ].map((row, i) => (
-              <Box key={i} sx={{ display: "flex", justifyContent: "space-between", py: 0.6, borderBottom: i < 2 ? `1px solid ${D.border}` : "none" }}>
-                <Typography sx={{ fontSize: 14, color: D.textSub }}>{row.label}</Typography>
-                <Typography sx={{ fontSize: 14, color: D.text, fontWeight: 700 }}>{row.value}</Typography>
-              </Box>
-            ))}
-          </Box>
-          <Typography sx={{ fontSize: 12, color: D.textMuted }}>*Galaktooligosakkarider &nbsp;&nbsp; **Fruktooligosakkarider</Typography>
-        </Box>
-
-        {/* Hurtiginfo */}
-        <Box sx={card}>
-          <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Hurtiginfo</Typography>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-            {product.hurtiginfo.map((h, i) => (
-              <Chip key={i} label={h.label} size="small" sx={{ height: 26, fontSize: 12.5, fontWeight: 600, bgcolor: D.surface, color: D.textSub, border: `1px solid ${D.borderMed}`, borderRadius: "6px", "& .MuiChip-label": { px: 1 } }} />
-            ))}
-          </Box>
         </Box>
       </Box>
     </Box>
