@@ -7,6 +7,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import { MK } from "./melkeTheme";
 import {
   HIT_BG,
   SUGGESTION_EXAMPLES,
@@ -21,18 +22,19 @@ import {
 // ─── Brukergrensesnitt for søk i Melkeerstatning ─────────────────────────────
 
 const SEARCH = {
-  ink: "#2D1727",
-  sub: "#4A3342",
-  muted: "#6B5262",
-  accent: "#A81F66",
-  line: "#EAD2E1",
-  lineSoft: "#F0DCE8",
-  border: "#E3C6D8",
-  soft: "#FFFAFD",
-  pill: "#FCE7F2",
-  pillText: "#8C1A59",
-  hit: "#FFEFA8",
-  hitNow: "#FFD84D",
+  ink: MK.text,
+  sub: MK.sub,
+  muted: MK.muted,
+  accent: MK.accent,
+  accentBg: MK.accentBg,
+  line: MK.border,
+  lineSoft: MK.lineSoft,
+  border: MK.borderMed,
+  soft: MK.soft,
+  pill: MK.pill,
+  pillText: MK.pillText,
+  hit: MK.hit,
+  hitNow: MK.hitNow,
 } as const;
 
 /** Tekst med treffene uthevet. Hver utheving har `data-hit`, slik at de kan navigeres. */
@@ -45,7 +47,7 @@ export function Hl({ text, terms }: { text: string; terms: string[] }) {
   ranges.forEach(([start, end], i) => {
     if (start > last) parts.push(text.slice(last, start));
     parts.push(
-      <mark key={i} data-hit="true" style={{ background: HIT_BG, color: SEARCH.ink, borderRadius: 3, padding: "0 2px" }}>
+      <mark key={i} data-hit="true" style={{ background: HIT_BG, color: MK.hitText, borderRadius: 3, padding: "0 2px" }}>
         {text.slice(start, end)}
       </mark>
     );
@@ -92,7 +94,7 @@ export function SearchHeader({
       {onBack ? (
         <ButtonBase
           onClick={onBack}
-          sx={{ gap: 0.5, minHeight: 40, px: 1.5, borderRadius: "10px", border: `1px solid ${SEARCH.border}`, bgcolor: "#FFFFFF", fontSize: 13.5, fontWeight: 600, color: SEARCH.sub, "&:hover": { bgcolor: SEARCH.pill, borderColor: SEARCH.accent } }}
+          sx={{ gap: 0.5, minHeight: 40, px: 1.5, borderRadius: "10px", border: `1px solid ${SEARCH.border}`, bgcolor: MK.surface, fontSize: 13.5, fontWeight: 600, color: SEARCH.sub, "&:hover": { bgcolor: SEARCH.pill, borderColor: SEARCH.accent } }}
         >
           <ChevronLeftRoundedIcon sx={{ fontSize: 18, color: SEARCH.accent }} />
           Tilbake til resultater
@@ -101,9 +103,9 @@ export function SearchHeader({
       <Box
         sx={{
           flex: "1 1 320px", minWidth: 0, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1,
-          minHeight: onBack ? 44 : 54, px: 1.75, py: 0.75, bgcolor: "#FFFFFF", borderRadius: "12px",
-          border: `${onBack ? 1.5 : 2}px solid ${onBack ? "#D79BBB" : SEARCH.accent}`,
-          boxShadow: onBack ? "none" : "0 6px 24px rgba(168,31,102,0.12)",
+          minHeight: onBack ? 44 : 54, px: 1.75, py: 0.75, bgcolor: MK.surface, borderRadius: "12px",
+          border: `${onBack ? 1.5 : 2}px solid ${onBack ? MK.borderAccent : SEARCH.accent}`,
+          boxShadow: onBack ? "none" : `0 6px 24px ${MK.shadowAccent}`,
           "&:focus-within": { borderColor: SEARCH.accent },
         }}
       >
@@ -111,7 +113,7 @@ export function SearchHeader({
         {tokens.map((token, i) => (
           <Box key={`${token}-${i}`} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 32, pl: 1.5, pr: 0.5, borderRadius: "8px", bgcolor: SEARCH.pill, color: SEARCH.pillText, fontSize: 14.5, fontWeight: 700 }}>
             {token}
-            <ButtonBase aria-label={`Fjern ${token}`} onClick={() => onRemoveToken(i)} sx={{ width: 22, height: 22, borderRadius: "6px", "&:hover": { bgcolor: "#F2CFE3" } }}>
+            <ButtonBase aria-label={`Fjern ${token}`} onClick={() => onRemoveToken(i)} sx={{ width: 22, height: 22, borderRadius: "6px", "&:hover": { bgcolor: MK.pillBorder } }}>
               <CloseRoundedIcon sx={{ fontSize: 14 }} />
             </ButtonBase>
           </Box>
@@ -133,13 +135,13 @@ export function SearchHeader({
         >
           <CloseRoundedIcon sx={{ fontSize: 18 }} />
         </ButtonBase>
-        <Box role="group" aria-label="Søkemåte" sx={{ display: "flex", p: "3px", gap: "2px", bgcolor: "#FBF4F8", border: `1px solid ${SEARCH.border}`, borderRadius: "10px" }}>
+        <Box role="group" aria-label="Søkemåte" sx={{ display: "flex", p: "3px", gap: "2px", bgcolor: MK.alt, border: `1px solid ${SEARCH.border}`, borderRadius: "10px" }}>
           {([["all", "Alle ord"], ["any", "Minst ett"]] as const).map(([value, label]) => (
             <ButtonBase
               key={value}
               aria-pressed={mode === value}
               onClick={() => onModeChange(value)}
-              sx={{ px: 1.5, minHeight: 30, borderRadius: "7px", fontSize: 13, fontWeight: 600, color: mode === value ? "#FFFFFF" : SEARCH.sub, bgcolor: mode === value ? SEARCH.accent : "transparent" }}
+              sx={{ px: 1.5, minHeight: 30, borderRadius: "7px", fontSize: 13, fontWeight: 600, color: mode === value ? MK.onAccent : SEARCH.sub, bgcolor: mode === value ? SEARCH.accentBg : "transparent" }}
             >
               {label}
             </ButtonBase>
@@ -158,8 +160,8 @@ export function SuggestionsPanel({ hasHit, onPick }: { hasHit: (term: string) =>
   const examples = SUGGESTION_EXAMPLES.filter((example) => parseTokens(example).every(hasHit));
   const groups = SUGGESTION_GROUPS.map((group) => ({ ...group, words: group.words.filter((w) => hasHit(w)) })).filter((g) => g.words.length > 0);
   const chipSx = {
-    px: 1.5, minHeight: 34, borderRadius: "8px", border: `1px solid ${SEARCH.border}`, bgcolor: "#FFFFFF", fontSize: 13.5, fontWeight: 600, color: SEARCH.sub,
-    "&:hover": { bgcolor: SEARCH.pill, borderColor: "#C9709F" },
+    px: 1.5, minHeight: 34, borderRadius: "8px", border: `1px solid ${SEARCH.border}`, bgcolor: MK.surface, fontSize: 13.5, fontWeight: 600, color: SEARCH.sub,
+    "&:hover": { bgcolor: SEARCH.pill, borderColor: MK.hoverBorder },
   } as const;
   return (
     <Box sx={{ p: 2.5, display: "grid", gap: 2.25, alignContent: "start" }}>
@@ -167,7 +169,7 @@ export function SuggestionsPanel({ hasHit, onPick }: { hasHit: (term: string) =>
         <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
           <Typography sx={{ ...groupLabelSx, mr: 0.5 }}>Prøv</Typography>
           {examples.map((example) => (
-            <ButtonBase key={example} onClick={() => onPick(parseTokens(example))} sx={{ px: 1.5, minHeight: 36, borderRadius: "8px", bgcolor: SEARCH.pill, color: SEARCH.pillText, fontSize: 14, fontWeight: 600, "&:hover": { bgcolor: "#F8D4E8" } }}>
+            <ButtonBase key={example} onClick={() => onPick(parseTokens(example))} sx={{ px: 1.5, minHeight: 36, borderRadius: "8px", bgcolor: SEARCH.pill, color: SEARCH.pillText, fontSize: 14, fontWeight: 600, "&:hover": { bgcolor: MK.pillHover } }}>
               {example}
             </ButtonBase>
           ))}
@@ -198,7 +200,7 @@ export function SuggestionsPanel({ hasHit, onPick }: { hasHit: (term: string) =>
             {item.keys.map((key, i) => (
               <Box key={key} sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
                 {i > 0 ? <span>eller</span> : null}
-                <Box component="kbd" sx={{ fontFamily: "inherit", fontSize: 12, fontWeight: 600, px: "7px", py: "2px", borderRadius: "6px", border: `1px solid ${SEARCH.border}`, bgcolor: "#FBF4F8", color: SEARCH.sub }}>{key}</Box>
+                <Box component="kbd" sx={{ fontFamily: "inherit", fontSize: 12, fontWeight: 600, px: "7px", py: "2px", borderRadius: "6px", border: `1px solid ${SEARCH.border}`, bgcolor: MK.alt, color: SEARCH.sub }}>{key}</Box>
               </Box>
             ))}
             {item.text}
@@ -223,7 +225,7 @@ function ProductThumb({ info, size }: { info: SearchProductInfo; size: "lg" | "s
   const w = size === "lg" ? 72 : 52;
   const h = size === "lg" ? 88 : 60;
   return (
-    <Box sx={{ flex: `0 0 ${w}px`, height: h, borderRadius: size === "lg" ? "12px" : "10px", bgcolor: "#F6EEF7", display: "grid", placeItems: "center" }}>
+    <Box sx={{ flex: `0 0 ${w}px`, height: h, borderRadius: size === "lg" ? "12px" : "10px", bgcolor: MK.tile, display: "grid", placeItems: "center" }}>
       {info.image ? <Box component="img" src={info.image} alt="" sx={{ width: w - 16, height: h - 18, objectFit: "contain" }} /> : null}
     </Box>
   );
@@ -236,7 +238,7 @@ export function SearchResults({ matches, info, terms, mode, onOpen }: ResultsPro
   const openButton = (id: string) => (
     <ButtonBase
       onClick={() => onOpen(id)}
-      sx={{ gap: 0.5, minHeight: 40, px: 1.75, borderRadius: "10px", border: `1px solid ${SEARCH.border}`, bgcolor: "#FFFFFF", fontSize: 14, fontWeight: 700, color: SEARCH.accent, whiteSpace: "nowrap", "&:hover": { bgcolor: SEARCH.pill, borderColor: SEARCH.accent } }}
+      sx={{ gap: 0.5, minHeight: 40, px: 1.75, borderRadius: "10px", border: `1px solid ${SEARCH.border}`, bgcolor: MK.surface, fontSize: 14, fontWeight: 700, color: SEARCH.accent, whiteSpace: "nowrap", "&:hover": { bgcolor: SEARCH.pill, borderColor: SEARCH.accent } }}
     >
       Åpne <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
     </ButtonBase>
@@ -265,19 +267,19 @@ export function SearchResults({ matches, info, terms, mode, onOpen }: ResultsPro
         const product = info[match.id];
         if (!product) return null;
         return (
-          <Box key={match.id} sx={{ display: "flex", gap: 2.25, p: 2, alignItems: "flex-start", bgcolor: "#FFFFFF", border: `1px solid ${SEARCH.line}`, borderRadius: "14px", "&:hover": { borderColor: "#C9709F", boxShadow: "0 8px 20px rgba(94,21,71,0.10)" } }}>
+          <Box key={match.id} sx={{ display: "flex", gap: 2.25, p: 2, alignItems: "flex-start", bgcolor: MK.surface, border: `1px solid ${SEARCH.line}`, borderRadius: "14px", "&:hover": { borderColor: MK.hoverBorder, boxShadow: `0 8px 20px ${MK.shadowSoft}` } }}>
             <ProductThumb info={product} size="lg" />
             <Box sx={{ flex: 1, minWidth: 0, display: "grid", gap: 1.25 }}>
               <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.25 }}>
                 <Typography sx={{ fontSize: 19, fontWeight: 800, color: SEARCH.ink }}>{product.name}</Typography>
                 <Typography sx={{ fontSize: 14, fontWeight: 600, color: SEARCH.muted }}>{product.meta}</Typography>
                 {mode === "all" && terms.length > 1 ? (
-                  <Box component="span" sx={{ px: 1.25, py: 0.4, borderRadius: "6px", bgcolor: "#E6F4EA", color: "#1B6B3A", fontSize: 12.5, fontWeight: 700 }}>
+                  <Box component="span" sx={{ px: 1.25, py: 0.4, borderRadius: "6px", bgcolor: MK.okBg, color: MK.ok, fontSize: 12.5, fontWeight: 700 }}>
                     Treffer alle {terms.length} ord
                   </Box>
                 ) : null}
                 {mode === "any" && match.missing.length > 0 ? (
-                  <Box component="span" sx={{ px: 1.25, py: 0.4, borderRadius: "6px", bgcolor: "#F4ECF1", color: SEARCH.muted, fontSize: 12.5, fontWeight: 700 }}>
+                  <Box component="span" sx={{ px: 1.25, py: 0.4, borderRadius: "6px", bgcolor: MK.hover, color: SEARCH.muted, fontSize: 12.5, fontWeight: 700 }}>
                     {match.matched.length} av {terms.length} ord
                   </Box>
                 ) : null}
@@ -291,7 +293,7 @@ export function SearchResults({ matches, info, terms, mode, onOpen }: ResultsPro
                 </Box>
               ))}
               {match.snippets.some((s) => s.negated) ? (
-                <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, alignSelf: "flex-start", px: 1.25, py: 0.6, borderRadius: "8px", bgcolor: "#FFF6DB", color: "#7A5200", fontSize: 13, fontWeight: 600 }}>
+                <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, alignSelf: "flex-start", px: 1.25, py: 0.6, borderRadius: "8px", bgcolor: MK.warnBg2, color: MK.warnText, fontSize: 13, fontWeight: 600 }}>
                   <WarningAmberRoundedIcon sx={{ fontSize: 17 }} />
                   Treffet står sammen med «ikke» – les teksten
                 </Box>
@@ -311,17 +313,17 @@ export function SearchResults({ matches, info, terms, mode, onOpen }: ResultsPro
         const product = info[match.id];
         if (!product) return null;
         return (
-          <Box key={match.id} sx={{ display: "flex", gap: 2, px: 2, py: 1.5, alignItems: "center", bgcolor: SEARCH.soft, border: `1px solid ${SEARCH.line}`, borderRadius: "14px", "&:hover": { borderColor: "#C9709F" } }}>
+          <Box key={match.id} sx={{ display: "flex", gap: 2, px: 2, py: 1.5, alignItems: "center", bgcolor: SEARCH.soft, border: `1px solid ${SEARCH.line}`, borderRadius: "14px", "&:hover": { borderColor: MK.hoverBorder } }}>
             <ProductThumb info={product} size="sm" />
             <Box sx={{ flex: 1, minWidth: 0, display: "grid", gap: 0.75 }}>
               <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.25 }}>
                 <Typography sx={{ fontSize: 16.5, fontWeight: 800, color: SEARCH.ink }}>{product.name}</Typography>
                 <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: SEARCH.muted }}>{product.meta}</Typography>
                 {match.matched.map((t) => (
-                  <Box key={t} component="span" sx={{ px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#E6F4EA", color: "#1B6B3A", fontSize: 12.5, fontWeight: 700 }}>✓ {t}</Box>
+                  <Box key={t} component="span" sx={{ px: 1, py: 0.25, borderRadius: "6px", bgcolor: MK.okBg, color: MK.ok, fontSize: 12.5, fontWeight: 700 }}>✓ {t}</Box>
                 ))}
                 {match.missing.map((t) => (
-                  <Box key={t} component="span" sx={{ px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#F4ECF1", color: SEARCH.muted, fontSize: 12.5, fontWeight: 700, textDecoration: "line-through" }}>{t}</Box>
+                  <Box key={t} component="span" sx={{ px: 1, py: 0.25, borderRadius: "6px", bgcolor: MK.hover, color: SEARCH.muted, fontSize: 12.5, fontWeight: 700, textDecoration: "line-through" }}>{t}</Box>
                 ))}
               </Box>
               {match.snippets[0] ? (
@@ -349,13 +351,13 @@ type BannerProps = {
 
 export function MatchBanner({ productName, total, termCounts, position, onPrev, onNext }: BannerProps) {
   return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.75, px: 2.5, py: 1.1, bgcolor: "#FFF8D6", borderBottom: "1px solid #F1E3A0", fontSize: 14, flexShrink: 0 }}>
+    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.75, px: 2.5, py: 1.1, bgcolor: MK.warnBg, borderBottom: `1px solid ${MK.warnBorder}`, fontSize: 14, flexShrink: 0 }}>
       <Box component="span" sx={{ fontWeight: 700 }}>{total === 1 ? "1 treff" : `${total} treff`} i {productName}</Box>
       <Box component="span" sx={{ color: SEARCH.sub }}>
         {termCounts.map((t, i) => (
           <span key={t.term}>
             {i > 0 ? " · " : ""}
-            <mark style={{ background: HIT_BG, color: SEARCH.ink, borderRadius: 3, padding: "0 3px" }}>{t.term}</mark> {t.count}
+            <mark style={{ background: HIT_BG, color: MK.hitText, borderRadius: 3, padding: "0 3px" }}>{t.term}</mark> {t.count}
           </span>
         ))}
       </Box>
@@ -364,7 +366,7 @@ export function MatchBanner({ productName, total, termCounts, position, onPrev, 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: SEARCH.sub }}>
           <Box component="span" sx={{ fontWeight: 600 }}>Treff {Math.min(position, total)} av {total}</Box>
           {[{ label: "Forrige treff", action: onPrev, icon: <KeyboardArrowUpRoundedIcon sx={{ fontSize: 20 }} /> }, { label: "Neste treff", action: onNext, icon: <KeyboardArrowDownRoundedIcon sx={{ fontSize: 20 }} /> }].map((b) => (
-            <ButtonBase key={b.label} aria-label={b.label} onClick={b.action} sx={{ width: 32, height: 30, borderRadius: "8px", border: `1px solid ${SEARCH.border}`, bgcolor: "#FFFFFF", "&:hover": { bgcolor: SEARCH.pill, borderColor: SEARCH.accent } }}>
+            <ButtonBase key={b.label} aria-label={b.label} onClick={b.action} sx={{ width: 32, height: 30, borderRadius: "8px", border: `1px solid ${SEARCH.border}`, bgcolor: MK.surface, "&:hover": { bgcolor: SEARCH.pill, borderColor: SEARCH.accent } }}>
               {b.icon}
             </ButtonBase>
           ))}
@@ -381,13 +383,13 @@ export function SearchTrigger({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Søk i melkeerstatning"
       sx={{
-        gap: 1, height: 40, mt: "3px", px: 1.75, flexShrink: 0, borderRadius: "10px", border: "1px dashed #D9BCCD", color: SEARCH.muted, fontSize: 14, fontWeight: 600,
-        "&:hover": { borderStyle: "solid", borderColor: SEARCH.accent, color: SEARCH.accent, bgcolor: "#FFFFFF" },
+        gap: 1, height: 40, px: 1.75, flexShrink: 0, borderRadius: "10px", border: `1px dashed ${MK.borderStrong}`, color: SEARCH.muted, fontSize: 14, fontWeight: 600,
+        "&:hover": { borderStyle: "solid", borderColor: SEARCH.accent, color: SEARCH.accent, bgcolor: MK.surface },
       }}
     >
       <SearchRoundedIcon sx={{ fontSize: 20 }} />
       Søk
-      <Box component="kbd" sx={{ fontFamily: "inherit", fontSize: 12, fontWeight: 600, px: 0.75, py: "1px", borderRadius: "6px", border: "1px solid #D9BCCD", bgcolor: "#FBF4F8" }}>Space</Box>
+      <Box component="kbd" sx={{ fontFamily: "inherit", fontSize: 12, fontWeight: 600, px: 0.75, py: "1px", borderRadius: "6px", border: `1px solid ${MK.borderStrong}`, bgcolor: MK.alt }}>Space</Box>
     </ButtonBase>
   );
 }

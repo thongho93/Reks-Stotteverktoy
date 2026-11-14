@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, ButtonBase, Typography, Tabs, Tab, Tooltip } from "@mui/material";
+import { Box, ButtonBase, Typography, Tabs, Tab, Popover, GlobalStyles as CssVars, useTheme } from "@mui/material";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import { MK, MK_DARK_VARS, MK_LIGHT_VARS, macroColor } from "./melkeTheme";
 import { Hl, MatchBanner, SearchHeader, SearchResults, SearchTrigger, SuggestionsPanel } from "./melkeSearch";
 import {
   HIT_BG,
@@ -23,7 +26,7 @@ import {
  */
 function groupBadges(product: { badges: { label: string }[] }) {
   const labels = product.badges.map((b) => b.label);
-  const primary = labels.filter((l) => /^(Hydrolysert|Aminosyrebasert)$/.test(l) || /komplett|^Tilskudd/i.test(l));
+  const primary = labels.filter((l) => /^(Hydrolysert|Aminosyrebasert)$/.test(l) || /komplett|variert kosthold|^Tilskudd/i.test(l));
   const fri = labels.filter((l) => /^(Glutenfri|Laktosefri|Kostfiberfri)$/.test(l));
   const tilsatt = labels.filter((l) => /^Med /.test(l)).map((l) => l.replace(/^Med /, ""));
   const sertifisert = labels
@@ -34,18 +37,19 @@ function groupBadges(product: { badges: { label: string }[] }) {
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const D = {
-  bg:         "#FBF4F8",
-  surface:    "#FFFFFF",
-  surfaceAlt: "#FBF4F8",
-  border:     "#EAD2E1",
-  borderMed:  "#E3C6D8",
-  text:       "#2D1727",
-  textSub:    "#4A3342",
-  textMuted:  "#6B5262",
-  blue:       "#A81F66",
-  blueLight:  "#FCE7F2",
-  blueMid:    "#F2CFE3",
-  purple:     "#A81F66",
+  bg:         MK.bg,
+  surface:    MK.surface,
+  surfaceAlt: MK.alt,
+  border:     MK.border,
+  borderMed:  MK.borderMed,
+  text:       MK.text,
+  textSub:    MK.sub,
+  textMuted:  MK.muted,
+  blue:       MK.accent,
+  blueLight:  MK.pill,
+  blueMid:    MK.pillBorder,
+  purple:     MK.accent,
+  purpleBg:   MK.accentBg,
   radius:     14,
   radiusSm:   10,
   shadow:     "none",
@@ -62,7 +66,7 @@ const ICON_GUT2 = (c: string) => <svg width="48" height="48" viewBox="0 0 48 48"
 // ─── Product data ─────────────────────────────────────────────────────────────
 type NutritionRow = { label: string; unit: string; per100gPulver: string; per100mlUtblandet: string };
 
-type ManufacturerId = "nutricia" | "nestle";
+type ManufacturerId = "nutricia" | "nestle" | "mead";
 
 type Product = {
   id: string;
@@ -988,8 +992,8 @@ type Manufacturer = {
   notice: string;
   footer: string;
   address: string;
-  tel: { label: string; href: string };
-  email: string;
+  tel: { label: string; href: string; title?: string };
+  email?: string;
   extra: { label: string; value: string; href: string }[];
 };
 
@@ -1019,6 +1023,16 @@ const MANUFACTURERS: Record<ManufacturerId, Manufacturer> = {
       { label: "Bestilling (grossist)", value: "orders@no.nestle.com", href: "mailto:orders@no.nestle.com" },
       { label: "Web", value: "www.nestlehealthscience.no", href: "https://www.nestlehealthscience.no" },
     ],
+  },
+  mead: {
+    label: "Mead Johnson",
+    short: "Mead Johnson",
+    contactTitle: "Kontakt Mead Johnson / Scandinavian Biopharma",
+    notice: "Nutramigen-produktene er næringsmidler til spesielle medisinske formål og skal brukes under medisinsk tilsyn. Produktene skal ikke gis parenteralt.",
+    footer: "Nutramigen-produktene er næringsmidler til spesielle medisinske formål og skal brukes under medisinsk tilsyn.",
+    address: "Scandinavian Biopharma, Industrivägen 1, 171 48 Solna, Sverige",
+    tel: { label: "23 96 23 00", href: "tel:+4723962300", title: "Kundesenter" },
+    extra: [],
   },
 };
 
@@ -1764,38 +1778,839 @@ const ALFAMINO_JUNIOR: Product = {
   ],
 };
 
-const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON, NEOCATE_JUNIOR, ALTHERA, ALFARE, ALFAMINO, ALFAMINO_JUNIOR];
+const NUTRAMIGEN_1: Product = {
+  id: "nutramigen-1",
+  manufacturer: "mead",
+  name: "Nutramigen 1",
+  age: "0–6 måneder",
+  tagline: "Hypoallergen spesialnæring til kostholdsbehandling av kumelkproteinallergi.",
+  description: "Ernæringsmessig fullverdig og spesialutviklet for spedbarn med kumelkproteinallergi. Basert på høygradig hydrolysert kaseinprotein. Laktosefri.",
+  image: "/nutrition/nutramigen-1.jpg",
+  thumb: "/nutrition/thumbs/nutramigen-1.png",
+  imageScale: 1,
+  type: "Hydrolysert",
+  badges: [
+    { label: "Hydrolysert",                          color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett 0–6 måneder", color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                           color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                        color: "#D97706", icon: "drop"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "0–6 måneder" },
+    { label: "Energitetthet", value: "0,68 kcal/ml" },
+    { label: "Protein",       value: "Høygradig hydrolysert kasein" },
+    { label: "Laktose",       value: "Nei" },
+  ],
+  fordeler: [
+    "Effektiv og veldokumentert.",
+    "Laktosefri.",
+    "Dekker daglig næringsbehov frem til ca. 6 måneders alder, før overgang til Nutramigen 2.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_GUT2, ICON_MILK_BOTTLE],
+  bruksomraader: [
+    "Ernæringsmessig fullverdig og spesialutviklet for spedbarn med kumelkproteinallergi.",
+    "Ivaretar daglig næringsbehov frem til ca. 6 måneders alder. Da anbefales det å gå over til Nutramigen 2, som er tilpasset fra ca. 6 måneder og fremover.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Morsmelk er spedbarnets beste føde. Bruk av morsmelkerstatning kan minske tilgangen til morsmelk.",
+    "Det er svært viktig å følge tilberedningsinstruksjonene. Feil håndtering kan påvirke barnets helse.",
+    "Skal brukes under medisinsk tilsyn.",
+    "Skal ikke gis parenteralt.",
+  ],
+  hurtiginfo: [
+    { label: "Laktosefri",               icon: null },
+    { label: "Med DHA & ARA",            icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 68,
+  pulverPer100ml: "13,5 g pulver",
+  macros: [
+    { label: "Fett",         value: 45, color: "#7C3AED", amount: "3,4 g" },
+    { label: "Karbohydrat",  value: 44, color: "#F97316", amount: "7,4 g" },
+    { label: "Protein",      value: 11, color: "#3B82F6", amount: "1,88 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",      value: "Laktosefri" },
+    { label: "DHA",          value: "15,5 mg"    },
+    { label: "ARA",          value: "19,5 mg"    },
+    { label: "Kalsium",      value: "76 mg"      },
+    { label: "Jern",         value: "1,21 mg"    },
+    { label: "Vitamin D",    value: "1,68 µg"    },
+    { label: "Osmolaritet",  value: "270 mOsm/l" },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml ferdig blanding"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                unit: "kJ",   per100gPulver: "2098",  per100mlUtblandet: "284" },
+          { label: "Energi (kcal)",              unit: "kcal", per100gPulver: "501",   per100mlUtblandet: "68" },
+          { label: "Fett",                       unit: "g",    per100gPulver: "25",    per100mlUtblandet: "3,4" },
+          { label: "– hvorav mettede fettsyrer", unit: "g",    per100gPulver: "10",    per100mlUtblandet: "1,35" },
+          { label: "– linolsyre",                unit: "g",    per100gPulver: "4",     per100mlUtblandet: "0,54" },
+          { label: "– α-linolensyre",            unit: "mg",   per100gPulver: "350",   per100mlUtblandet: "47" },
+          { label: "– arakidonsyre (ARA)",       unit: "mg",   per100gPulver: "145",   per100mlUtblandet: "19,5" },
+          { label: "– dokosaheksaensyre (DHA)",  unit: "mg",   per100gPulver: "115",   per100mlUtblandet: "15,5" },
+          { label: "Karbohydrat",                unit: "g",    per100gPulver: "55",    per100mlUtblandet: "7,4" },
+          { label: "– hvorav sukkerarter",       unit: "g",    per100gPulver: "5,7",   per100mlUtblandet: "0,77" },
+          { label: "Protein",                    unit: "g",    per100gPulver: "14",    per100mlUtblandet: "1,88" },
+          { label: "Salt",                       unit: "g",    per100gPulver: "0,6",   per100mlUtblandet: "0,08" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "240",   per100mlUtblandet: "32" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "610",   per100mlUtblandet: "82" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "480",   per100mlUtblandet: "65" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "570",   per100mlUtblandet: "76" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "390",   per100mlUtblandet: "52" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "38",    per100mlUtblandet: "5" },
+          { label: "Jern",      unit: "mg", per100gPulver: "9",     per100mlUtblandet: "1,21" },
+          { label: "Sink",      unit: "mg", per100gPulver: "3,5",   per100mlUtblandet: "0,47" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,38",  per100mlUtblandet: "0,05" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,085", per100mlUtblandet: "0,011" },
+          { label: "Selen",     unit: "µg", per100gPulver: "17,5",  per100mlUtblandet: "2,4" },
+          { label: "Krom",      unit: "µg", per100gPulver: "11",    per100mlUtblandet: "1,48" },
+          { label: "Molybden",  unit: "µg", per100gPulver: "28",    per100mlUtblandet: "3,8" },
+          { label: "Jod",       unit: "µg", per100gPulver: "115",   per100mlUtblandet: "15,5" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg RE",     per100gPulver: "450",  per100mlUtblandet: "61" },
+          { label: "Vitamin D",    unit: "µg",        per100gPulver: "12,5", per100mlUtblandet: "1,68" },
+          { label: "Vitamin E",    unit: "mg α-TE",   per100gPulver: "4,5",  per100mlUtblandet: "0,61" },
+          { label: "Vitamin K",    unit: "µg",        per100gPulver: "65",   per100mlUtblandet: "8,7" },
+          { label: "Vitamin C",    unit: "mg",        per100gPulver: "60",   per100mlUtblandet: "8,1" },
+          { label: "Tiamin",       unit: "mg",        per100gPulver: "0,4",  per100mlUtblandet: "0,054" },
+          { label: "Riboflavin",   unit: "mg",        per100gPulver: "0,45", per100mlUtblandet: "0,061" },
+          { label: "Niacin",       unit: "mg",        per100gPulver: "5",    per100mlUtblandet: "0,67" },
+          { label: "Vitamin B6",   unit: "mg",        per100gPulver: "0,3",  per100mlUtblandet: "0,04" },
+          { label: "Folat",        unit: "µg DFE",    per100gPulver: "135",  per100mlUtblandet: "18,2" },
+          { label: "Folsyre",      unit: "µg",        per100gPulver: "80",   per100mlUtblandet: "10,8" },
+          { label: "Vitamin B12",  unit: "µg",        per100gPulver: "1,5",  per100mlUtblandet: "0,2" },
+          { label: "Biotin",       unit: "µg",        per100gPulver: "15",   per100mlUtblandet: "2" },
+          { label: "Pantotensyre", unit: "mg",        per100gPulver: "2,5",  per100mlUtblandet: "0,34" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Kolin",        unit: "mg",      per100gPulver: "165",  per100mlUtblandet: "22" },
+          { label: "Inositol",     unit: "mg",      per100gPulver: "85",   per100mlUtblandet: "11,4" },
+          { label: "L-karnitin",   unit: "mg",      per100gPulver: "12,5", per100mlUtblandet: "1,68" },
+          { label: "Taurin",       unit: "mg",      per100gPulver: "30",   per100mlUtblandet: "4" },
+          { label: "Osmolaritet",  unit: "mOsm/l",  per100gPulver: "—",    per100mlUtblandet: "270" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Vask hendene grundig. Vask og kok flasker, smokker, lokk og andre redskaper (minst 5 minutter i kokende vann).",
+    "Kok opp rent vann og kjøl det ned til 70 °C. Hell ønsket mengde vann i en ren flaske.",
+    "Fyll måleskjeen med pulver (måleskjeen skal kun brukes til å måle pulver). Ikke press pulveret ned. Stryk av med baksiden av en ren, tørr kniv. Ha riktig antall måleskjeer i flasken, og oppbevar måleskjeen tørr i boksen.",
+    "Lukk flasken, snu den og rist godt til pulveret er helt oppløst (minst 1 minutt).",
+    "Kjøl blandingen ned til spisetemperatur før du gir den til barnet. Kontroller temperaturen på innsiden av håndleddet.",
+  ],
+  dosering: "Tabellen er veiledende. Det er individuelt hvor mye et barn spiser. En strøken måleskje (4,5 g) per 30 ml vann.",
+  mixingInfo: { konsentrasjon: "13,5", scoopGram: "4,5" },
+  mixingTable: [
+    { skjeer: 3, pulver: "13,5", vann: 90, ferdig: 100, energi: 68 },
+  ],
+  doseringTabell: {
+    tittel: "Dosering etter alder",
+    kolonner: ["Alder", "Vekt (kg)", "Måltider/døgn", "Vann (ml)", "Måleskjeer", "Ferdig (ml)"],
+    rader: [
+      ["0–2 uker",     "<3–3,5", "6",   "90",  "3", "100"],
+      ["2–4 uker",     "3,5–4",  "5–6", "120", "4", "130"],
+      ["1–2 måneder",  "4–5",    "5",   "150", "5", "170"],
+      ["2–4 måneder",  "5–6,5",  "4–5", "180", "6", "200"],
+      ["4–6 måneder",  ">6,5",   "4",   "210", "7", "230"],
+    ],
+  },
+  holdbarhet: "Boksen oppbevares tørt i romtemperatur. Etter åpning oppbevares boksen tett lukket og tørt, og innholdet må brukes innen 1 måned. Ikke frys pulveret og unngå sterk varme.",
+  ingredienser: "Glukosesirup, vegetabilske oljer (palmolein, kokosnøtt, soya, solsikke med høyt oljesyreinnhold), høygradig hydrolysert kasein (fra melk), modifisert maisstivelse, kalsiumsitrat, kaliumfosfat, kalsiumfosfat, olje fra Mortierella alpina, kaliumklorid, magnesiumfosfat, olje fra mikroalgen Schizochytrium sp., kolinklorid, natriumklorid, L-cystin, inositol, L-tyrosin, L-tryptofan, taurin, jernsulfat, L-karnitin, vitamin E (DL-alfa-tokoferylacetat), sinksulfat, vitamin C (askorbylpalmitat, askorbinsyre), niacin (nikotinamid), vitamin A (retinylpalmitat), pantotensyre (kalsiumpantotenat), kobbersulfat, tiamin (tiaminhydroklorid), riboflavin, vitamin B6 (pyridoksinhydroklorid), mangansulfat, natriumjodid, folat (folsyre), natriummolybdat, vitamin K (fytomenadion), kromklorid, natriumselenitt, biotin (D-biotin), vitamin D (kolekalsiferol), vitamin B12 (cyanokobalamin).",
+  smaksvarianter: "",
+  indikasjon: "Kostholdsbehandling av kumelkproteinallergi hos spedbarn, fra fødselen og frem til ca. 6 måneders alder.",
+  kontraindikasjon: "",
+  forsiktighetsregler: "Morsmelk er spedbarnets beste føde, og bruk av morsmelkerstatning kan minske tilgangen til morsmelk. Det er svært viktig å følge tilberedningsinstruksjonene – feil håndtering kan påvirke barnets helse. Skal brukes under medisinsk tilsyn og ikke gis parenteralt.",
+  bestilling: [
+    { produktnavn: "Nutramigen 1", bestillingsnr: "", varenr: "848981", salgsenhet: "Boks 400 g" },
+  ],
+};
+
+const NUTRAMIGEN_2: Product = {
+  id: "nutramigen-2",
+  manufacturer: "mead",
+  name: "Nutramigen 2",
+  age: "Fra 6 måneder",
+  tagline: "Hypoallergen spesialnæring til kostholdsbehandling av kumelkproteinallergi.",
+  description: "Spesialutviklet for barn med kumelkproteinallergi. Basert på høygradig hydrolysert kaseinprotein, og gir barnet alle næringsstoffene det trenger som en del av et variert kosthold. Laktosefri.",
+  image: "/nutrition/nutramigen-2.jpg",
+  thumb: "/nutrition/thumbs/nutramigen-2.png",
+  imageScale: 1,
+  type: "Hydrolysert",
+  badges: [
+    { label: "Hydrolysert",                          color: "#3B82F6", icon: "drop"   },
+    { label: "Egnet som del av variert kosthold",   color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                           color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                        color: "#D97706", icon: "drop"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "Fra 6 måneder" },
+    { label: "Energitetthet", value: "0,68 kcal/ml" },
+    { label: "Protein",       value: "Høygradig hydrolysert kasein" },
+    { label: "Laktose",       value: "Nei" },
+  ],
+  fordeler: [
+    "Effektiv og veldokumentert.",
+    "Laktosefri.",
+    "Gir barnet alle næringsstoffene det trenger som en del av et variert kosthold.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_GUT2, ICON_MILK_BOTTLE],
+  bruksomraader: [
+    "Spesialutviklet for barn med kumelkproteinallergi, fra ca. 6 måneders alder og oppover.",
+    "Gir alle næringsstoffene barnet trenger som en del av et variert kosthold.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Høygradig hydrolysert spesialnæring smaker og lukter annerledes enn vanlig erstatning. Det kan ta litt tid før barnet venner seg til den.",
+    "Morsmelk er spedbarnets beste føde. Bruk av morsmelkerstatning kan minske tilgangen til morsmelk.",
+    "Det er svært viktig å følge tilberedningsinstruksjonene. Feil håndtering kan påvirke barnets helse.",
+    "Skal brukes under medisinsk tilsyn og ikke gis parenteralt.",
+  ],
+  hurtiginfo: [
+    { label: "Laktosefri",               icon: null },
+    { label: "Med DHA & ARA",            icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Del av variert kosthold",    icon: null },
+  ],
+  kcalPer100ml: 68,
+  pulverPer100ml: "13,5 g pulver",
+  macros: [
+    { label: "Fett",         value: 45, color: "#7C3AED", amount: "3,4 g" },
+    { label: "Karbohydrat",  value: 45, color: "#F97316", amount: "7,7 g" },
+    { label: "Protein",      value: 10, color: "#3B82F6", amount: "1,68 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",      value: "Laktosefri" },
+    { label: "DHA",          value: "15,5 mg"    },
+    { label: "ARA",          value: "19,5 mg"    },
+    { label: "Kalsium",      value: "81 mg"      },
+    { label: "Jern",         value: "1,08 mg"    },
+    { label: "Vitamin D",    value: "1,68 µg"    },
+    { label: "Osmolaritet",  value: "351 mOsm/l" },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml ferdig blanding"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                unit: "kJ",   per100gPulver: "2107",  per100mlUtblandet: "285" },
+          { label: "Energi (kcal)",              unit: "kcal", per100gPulver: "503",   per100mlUtblandet: "68" },
+          { label: "Fett",                       unit: "g",    per100gPulver: "25",    per100mlUtblandet: "3,4" },
+          { label: "– hvorav mettede fettsyrer", unit: "g",    per100gPulver: "10,5",  per100mlUtblandet: "1,41" },
+          { label: "– linolsyre",                unit: "g",    per100gPulver: "4",     per100mlUtblandet: "0,54" },
+          { label: "– α-linolensyre",            unit: "mg",   per100gPulver: "350",   per100mlUtblandet: "47" },
+          { label: "– arakidonsyre (ARA)",       unit: "mg",   per100gPulver: "145",   per100mlUtblandet: "19,5" },
+          { label: "– dokosaheksaensyre (DHA)",  unit: "mg",   per100gPulver: "115",   per100mlUtblandet: "15,5" },
+          { label: "Karbohydrat",                unit: "g",    per100gPulver: "57",    per100mlUtblandet: "7,7" },
+          { label: "– hvorav sukkerarter",       unit: "g",    per100gPulver: "26",    per100mlUtblandet: "3,5" },
+          { label: "Protein",                    unit: "g",    per100gPulver: "12,5",  per100mlUtblandet: "1,68" },
+          { label: "Salt",                       unit: "g",    per100gPulver: "0,44",  per100mlUtblandet: "0,06" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "175",  per100mlUtblandet: "24" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "700",  per100mlUtblandet: "94" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "350",  per100mlUtblandet: "47" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "600",  per100mlUtblandet: "81" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "350",  per100mlUtblandet: "47" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "60",   per100mlUtblandet: "8,1" },
+          { label: "Jern",      unit: "mg", per100gPulver: "8",    per100mlUtblandet: "1,08" },
+          { label: "Sink",      unit: "mg", per100gPulver: "5,5",  per100mlUtblandet: "0,74" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,38", per100mlUtblandet: "0,05" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,11", per100mlUtblandet: "0,015" },
+          { label: "Selen",     unit: "µg", per100gPulver: "17,5", per100mlUtblandet: "2,4" },
+          { label: "Krom",      unit: "µg", per100gPulver: "15",   per100mlUtblandet: "2" },
+          { label: "Molybden",  unit: "µg", per100gPulver: "15,5", per100mlUtblandet: "2,1" },
+          { label: "Jod",       unit: "µg", per100gPulver: "115",  per100mlUtblandet: "15,5" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg RE",     per100gPulver: "480",   per100mlUtblandet: "65" },
+          { label: "Vitamin D",    unit: "µg",        per100gPulver: "12,5",  per100mlUtblandet: "1,68" },
+          { label: "Vitamin E",    unit: "mg α-TE",   per100gPulver: "5",     per100mlUtblandet: "0,67" },
+          { label: "Vitamin K",    unit: "µg",        per100gPulver: "40",    per100mlUtblandet: "5,4" },
+          { label: "Vitamin C",    unit: "mg",        per100gPulver: "55",    per100mlUtblandet: "7,4" },
+          { label: "Tiamin",       unit: "mg",        per100gPulver: "0,48",  per100mlUtblandet: "0,065" },
+          { label: "Riboflavin",   unit: "mg",        per100gPulver: "0,63",  per100mlUtblandet: "0,084" },
+          { label: "Niacin",       unit: "mg",        per100gPulver: "7,7",   per100mlUtblandet: "1,04" },
+          { label: "Vitamin B6",   unit: "mg",        per100gPulver: "0,65",  per100mlUtblandet: "0,087" },
+          { label: "Folat",        unit: "µg DFE",    per100gPulver: "100",   per100mlUtblandet: "13,5" },
+          { label: "Folsyre",      unit: "µg",        per100gPulver: "60",    per100mlUtblandet: "8,1" },
+          { label: "Vitamin B12",  unit: "µg",        per100gPulver: "1,05",  per100mlUtblandet: "0,141" },
+          { label: "Biotin",       unit: "µg",        per100gPulver: "10,5",  per100mlUtblandet: "1,41" },
+          { label: "Pantotensyre", unit: "mg",        per100gPulver: "3,8",   per100mlUtblandet: "0,5" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Kolin",        unit: "mg",      per100gPulver: "120", per100mlUtblandet: "16,1" },
+          { label: "Inositol",     unit: "mg",      per100gPulver: "85",  per100mlUtblandet: "11,4" },
+          { label: "L-karnitin",   unit: "mg",      per100gPulver: "11",  per100mlUtblandet: "1,48" },
+          { label: "Taurin",       unit: "mg",      per100gPulver: "30",  per100mlUtblandet: "4" },
+          { label: "Osmolaritet",  unit: "mOsm/l",  per100gPulver: "—",   per100mlUtblandet: "351" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Vask hendene grundig. Vask og kok flasker, smokker, lokk og andre redskaper (minst 5 minutter i kokende vann).",
+    "Kok opp rent vann og kjøl det ned til 70 °C. Hell ønsket mengde vann i en ren flaske.",
+    "Fyll måleskjeen med pulver (måleskjeen skal kun brukes til å måle pulver). Ikke press pulveret ned. Stryk av med baksiden av en ren, tørr kniv. Ha riktig antall måleskjeer i flasken, og oppbevar måleskjeen tørr i boksen.",
+    "Lukk flasken, snu den og rist godt til pulveret er helt oppløst (minst 1 minutt).",
+    "Kjøl blandingen ned til spisetemperatur før du gir den til barnet. Kontroller temperaturen på innsiden av håndleddet.",
+  ],
+  dosering: "Tabellen er veiledende. Hvert barn er unikt, og barnets matbehov kan være forskjellig fra det som er angitt. En strøken måleskje (4,5 g) per 30 ml vann.",
+  mixingInfo: { konsentrasjon: "13,5", scoopGram: "4,5" },
+  mixingTable: [
+    { skjeer: 7, pulver: "31,5", vann: 210, ferdig: 230, energi: 156 },
+  ],
+  doseringTabell: {
+    tittel: "Dosering etter alder",
+    kolonner: ["Alder", "Måltider/døgn", "Vann (ml)", "Måleskjeer", "Ferdig (ml)"],
+    rader: [
+      ["6–12 måneder", "2–3", "210", "7", "230"],
+      ["Over 1 år",    "2",   "210", "7", "230"],
+    ],
+  },
+  holdbarhet: "Boksen oppbevares tørt i romtemperatur. Etter åpning oppbevares boksen tett lukket og tørt, og innholdet må brukes innen 1 måned. Ikke frys pulveret og unngå sterk varme.",
+  ingredienser: "Glukosesirup, vegetabilske oljer (palmolein, kokosnøtt, soya, solsikke med høyt oljesyreinnhold), høygradig hydrolysert kasein (fra melk), fruktose, modifisert maisstivelse, kalsiumsitrat, kaliumsitrat, kalsiumfosfat, magnesiumfosfat, kaliumklorid, olje fra Mortierella alpina, olje fra mikroalgen Schizochytrium sp., L-cystin, kolinklorid, natriumsitrat, L-tyrosin, inositol, L-tryptofan, jernsulfat, taurin, sinksulfat, L-karnitin, niacin (nikotinamid), vitamin E (DL-alfa-tokoferylacetat), vitamin C (askorbylpalmitat, askorbinsyre), pantotensyre (kalsiumpantotenat), vitamin A (retinylpalmitat), kobbersulfat, vitamin B6 (pyridoksinhydroklorid), riboflavin, tiamin (tiaminhydroklorid), mangansulfat, natriumjodid, folat (folsyre), kromklorid, vitamin K (fytomenadion), natriummolybdat, natriumselenitt, biotin (D-biotin), vitamin D (kolekalsiferol), vitamin B12 (cyanokobalamin).",
+  smaksvarianter: "",
+  indikasjon: "Kostholdsbehandling av kumelkproteinallergi hos barn fra ca. 6 måneders alder, som en del av et variert kosthold.",
+  kontraindikasjon: "",
+  forsiktighetsregler: "Morsmelk er spedbarnets beste føde, og bruk av morsmelkerstatning kan minske tilgangen til morsmelk. Det er svært viktig å følge tilberedningsinstruksjonene – feil håndtering kan påvirke barnets helse. Skal brukes under medisinsk tilsyn og ikke gis parenteralt.",
+  bestilling: [
+    { produktnavn: "Nutramigen 2", bestillingsnr: "", varenr: "857931", salgsenhet: "Boks 400 g" },
+  ],
+};
+
+const NUTRAMIGEN_PURAMINO: Product = {
+  id: "nutramigen-puramino",
+  manufacturer: "mead",
+  name: "Nutramigen Puramino",
+  age: "Fra fødselen",
+  tagline: "Hypoallergen aminosyrebasert spesialnæring til kostbehandling av alvorlig kumelkproteinallergi og multiple matallergier.",
+  description: "Ernæringsmessig fullverdig og sammensatt for å ivareta spedbarnets næringsbehov fra første leveuke. Basert på 100 % frie aminosyrer.",
+  image: "/nutrition/nutramigen-puramino.jpg",
+  thumb: "/nutrition/thumbs/nutramigen-puramino.png",
+  imageScale: 1,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",                     color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett fra fødselen", color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                          color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                       color: "#D97706", icon: "drop"   },
+    { label: "Med MCT",                             color: "#D97706", icon: "drop"   },
+    { label: "Halalsertifisert",                    color: "#D97706", icon: "star"   },
+    { label: "Koshersertifisert",                   color: "#D97706", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "Fra fødselen" },
+    { label: "Energitetthet", value: "0,68 kcal/ml" },
+    { label: "Protein",       value: "100 % frie aminosyrer" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "Nei" },
+  ],
+  fordeler: [
+    "33 % MCT-olje av totalt fett – en lett tilgjengelig kilde til fett og energi.",
+    "Laktosefri og uten smakstilsetning.",
+    "Kan brukes som eneste næringskilde frem til 6 måneders alder, og videre som en del av et variert kosthold.",
+  ],
+  fordelerIcons: [ICON_DROP, ICON_GUT2, ICON_MILK_BOTTLE],
+  bruksomraader: [
+    "Kostbehandling av alvorlig kumelkproteinallergi og multiple matallergier.",
+    "Når et høygradig hydrolysat ikke har hatt effekt.",
+    "Andre indikasjoner som krever elementaldiett, blant annet eosinofil øsofagitt og manglende vekst.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Tilberedt spesialnæring har svært kort holdbarhet: gi den innen to timer etter tilberedning, og bruk den innen én time etter at barnet har begynt å drikke, ellers kastes den.",
+    "Tilbered kun ett måltid om gangen. Tilberedt spesialnæring må ikke fryses.",
+    "Morsmelk er spedbarnets beste føde. Bruk av morsmelkerstatning kan minske tilgangen til morsmelk.",
+    "Skal brukes under medisinsk tilsyn og ikke gis parenteralt.",
+  ],
+  hurtiginfo: [
+    { label: "Laktosefri",               icon: null },
+    { label: "Halalsertifisert",         icon: null },
+    { label: "Koshersertifisert",        icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 68,
+  pulverPer100ml: "13,2 g pulver",
+  macros: [
+    { label: "Fett",         value: 49, color: "#7C3AED", amount: "3,7 g" },
+    { label: "Karbohydrat",  value: 40, color: "#F97316", amount: "6,9 g" },
+    { label: "Protein",      value: 11, color: "#3B82F6", amount: "1,88 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",      value: "Laktosefri"        },
+    { label: "MCT",          value: "33 % av fettet"    },
+    { label: "DHA",          value: "15,5 mg"           },
+    { label: "ARA",          value: "19,5 mg"           },
+    { label: "Kalsium",      value: "76 mg"             },
+    { label: "Jern",         value: "1,01 mg"           },
+    { label: "Osmolaritet",  value: "314 mOsm/l"        },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml ferdig blanding"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                unit: "kJ",   per100gPulver: "2140",  per100mlUtblandet: "285" },
+          { label: "Energi (kcal)",              unit: "kcal", per100gPulver: "510",   per100mlUtblandet: "68" },
+          { label: "Fett",                       unit: "g",    per100gPulver: "28",    per100mlUtblandet: "3,7" },
+          { label: "– hvorav mettede fettsyrer", unit: "g",    per100gPulver: "10,7",  per100mlUtblandet: "1,41" },
+          { label: "– linolsyre",                unit: "g",    per100gPulver: "3,5",   per100mlUtblandet: "0,46" },
+          { label: "– α-linolensyre",            unit: "mg",   per100gPulver: "370",   per100mlUtblandet: "49" },
+          { label: "– arakidonsyre (ARA)",       unit: "mg",   per100gPulver: "148",   per100mlUtblandet: "19,5" },
+          { label: "– dokosaheksaensyre (DHA)",  unit: "mg",   per100gPulver: "117",   per100mlUtblandet: "15,5" },
+          { label: "Karbohydrat",                unit: "g",    per100gPulver: "52",    per100mlUtblandet: "6,9" },
+          { label: "– hvorav sukkerarter",       unit: "g",    per100gPulver: "4,2",   per100mlUtblandet: "0,55" },
+          { label: "Protein",                    unit: "g",    per100gPulver: "14,3",  per100mlUtblandet: "1,88" },
+          { label: "Salt",                       unit: "g",    per100gPulver: "0,42",  per100mlUtblandet: "0,06" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "168",   per100mlUtblandet: "22" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "730",   per100mlUtblandet: "96" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "450",   per100mlUtblandet: "60" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "580",   per100mlUtblandet: "76" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "330",   per100mlUtblandet: "44" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "61",    per100mlUtblandet: "8,1" },
+          { label: "Jern",      unit: "mg", per100gPulver: "7,7",   per100mlUtblandet: "1,01" },
+          { label: "Sink",      unit: "mg", per100gPulver: "4,6",   per100mlUtblandet: "0,61" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,38",  per100mlUtblandet: "0,05" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,087", per100mlUtblandet: "0,011" },
+          { label: "Selen",     unit: "µg", per100gPulver: "18,4",  per100mlUtblandet: "2,4" },
+          { label: "Krom",      unit: "µg", per100gPulver: "26",    per100mlUtblandet: "3,4" },
+          { label: "Molybden",  unit: "µg", per100gPulver: "15,8",  per100mlUtblandet: "2,1" },
+          { label: "Jod",       unit: "µg", per100gPulver: "102",   per100mlUtblandet: "13,5" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg RE",     per100gPulver: "430",   per100mlUtblandet: "57" },
+          { label: "Vitamin D",    unit: "µg",        per100gPulver: "12,25", per100mlUtblandet: "1,63" },
+          { label: "Vitamin E",    unit: "mg α-TE",   per100gPulver: "4,6",   per100mlUtblandet: "0,61" },
+          { label: "Vitamin K",    unit: "µg",        per100gPulver: "46",    per100mlUtblandet: "6,1" },
+          { label: "Vitamin C",    unit: "mg",        per100gPulver: "48",    per100mlUtblandet: "6,4" },
+          { label: "Tiamin",       unit: "mg",        per100gPulver: "0,31",  per100mlUtblandet: "0,04" },
+          { label: "Riboflavin",   unit: "mg",        per100gPulver: "0,41",  per100mlUtblandet: "0,054" },
+          { label: "Niacin",       unit: "mg",        per100gPulver: "4,7",   per100mlUtblandet: "0,63" },
+          { label: "Vitamin B6",   unit: "mg",        per100gPulver: "0,38",  per100mlUtblandet: "0,05" },
+          { label: "Folat",        unit: "µg DFE",    per100gPulver: "87",    per100mlUtblandet: "11,4" },
+          { label: "Folsyre",      unit: "µg",        per100gPulver: "52",    per100mlUtblandet: "6,9" },
+          { label: "Vitamin B12",  unit: "µg",        per100gPulver: "0,92",  per100mlUtblandet: "0,121" },
+          { label: "Biotin",       unit: "µg",        per100gPulver: "12,2",  per100mlUtblandet: "1,62" },
+          { label: "Pantotensyre", unit: "mg",        per100gPulver: "2,9",   per100mlUtblandet: "0,38" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Kolin",        unit: "mg",      per100gPulver: "163",  per100mlUtblandet: "22" },
+          { label: "Inositol",     unit: "mg",      per100gPulver: "87",   per100mlUtblandet: "11,4" },
+          { label: "L-karnitin",   unit: "mg",      per100gPulver: "10,2", per100mlUtblandet: "1,35" },
+          { label: "Taurin",       unit: "mg",      per100gPulver: "31",   per100mlUtblandet: "4" },
+          { label: "Osmolaritet",  unit: "mOsm/l",  per100gPulver: "—",    per100mlUtblandet: "314" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Vask hendene grundig. Vask og kok flasker, smokker, lokk og andre redskaper (minst 5 minutter i kokende vann).",
+    "Kok opp rent vann og kjøl det ned til 70 °C. Hell ønsket mengde vann i en ren flaske.",
+    "Fyll måleskjeen med pulver (kun til å måle pulver). Ikke press pulveret ned. Stryk av med baksiden av en ren, tørr kniv. Ha riktig antall måleskjeer i flasken, og oppbevar måleskjeen tørr i boksen.",
+    "Lukk flasken, snu den og rist godt til pulveret er helt oppløst. Kjøl blandingen ned til spisetemperatur og kontroller temperaturen på innsiden av håndleddet.",
+    "Gi spesialnæringen umiddelbart etter tilberedning, innen to timer. Tilbered kun ett måltid om gangen. Når barnet har begynt å drikke den, skal den brukes innen én time eller kastes. Den må ikke fryses.",
+  ],
+  dosering: "Tabellen er veiledende. Det er individuelt hvor mye et barn spiser. En strøken måleskje (4,4 g) per 30 ml vann.",
+  mixingInfo: { konsentrasjon: "13,2", scoopGram: "4,4" },
+  mixingTable: [
+    { skjeer: 3, pulver: "13,2", vann: 90, ferdig: 100, energi: 68 },
+  ],
+  doseringTabell: {
+    tittel: "Dosering etter alder",
+    kolonner: ["Alder", "Vekt (kg)", "Flasker/døgn", "Vann (ml)", "Måleskjeer", "Ferdig (ml)"],
+    rader: [
+      ["0–2 uker",     "<3–3,5", "6–7", "90",  "3", "100"],
+      ["2–4 uker",     "3,5–4",  "5–6", "120", "4", "130"],
+      ["1–2 måneder",  "4–5",    "5",   "150", "5", "170"],
+      ["2–4 måneder",  "5–6,5",  "4–5", "180", "6", "200"],
+      ["4–6 måneder",  "6,5–7,5", "4",  "210", "7", "230"],
+      ["6–12 måneder", "7,5–9,5", "2–3", "240", "8", "260"],
+      ["Over 1 år",    ">9,5",   "2–3", "240", "8", "260"],
+    ],
+  },
+  holdbarhet: "Uåpnet boks oppbevares tørt og kjølig – se «Best før»-dato på bunnen av boksen. Åpnet boks oppbevares tørt og tett lukket og brukes innen 1 måned. Pulveret bør ikke fryses og ikke utsettes for kraftig oppvarming.",
+  ingredienser: "Glukosesirup, vegetabilske oljer (solsikkeolje med høyt oljesyreinnhold, mellomlange kjedede triglyserider fra kokosnøtt/palmekjerne (9,3 %), soya), modifisert tapiokastivelse, kaliumaspartat, L-leucin, L-lysinhydroklorid, kalsiumfosfat, L-prolin, L-alanin, L-valin, L-isoleucin, mononatriumglutamat, L-treonin, L-serin, L-tyrosin, L-aspartat, L-arginin, L-fenylalanin, magnesiumfosfat, L-histidin, L-cystin, glycin, L-tryptofan, olje fra Mortierella alpina, L-metionin, kaliumklorid, olje fra mikroalgen Schizochytrium sp., kalsiumsitrat, kolinklorid, natriumsitrat, inositol, vitamin C (askorbinsyre), jernsulfat, taurin, sinksulfat, L-karnitin, vitamin E (DL-alfa-tokoferylacetat), niacin (nikotinamid), pantotensyre (kalsiumpantotenat), vitamin A (retinylpalmitat), kobbersulfat, vitamin B6 (pyridoksinhydroklorid), tiamin (tiaminhydroklorid), riboflavin, mangansulfat, natriumjodid, kromklorid, folat (folsyre), vitamin K (fytomenadion), natriumselenitt, natriummolybdat, biotin (D-biotin), vitamin D (kolekalsiferol), vitamin B12 (cyanokobalamin).",
+  smaksvarianter: "Uten smakstilsetning.",
+  indikasjon: "Kostbehandling av alvorlig kumelkproteinallergi, multiple matallergier, når et høygradig hydrolysat ikke har hatt effekt, og andre indikasjoner som krever elementaldiett (blant annet eosinofil øsofagitt og manglende vekst).",
+  kontraindikasjon: "",
+  forsiktighetsregler: "Morsmelk er spedbarnets beste føde, og bruk av morsmelkerstatning kan minske tilgangen til morsmelk. Det er svært viktig å følge tilberedningsinstruksjonene – feil håndtering kan påvirke barnets helse. Skal brukes under medisinsk tilsyn og ikke gis parenteralt.",
+  bestilling: [
+    { produktnavn: "Nutramigen Puramino", bestillingsnr: "", varenr: "819408", salgsenhet: "Boks 400 g" },
+  ],
+};
+
+const NUTRAMIGEN_PURAMINO_JUNIOR: Product = {
+  id: "nutramigen-puramino-junior",
+  manufacturer: "mead",
+  name: "Nutramigen Puramino Junior",
+  age: "Fra 1 år",
+  tagline: "Hypoallergen spesialnæring basert på frie aminosyrer til kostbehandling av alvorlig kumelkproteinallergi og multiple matallergier hos barn fra 1 år.",
+  description: "Ernæringsmessig fullverdig. Kan brukes som en del av en variert kost, som barnets melk, som berikning i barnets mat, eller som eneste næringskilde, for eksempel ved sonding.",
+  image: "/nutrition/nutramigen-puramino-junior.jpg",
+  thumb: "/nutrition/thumbs/nutramigen-puramino-junior.png",
+  imageScale: 1,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",                   color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett fra 1 år", color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                        color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA",                           color: "#D97706", icon: "drop"   },
+    { label: "Med MCT",                           color: "#D97706", icon: "drop"   },
+    { label: "Halalsertifisert",                  color: "#D97706", icon: "star"   },
+    { label: "Koshersertifisert",                 color: "#D97706", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "Fra 1 år" },
+    { label: "Energitetthet", value: "1 kcal/ml" },
+    { label: "Protein",       value: "100 % frie aminosyrer" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "Nei" },
+  ],
+  fordeler: [
+    "33 % MCT-olje av totalt fett, gunstig for barn med ulike malabsorpsjonstilstander.",
+    "Inneholder DHA i mengder som anbefales av EFSA.",
+    "Laktosefri og uten smakstilsetning.",
+  ],
+  fordelerIcons: [ICON_DROP, ICON_SHIELD_STAR, ICON_GUT2],
+  bruksomraader: [
+    "Kostbehandling av alvorlig kumelkproteinallergi og multiple matallergier, når et høygradig hydrolysat ikke har hatt effekt, og andre indikasjoner som krever elementaldiett, blant annet eosinofil øsofagitt og manglende vekst.",
+    "Kan brukes fra 1-års alder, som del av en variert kost – som barnets melk og/eller som berikning i barnets mat.",
+    "Kan også brukes som barnets eneste næringskilde, for eksempel ved sonding.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Tilberedt spesialnæring har svært kort holdbarhet: gi den innen to timer, eller dekk den til og sett den i kjøleskap (2–4 °C) i maks 24 timer. Når barnet har begynt å drikke, brukes den innen én time eller kastes.",
+    "Tilberedt spesialnæring må ikke fryses.",
+    "Skal brukes under medisinsk tilsyn og ikke gis parenteralt.",
+    "Kan forskrives på blå resept av lege, eller kjøpes reseptfritt på apotek.",
+  ],
+  hurtiginfo: [
+    { label: "Laktosefri",               icon: null },
+    { label: "Halalsertifisert",         icon: null },
+    { label: "Koshersertifisert",        icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 100,
+  pulverPer100ml: "20,4 g pulver",
+  macros: [
+    { label: "Fett",         value: 41, color: "#7C3AED", amount: "4,5 g" },
+    { label: "Karbohydrat",  value: 48, color: "#F97316", amount: "12,1 g" },
+    { label: "Protein",      value: 11, color: "#3B82F6", amount: "2,8 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",      value: "Laktosefri"     },
+    { label: "MCT",          value: "33 % av fettet" },
+    { label: "DHA",          value: "23 mg"          },
+    { label: "Kalsium",      value: "100 mg"         },
+    { label: "Jern",         value: "1 mg"           },
+    { label: "Vitamin D",    value: "1,4 µg"         },
+    { label: "Osmolaritet",  value: "480 mOsm/l"     },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml ferdig blanding (20,4 g pulver + 90 ml vann)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                unit: "kJ",   per100gPulver: "2050",  per100mlUtblandet: "418" },
+          { label: "Energi (kcal)",              unit: "kcal", per100gPulver: "490",   per100mlUtblandet: "100" },
+          { label: "Fett",                       unit: "g",    per100gPulver: "22",    per100mlUtblandet: "4,5" },
+          { label: "– hvorav mettede fettsyrer", unit: "g",    per100gPulver: "8,3",   per100mlUtblandet: "1,69" },
+          { label: "– linolsyre",                unit: "g",    per100gPulver: "2,9",   per100mlUtblandet: "0,59" },
+          { label: "– α-linolensyre",            unit: "mg",   per100gPulver: "310",   per100mlUtblandet: "63" },
+          { label: "– dokosaheksaensyre (DHA)",  unit: "mg",   per100gPulver: "113",   per100mlUtblandet: "23" },
+          { label: "Karbohydrat",                unit: "g",    per100gPulver: "59",    per100mlUtblandet: "12,1" },
+          { label: "– hvorav sukkerarter",       unit: "g",    per100gPulver: "5,3",   per100mlUtblandet: "1,08" },
+          { label: "Protein",                    unit: "g",    per100gPulver: "13,7",  per100mlUtblandet: "2,8" },
+          { label: "Salt",                       unit: "g",    per100gPulver: "0,49",  per100mlUtblandet: "0,1" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "196",  per100mlUtblandet: "40" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "490",  per100mlUtblandet: "100" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "300",  per100mlUtblandet: "61" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "490",  per100mlUtblandet: "100" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "290",  per100mlUtblandet: "60" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "78",   per100mlUtblandet: "16" },
+          { label: "Jern",      unit: "mg", per100gPulver: "4,9",  per100mlUtblandet: "1" },
+          { label: "Sink",      unit: "mg", per100gPulver: "4,4",  per100mlUtblandet: "0,9" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,54", per100mlUtblandet: "0,11" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,28", per100mlUtblandet: "0,057" },
+          { label: "Selen",     unit: "µg", per100gPulver: "15,7", per100mlUtblandet: "3,2" },
+          { label: "Krom",      unit: "µg", per100gPulver: "14,7", per100mlUtblandet: "3" },
+          { label: "Molybden",  unit: "µg", per100gPulver: "22",   per100mlUtblandet: "4,5" },
+          { label: "Jod",       unit: "µg", per100gPulver: "74",   per100mlUtblandet: "15" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg RE",     per100gPulver: "300",   per100mlUtblandet: "61" },
+          { label: "Vitamin D",    unit: "µg",        per100gPulver: "6,75",  per100mlUtblandet: "1,4" },
+          { label: "Vitamin E",    unit: "mg α-TE",   per100gPulver: "5,9",   per100mlUtblandet: "1,2" },
+          { label: "Vitamin K",    unit: "µg",        per100gPulver: "19,6",  per100mlUtblandet: "4" },
+          { label: "Vitamin C",    unit: "mg",        per100gPulver: "49",    per100mlUtblandet: "10" },
+          { label: "Tiamin",       unit: "mg",        per100gPulver: "0,37",  per100mlUtblandet: "0,075" },
+          { label: "Riboflavin",   unit: "mg",        per100gPulver: "0,49",  per100mlUtblandet: "0,1" },
+          { label: "Niacin",       unit: "mg",        per100gPulver: "4,9",   per100mlUtblandet: "1" },
+          { label: "Vitamin B6",   unit: "mg",        per100gPulver: "0,49",  per100mlUtblandet: "0,1" },
+          { label: "Folsyre",      unit: "µg",        per100gPulver: "74",    per100mlUtblandet: "15" },
+          { label: "Vitamin B12",  unit: "µg",        per100gPulver: "1,23",  per100mlUtblandet: "0,25" },
+          { label: "Biotin",       unit: "µg",        per100gPulver: "10,8",  per100mlUtblandet: "2,2" },
+          { label: "Pantotensyre", unit: "mg",        per100gPulver: "2,1",   per100mlUtblandet: "0,43" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Kolin",        unit: "mg",      per100gPulver: "108", per100mlUtblandet: "22" },
+          { label: "Inositol",     unit: "mg",      per100gPulver: "83",  per100mlUtblandet: "17" },
+          { label: "L-karnitin",   unit: "mg",      per100gPulver: "9,8", per100mlUtblandet: "2" },
+          { label: "Taurin",       unit: "mg",      per100gPulver: "29",  per100mlUtblandet: "6" },
+          { label: "Osmolaritet",  unit: "mOsm/l",  per100gPulver: "—",   per100mlUtblandet: "480" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Vask hendene grundig. Vask og kok flasker, smokker, lokk og andre redskaper (minst 5 minutter i kokende vann).",
+    "Kok opp rent vann og kjøl det ned til 70 °C. Hell ønsket mengde vann i en ren flaske.",
+    "Fyll måleskjeen med pulver (kun til å måle pulver). Ikke press pulveret ned. Stryk av med baksiden av en ren, tørr kniv. Ha riktig antall måleskjeer i flasken, og oppbevar måleskjeen tørr i boksen.",
+    "Lukk flasken, snu og rist godt til pulveret er helt oppløst – i en kopp røres det rundt til produktet er jevnt. Kjøl blandingen ned til spisetemperatur og kontroller temperaturen på innsiden av håndleddet.",
+    "Gi spesialnæringen umiddelbart etter tilberedning, innen to timer, eller dekk den til og sett den i kjøleskap (2–4 °C) i maks 24 timer. Når barnet har begynt å drikke den, skal den brukes innen én time eller kastes. Den må ikke fryses.",
+  ],
+  dosering: "Anbefalt inntak bestemmes av lege eller dietetiker og avhenger av barnets alder, kroppsvekst, type medisinsk tilstand og inntaket av andre matvarer. 1 strøken måleskje (6,8 g) til 30 ml vann gir en konsentrasjon på ca. 1 kcal/ml.",
+  mixingInfo: { konsentrasjon: "20,4", scoopGram: "6,8" },
+  mixingTable: [
+    { skjeer: 3, pulver: "20,4", vann: 90, ferdig: 100, energi: 100 },
+  ],
+  holdbarhet: "Boksen oppbevares tørt i romtemperatur. Etter åpning oppbevares boksen tett lukket og tørt, og innholdet må brukes innen 1 måned. Ikke frys pulveret og unngå sterk varme.",
+  ingredienser: "Glukosesirup, vegetabilske oljer (solsikkeolje med høyt oljesyreinnhold, mellomlange kjedede triglyserider fra kokosnøtt/palmekjerne (7,3 %), soya), modifisert tapiokastivelse, kaliumaspartat, L-leucin, L-lysinhydroklorid, L-prolin, L-alanin, kalsiumfosfat, L-valin, L-isoleucin, mononatriumglutamat, L-treonin, L-serin, L-tyrosin, L-aspartat, L-arginin, L-fenylalanin, magnesiumfosfat, kalsiumsitrat, L-histidin, L-cystin, glycin, L-tryptofan, L-metionin, natriumsitrat, olje fra mikroalgen Schizochytrium sp., kolinklorid, inositol, vitamin C (askorbinsyre), taurin, jernsulfat, sinksulfat, L-karnitin, vitamin E (DL-alfa-tokoferylacetat), niacin (nikotinamid), pantotensyre (kalsiumpantotenat), kobbersulfat, vitamin A (retinylpalmitat), vitamin B6 (pyridoksinhydroklorid), mangansulfat, tiamin (tiaminhydroklorid), riboflavin, vitamin D (kolekalsiferol), natriumjodid, folsyre, natriummolybdat, natriumselenitt, kromklorid, vitamin K (fytomenadion), biotin (D-biotin), vitamin B12 (cyanokobalamin).",
+  smaksvarianter: "Uten smakstilsetning.",
+  indikasjon: "Kostbehandling av alvorlig kumelkproteinallergi, multiple matallergier, når et høygradig hydrolysat ikke har hatt effekt, og andre indikasjoner som krever elementaldiett (blant annet eosinofil øsofagitt og manglende vekst), fra 1 års alder.",
+  kontraindikasjon: "",
+  forsiktighetsregler: "Det er svært viktig å følge tilberedningsinstruksjonene – feil håndtering kan påvirke barnets helse. Skal brukes under medisinsk tilsyn og ikke gis parenteralt.",
+  bestilling: [
+    { produktnavn: "Nutramigen Puramino Junior", bestillingsnr: "", varenr: "830756", salgsenhet: "Boks 400 g" },
+  ],
+};
+
+const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON, NEOCATE_JUNIOR, ALTHERA, ALFARE, ALFAMINO, ALFAMINO_JUNIOR, NUTRAMIGEN_1, NUTRAMIGEN_2, NUTRAMIGEN_PURAMINO, NUTRAMIGEN_PURAMINO_JUNIOR];
 const PRODUCT_GROUPS = (Object.keys(MANUFACTURERS) as ManufacturerId[])
   .map((id) => ({ id, label: MANUFACTURERS[id].label, short: MANUFACTURERS[id].short, products: PRODUCTS.filter((p) => p.manufacturer === id) }))
   .filter((group) => group.products.length > 0);
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-/** Kompakt produktvalg: miniatyr og navn. Alder og type vises som tips ved hover/fokus. */
-function ProductChip({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
+function ProductThumb({ product, width, height }: { product: Product; width: number; height: number }) {
+  const src = product.thumb ?? product.image;
   return (
-    <Tooltip title={`${product.age} · ${product.type}`} placement="bottom" enterDelay={350} arrow>
+    <Box sx={{ width, height, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: MK.thumbBg, borderRadius: "6px", overflow: "hidden" }}>
+      {src
+        ? <Box component="img" src={src} alt="" sx={{ width, height, objectFit: "contain" }} />
+        : <BottleIcon size={Math.min(width, height) - 4} color={D.purple} />}
+    </Box>
+  );
+}
+
+type ProductGroup = (typeof PRODUCT_GROUPS)[number];
+
+/** Én nedtrekksknapp per produsent. Viser valgt produkt når det tilhører produsenten, ellers produsentens navn og antall produkter. */
+function ManufacturerPicker({ group, selectedId, onSelect }: { group: ProductGroup; selectedId: string; onSelect: (id: string) => void }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const selectedRef = useRef<HTMLButtonElement | null>(null);
+  const active = group.products.find((p) => p.id === selectedId);
+  const single = group.products.length === 1;
+
+  // Fokus på valgt produkt når menyen åpnes, slik at piltaster og mellomrom virker med en gang.
+  useEffect(() => {
+    if (!anchor) return;
+    const timer = setTimeout(() => (selectedRef.current ?? document.querySelector<HTMLElement>(".MuiPopover-paper [data-product-item]"))?.focus(), 80);
+    return () => clearTimeout(timer);
+  }, [anchor]);
+
+  const moveFocus = (event: React.KeyboardEvent<HTMLElement>) => {
+    const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"];
+    if (!keys.includes(event.key)) return;
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[data-product-item]"));
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+    const next = items[(current + step + items.length) % items.length];
+    if (next) {
+      event.preventDefault();
+      next.focus();
+    }
+  };
+
+  return (
+    <>
       <ButtonBase
-        onClick={onClick}
-        aria-pressed={selected}
+        onClick={(event) => (single ? onSelect(group.products[0].id) : setAnchor(event.currentTarget))}
+        aria-haspopup={single ? undefined : "true"}
+        aria-expanded={anchor ? "true" : undefined}
+        aria-pressed={single ? Boolean(active) : undefined}
+        aria-label={active ? `${group.label}. Valgt: ${active.name}` : `${group.label}. ${group.products.length} ${group.products.length === 1 ? "produkt" : "produkter"}`}
         sx={{
-          display: "flex", alignItems: "center", gap: 1.25, height: 52, pl: 1, pr: 1.75, minWidth: 0, flexShrink: 0,
-          borderRadius: "12px",
-          border: `1.5px solid ${selected ? D.purple : "transparent"}`,
-          bgcolor: selected ? "#FFF5FA" : "transparent",
-          color: selected ? D.purple : D.textSub,
-          transition: "background-color 120ms, border-color 120ms",
-          "&:hover": { bgcolor: selected ? "#FFF5FA" : "#F6E6EF" },
-          "&.Mui-focusVisible": { outline: `2px solid ${D.purple}`, outlineOffset: 1 },
+          display: "flex", alignItems: "center", gap: 1.25, minWidth: single ? 0 : 230, height: 52, pl: 1.25, pr: single ? 2 : 1.25, borderRadius: "12px",
+          border: `1.5px solid ${active || anchor ? D.purple : D.borderMed}`, bgcolor: active ? MK.sel : D.surface, textAlign: "left", justifyContent: "flex-start",
+          transition: "border-color 120ms, background-color 120ms", "&:hover": { borderColor: D.purple },
         }}
       >
-        <Box sx={{ width: 34, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {product.thumb ?? product.image
-            ? <Box component="img" src={product.thumb ?? product.image} alt="" sx={{ width: 34, height: 40, objectFit: "contain" }} />
-            : <BottleIcon size={24} color={D.purple} />}
+        {active ? (
+          <ProductThumb product={active} width={30} height={38} />
+        ) : (
+          <Box aria-hidden sx={{ display: "flex", alignItems: "center", flexShrink: 0, pl: 1 }}>
+            {group.products.slice(0, 3).map((p, i) => (
+              <Box key={p.id} sx={{ ml: i === 0 ? 0 : -1.25, opacity: 0.9 }}>
+                <ProductThumb product={p} width={22} height={28} />
+              </Box>
+            ))}
+          </Box>
+        )}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontWeight: 800, fontSize: 15, lineHeight: 1.2, color: active ? D.purple : D.text }}>{active ? active.name : group.short}</Typography>
+          <Typography noWrap sx={{ fontSize: 12.5, lineHeight: 1.3, color: D.textMuted }}>
+            {active ? `${group.short} · ${active.age}` : `${group.products.length} ${group.products.length === 1 ? "produkt" : "produkter"}`}
+          </Typography>
         </Box>
-        <Typography noWrap sx={{ fontWeight: selected ? 800 : 600, fontSize: 14.5, lineHeight: 1.2, color: "inherit" }}>{product.name}</Typography>
+        {single ? null : (
+          <ExpandMoreRoundedIcon sx={{ color: D.purple, transform: anchor ? "rotate(180deg)" : "none", transition: "transform 120ms" }} />
+        )}
       </ButtonBase>
-    </Tooltip>
+
+      {single ? null : (
+        <Popover
+          open={Boolean(anchor)}
+          anchorEl={anchor}
+          onClose={() => setAnchor(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          slotProps={{ root: { "data-no-space-search": "" } as object, paper: { onKeyDown: moveFocus, sx: { mt: 0.75, minWidth: 270, borderRadius: "14px", border: `1px solid ${D.border}`, boxShadow: `0 16px 40px ${MK.shadow}`, maxWidth: "calc(100vw - 32px)" } } }}
+        >
+          <Box role="group" aria-label={group.label} sx={{ p: 1.25, display: "grid", gap: 0.5 }}>
+            <Typography sx={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: D.textMuted, px: 1, pb: 0.75, mb: 0.25, borderBottom: `1px solid ${D.border}` }}>
+              {group.label}
+            </Typography>
+            {group.products.map((p) => {
+              const selected = p.id === selectedId;
+              return (
+                <ButtonBase
+                  key={p.id}
+                  data-product-item
+                  ref={selected ? selectedRef : undefined}
+                  aria-pressed={selected}
+                  onClick={() => { onSelect(p.id); setAnchor(null); }}
+                  sx={{
+                    display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 1.25, width: "100%", px: 1, py: 0.75, textAlign: "left",
+                    borderRadius: "10px", border: `1.5px solid ${selected ? D.purple : "transparent"}`, bgcolor: selected ? MK.sel : "transparent",
+                    "&:hover": { bgcolor: selected ? MK.sel : MK.hover },
+                    "&.Mui-focusVisible": { outline: `2px solid ${D.purple}`, outlineOffset: 1 },
+                  }}
+                >
+                  <ProductThumb product={p} width={30} height={38} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: selected ? 800 : 600, fontSize: 14.5, lineHeight: 1.25, color: selected ? D.purple : D.text }}>{p.name}</Typography>
+                    <Typography sx={{ fontSize: 12.5, lineHeight: 1.3, color: D.textMuted }}>{p.age} · {p.type}</Typography>
+                  </Box>
+                </ButtonBase>
+              );
+            })}
+          </Box>
+        </Popover>
+      )}
+    </>
+  );
+}
+
+/** Startsiden: alle produkter, gruppert på produsent. Fyller høyden uten å scrolle (kortene krymper om det trengs). */
+function ProductStart({ onSelect }: { onSelect: (id: string) => void }) {
+  return (
+    <Box
+      sx={{
+        flex: 1, minHeight: 0, display: "grid", alignContent: "start", columnGap: 3, rowGap: 2.5, px: 3, py: 2.25,
+        gridTemplateColumns: { xs: "minmax(0, 1fr)", md: `repeat(${PRODUCT_GROUPS.length}, minmax(0, 1fr))` },
+        overflowX: "hidden", overflowY: { xs: "auto", md: "hidden" },
+      }}
+    >
+      {PRODUCT_GROUPS.map((group) => (
+        <Box key={group.id} role="group" aria-label={group.label} sx={{ display: "flex", flexDirection: "column", gap: 1, minHeight: 0, minWidth: 0 }}>
+          <Typography
+            component="h2"
+            sx={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: D.textMuted, pb: 0.75, mb: 0.25, borderBottom: `1px solid ${D.border}` }}
+          >
+            {group.label}
+          </Typography>
+          {group.products.map((p) => (
+            <ButtonBase
+              key={p.id}
+              onClick={() => onSelect(p.id)}
+              aria-label={`${p.name}, ${p.age}`}
+              sx={{
+                display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 1.5, width: "100%", height: 88, minHeight: 56, flexShrink: 1, px: 1.75, textAlign: "left",
+                borderRadius: "12px", border: `1px solid ${D.border}`, bgcolor: D.surface, overflow: "hidden",
+                transition: "border-color 120ms, background-color 120ms",
+                "&:hover": { borderColor: MK.hoverBorder, bgcolor: MK.soft },
+                "&.Mui-focusVisible": { outline: `2px solid ${D.purple}`, outlineOffset: 1 },
+              }}
+            >
+              <ProductThumb product={p} width={40} height={50} />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography noWrap sx={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: D.text }}>{p.name}</Typography>
+                <Typography noWrap sx={{ fontSize: 12.5, lineHeight: 1.3, color: D.textMuted }}>{p.age} · {p.type}</Typography>
+              </Box>
+            </ButtonBase>
+          ))}
+        </Box>
+      ))}
+    </Box>
   );
 }
 
@@ -1829,8 +2644,8 @@ function OversiktTab({ product, terms }: { product: Product; terms: string[] }) 
         </Box>
 
         {/* Viktig å vite */}
-        <Box sx={{ ...card, bgcolor: "#FFF5FA", border: "1px solid #F2CFE3" }}>
-          <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: "#8C1A59" }}>Viktig å vite</Typography>
+        <Box sx={{ ...card, bgcolor: MK.sel, border: `1px solid ${MK.pillBorder}` }}>
+          <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: MK.pillText }}>Viktig å vite</Typography>
           {product.viktigAVite.map((v, i) => (
             <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
               <CheckIcon color={D.purple} size={14} />
@@ -1892,13 +2707,13 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
         <Box sx={{ flex: "1 1 380px", minWidth: 0, display: "grid", gap: 1 }}>
           <Box role="img" aria-label="Fordeling av energi mellom makronæringsstoffer" sx={{ display: "flex", height: 12, borderRadius: "6px", overflow: "hidden", gap: "2px" }}>
             {macros.map((m, i) => (
-              <Box key={i} sx={{ flex: `${(m.value / total) * 100} 1 0`, minWidth: 3, bgcolor: m.color }} />
+              <Box key={i} sx={{ flex: `${(m.value / total) * 100} 1 0`, minWidth: 3, bgcolor: macroColor(m.color) }} />
             ))}
           </Box>
           <Box sx={{ display: "flex", flexWrap: "wrap", columnGap: 2.5, rowGap: 0.25 }}>
             {macros.map((m, i) => (
               <Box key={i} sx={{ display: "inline-flex", alignItems: "baseline", gap: 0.75 }}>
-                <Box sx={{ flex: "0 0 9px", height: 9, borderRadius: "3px", bgcolor: m.color, alignSelf: "center" }} />
+                <Box sx={{ flex: "0 0 9px", height: 9, borderRadius: "3px", bgcolor: macroColor(m.color), alignSelf: "center" }} />
                 <Typography component="span" sx={{ fontSize: 13, fontWeight: 600, color: D.textSub }}><Hl text={m.label} terms={terms} /></Typography>
                 <Typography component="span" sx={{ fontSize: 14, fontWeight: 800, color: D.text }}><Hl text={m.amount} terms={terms} /></Typography>
               </Box>
@@ -1911,7 +2726,7 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
       <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", columnGap: 2, rowGap: 1 }}>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
           {nokkel.map((n, i) => (
-            <Box key={i} sx={{ display: "flex", alignItems: "baseline", gap: 0.75, px: 1.25, py: 0.5, borderRadius: "8px", border: `1px solid ${D.border}`, bgcolor: "#FFFAFD" }}>
+            <Box key={i} sx={{ display: "flex", alignItems: "baseline", gap: 0.75, px: 1.25, py: 0.5, borderRadius: "8px", border: `1px solid ${D.border}`, bgcolor: MK.soft }}>
               <Typography sx={{ fontSize: 12.5, color: D.textMuted }}><Hl text={n.label} terms={terms} /></Typography>
               <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: D.text }}><Hl text={n.value} terms={terms} /></Typography>
             </Box>
@@ -1926,7 +2741,7 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
                   key={i}
                   onClick={() => setSectionIndex(i)}
                   aria-pressed={active}
-                  sx={{ px: 1.5, minHeight: 30, borderRadius: "7px", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", color: active ? "#FFFFFF" : D.textSub, bgcolor: active ? D.purple : "transparent", "&:hover": { bgcolor: active ? D.purple : D.blueLight } }}
+                  sx={{ px: 1.5, minHeight: 30, borderRadius: "7px", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", color: active ? MK.onAccent : D.textSub, bgcolor: active ? D.purpleBg : "transparent", "&:hover": { bgcolor: active ? D.purple : D.blueLight } }}
                 >
                   {sec.title || "Næringsinnhold"}
                 </ButtonBase>
@@ -1941,7 +2756,7 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: halves.length > 1 ? "1fr 1fr" : "1fr" } }}>
           {halves.map((half, h) => (
             <Box key={h} sx={{ borderLeft: { md: h > 0 ? `1px solid ${D.border}` : "none" } }}>
-              <Box sx={{ display: "grid", gridTemplateColumns: columns, gap: 1, px: 1.75, py: 0.75, bgcolor: "#F6E6EF" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: columns, gap: 1, px: 1.75, py: 0.75, bgcolor: MK.hover }}>
                 <Box />
                 <Typography title={headers[2] || undefined} sx={headerCell}>Pr. 100 g</Typography>
                 <Typography title={headers[3] || undefined} sx={headerCell}>Pr. 100 ml</Typography>
@@ -1990,21 +2805,21 @@ function TilberedningTab({ product, terms }: { product: Product; terms: string[]
 
       <Box sx={{ flex: "1.3 1 400px", minWidth: 0, display: "grid", gap: 2.5 }}>
         {/* Konsentrasjon som formel */}
-        <Box sx={{ bgcolor: "#FFF5FA", border: "1px solid #F2CFE3", borderRadius: "12px", p: 2, display: "grid", gap: 1.5 }}>
-          <Typography sx={{ ...labelSx, color: "#8C1A59" }}>Anbefalt konsentrasjon {product.mixingInfo.konsentrasjon} % vekt/volum</Typography>
+        <Box sx={{ bgcolor: MK.sel, border: `1px solid ${MK.pillBorder}`, borderRadius: "12px", p: 2, display: "grid", gap: 1.5 }}>
+          <Typography sx={{ ...labelSx, color: MK.pillText }}>Anbefalt konsentrasjon {product.mixingInfo.konsentrasjon} % vekt/volum</Typography>
           {first ? (
             <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.25 }}>
-              <Box sx={{ px: 1.75, py: 1.25, borderRadius: "10px", bgcolor: D.surface, border: "1px solid #F2CFE3" }}>
+              <Box sx={{ px: 1.75, py: 1.25, borderRadius: "10px", bgcolor: D.surface, border: `1px solid ${MK.pillBorder}` }}>
                 <Typography sx={{ fontSize: 12.5, color: D.textMuted }}>{first.skjeer} {first.skjeer === 1 ? "måleskje" : "måleskjeer"}</Typography>
                 <Typography sx={{ fontSize: 18, fontWeight: 800, color: D.text }}>{first.pulver} g pulver</Typography>
               </Box>
-              <Typography sx={{ fontSize: 20, fontWeight: 700, color: "#8C1A59" }}>+</Typography>
-              <Box sx={{ px: 1.75, py: 1.25, borderRadius: "10px", bgcolor: D.surface, border: "1px solid #F2CFE3" }}>
+              <Typography sx={{ fontSize: 20, fontWeight: 700, color: MK.pillText }}>+</Typography>
+              <Box sx={{ px: 1.75, py: 1.25, borderRadius: "10px", bgcolor: D.surface, border: `1px solid ${MK.pillBorder}` }}>
                 <Typography sx={{ fontSize: 12.5, color: D.textMuted }}>vann</Typography>
                 <Typography sx={{ fontSize: 18, fontWeight: 800, color: D.text }}>{first.vann} ml</Typography>
               </Box>
-              <Typography sx={{ fontSize: 20, fontWeight: 700, color: "#8C1A59" }}>=</Typography>
-              <Box sx={{ px: 1.75, py: 1.25, borderRadius: "10px", bgcolor: D.purple, color: "#FFFFFF" }}>
+              <Typography sx={{ fontSize: 20, fontWeight: 700, color: MK.pillText }}>=</Typography>
+              <Box sx={{ px: 1.75, py: 1.25, borderRadius: "10px", bgcolor: D.purpleBg, color: MK.onAccent }}>
                 <Typography sx={{ fontSize: 12.5, opacity: 0.9 }}>ferdig</Typography>
                 <Typography sx={{ fontSize: 18, fontWeight: 800 }}>{first.ferdig} ml · {first.energi} kcal</Typography>
               </Box>
@@ -2017,7 +2832,7 @@ function TilberedningTab({ product, terms }: { product: Product; terms: string[]
           <Box sx={{ display: "grid", gap: 1 }}>
             <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Utblandingstabell</Typography>
             <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", overflow: "hidden" }}>
-              <Box sx={{ display: "grid", gridTemplateColumns: columns, gap: 1, px: 2, py: 1.25, bgcolor: "#F6E6EF" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: columns, gap: 1, px: 2, py: 1.25, bgcolor: MK.hover }}>
                 {["Måleskjeer", "Pulver (g)", "Vann (ml)", "Ferdig (ml)", "Energi (kcal)"].map((h, i) => (
                   <Typography key={h} sx={{ fontSize: 12.5, fontWeight: 700, color: D.textSub, textAlign: i === 0 ? "left" : "right" }}>{h}</Typography>
                 ))}
@@ -2040,7 +2855,7 @@ function TilberedningTab({ product, terms }: { product: Product; terms: string[]
           <Box sx={{ display: "grid", gap: 1 }}>
             <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>{product.doseringTabell.tittel}</Typography>
             <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", overflow: "hidden" }}>
-              <Box sx={{ display: "grid", gridTemplateColumns: `1.5fr repeat(${product.doseringTabell.kolonner.length - 1}, minmax(0, 1fr))`, gap: 1, px: 2, py: 1.25, bgcolor: "#F6E6EF" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: `1.5fr repeat(${product.doseringTabell.kolonner.length - 1}, minmax(0, 1fr))`, gap: 1, px: 2, py: 1.25, bgcolor: MK.hover }}>
                 {product.doseringTabell.kolonner.map((h, i) => (
                   <Typography key={h} sx={{ fontSize: 12.5, fontWeight: 700, color: D.textSub, textAlign: i === 0 ? "left" : "right" }}>{h}</Typography>
                 ))}
@@ -2081,6 +2896,7 @@ type Dokument = { title: string; url: string; sizeLabel: string; color?: string 
 const INGR_EGENSKAPER_STANDARD = ["Glutenfri", "Inneholder fiskolje", "Inneholder laktose"];
 const INGR_EGENSKAPER_NEOCATE_LCP = ["Glutenfri", "Kostfiberfri", "Laktosefri"];
 const INGR_EGENSKAPER_NEOCATE_SPOON = ["Glutenfri", "Laktosefri"];
+const INGR_EGENSKAPER_NUTRAMIGEN = ["Laktosefri"];
 const INGR_EGENSKAPER_ALFAMINO_JUNIOR = ["Glutenfri", "Halalsertifisert"];
 const INGR_EGENSKAPER_ALFAMINO = ["Glutenfri", "Laktosefri", "Halalsertifisert"];
 const INGR_EGENSKAPER_ALFARE = ["Glutenfri", "Laktosefri"];
@@ -2096,7 +2912,7 @@ function IngrediensTab({ product, terms }: { product: Product; terms: string[] }
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
           {egenskaper.map((label) => (
             <Box key={label} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 1.25, py: 0.5, borderRadius: "6px", border: `1px solid ${D.borderMed}`, color: D.textSub, fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>
-              <CheckRoundedIcon sx={{ fontSize: 15, color: "#1B6B3A" }} />
+              <CheckRoundedIcon sx={{ fontSize: 15, color: MK.ok }} />
               <Hl text={label} terms={terms} />
             </Box>
           ))}
@@ -2127,7 +2943,7 @@ function CopyRow({ label, value, terms }: { label: string; value: string; terms:
       <ButtonBase
         onClick={copy}
         aria-label={`Kopier ${label.toLowerCase()} ${value}`}
-        sx={{ gap: 0.5, px: 1.25, minHeight: 34, borderRadius: "8px", border: `1px solid ${D.borderMed}`, fontSize: 13, fontWeight: 600, color: copied ? "#1B6B3A" : D.textSub, "&:hover": { bgcolor: D.blueLight, borderColor: D.purple } }}
+        sx={{ gap: 0.5, px: 1.25, minHeight: 34, borderRadius: "8px", border: `1px solid ${D.borderMed}`, fontSize: 13, fontWeight: 600, color: copied ? MK.ok : D.textSub, "&:hover": { bgcolor: D.blueLight, borderColor: D.purple } }}
       >
         {copied ? <CheckRoundedIcon sx={{ fontSize: 16 }} /> : <ContentCopyRoundedIcon sx={{ fontSize: 16, color: D.purple }} />}
         {copied ? "Kopiert" : "Kopier"}
@@ -2147,7 +2963,7 @@ function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Pr
         <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", px: 2.25, pt: 2, pb: 0.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.75, pb: 1.75 }}>
             {product.image ? (
-              <Box sx={{ width: 56, height: 64, flexShrink: 0, borderRadius: "10px", bgcolor: "#F6EEF7", display: "grid", placeItems: "center" }}>
+              <Box sx={{ width: 56, height: 64, flexShrink: 0, borderRadius: "10px", bgcolor: MK.tile, display: "grid", placeItems: "center" }}>
                 <Box component="img" src={product.image} alt="" sx={{ width: 44, height: 52, objectFit: "contain" }} />
               </Box>
             ) : null}
@@ -2160,7 +2976,7 @@ function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Pr
                   <Hl text={row.produktnavn} terms={terms} />
                 </Typography>
               ) : null}
-              <CopyRow label="Bestillingsnr." value={row.bestillingsnr} terms={terms} />
+              {row.bestillingsnr ? <CopyRow label="Bestillingsnr." value={row.bestillingsnr} terms={terms} /> : null}
               <CopyRow label="Varenr." value={row.varenr} terms={terms} />
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1.1, borderTop: `1px solid ${D.border}` }}>
                 <Typography sx={{ flex: "0 0 120px", fontSize: 14, color: D.textMuted }}>Salgsenhet</Typography>
@@ -2171,8 +2987,8 @@ function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Pr
         </Box>
 
         {product.forsiktighetsregler || product.kontraindikasjon ? (
-          <Box sx={{ ...card, bgcolor: "#FFF5FA", border: "1px solid #F2CFE3" }}>
-            <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: "#8C1A59" }}>Viktig informasjon</Typography>
+          <Box sx={{ ...card, bgcolor: MK.sel, border: `1px solid ${MK.pillBorder}` }}>
+            <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: MK.pillText }}>Viktig informasjon</Typography>
             {product.forsiktighetsregler ? (
               <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.6 }}><Hl text={product.forsiktighetsregler} terms={terms} /></Typography>
             ) : null}
@@ -2202,7 +3018,7 @@ function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Pr
                   display: "flex", alignItems: "center", gap: 1.5, p: 1.5, minHeight: 64,
                   bgcolor: D.surface, border: `1px solid ${D.border}`, borderRadius: "12px",
                   textDecoration: "none", transition: "border-color 120ms, background-color 120ms",
-                  "&:hover": { borderColor: "#C9709F", bgcolor: "#FFFAFD" },
+                  "&:hover": { borderColor: MK.hoverBorder, bgcolor: MK.soft },
                 }}
               >
                 <Box sx={{ flex: "0 0 40px", height: 40, borderRadius: "10px", bgcolor: D.blueLight, color: D.purple, display: "grid", placeItems: "center", fontSize: 11.5, fontWeight: 800 }}>
@@ -2226,8 +3042,13 @@ function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Pr
           <Typography sx={{ fontSize: 14, color: D.textSub, lineHeight: 1.6, fontStyle: "italic" }}>{maker.notice}</Typography>
           <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.7 }}>
             {maker.address}<br />
-            Tlf. <Box component="a" href={maker.tel.href} sx={{ color: D.purple, fontWeight: 600 }}>{maker.tel.label}</Box><br />
-            E-post <Box component="a" href={`mailto:${maker.email}`} sx={{ color: D.purple, fontWeight: 600 }}>{maker.email}</Box>
+            {maker.tel.title ?? "Tlf."} <Box component="a" href={maker.tel.href} sx={{ color: D.purple, fontWeight: 600 }}>{maker.tel.label}</Box>
+            {maker.email ? (
+              <>
+                <br />
+                E-post <Box component="a" href={`mailto:${maker.email}`} sx={{ color: D.purple, fontWeight: 600 }}>{maker.email}</Box>
+              </>
+            ) : null}
             {maker.extra.map((line) => (
               <span key={line.label}>
                 <br />
@@ -2247,6 +3068,10 @@ const DOKUMENT_MAP: Record<string, Dokument[]> = {
   "pepticate-plus-2": [{ title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" }],
   "neocate-lcp": [{ title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" }],
   "neocate-spoon": [{ title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" }],
+  "nutramigen-puramino-junior": [{ title: "Produktark Nutramigen Puramino Junior", url: "/dokumenter/Nutramigen-Puramino-Junior.pdf", sizeLabel: "435 KB" }],
+  "nutramigen-puramino": [{ title: "Produktark Nutramigen Puramino", url: "/dokumenter/Nutramigen-Puramino.pdf", sizeLabel: "458 KB" }],
+  "nutramigen-2": [{ title: "Produktark Nutramigen 2", url: "/dokumenter/Nutramigen-2.pdf", sizeLabel: "418 KB" }],
+  "nutramigen-1": [{ title: "Produktark Nutramigen 1", url: "/dokumenter/Nutramigen-1.pdf", sizeLabel: "415 KB" }],
   "alfamino-junior": [{ title: "Produktark Alfamino Junior", url: "/dokumenter/Alfamino-Junior.pdf", sizeLabel: "331 KB" }],
   "alfamino": [{ title: "Produktark Alfamino", url: "/dokumenter/Alfamino.pdf", sizeLabel: "272 KB" }],
   "alfare": [{ title: "Produktark Alfaré", url: "/dokumenter/Alfare.pdf", sizeLabel: "309 KB" }],
@@ -2268,6 +3093,8 @@ const ingrEgenskaper = (product: Product): string[] => {
   if (product.id === "alfare") return INGR_EGENSKAPER_ALFARE;
   if (product.id === "alfamino") return INGR_EGENSKAPER_ALFAMINO;
   if (product.id === "alfamino-junior") return INGR_EGENSKAPER_ALFAMINO_JUNIOR;
+  if (product.id.startsWith("nutramigen-puramino")) return ["Laktosefri", "Halalsertifisert", "Koshersertifisert"];
+  if (product.id.startsWith("nutramigen")) return INGR_EGENSKAPER_NUTRAMIGEN;
   return INGR_EGENSKAPER_STANDARD;
 };
 
@@ -2362,7 +3189,11 @@ function CheckIcon({ size = 14, color = "#22C55E" }: { size?: number; color?: st
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MelkeerstatningTab() {
+  const muiTheme = useTheme();
+  const mkVars = muiTheme.palette.mode === "dark" ? MK_DARK_VARS : MK_LIGHT_VARS;
   const [selectedId, setSelectedId] = useState<string>(PRODUCTS[0].id);
+  // Startsiden viser alle produktene; et valgt produkt åpner produktvisningen.
+  const [home, setHome] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
 
   // Søk: lukket til brukeren åpner det (knapp eller «/»).
@@ -2397,6 +3228,7 @@ export default function MelkeerstatningTab() {
     let swallowKeyUp = false;
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isSpace(event) || typing(event.target)) return;
+      if ((event.target as HTMLElement | null)?.closest?.("[data-no-space-search]")) return;
       event.preventDefault();
       event.stopPropagation();
       if (event.repeat) return;
@@ -2459,6 +3291,7 @@ export default function MelkeerstatningTab() {
       .map((f) => f.tab)
       .sort((a, b) => a - b)[0];
     setSelectedId(id);
+    setHome(false);
     setActiveTab(firstTab ?? 0);
     setView("product");
     setCur(0);
@@ -2526,10 +3359,17 @@ export default function MelkeerstatningTab() {
   }, [searchOpen, view, cur, activeTab, selectedId, termsKey]);
 
   const showResults = searchOpen && (view === "results" || terms.length === 0);
+  const chooseProduct = (id: string) => {
+    setSelectedId(id);
+    setActiveTab(0);
+    setHome(false);
+  };
+  const productGroup = PRODUCT_GROUPS.find((g) => g.id === product.manufacturer) ?? PRODUCT_GROUPS[0];
   const hero = heroInfo(product);
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, bgcolor: D.surface, overflow: "hidden" }}>
+    <Box data-melke-root sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, bgcolor: D.surface, color: D.text, overflow: "hidden" }}>
+      <CssVars styles={{ ":root": mkVars }} />
       {searchOpen ? (
         <SearchHeader
           tokens={tokens}
@@ -2547,29 +3387,31 @@ export default function MelkeerstatningTab() {
           hint={terms.length === 0 ? "Søker i navn, egenskaper, fordeler, bruksområder, tilberedning, ingredienser, næringsinnhold og bestillingsinfo – også på varenr." : undefined}
         />
       ) : (
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 2.5, py: 1.5, flexShrink: 0, bgcolor: "#FFFAFD", borderBottom: `1px solid ${D.border}` }}>
-          <Box sx={{ flex: 1, minWidth: 0, display: "grid", gap: 0.75 }}>
-            {PRODUCT_GROUPS.map((group) => (
-              <Box key={group.id} role="group" aria-label={group.label} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 0.5, rowGap: 0.5 }}>
-                <Typography title={group.label} sx={{ flex: "0 0 76px", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: D.textMuted, whiteSpace: "nowrap" }}>
-                  {group.short}
-                </Typography>
-                {group.products.map((p) => (
-                  <ProductChip
-                    key={p.id}
-                    product={p}
-                    selected={p.id === selectedId}
-                    onClick={() => { setSelectedId(p.id); setActiveTab(0); }}
-                  />
-                ))}
-              </Box>
-            ))}
-          </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2.5, py: 1.25, flexShrink: 0, bgcolor: MK.soft, borderBottom: `1px solid ${D.border}` }}>
+          {home ? (
+            <Typography component="h1" sx={{ fontWeight: 800, fontSize: 18, color: D.text, flex: 1 }}>Velg produkt</Typography>
+          ) : (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25, alignItems: "center", flex: 1, minWidth: 0 }}>
+              <ButtonBase
+                onClick={() => setHome(true)}
+                sx={{
+                  display: "flex", alignItems: "center", gap: 0.5, height: 52, pl: 1, pr: 1.75, borderRadius: "12px", border: `1.5px solid ${D.borderMed}`, bgcolor: D.surface,
+                  fontSize: 14.5, fontWeight: 600, color: D.textSub, transition: "border-color 120ms", "&:hover": { borderColor: D.purple, color: D.purple },
+                }}
+              >
+                <ChevronLeftRoundedIcon sx={{ color: D.purple }} />
+                Alle produkter
+              </ButtonBase>
+              <ManufacturerPicker group={productGroup} selectedId={selectedId} onSelect={chooseProduct} />
+            </Box>
+          )}
           <SearchTrigger onClick={() => { setSearchOpen(true); setView("results"); }} />
         </Box>
       )}
 
-      {showResults ? (
+      {home && !searchOpen ? (
+        <ProductStart onSelect={chooseProduct} />
+      ) : showResults ? (
         <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
           {terms.length === 0 ? (
             <SuggestionsPanel hasHit={hasHit} onPick={(list) => { addTokens(list); inputRef.current?.focus(); }} />
@@ -2585,7 +3427,7 @@ export default function MelkeerstatningTab() {
 
           {/* Produkthode */}
           <Box ref={heroRef} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2.5, px: 3, py: 1.5, flexShrink: 0, borderBottom: `1px solid ${D.border}` }}>
-            <Box sx={{ width: 80, height: 92, flexShrink: 0, borderRadius: "10px", bgcolor: "#F6EEF7", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <Box sx={{ width: 80, height: 92, flexShrink: 0, borderRadius: "10px", bgcolor: MK.tile, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
               {product.image
                 ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 70, height: 82, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
                 : <BottleIcon size={40} color={D.purple} />}
@@ -2599,7 +3441,7 @@ export default function MelkeerstatningTab() {
               {hero.primary.length > 0 ? (
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
                   {hero.primary.map((label) => (
-                    <Box key={label} sx={{ px: 1.25, py: 0.5, borderRadius: "6px", bgcolor: "#FCE7F2", color: "#8C1A59", fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>
+                    <Box key={label} sx={{ px: 1.25, py: 0.5, borderRadius: "6px", bgcolor: MK.pill, color: MK.pillText, fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>
                       <Hl text={label} terms={terms} />
                     </Box>
                   ))}
@@ -2660,7 +3502,7 @@ export default function MelkeerstatningTab() {
                     <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.9 }}>
                       {label}
                       {searchOpen && tabCounts[i] > 0 ? (
-                        <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.75, boxSizing: "border-box", borderRadius: "10px", bgcolor: HIT_BG, color: D.text, fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                        <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.75, boxSizing: "border-box", borderRadius: "10px", bgcolor: HIT_BG, color: MK.hitText, fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                           {tabCounts[i]}
                         </Box>
                       ) : null}

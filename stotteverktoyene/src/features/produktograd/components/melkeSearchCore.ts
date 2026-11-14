@@ -3,14 +3,16 @@
 // står i begynnelsen av et ord i teksten («sonde» treffer «sondeernæring»), uavhengig av store
 // bokstaver og aksenter.
 
+import { MK } from "./melkeTheme";
+
 export type SearchMode = "all" | "any";
 
 /** Ett stykke tekst som er synlig i produktvisningen. `tab` er undertabben (0–4), eller -1 for produkthodet. */
 export type SearchField = { tab: number; label: string; text: string };
 
-export const HIT_BG = "#FFEFA8";
-export const HIT_NOW_BG = "#FFD84D";
-export const HIT_NOW_SHADOW = "0 0 0 2px #A81F66";
+export const HIT_BG = MK.hit;
+export const HIT_NOW_BG = MK.hitNow;
+export const HIT_NOW_SHADOW = `0 0 0 2px ${MK.hitRing}`;
 
 /** Små bokstaver uten aksenter, med samme lengde som teksten (så posisjonene kan brukes i originalen). */
 export const normalizeText = (value: string): string =>
@@ -122,8 +124,8 @@ export function rankProducts(items: SearchableProduct[], terms: string[]): Produ
 export type SearchProductInfo = { id: string; name: string; meta: string; image?: string };
 
 export const SUGGESTION_GROUPS: { label: string; words: string[] }[] = [
-  { label: "Egenskap", words: ["Laktosefri", "Glutenfri", "Hydrolysert", "Aminosyrebasert", "Halal", "Kosher", "GOS/FOS", "DHA", "Nukleotider", "HMO", "MCT"] },
-  { label: "Produsent", words: ["Nutricia", "Nestlé"] },
+  { label: "Egenskap", words: ["Laktosefri", "Glutenfri", "Hydrolysert", "Aminosyrebasert", "Halal", "Kosher", "GOS/FOS", "DHA", "Nukleotider", "HMO", "MCT", "Kasein"] },
+  { label: "Produsent", words: ["Nutricia", "Nestlé", "Mead Johnson"] },
   { label: "Alder", words: ["0–6 måneder", "fra 6 måneder", "0–12 måneder", "0–1 år", "fra 1 år", "fast føde"] },
   { label: "Bruk", words: ["Sondeernæring", "Matlaging", "Eneste næringskilde", "Tilskudd", "Tåteflaske"] },
   { label: "Tilstand", words: ["Kumelkallergi", "Multimatvareallergi", "Refluks", "Diaré", "Tarm", "Malabsorpsjon", "Parenteral"] },
