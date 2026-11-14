@@ -272,7 +272,6 @@ const PEPTICATE_PLUS_2: Product = {
     { label: "Glutenfri", color: "#4ADE80", icon: "shield" },
     { label: "Med GOS/FOS",          color: "#EA580C", icon: "gut"    },
     { label: "Med DHA & ARA",        color: "#D97706", icon: "drop"   },
-    { label: "Med nukleotider",      color: "#A78BFA", icon: "star"   },
   ],
   summary: [
     { label: "Alder",        value: "6+ mnd" },
@@ -298,14 +297,14 @@ const PEPTICATE_PLUS_2: Product = {
   fodmap: { laktose: "20,6 g", gos: true, fos: true },
   viktigAVite: [
     "Morsmelk er det beste for spedbarn.",
-    "Pepticate Plus er et næringsmiddel til spesielle medisinske formål.",
+    "Skal ikke brukes til spedbarn under 6 måneders alder.",
     "Ikke egnet til bruk som eneste næringskilde.",
+    "Skal brukes etter anbefaling fra lege eller klinisk ernæringsfysiolog, og først etter vurdering av øvrig kostbehandling inklusiv amming.",
     "Tilbered alltid bare ett måltid om gangen.",
   ],
   hurtiginfo: [
     { label: "Glutenfri",         icon: null },
     { label: "Med DHA & ARA",     icon: null },
-    { label: "Med nukleotider",   icon: null },
     { label: "Hypoallergen",      icon: null },
     { label: "6+ mnd",            icon: null },
     { label: "Tilskuddsblanding", icon: null },
@@ -463,21 +462,20 @@ const NEOCATE_LCP: Product = {
     "Inneholder alle næringsstoffer et spedbarn trenger og kan brukes som eneste ernæringskilde.",
     "Hypoallergen sammensetning basert på frie aminosyrer gir svært lav risiko for allergisk reaksjon.",
     "Beriket med langkjedede fettsyrer DHA og ARA som er viktige for utvikling av hjerne- og synsfunksjon.",
-    "Beriket med nukleotider som har påvist positive effekter på spedbarns immunfunksjon i tidlig spedbarnsalder.",
-    "Laktosefri, glutenfri og kostfiberfri formulering ved behov for elementalkost.",
+    "Beriket med nukleotider som har påvist positive effekter på spedbarns immunfunksjon og i perioder med rask vekst, som tidlig spedbarnsalder.",
   ],
-  fordelerIcons: [ICON_MILK_BOTTLE, ICON_SHIELD_STAR, ICON_DROP, ICON_GUT2, ICON_GUT],
+  fordelerIcons: [ICON_MILK_BOTTLE, ICON_SHIELD_STAR, ICON_DROP, ICON_GUT2],
   bruksomraader: [
-    "Til kostbehandling av spedbarn 0–1 år med kumelkallergi og multimatvareallergi.",
-    "Til andre tilstander hvor elementalkost er anbefalt, inkludert mage- og tarmsykdommer.",
-    "Kan brukes ved overgang fra parenteral til enteral ernæring og ved sondeernæring.",
+    "Til kostbehandling av spedbarn 0–1 år med kumelkallergi, multimatvareallergi og andre indikasjoner hvor elementalkost er anbefalt.",
+    "Aminosyrene gjør at produktet er lettfordøyelig og egner seg godt til spedbarn med sykdom i mage- og tarmkanalen.",
   ],
   fodmap: { laktose: "0 g", gos: false, fos: false },
   viktigAVite: [
     "Morsmelk er det beste for spedbarn.",
-    "Neocate LCP er et næringsmiddel til spesielle medisinske formål.",
-    "Skal brukes under medisinsk tilsyn etter nøye vurdering av all næringstilførsel.",
+    "Egnet som eneste næringskilde for spedbarn under ett år etter nøye vurdering av alle former for næringstilførsel, inkludert amming.",
     "Ikke for parenteralt bruk.",
+    "Serumnivåer av mikronæringsstoffer, spesielt fosfat, bør monitoreres rutinemessig når Neocate brukes som primær eller eneste næringskilde for pasienter med kompleks systemisk sykdom som involverer flere diagnoser og tarmsykdom.",
+    "Tilbered alltid bare ett måltid om gangen.",
   ],
   hurtiginfo: [
     { label: "Glutenfri",                icon: null },
@@ -623,7 +621,7 @@ const NEOCATE_SPOON: Product = {
     { label: "Aminosyrebasert",         color: "#3B82F6", icon: "drop"   },
     { label: "Laktosefri",              color: "#EA580C", icon: "gut"    },
     { label: "Glutenfri",               color: "#4ADE80", icon: "shield" },
-    { label: "Halal- og koshersertifisert", color: "#D97706", icon: "star" },
+    { label: "Halalsertifisert",     color: "#D97706", icon: "star" },
   ],
   summary: [
     { label: "Alder",         value: "6+ måneder" },
@@ -635,28 +633,25 @@ const NEOCATE_SPOON: Product = {
   ],
   fordeler: [
     "Hypoallergen og basert på frie aminosyrer som gir svært lav risiko for allergisk reaksjon.",
-    "Én porsjon Neocate Spoon inneholder 265 mg kalsium, som gjør det enklere å møte eldre barnets kalsiumbehov.",
-    "Egnet konsistens for skjemating – velegnet for kumelkallergiske barn som tilvennes fast føde.",
-    "Glutenfri og laktosefri elementalkost for barn med behov for fri aminosyrebasert ernæring.",
-    "Halal- og koshersertifisert.",
+    "Én porsjon Neocate Spoon inneholder 265 mg kalsium, som gjør det enklere å møte det eldre barnets kalsiumbehov.",
+    "Får en passende konsistens for skje når det blandes med vann, og er velegnet for kumelkallergiske barn som skal tilvennes fast føde.",
   ],
-  fordelerIcons: [ICON_SHIELD_STAR, ICON_DROP, ICON_MILK_BOTTLE, ICON_GUT, ICON_MICROSCOPE],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_DROP, ICON_MILK_BOTTLE],
   bruksomraader: [
-    "Til kostbehandling av barn og spedbarn fra 6 måneders alder med kumelkallergi og multimatvareallergi.",
-    "Til andre indikasjoner hvor elementalkost er anbefalt.",
+    "Til kostbehandling av barn og spedbarn fra 6 måneders alder med kumelkallergi, multimatvareallergi og andre indikasjoner hvor elementalkost er anbefalt.",
     "Aminosyrene gjør at produktet er lettfordøyelig og egner seg godt til barn med sykdom i mage- og tarmkanalen.",
   ],
   fodmap: { laktose: "0 g", gos: false, fos: false },
   viktigAVite: [
-    "Skal ikke brukes som eneste næringskilde.",
+    "Ikke egnet til bruk som eneste næringskilde.",
     "Ikke egnet til flaske eller sondeernæring.",
-    "Neocate Spoon er et næringsmiddel til spesielle medisinske formål.",
-    "Skal brukes under medisinsk tilsyn etter nøye vurdering av all næringstilførsel.",
+    "Gis til spedbarn i tillegg til morsmelk eller annen ernæringsmessig komplett hypoallergen morsmelkerstatning.",
+    "Har et høyt innhold av kalsium og jern og er en kilde til vitamin D.",
   ],
   hurtiginfo: [
     { label: "Glutenfri",                icon: null },
     { label: "Laktosefri",               icon: null },
-    { label: "Halal- og koshersertifisert", icon: null },
+    { label: "Halalsertifisert",         icon: null },
     { label: "Hypoallergen",             icon: null },
     { label: "Ikke eneste næringskilde", icon: null },
   ],
@@ -762,12 +757,10 @@ const NEOCATE_SPOON: Product = {
     "For spedbarn som starter med fast føde kan konsistensen til Neocate Spoon endres ved å tilsette mer eller mindre vann etter behov.",
     "Anbefalte blandingsforhold bestemmes av lege eller klinisk ernæringsfysiolog avhengig av pasientens alder, kroppsvekt og medisinske tilstand.",
   ],
-  dosering: "Ikke egnet til bruk som eneste næringskilde. Ikke egnet til flaske eller sondeernæring. Dosering bestemmes av lege eller klinisk ernæringsfysiolog.",
+  dosering: "Bruk den mengde produkt og blandingsforhold som anbefales av lege eller klinisk ernæringsfysiolog. Dette avhenger av pasientens alder, kroppsvekt og medisinske tilstand.",
   mixingInfo: { konsentrasjon: "37", scoopGram: "4,6" },
   mixingTable: [
-    { skjeer: 4,  pulver: "18,5", vann: 30,  ferdig: 50,  energi: 88  },
     { skjeer: 8,  pulver: "37,0", vann: 60,  ferdig: 100, energi: 175 },
-    { skjeer: 16, pulver: "74,0", vann: 120, ferdig: 200, energi: 350 },
   ],
   holdbarhet: "18 måneder fra produksjonsdato. Holdbarhetsdato på pakningen. Oppbevares tørt og svalt. Sett alltid lokket på boksen etter bruk. Må ikke oppbevares i kjøleskap. Må brukes innen en måned etter åpning.",
   ingredienser: "Tørket glukosesirup, pregelatinisert risstivelse, raffinerte vegetabilske oljer (ikke-hydrogenert kokosolje, oliesyrerik solsikkeolje, rapsolje, solsikkeolje), aminosyrer (L-arginin-L-aspartat, L-leucin, L-lysinacetat, L-glutamin, L-prolin, L-valin, glysin, L-isoleucin, L-treonin, L-fenylalanin, L-tyrosin, L-serin, L-histidin, L-alanin, L-cystin, L-tryptofan, L-metionin), sukker, kalsiumfosfat tribasisk, emulgator (E472c), kolinbitartrat, magnesium-L-aspartat, magnesiumacetat, inositol, L-askorbinsyre, jernsulfat, taurin, sinksulfat, L-karnitin, DL-α-tokoferylacetat, kalsium-D-pantotenat, nikotinamid, mangansulfat, kobbersulfat, tiaminhydroklorid, pyridoksinhydroklorid, riboflavin, retinylacetat, kaliumjodid, kromklorid, pteroylmonoglutaminsyre, natriumselenitt, natriummolybdat, fytomenadion, D-biotin, kolekalsiferol, cyanokobalamin.",
@@ -1007,7 +1000,7 @@ function TilberedningTab({ product }: { product: Product }) {
         </Box>
 
         {/* Utblandingstabell */}
-        {product.mixingTable.length > 0 ? (
+        {product.mixingTable.length > 1 ? (
           <Box sx={{ display: "grid", gap: 1 }}>
             <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Utblandingstabell</Typography>
             <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", overflow: "hidden" }}>
