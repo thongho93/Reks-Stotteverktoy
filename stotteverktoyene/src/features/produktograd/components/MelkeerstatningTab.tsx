@@ -90,7 +90,7 @@ type Product = {
   nokkel: { label: string; value: string }[];
   tilberedning: string[];
   dosering: string;
-  mixingInfo: { konsentrasjon: string; scoopGram: string };
+  mixingInfo: { konsentrasjon: string; scoopGram: string; anbefaltSkjeer?: number };
   mixingTable: { skjeer: number; pulver: string; vann: number; ferdig: number; energi: number }[];
   holdbarhet: string;
   ingredienser: string;
@@ -468,6 +468,8 @@ const NEOCATE_LCP: Product = {
     { label: "Laktosefri",                      color: "#EA580C", icon: "gut"    },
     { label: "Med DHA & ARA",                   color: "#D97706", icon: "drop"   },
     { label: "Med nukleotider",                 color: "#A78BFA", icon: "star"   },
+    { label: "Halalsertifisert",                color: "#D97706", icon: "star"   },
+    { label: "Koshersertifisert",               color: "#D97706", icon: "star"   },
   ],
   summary: [
     { label: "Alder",         value: "0–1 år" },
@@ -792,7 +794,178 @@ const NEOCATE_SPOON: Product = {
   ],
 };
 
-const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON];
+const NEOCATE_JUNIOR: Product = {
+  id: "neocate-junior",
+  name: "Neocate Junior",
+  age: "Fra 1 år",
+  tagline: "Aminosyrebasert melkeerstatning spesielt utviklet for å møte det voksende barnets ernæringsbehov.",
+  description: "For barn fra 1 års alderen ved kumelkallergi og multimatvareallergi. Ernæringsmessig komplett ernæringsprodukt i pulverform. Hypoallergen. 35 % MCT-fett. Kan drikkes som kosttillegg, brukes som berikning eller som eneste ernæring/sondeernæring. Uten søtstoff.",
+  image: "/nutrition/Neocate-Junior.png",
+  imageScale: 1.25,
+  type: "Aminosyrebasert",
+  badges: [
+    { label: "Aminosyrebasert",                    color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett fra 1 år",  color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri",                          color: "#4ADE80", icon: "shield" },
+    { label: "Laktosefri",                         color: "#EA580C", icon: "gut"    },
+    { label: "Kostfiberfri",                       color: "#EA580C", icon: "gut"    },
+    { label: "Halalsertifisert",                   color: "#D97706", icon: "star"   },
+    { label: "Koshersertifisert",                  color: "#D97706", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "Fra 1 år" },
+    { label: "Energitetthet", value: "1 kcal/ml" },
+    { label: "Protein",       value: "Enkle aminosyrer" },
+    { label: "Kostfiber",     value: "Ikke tilsatt" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "Nei" },
+  ],
+  fordeler: [
+    "Skreddersydd ernæringsprofil som møter det voksende barnets ernæringsbehov.",
+    "God smak for bedre compliance.",
+    "Flere smaker (jordbær, vanilje og nøytral) gir variasjonsmuligheter. Uten søtstoff.",
+    "Reduserer kompleksitet: kan brukes som kosttillegg og som eneste ernæring/sondeernæring.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_MILK_BOTTLE, ICON_DROP, ICON_GUT2],
+  bruksomraader: [
+    "Til kostbehandling av barn fra 1 års alderen med kumelkallergi, multimatvareallergi og andre indikasjoner hvor elementalkost er anbefalt.",
+    "Brukes som erstatning for melk/melkeprodukter eller som tilskudd til annen mat og drikke.",
+  ],
+  fodmap: { laktose: "0 g", gos: false, fos: false },
+  viktigAVite: [
+    "Ikke egnet for spedbarn.",
+    "Ikke for parenteralt bruk.",
+    "Ferdig blanding skal ikke kokes, eller varmes/tilberedes i mikrobølgeovn.",
+    "Ved eneste kilde til ernæring må mikronæringsstoffstatus overvåkes. Serumnivåer, spesielt fosfat, bør monitoreres rutinemessig ved kompleks systemisk sykdom og tarmsykdom, spesielt i kombinasjon med sondemating og/eller tidligere prematuritet.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Laktosefri",               icon: null },
+    { label: "Halalsertifisert",         icon: null },
+    { label: "Koshersertifisert",        icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 100,
+  pulverPer100ml: "21,1 g pulver",
+  macros: [
+    { label: "Fett (42 E%)",        value: 42, color: "#7C3AED", amount: "4,6 g" },
+    { label: "Karbohydrat (47 E%)", value: 47, color: "#F97316", amount: "11,8 g" },
+    { label: "Protein (11 E%)",     value: 11, color: "#3B82F6", amount: "2,8 g" },
+    { label: "Kostfiber (0 E%)",    value: 0,  color: "#22C55E", amount: "0 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",   value: "0 g"      },
+    { label: "Kalsium",   value: "90,4 mg"  },
+    { label: "Jern",      value: "1,20 mg"  },
+    { label: "Vitamin D", value: "1,31 µg"  },
+    { label: "Natrium",   value: "60,6 mg"  },
+    { label: "Sink",      value: "1,10 mg"  },
+    { label: "Vitamin A", value: "45,2 µg"  },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml ferdig løsning (21,1 % konsentrasjon)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                  unit: "kJ",   per100gPulver: "1985",   per100mlUtblandet: "419" },
+          { label: "Energi (kcal)",                unit: "kcal", per100gPulver: "473",    per100mlUtblandet: "100" },
+          { label: "Fett (42 E%)",                 unit: "g",    per100gPulver: "21,9",   per100mlUtblandet: "4,6" },
+          { label: "– hvorav mettede fettsyrer",   unit: "g",    per100gPulver: "9,7",    per100mlUtblandet: "2,1" },
+          { label: "– MCT",                        unit: "g",    per100gPulver: "7,7",    per100mlUtblandet: "1,63" },
+          { label: "– enumettede fettsyrer",       unit: "g",    per100gPulver: "8,2",    per100mlUtblandet: "1,7" },
+          { label: "– flerumettede fettsyrer",     unit: "g",    per100gPulver: "4,0",    per100mlUtblandet: "0,84" },
+          { label: "– linolsyre (LA)",             unit: "g",    per100gPulver: "3,44",   per100mlUtblandet: "0,73" },
+          { label: "– α-linolensyre (ALA)",        unit: "g",    per100gPulver: "0,33",   per100mlUtblandet: "0,07" },
+          { label: "– ratio n-6:n-3",              unit: "",     per100gPulver: "10:1",   per100mlUtblandet: "10,4:1" },
+          { label: "Karbohydrat (47 E%)",          unit: "g",    per100gPulver: "55,9",   per100mlUtblandet: "11,8" },
+          { label: "– hvorav sukkerarter",         unit: "g",    per100gPulver: "4,9",    per100mlUtblandet: "1,0" },
+          { label: "– laktose",                    unit: "g",    per100gPulver: "0",      per100mlUtblandet: "0" },
+          { label: "Kostfiber (0 E%)",             unit: "g",    per100gPulver: "0",      per100mlUtblandet: "0" },
+          { label: "Protein (11 E%)",              unit: "g",    per100gPulver: "13,4",   per100mlUtblandet: "2,8" },
+          { label: "Salt",                         unit: "g",    per100gPulver: "0,72",   per100mlUtblandet: "0,15" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg (mmol)",     per100gPulver: "287 (12,5)",  per100mlUtblandet: "60,6 (2,64)" },
+          { label: "Kalium",    unit: "mg (mmol)",     per100gPulver: "546 (14,0)",  per100mlUtblandet: "115 (2,95)" },
+          { label: "Klorid",    unit: "mg (mmol)",     per100gPulver: "441 (12,4)",  per100mlUtblandet: "92,2 (2,6)" },
+          { label: "Kalsium",   unit: "mg (mmol)",     per100gPulver: "428 (10,7)",  per100mlUtblandet: "90,4 (2,26)" },
+          { label: "Fosfor",    unit: "mg (mmol PO₄)", per100gPulver: "309 (9,99)",  per100mlUtblandet: "65,3 (2,11)" },
+          { label: "Magnesium", unit: "mg (mmol)",     per100gPulver: "66,5 (2,74)", per100mlUtblandet: "14,0 (0,58)" },
+          { label: "Jern",      unit: "mg",            per100gPulver: "5,70",        per100mlUtblandet: "1,20" },
+          { label: "Sink",      unit: "mg",            per100gPulver: "5,20",        per100mlUtblandet: "1,10" },
+          { label: "Kobber",    unit: "mg",            per100gPulver: "0,48",        per100mlUtblandet: "0,10" },
+          { label: "Mangan",    unit: "mg",            per100gPulver: "0,30",        per100mlUtblandet: "0,063" },
+          { label: "Molybden",  unit: "µg",            per100gPulver: "21,4",        per100mlUtblandet: "4,52" },
+          { label: "Selen",     unit: "µg",            per100gPulver: "15,2",        per100mlUtblandet: "3,21" },
+          { label: "Krom",      unit: "µg",            per100gPulver: "10,5",        per100mlUtblandet: "2,22" },
+          { label: "Jod",       unit: "µg",            per100gPulver: "71,3",        per100mlUtblandet: "15,0" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg",         per100gPulver: "214",          per100mlUtblandet: "45,2" },
+          { label: "Vitamin D",    unit: "µg",         per100gPulver: "6,20",         per100mlUtblandet: "1,31" },
+          { label: "Vitamin E",    unit: "mg (α-TE)",  per100gPulver: "8,60",         per100mlUtblandet: "1,81" },
+          { label: "Vitamin C",    unit: "mg",         per100gPulver: "47,5",         per100mlUtblandet: "10,0" },
+          { label: "Vitamin K",    unit: "µg",         per100gPulver: "25,6",         per100mlUtblandet: "5,40" },
+          { label: "Tiamin",       unit: "mg",         per100gPulver: "0,48",         per100mlUtblandet: "0,10" },
+          { label: "Riboflavin",   unit: "mg",         per100gPulver: "0,95",         per100mlUtblandet: "0,20" },
+          { label: "Niacin",       unit: "mg (mg NE)", per100gPulver: "5,30 (8,98)",  per100mlUtblandet: "1,12 (1,89)" },
+          { label: "Pantotensyre", unit: "mg",         per100gPulver: "1,90",         per100mlUtblandet: "0,40" },
+          { label: "Vitamin B6",   unit: "mg",         per100gPulver: "0,60",         per100mlUtblandet: "0,13" },
+          { label: "Folinsyre",    unit: "µg",         per100gPulver: "73,0",         per100mlUtblandet: "15,4" },
+          { label: "Vitamin B12",  unit: "µg",         per100gPulver: "1,20",         per100mlUtblandet: "0,25" },
+          { label: "Biotin",       unit: "µg",         per100gPulver: "14,3",         per100mlUtblandet: "3,20" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Kolin",       unit: "mg",           per100gPulver: "95,0", per100mlUtblandet: "20,0" },
+          { label: "Inositol",    unit: "mg",           per100gPulver: "26,1", per100mlUtblandet: "5,51" },
+          { label: "L-karnitin",  unit: "mg",           per100gPulver: "15,8", per100mlUtblandet: "3,33" },
+          { label: "Taurin",      unit: "mg",           per100gPulver: "31,6", per100mlUtblandet: "6,68" },
+          { label: "Osmolalitet", unit: "mOsm/kg H₂O",  per100gPulver: "—",    per100mlUtblandet: "590–600" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Vask hendene og rengjør alle redskaper.",
+    "Mål opp anbefalt mengde vann i en beholder.",
+    "Tilsett anbefalt mengde pulver til vannet. Bruk kun vedlagt måleskje – en strøken måleskje gir 7,3 g pulver.",
+    "Dekk til og rist beholderen til pulveret er oppløst.",
+    "Rist eller rør om blandingen umiddelbart før bruk. Smaker best avkjølt hvis den serveres som drikke.",
+    "Tilberedt produkt oppbevares i kjøleskap og brukes innen 24 timer.",
+  ],
+  dosering: "Egnet som eneste næringskilde. Doseringen er individuell og skal bestemmes i samråd med lege eller klinisk ernæringsfysiolog. Anbefalt konsentrasjon er 21,1 % vekt/volum (1 kcal/ml): tilsett 1 strøken måleskje til hver 30 ml vann.",
+  mixingInfo: { konsentrasjon: "21,1", scoopGram: "7,3", anbefaltSkjeer: 3 },
+  mixingTable: [
+    { skjeer: 2, pulver: "14,6", vann: 90, ferdig: 100, energi: 69  },
+    { skjeer: 3, pulver: "21,9", vann: 90, ferdig: 105, energi: 105 },
+    { skjeer: 4, pulver: "29,2", vann: 90, ferdig: 110, energi: 138 },
+  ],
+  holdbarhet: "To år fra produksjonsdato. Holdbarhetsdato står på pakningen. Utblandet produkt kan oppbevares i kjøleskap i 24 timer. Uåpnet boks oppbevares i romtemperatur. Åpnet boks oppbevares med lokk, på et svalt og tørt sted. Brukes innen en måned.",
+  ingredienser: "Tørket glukosesirup, raffinerte vegetabilske oljer (mellomkjedede triglyserider (kokosolje og/eller palmeolje), oljesyrerik solsikkeolje, rapsolje, solsikkeolje), L-serin, L-glutamin, glysin, L-alanin, L-leucin, L-lysinacetat, L-treonin, kaliumsitrat, L-tyrosin, emulgator (sitronsyreestere av mono- og diglyserider av fettsyrer), L-valin, L-isoleucin, kalsiumhydrogenfosfat, magnesiumklorid, L-prolin, natriumhydrogenfosfat, kalsiumkarbonat, L-cystin, L-fenylalanin, L-histidin, dikaliumhydrogenfosfat, L-metionin, L-arginin, natriumklorid, kolinbitartrat, L-tryptofan, kalsiumsitrat, kalsiumklorid, L-askorbinsyre, antioksidanter (solsikkelecitin, askorbylpalmitat), taurin, inositol, aroma (jordbær i jordbærsmak, vanilje i vaniljesmak), jernsulfat, L-karnitin, sinksulfat, nikotinamid, DL-α-tokoferylacetat, kalsium-D-pantotenat, kobbersulfat, riboflavin, mangansulfat, pyridoksinhydroklorid, tiaminhydroklorid, retinylacetat, kaliumjodid, pteroylmonoglutaminsyre, natriummolybdat, DL-α-tokoferol, kromklorid, natriumselenitt, fytomenadion, D-biotin, kolekalsiferol, cyanokobalamin. Glutenfri. Laktosefri. Melkeproteinfri. Kostfiberfri. Halal- og koshersertifisert.",
+  smaksvarianter: "Jordbærsmak, vaniljesmak og nøytral smak.",
+  indikasjon: "Til kostbehandling av barn fra 1 år med kumelkallergi, multimatvareallergi og andre indikasjoner hvor elementalkost er anbefalt. Brukes som erstatning for melk/melkeprodukter eller som tilskudd til annen mat og drikke.",
+  kontraindikasjon: "Spedbarn. Intoleranse mot en eller flere av produktets ingredienser.",
+  forsiktighetsregler: "Ikke for parenteralt bruk. Ferdig blanding skal ikke kokes, eller varmes/tilberedes i mikrobølgeovn. Ved eneste kilde til ernæring må mikronæringsstoffstatus overvåkes.",
+  bestilling: [
+    { produktnavn: "Neocate Junior jordbærsmak", bestillingsnr: "212049", varenr: "810980", salgsenhet: "400 g boks" },
+    { produktnavn: "Neocate Junior vaniljesmak", bestillingsnr: "212050", varenr: "800070", salgsenhet: "400 g boks" },
+    { produktnavn: "Neocate Junior nøytral smak", bestillingsnr: "211721", varenr: "806063", salgsenhet: "400 g boks" },
+  ],
+};
+
+const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON, NEOCATE_JUNIOR];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function ProductCard({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
@@ -817,8 +990,8 @@ function ProductCard({ product, selected, onClick }: { product: Product; selecte
           : <BottleIcon size={30} color={D.purple} />}
       </Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography noWrap sx={{ fontWeight: selected ? 800 : 700, fontSize: 14.5, color: D.text, lineHeight: 1.25 }}>{product.name}</Typography>
-        <Typography noWrap sx={{ fontSize: 12.5, color: D.textMuted, lineHeight: 1.3 }}>{product.age} · {product.type}</Typography>
+        <Typography sx={{ fontWeight: selected ? 800 : 700, fontSize: 14.5, color: D.text, lineHeight: 1.25 }}>{product.name}</Typography>
+        <Typography sx={{ fontSize: 12.5, color: D.textMuted, lineHeight: 1.3 }}>{product.age} · {product.type}</Typography>
       </Box>
     </ButtonBase>
   );
@@ -979,7 +1152,7 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
 }
 
 function TilberedningTab({ product, terms }: { product: Product; terms: string[] }) {
-  const first = product.mixingTable[0];
+  const first = product.mixingTable.find((r) => r.skjeer === product.mixingInfo.anbefaltSkjeer) ?? product.mixingTable[0];
   const card = { bgcolor: D.surfaceAlt, borderRadius: "12px", p: 2, display: "grid", gap: 0.75, alignContent: "start" } as const;
   const columns = "repeat(5, minmax(0, 1fr))";
   return (
@@ -1070,6 +1243,8 @@ type Dokument = { title: string; url: string; sizeLabel: string; color?: string 
 
 const INGR_EGENSKAPER_STANDARD = ["Glutenfri", "Inneholder fiskolje", "Inneholder laktose"];
 const INGR_EGENSKAPER_NEOCATE_LCP = ["Glutenfri", "Kostfiberfri", "Laktosefri"];
+const INGR_EGENSKAPER_NEOCATE_SPOON = ["Glutenfri", "Laktosefri"];
+const INGR_EGENSKAPER_NEOCATE_JUNIOR = ["Glutenfri", "Laktosefri", "Melkeproteinfri", "Kostfiberfri"];
 
 function IngrediensTab({ product, terms }: { product: Product; terms: string[] }) {
   const egenskaper = ingrEgenskaper(product);
@@ -1121,7 +1296,6 @@ function CopyRow({ label, value, terms }: { label: string; value: string; terms:
 }
 
 function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Product; dokumenter: Dokument[]; terms: string[] }) {
-  const row = product.bestilling[0];
   const card = { bgcolor: D.surfaceAlt, borderRadius: "12px", p: 2.25, display: "grid", gap: 1, alignContent: "start" } as const;
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3.5, alignItems: "flex-start" }}>
@@ -1137,16 +1311,21 @@ function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Pr
             ) : null}
             <Typography sx={{ fontWeight: 800, fontSize: 17, color: D.text }}>{product.name}</Typography>
           </Box>
-          {row ? (
-            <>
+          {product.bestilling.map((row, i) => (
+            <Box key={i} sx={{ pb: product.bestilling.length > 1 ? 1.5 : 0 }}>
+              {product.bestilling.length > 1 ? (
+                <Typography sx={{ fontSize: 14.5, fontWeight: 800, color: D.purple, pt: i > 0 ? 1.25 : 0.25, pb: 0.5, borderTop: i > 0 ? `1px solid ${D.border}` : "none" }}>
+                  <Hl text={row.produktnavn} terms={terms} />
+                </Typography>
+              ) : null}
               <CopyRow label="Bestillingsnr." value={row.bestillingsnr} terms={terms} />
               <CopyRow label="Varenr." value={row.varenr} terms={terms} />
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1.1, borderTop: `1px solid ${D.border}` }}>
                 <Typography sx={{ flex: "0 0 120px", fontSize: 14, color: D.textMuted }}>Salgsenhet</Typography>
                 <Typography sx={{ flex: 1, fontSize: 15, fontWeight: 700, color: D.text }}><Hl text={row.salgsenhet} terms={terms} /></Typography>
               </Box>
-            </>
-          ) : null}
+            </Box>
+          ))}
         </Box>
 
         {product.forsiktighetsregler || product.kontraindikasjon ? (
@@ -1222,6 +1401,7 @@ const DOKUMENT_MAP: Record<string, Dokument[]> = {
   "pepticate-plus-2": [{ title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" }],
   "neocate-lcp": [{ title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" }],
   "neocate-spoon": [{ title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" }],
+  "neocate-junior": [{ title: "Produktark Neocate Junior", url: "/dokumenter/Neocate-Junior-2026.pdf", sizeLabel: "1,1 MB" }],
 };
 
 /** Produktbeskrivelsen er første fordel (med mindre den allerede står i listen). */
@@ -1230,8 +1410,12 @@ function fordelerList(product: Product): string[] {
   return product.fordeler.some((f) => f.includes(product.tagline)) ? product.fordeler : [beskrivelse, ...product.fordeler];
 }
 
-const ingrEgenskaper = (product: Product): string[] =>
-  product.id === "neocate-lcp" ? INGR_EGENSKAPER_NEOCATE_LCP : INGR_EGENSKAPER_STANDARD;
+const ingrEgenskaper = (product: Product): string[] => {
+  if (product.id === "neocate-lcp") return INGR_EGENSKAPER_NEOCATE_LCP;
+  if (product.id === "neocate-spoon") return INGR_EGENSKAPER_NEOCATE_SPOON;
+  if (product.id === "neocate-junior") return INGR_EGENSKAPER_NEOCATE_JUNIOR;
+  return INGR_EGENSKAPER_STANDARD;
+};
 
 /** Det som vises i produkthodet. Brukes både til visning og til søk, så de alltid er like. */
 function heroInfo(product: Product) {
@@ -1239,7 +1423,14 @@ function heroInfo(product: Product) {
   const smak = product.smaksvarianter ? product.smaksvarianter.replace(/\.$/, "") : "";
   const tiles = [
     // Alderen står allerede ved siden av navnet, så den trenger ikke egen rute.
-    ...product.summary.filter((s) => s.label !== "Alder").map((s) => ({ label: s.label, value: s.value, span: 1 })),
+    // Har produktet både halal og kosher, slås de sammen til én «Sertifisert»-rute i stedet for kun «Halal».
+    ...product.summary
+      .filter((s) => s.label !== "Alder")
+      .map((s) =>
+        s.label === "Halal" && s.value === "Ja" && g.sertifisert.some((l) => /kosher/i.test(l))
+          ? { label: "Sertifisert", value: g.sertifisert.join(" · "), span: 1 }
+          : { label: s.label, value: s.value, span: 1 }
+      ),
     // «Fri for» + «Gluten» leses som «Fri for gluten».
     { label: "Fri for", value: g.fri.filter((l) => l !== "Laktosefri").map((l) => l.replace(/fri$/i, "")).join(" · "), span: 1 },
     { label: "Tilsatt", value: g.tilsatt.join(" · "), span: 3 },
@@ -1275,12 +1466,12 @@ function buildSearchFields(product: Product): SearchField[] {
   ingrEgenskaper(product).forEach((text) => add(3, "Egenskaper", text));
   add(3, "Ingredienser", product.ingredienser);
 
-  const order = product.bestilling[0];
-  if (order) {
+  product.bestilling.forEach((order) => {
+    if (product.bestilling.length > 1) add(4, "Bestilling", order.produktnavn);
     add(4, "Bestilling", order.bestillingsnr);
     add(4, "Bestilling", order.varenr);
     add(4, "Bestilling", order.salgsenhet);
-  }
+  });
   add(4, "Viktig informasjon", product.forsiktighetsregler);
   add(4, "Viktig informasjon", product.kontraindikasjon);
   (DOKUMENT_MAP[product.id] ?? []).forEach((doc) => add(4, "Dokumenter", doc.title));
@@ -1502,7 +1693,7 @@ export default function MelkeerstatningTab() {
         />
       ) : (
         <Box sx={{ display: "flex", gap: 1.25, px: 2, py: 1.75, flexShrink: 0, bgcolor: "#FFFAFD", borderBottom: `1px solid ${D.border}` }}>
-          <Box sx={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" }, gap: 1.25 }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(3, minmax(0, 1fr))", lg: `repeat(${PRODUCTS.length}, minmax(0, 1fr))` }, gap: 1.25 }}>
             {PRODUCTS.map(p => (
               <ProductCard
                 key={p.id}
