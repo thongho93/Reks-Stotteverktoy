@@ -381,7 +381,7 @@ export function SearchTrigger({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Søk i melkeerstatning"
       sx={{
-        gap: 1, height: 64, px: 2, flexShrink: 0, borderRadius: "12px", border: "1px dashed #D9BCCD", color: SEARCH.muted, fontSize: 14, fontWeight: 600,
+        gap: 1, height: 40, mt: "3px", px: 1.75, flexShrink: 0, borderRadius: "10px", border: "1px dashed #D9BCCD", color: SEARCH.muted, fontSize: 14, fontWeight: 600,
         "&:hover": { borderStyle: "solid", borderColor: SEARCH.accent, color: SEARCH.accent, bgcolor: "#FFFFFF" },
       }}
     >

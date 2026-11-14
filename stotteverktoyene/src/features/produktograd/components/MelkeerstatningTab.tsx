@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, ButtonBase, Typography, Tabs, Tab } from "@mui/material";
+import { Box, ButtonBase, Typography, Tabs, Tab, Tooltip } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
@@ -62,13 +62,18 @@ const ICON_GUT2 = (c: string) => <svg width="48" height="48" viewBox="0 0 48 48"
 // ─── Product data ─────────────────────────────────────────────────────────────
 type NutritionRow = { label: string; unit: string; per100gPulver: string; per100mlUtblandet: string };
 
+type ManufacturerId = "nutricia" | "nestle";
+
 type Product = {
   id: string;
+  manufacturer: ManufacturerId;
   name: string;
   age: string;
   tagline: string;
   description: string;
   image?: string;
+  /** Beskåret miniatyr til produktvelgeren, slik at alle bokser får lik størrelse. */
+  thumb?: string;
   imageScale?: number;
   type: "Hydrolysert" | "Aminosyrebasert";
   badges: { label: string; color: string; icon: "drop" | "shield" | "gut" | "star" }[];
@@ -92,6 +97,7 @@ type Product = {
   dosering: string;
   mixingInfo: { konsentrasjon: string; scoopGram: string; anbefaltSkjeer?: number };
   mixingTable: { skjeer: number; pulver: string; vann: number; ferdig: number; energi: number }[];
+  doseringTabell?: { alder: string; vann: string; skjeer: string; maaltider: string; bokser: string }[];
   holdbarhet: string;
   ingredienser: string;
   smaksvarianter: string;
@@ -103,11 +109,13 @@ type Product = {
 
 const PEPTICATE_1: Product = {
   id: "pepticate-1",
+  manufacturer: "nutricia",
   name: "Pepticate 1",
   age: "0–6 måneder",
   tagline: "Mysebasert, høygradig hydrolysert morsmelkerstatning for barn 0–1 år med kumelkallergi.",
   description: "Ernæringsmessig komplett og hypoallergen.",
   image: "/nutrition/pepticate-1.png",
+  thumb: "/nutrition/thumbs/pepticate-1.png",
   type: "Hydrolysert",
   badges: [
     { label: "Hydrolysert",                    color: "#3B82F6", icon: "drop"   },
@@ -278,11 +286,13 @@ const PEPTICATE_1: Product = {
 
 const PEPTICATE_PLUS_2: Product = {
   id: "pepticate-plus-2",
+  manufacturer: "nutricia",
   name: "Pepticate Plus 2",
   age: "6+ måneder",
   tagline: "Mysebasert, høygradig hydrolysert ernæringsprodukt til spedbarn fra 6 måneder med kumelkallergi.",
   description: "Hypoallergen tilskuddsblanding i pulverform, som er egnet som en del av en balansert kost fra 6 måneders alder. Energitetthet på 0,68 kcal/ml. Tilsatt ingredienser som er en kilde til de langkjedede fettsyrer (ARA/DHA).",
   image: "/nutrition/pepticate-plus-2.png",
+  thumb: "/nutrition/thumbs/pepticate-plus-2.png",
   imageScale: 1.3,
   type: "Hydrolysert",
   badges: [
@@ -454,11 +464,13 @@ const PEPTICATE_PLUS_2: Product = {
 
 const NEOCATE_LCP: Product = {
   id: "neocate-lcp",
+  manufacturer: "nutricia",
   name: "Neocate LCP",
   age: "0–1 år",
   tagline: "Aminosyrebasert melkeerstatning for spedbarn med kumelkallergi og multimatvareallergi.",
   description: "Ernæringsmessig komplett næringsprodukt i pulverform. Hypoallergen, laktosefri og egnet som eneste næringskilde.",
   image: "/nutrition/Neocate-LCP-400-g-752x960.png",
+  thumb: "/nutrition/thumbs/neocate-lcp.png",
   imageScale: 0.9,
   type: "Aminosyrebasert",
   badges: [
@@ -631,11 +643,13 @@ const NEOCATE_LCP: Product = {
 
 const NEOCATE_SPOON: Product = {
   id: "neocate-spoon",
+  manufacturer: "nutricia",
   name: "Neocate Spoon",
   age: "6+ måneder",
   tagline: "Aminosyrebasert næringstilskudd for barn med kumelkallergi og multimatvareallergi. Glutenfri. Laktosefri.",
   description: "Aminosyrebasert næringstilskudd i pulverform. Hypoallergen. Energitetthet 1,75 kcal/ml. Egnet for barn som tilvennes fast føde. Skal ikke brukes som eneste næringskilde.",
   image: "/nutrition/Nutricia-Neocate-Spoon.png",
+  thumb: "/nutrition/thumbs/neocate-spoon.png",
   imageScale: 1.08,
   type: "Aminosyrebasert",
   badges: [
@@ -796,11 +810,13 @@ const NEOCATE_SPOON: Product = {
 
 const NEOCATE_JUNIOR: Product = {
   id: "neocate-junior",
+  manufacturer: "nutricia",
   name: "Neocate Junior",
   age: "Fra 1 år",
   tagline: "Aminosyrebasert melkeerstatning spesielt utviklet for å møte det voksende barnets ernæringsbehov.",
   description: "For barn fra 1 års alderen ved kumelkallergi og multimatvareallergi. Ernæringsmessig komplett ernæringsprodukt i pulverform. Hypoallergen. 35 % MCT-fett. Kan drikkes som kosttillegg, brukes som berikning eller som eneste ernæring/sondeernæring. Uten søtstoff.",
   image: "/nutrition/Neocate-Junior.png",
+  thumb: "/nutrition/thumbs/neocate-junior.png",
   imageScale: 1.25,
   type: "Aminosyrebasert",
   badges: [
@@ -965,35 +981,258 @@ const NEOCATE_JUNIOR: Product = {
   ],
 };
 
-const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON, NEOCATE_JUNIOR];
+type Manufacturer = {
+  label: string;
+  short: string;
+  contactTitle: string;
+  notice: string;
+  footer: string;
+  address: string;
+  tel: { label: string; href: string };
+  email: string;
+  extra: { label: string; value: string; href: string }[];
+};
+
+/** Rekkefølgen her er rekkefølgen på gruppene i produktvelgeren. */
+const MANUFACTURERS: Record<ManufacturerId, Manufacturer> = {
+  nutricia: {
+    label: "Nutricia",
+    short: "Nutricia",
+    contactTitle: "Kontakt Nutricia",
+    notice: "Nutricias produkter er registrerte næringsmidler til spesielle medisinske formål og skal brukes i samråd med helsepersonell. Ved eneste kilde til ernæring må mikronæringsstoffstatus overvåkes.",
+    footer: "Nutricias produkter er registrerte næringsmidler til spesielle medisinske formål og skal brukes i samråd med helsepersonell.",
+    address: "Nutricia, ℅ Danone AS",
+    tel: { label: "+47 23 00 21 00", href: "tel:+4723002100" },
+    email: "nutricia.amnno@danone.com",
+    extra: [],
+  },
+  nestle: {
+    label: "Nestlé Health Science",
+    short: "Nestlé",
+    contactTitle: "Kontakt Nestlé Health Science",
+    notice: "Nestlé Health Science sine produkter er næringsmidler til spesielle medisinske formål og skal brukes under medisinsk tilsyn. Kun for helsepersonell.",
+    footer: "Næringsmidler til spesielle medisinske formål skal brukes under medisinsk tilsyn.",
+    address: "Nestlé Health Science, Postboks 683 Skøyen, 0214 Oslo",
+    tel: { label: "800 31 425", href: "tel:80031425" },
+    email: "nestlehealthscience@no.nestle.com",
+    extra: [
+      { label: "Bestilling (grossist)", value: "orders@no.nestle.com", href: "mailto:orders@no.nestle.com" },
+      { label: "Web", value: "www.nestlehealthscience.no", href: "https://www.nestlehealthscience.no" },
+    ],
+  },
+};
+
+const ALTHERA: Product = {
+  id: "althera",
+  manufacturer: "nestle",
+  name: "Althéra",
+  age: "0–12 måneder",
+  tagline: "Hypoallergen spesialnæring med humane melkeoligosakkarider (HMO) for spedbarn med kumelkproteinallergi.",
+  description: "Inneholder ekstensivt hydrolysert myseprotein, renprodusert laktose og HMO (2’-fukosyllaktose og lakto-N-neotetraose, ikke fra morsmelk). Høyt hydrolysert, med minst peptider på markedet.",
+  image: "/nutrition/althera.jpg",
+  thumb: "/nutrition/thumbs/althera.png",
+  imageScale: 1,
+  type: "Hydrolysert",
+  badges: [
+    { label: "Hydrolysert",                          color: "#3B82F6", icon: "drop"   },
+    { label: "Ernæringsmessig komplett 0–12 måneder", color: "#4ADE80", icon: "shield" },
+    { label: "Glutenfri",                            color: "#4ADE80", icon: "shield" },
+    { label: "Med HMO",                              color: "#EA580C", icon: "gut"    },
+    { label: "Med DHA & ARA",                        color: "#D97706", icon: "drop"   },
+    { label: "Halalsertifisert",                     color: "#D97706", icon: "star"   },
+  ],
+  summary: [
+    { label: "Alder",         value: "0–12 måneder" },
+    { label: "Energitetthet", value: "0,66 kcal/ml" },
+    { label: "Protein",       value: "Ekstensivt hydrolysert myse" },
+    { label: "Kostfiber",     value: "HMO (0,15 g/100 ml)" },
+    { label: "Halal",         value: "Ja" },
+    { label: "Laktose",       value: "Ja" },
+  ],
+  fordeler: [
+    "Oppfyller de internasjonale kriteriene for hypoallergenisitet og er en sikker ernæringsbehandling av spedbarn med konstatert kumelkproteinallergi.",
+    "Gir effektiv symptomlindring hos 98,4 %.",
+    "Renprodusert laktose gir en god og mild smak, stimulerer kalsiumopptak og fremmer veksten av bifidobakterier i tarmen.",
+    "HMO støtter immunforsvaret og reduserer risiko for infeksjoner, og fremmer en tarmflora mer lik den hos ammede barn.",
+  ],
+  fordelerIcons: [ICON_SHIELD_STAR, ICON_MILK_BOTTLE, ICON_GUT2, ICON_DROP],
+  bruksomraader: [
+    "Fullverdig næringsmiddel til spesielle medisinske formål for spedbarn 0–12 måneder med kumelkproteinallergi.",
+    "Egnet som eneste næringskilde fra fødsel og opp til 6 måneder. Fra 6 måneder suppleres Althéra med melkefri kost.",
+    "Over 1 års alder kan Althéra brukes som en betydelig næringskilde sammen med variert melkefri kost.",
+  ],
+  fodmap: { laktose: "3,7 g", gos: false, fos: false },
+  viktigAVite: [
+    "Mødre skal oppmuntres til å fortsette amming selv om barnet har kumelkproteinallergi.",
+    "Ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom.",
+    "Skal brukes under medisinsk tilsyn.",
+    "Kan foreskrives på blå resept.",
+  ],
+  hurtiginfo: [
+    { label: "Glutenfri",                icon: null },
+    { label: "Halalsertifisert",         icon: null },
+    { label: "Med HMO",                  icon: null },
+    { label: "Med DHA & ARA",            icon: null },
+    { label: "Hypoallergen",             icon: null },
+    { label: "Ernæringsmessig komplett", icon: null },
+  ],
+  kcalPer100ml: 66,
+  pulverPer100ml: "13,2 g pulver",
+  macros: [
+    { label: "Fett (46 E%)",        value: 46, color: "#7C3AED", amount: "3,4 g" },
+    { label: "Karbohydrat (44 E%)", value: 44, color: "#F97316", amount: "7,4 g" },
+    { label: "Protein (9 E%)",      value: 9,  color: "#3B82F6", amount: "1,5 g" },
+    { label: "Kostfiber (1 E%)",    value: 1,  color: "#22C55E", amount: "0,15 g" },
+  ],
+  nokkel: [
+    { label: "Laktose",   value: "3,7 g"    },
+    { label: "HMO",       value: "0,15 g"   },
+    { label: "DHA",       value: "18 mg"    },
+    { label: "ARA",       value: "18 mg"    },
+    { label: "Kalsium",   value: "70 mg"    },
+    { label: "Jern",      value: "0,80 mg"  },
+    { label: "Vitamin D", value: "1,6 µg"   },
+  ],
+  nutrition: {
+    headers: ["", "", "pr. 100 g pulver", "pr. 100 ml utblandet (13,2 g pulver)"],
+    rows: [],
+    sections: [
+      {
+        title: "",
+        rows: [
+          { label: "Energi (kJ)",                  unit: "kJ",   per100gPulver: "2109",   per100mlUtblandet: "278" },
+          { label: "Energi (kcal)",                unit: "kcal", per100gPulver: "504",    per100mlUtblandet: "66" },
+          { label: "Fett (46 E%)",                 unit: "g",    per100gPulver: "26",     per100mlUtblandet: "3,4" },
+          { label: "– hvorav mettet",              unit: "g",    per100gPulver: "6,0",    per100mlUtblandet: "0,79" },
+          { label: "– hvorav enumettet",           unit: "g",    per100gPulver: "14",     per100mlUtblandet: "1,8" },
+          { label: "– hvorav flerumettet",         unit: "g",    per100gPulver: "4,4",    per100mlUtblandet: "0,58" },
+          { label: "– linolsyre",                  unit: "mg",   per100gPulver: "3700",   per100mlUtblandet: "488" },
+          { label: "– α-linolensyre",              unit: "mg",   per100gPulver: "380",    per100mlUtblandet: "50" },
+          { label: "– DHA",                        unit: "mg",   per100gPulver: "135",    per100mlUtblandet: "18" },
+          { label: "– ARA",                        unit: "mg",   per100gPulver: "135",    per100mlUtblandet: "18" },
+          { label: "Karbohydrat (44 E%)",          unit: "g",    per100gPulver: "55,8",   per100mlUtblandet: "7,4" },
+          { label: "– hvorav sukkerarter",         unit: "g",    per100gPulver: "29",     per100mlUtblandet: "3,8" },
+          { label: "– hvorav laktose",             unit: "g",    per100gPulver: "28",     per100mlUtblandet: "3,7" },
+          { label: "Kostfiber (1 E%)",             unit: "g",    per100gPulver: "1,1",    per100mlUtblandet: "0,15" },
+          { label: "– lakto-N-neotetraose",        unit: "g",    per100gPulver: "0,38",   per100mlUtblandet: "0,050" },
+          { label: "– 2’-fukosyllaktose",          unit: "g",    per100gPulver: "0,76",   per100mlUtblandet: "0,10" },
+          { label: "Protein (9 E%)",               unit: "g",    per100gPulver: "11",     per100mlUtblandet: "1,5" },
+          { label: "Salt",                         unit: "g",    per100gPulver: "0,49",   per100mlUtblandet: "0,064" },
+          { label: "Forhold n6:n3",                unit: "",     per100gPulver: "7,5:1",  per100mlUtblandet: "7,5:1" },
+        ],
+      },
+      {
+        title: "Mineraler og sporstoffer",
+        rows: [
+          { label: "Natrium",   unit: "mg", per100gPulver: "195",   per100mlUtblandet: "26" },
+          { label: "Kalium",    unit: "mg", per100gPulver: "580",   per100mlUtblandet: "77" },
+          { label: "Klorid",    unit: "mg", per100gPulver: "400",   per100mlUtblandet: "53" },
+          { label: "Kalsium",   unit: "mg", per100gPulver: "530",   per100mlUtblandet: "70" },
+          { label: "Fosfor",    unit: "mg", per100gPulver: "350",   per100mlUtblandet: "46" },
+          { label: "Magnesium", unit: "mg", per100gPulver: "45",    per100mlUtblandet: "5,9" },
+          { label: "Jern",      unit: "mg", per100gPulver: "6,1",   per100mlUtblandet: "0,80" },
+          { label: "Sink",      unit: "mg", per100gPulver: "4,3",   per100mlUtblandet: "0,57" },
+          { label: "Kobber",    unit: "mg", per100gPulver: "0,41",  per100mlUtblandet: "0,054" },
+          { label: "Mangan",    unit: "mg", per100gPulver: "0,075", per100mlUtblandet: "0,0090" },
+          { label: "Selen",     unit: "µg", per100gPulver: "25",    per100mlUtblandet: "3,3" },
+          { label: "Jod",       unit: "µg", per100gPulver: "122",   per100mlUtblandet: "16" },
+        ],
+      },
+      {
+        title: "Vitaminer",
+        rows: [
+          { label: "Vitamin A",    unit: "µg",         per100gPulver: "500",      per100mlUtblandet: "66" },
+          { label: "Vitamin D",    unit: "µg",         per100gPulver: "12",       per100mlUtblandet: "1,6" },
+          { label: "Vitamin E",    unit: "mg",         per100gPulver: "14",       per100mlUtblandet: "1,8" },
+          { label: "Vitamin K",    unit: "µg",         per100gPulver: "45",       per100mlUtblandet: "5,9" },
+          { label: "Vitamin C",    unit: "mg",         per100gPulver: "80",       per100mlUtblandet: "11" },
+          { label: "Niacin",       unit: "mg (mg NE)", per100gPulver: "7 (11)",   per100mlUtblandet: "0,92 (1,4)" },
+          { label: "Vitamin B1",   unit: "mg",         per100gPulver: "0,51",     per100mlUtblandet: "0,067" },
+          { label: "Vitamin B2",   unit: "mg",         per100gPulver: "1,0",      per100mlUtblandet: "0,13" },
+          { label: "Vitamin B6",   unit: "mg",         per100gPulver: "0,40",     per100mlUtblandet: "0,053" },
+          { label: "Folsyre",      unit: "µg",         per100gPulver: "75",       per100mlUtblandet: "9,9" },
+          { label: "Folat",        unit: "µg DFE",     per100gPulver: "125",      per100mlUtblandet: "16" },
+          { label: "Vitamin B12",  unit: "µg",         per100gPulver: "1,4",      per100mlUtblandet: "0,18" },
+          { label: "Biotin",       unit: "µg",         per100gPulver: "12",       per100mlUtblandet: "1,6" },
+          { label: "Pantotensyre", unit: "mg",         per100gPulver: "3,3",      per100mlUtblandet: "0,44" },
+        ],
+      },
+      {
+        title: "Annet",
+        rows: [
+          { label: "Taurin",       unit: "mg",           per100gPulver: "40",  per100mlUtblandet: "5,3" },
+          { label: "L-karnitin",   unit: "mg",           per100gPulver: "8,5", per100mlUtblandet: "1,1" },
+          { label: "Kolin",        unit: "mg",           per100gPulver: "145", per100mlUtblandet: "19" },
+          { label: "Inositol",     unit: "mg",           per100gPulver: "35",  per100mlUtblandet: "4,6" },
+          { label: "Osmolaritet",  unit: "mOsm/l",       per100gPulver: "—",   per100mlUtblandet: "273" },
+          { label: "Osmolalitet",  unit: "mOsm/kg H₂O",  per100gPulver: "—",   per100mlUtblandet: "305" },
+        ],
+      },
+    ],
+  },
+  tilberedning: [
+    "Bruk kokt vann og steriliserte flasker. Ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom.",
+    "Mål opp vann i flasken etter doseringstabellen.",
+    "Tilsett strøkne måleskjeer pulver. Bruk kun måleskjeen som følger med i forpakningen – en strøken måleskje veier 4,4 g.",
+    "90 ml vann + 3 strøkne måleskjeer pulver gir 100 ml ferdig blanding.",
+    "Tilbered kun én flaske om gangen. Ikke spar på gjenværende blanding i flasken – kast innholdet.",
+  ],
+  dosering: "Doseringstabellen er ment som en veiledning. Ansvarlig lege eller klinisk ernæringsfysiolog bør beregne egnet dagsdose som er tilpasset individuelt for hvert enkelt barn.",
+  mixingInfo: { konsentrasjon: "13,2", scoopGram: "4,4" },
+  mixingTable: [
+    { skjeer: 3, pulver: "13,2", vann: 90, ferdig: 100, energi: 66 },
+  ],
+  doseringTabell: [
+    { alder: "0–2 uker",      vann: "90",  skjeer: "3", maaltider: "6",   bokser: "6" },
+    { alder: "2–4 uker",      vann: "120", skjeer: "4", maaltider: "5",   bokser: "7" },
+    { alder: "1–2 måneder",   vann: "150", skjeer: "5", maaltider: "5",   bokser: "8–9" },
+    { alder: "2–4 måneder",   vann: "180", skjeer: "6", maaltider: "5",   bokser: "10" },
+    { alder: "4–6 måneder",   vann: "210", skjeer: "7", maaltider: "5",   bokser: "12" },
+    { alder: "Over 6 måneder", vann: "210", skjeer: "7", maaltider: "3–4", bokser: "7–9" },
+  ],
+  holdbarhet: "Oppbevares svalt og tørt og brukes innen best før dato. Åpnet forpakning brukes innen 3 uker. Tilbered kun 1 flaske om gangen. Ikke spar på gjenværende blanding i flasken. Kast innholdet.",
+  ingredienser: "Laktose, maltodekstrin, vegetabilske oljer (solsikke, raps, kokos), ekstensivt hydrolysert myseprotein (melk), mineraler (kalsiumglyserofosfat, kaliumfosfat, magnesiumklorid, kalsiumklorid, natriumklorid, mangansulfat, jernsulfat, kaliumjodid, natriumfosfat, sinksulfat, kaliumsitrat, kaliumklorid, natriumselenat, kobbersulfat), emulgator (E472c), fiber (2’-fukosyllaktose, lakto-N-neotetraose), olje fra Mortierella alpina (ARA), olje fra mikroalgen Schizochytrium sp. (DHA), surhetsregulerende middel (E330), kolindibartartrat, vitaminer (C, E, niacin, pantotensyre, riboflavin, A, tiamin, B6, folsyre, K, D, biotin, B12), L-arginin, L-histidin, taurin, inositol, L-karnitin. Glutenfri. Pakket i beskyttet atmosfære. Halal-sertifisert.",
+  smaksvarianter: "Nøytral smak.",
+  indikasjon: "Hypoallergen spesialnæring til ernæringsbehandling av spedbarn 0–12 måneder med kumelkproteinallergi. Egnet som eneste næringskilde fra fødsel og opp til 6 måneder.",
+  kontraindikasjon: "Galaktosemi og glukose-galaktose-malabsorpsjon.",
+  forsiktighetsregler: "Mødre skal oppmuntres til å fortsette amming selv om barnet har kumelkproteinallergi. Ved bruk av spesialnæring er det viktig å gi korrekte tilberedningsinstruksjoner: ukokt vann, usteriliserte flasker eller feilaktig blanding kan føre til sykdom. Skal brukes under medisinsk tilsyn. Kun for helsepersonell.",
+  bestilling: [
+    { produktnavn: "Althéra nøytral smak", bestillingsnr: "900691", varenr: "835440", salgsenhet: "1 x 400 g pulver" },
+  ],
+};
+
+const PRODUCTS: Product[] = [PEPTICATE_1, PEPTICATE_PLUS_2, NEOCATE_LCP, NEOCATE_SPOON, NEOCATE_JUNIOR, ALTHERA];
+const PRODUCT_GROUPS = (Object.keys(MANUFACTURERS) as ManufacturerId[])
+  .map((id) => ({ id, label: MANUFACTURERS[id].label, short: MANUFACTURERS[id].short, products: PRODUCTS.filter((p) => p.manufacturer === id) }))
+  .filter((group) => group.products.length > 0);
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-function ProductCard({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
+/** Kompakt produktvalg: miniatyr og navn. Alder og type vises som tips ved hover/fokus. */
+function ProductChip({ product, selected, onClick }: { product: Product; selected: boolean; onClick: () => void }) {
   return (
-    <ButtonBase
-      onClick={onClick}
-      aria-pressed={selected}
-      sx={{
-        display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 1.5, textAlign: "left",
-        px: selected ? "11px" : "12px", py: selected ? "7px" : "8px", minHeight: 64, minWidth: 0,
-        borderRadius: "12px",
-        border: selected ? `2px solid ${D.purple}` : `1px solid ${D.border}`,
-        bgcolor: D.surface,
-        boxShadow: selected ? "0 6px 18px rgba(168,31,102,0.14)" : "none",
-        transition: "border-color 120ms",
-        "&:hover": { borderColor: selected ? D.purple : "#C9709F" },
-      }}
-    >
-      <Box sx={{ width: 36, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {product.image
-          ? <Box component="img" src={product.image} alt="" sx={{ width: 36, height: 44, objectFit: "contain" }} />
-          : <BottleIcon size={30} color={D.purple} />}
-      </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontWeight: selected ? 800 : 700, fontSize: 14.5, color: D.text, lineHeight: 1.25 }}>{product.name}</Typography>
-        <Typography sx={{ fontSize: 12.5, color: D.textMuted, lineHeight: 1.3 }}>{product.age} · {product.type}</Typography>
-      </Box>
-    </ButtonBase>
+    <Tooltip title={`${product.age} · ${product.type}`} placement="bottom" enterDelay={350} arrow>
+      <ButtonBase
+        onClick={onClick}
+        aria-pressed={selected}
+        sx={{
+          display: "flex", alignItems: "center", gap: 1.25, height: 52, pl: 1, pr: 1.75, minWidth: 0, flexShrink: 0,
+          borderRadius: "12px",
+          border: `1.5px solid ${selected ? D.purple : "transparent"}`,
+          bgcolor: selected ? "#FFF5FA" : "transparent",
+          color: selected ? D.purple : D.textSub,
+          transition: "background-color 120ms, border-color 120ms",
+          "&:hover": { bgcolor: selected ? "#FFF5FA" : "#F6E6EF" },
+          "&.Mui-focusVisible": { outline: `2px solid ${D.purple}`, outlineOffset: 1 },
+        }}
+      >
+        <Box sx={{ width: 34, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {product.thumb ?? product.image
+            ? <Box component="img" src={product.thumb ?? product.image} alt="" sx={{ width: 34, height: 40, objectFit: "contain" }} />
+            : <BottleIcon size={24} color={D.purple} />}
+        </Box>
+        <Typography noWrap sx={{ fontWeight: selected ? 800 : 600, fontSize: 14.5, lineHeight: 1.2, color: "inherit" }}>{product.name}</Typography>
+      </ButtonBase>
+    </Tooltip>
   );
 }
 
@@ -1059,58 +1298,64 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
   const sections = product.nutrition.sections;
   const section = sections[sectionIndex] ?? sections[0];
   const headers = product.nutrition.headers;
-  const header100g = headers[2] || "pr. 100 g pulver";
-  const header100ml = headers[3] || "pr. 100 ml utblandet";
   const total = macros.reduce((sum, m) => sum + m.value, 0) || 1;
-  const columns = "minmax(0, 1fr) 130px minmax(120px, 220px)";
+  const columns = "minmax(0, 1fr) 76px 92px";
+
+  // Lange tabeller deles i to kolonner side om side, slik at de bruker halvparten av høyden.
+  const rows = section?.rows ?? [];
+  const isSub = (label: string) => label.startsWith("–") || label.startsWith("·");
+  let split = rows.length;
+  if (rows.length > 7) {
+    split = Math.ceil(rows.length / 2);
+    while (split < rows.length && isSub(rows[split].label)) split += 1;
+  }
+  const halves = split < rows.length ? [rows.slice(0, split), rows.slice(split)] : [rows];
+
+  const headerCell = { fontSize: 11.5, fontWeight: 700, color: D.textSub, textAlign: "right", lineHeight: 1.2 } as const;
 
   return (
-    <Box sx={{ display: "grid", gap: 3 }}>
+    <Box sx={{ display: "grid", gap: 1.75 }}>
       {/* Energi og makronæringsstoffer */}
-      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 3.5 }}>
-        <Box sx={{ flex: "0 0 190px" }}>
-          <Typography sx={{ fontSize: 46, fontWeight: 800, lineHeight: 1, color: D.text }}>
+      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 3.5, rowGap: 1 }}>
+        <Box sx={{ flex: "0 0 auto" }}>
+          <Typography sx={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: D.text }}>
             {product.kcalPer100ml}{" "}
-            <Box component="span" sx={{ fontSize: 20, fontWeight: 700, color: D.textMuted }}>kcal</Box>
+            <Box component="span" sx={{ fontSize: 17, fontWeight: 700, color: D.textMuted }}>kcal</Box>
           </Typography>
-          <Typography sx={{ fontSize: 13.5, lineHeight: 1.4, color: D.textMuted, mt: 0.5 }}>
-            pr. 100 ml utblandet<br />({product.pulverPer100ml})
+          <Typography sx={{ fontSize: 12.5, lineHeight: 1.3, color: D.textMuted, mt: 0.5 }}>
+            pr. 100 ml utblandet ({product.pulverPer100ml})
           </Typography>
         </Box>
-        <Box sx={{ flex: "1 1 420px", minWidth: 0, display: "grid", gap: 1.5 }}>
-          <Box role="img" aria-label="Fordeling av energi mellom makronæringsstoffer" sx={{ display: "flex", height: 14, borderRadius: "7px", overflow: "hidden", gap: "2px" }}>
+        <Box sx={{ flex: "1 1 380px", minWidth: 0, display: "grid", gap: 1 }}>
+          <Box role="img" aria-label="Fordeling av energi mellom makronæringsstoffer" sx={{ display: "flex", height: 12, borderRadius: "6px", overflow: "hidden", gap: "2px" }}>
             {macros.map((m, i) => (
               <Box key={i} sx={{ flex: `${(m.value / total) * 100} 1 0`, minWidth: 3, bgcolor: m.color }} />
             ))}
           </Box>
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" }, gap: 1.25 }}>
+          <Box sx={{ display: "flex", flexWrap: "wrap", columnGap: 2.5, rowGap: 0.25 }}>
             {macros.map((m, i) => (
-              <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                <Box sx={{ flex: "0 0 10px", height: 10, borderRadius: "3px", mt: "5px", bgcolor: m.color }} />
-                <Box>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: D.textSub, lineHeight: 1.3 }}><Hl text={m.label} terms={terms} /></Typography>
-                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: D.text }}><Hl text={m.amount} terms={terms} /></Typography>
-                </Box>
+              <Box key={i} sx={{ display: "inline-flex", alignItems: "baseline", gap: 0.75 }}>
+                <Box sx={{ flex: "0 0 9px", height: 9, borderRadius: "3px", bgcolor: m.color, alignSelf: "center" }} />
+                <Typography component="span" sx={{ fontSize: 13, fontWeight: 600, color: D.textSub }}><Hl text={m.label} terms={terms} /></Typography>
+                <Typography component="span" sx={{ fontSize: 14, fontWeight: 800, color: D.text }}><Hl text={m.amount} terms={terms} /></Typography>
               </Box>
             ))}
           </Box>
         </Box>
       </Box>
 
-      {/* Nøkkelnæringsstoffer */}
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-        {nokkel.map((n, i) => (
-          <Box key={i} sx={{ display: "flex", alignItems: "baseline", gap: 1, px: 1.5, py: 0.9, borderRadius: "10px", border: `1px solid ${D.border}`, bgcolor: "#FFFAFD" }}>
-            <Typography sx={{ fontSize: 13, color: D.textMuted }}><Hl text={n.label} terms={terms} /></Typography>
-            <Typography sx={{ fontSize: 14, fontWeight: 700, color: D.text }}><Hl text={n.value} terms={terms} /></Typography>
-          </Box>
-        ))}
-      </Box>
-
-      {/* Fullstendig næringstabell */}
-      <Box sx={{ display: "grid", gap: 1.5 }}>
+      {/* Nøkkelnæringsstoffer og valg av tabelldel */}
+      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", columnGap: 2, rowGap: 1 }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+          {nokkel.map((n, i) => (
+            <Box key={i} sx={{ display: "flex", alignItems: "baseline", gap: 0.75, px: 1.25, py: 0.5, borderRadius: "8px", border: `1px solid ${D.border}`, bgcolor: "#FFFAFD" }}>
+              <Typography sx={{ fontSize: 12.5, color: D.textMuted }}><Hl text={n.label} terms={terms} /></Typography>
+              <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: D.text }}><Hl text={n.value} terms={terms} /></Typography>
+            </Box>
+          ))}
+        </Box>
         {sections.length > 1 ? (
-          <Box role="group" aria-label="Velg del av næringstabellen" sx={{ display: "flex", flexWrap: "wrap", p: "3px", gap: "2px", bgcolor: D.surface, border: `1px solid ${D.borderMed}`, borderRadius: "10px", alignSelf: "flex-start", width: "fit-content" }}>
+          <Box role="group" aria-label="Velg del av næringstabellen" sx={{ display: "flex", flexWrap: "wrap", p: "3px", gap: "2px", bgcolor: D.surface, border: `1px solid ${D.borderMed}`, borderRadius: "10px" }}>
             {sections.map((sec, i) => {
               const active = i === sectionIndex;
               return (
@@ -1118,7 +1363,7 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
                   key={i}
                   onClick={() => setSectionIndex(i)}
                   aria-pressed={active}
-                  sx={{ px: 1.75, minHeight: 34, borderRadius: "7px", fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", color: active ? "#FFFFFF" : D.textSub, bgcolor: active ? D.purple : "transparent", "&:hover": { bgcolor: active ? D.purple : D.blueLight } }}
+                  sx={{ px: 1.5, minHeight: 30, borderRadius: "7px", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", color: active ? "#FFFFFF" : D.textSub, bgcolor: active ? D.purple : "transparent", "&:hover": { bgcolor: active ? D.purple : D.blueLight } }}
                 >
                   {sec.title || "Næringsinnhold"}
                 </ButtonBase>
@@ -1126,25 +1371,33 @@ function NæringsinnholdTab({ product, terms }: { product: Product; terms: strin
             })}
           </Box>
         ) : null}
-        <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", overflow: "hidden" }}>
-          <Box sx={{ display: "grid", gridTemplateColumns: columns, gap: 1.5, px: 2, py: 1.25, bgcolor: "#F6E6EF" }}>
-            <Box />
-            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: D.textSub, textAlign: "right" }}>{header100g}</Typography>
-            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: D.textSub, textAlign: "right" }}>{header100ml}</Typography>
-          </Box>
-          {section?.rows.map((row, i) => {
-            const sub = row.label.startsWith("–") || row.label.startsWith("·");
-            return (
-              <Box key={i} sx={{ display: "grid", gridTemplateColumns: columns, gap: 1.5, px: 2, py: 1, bgcolor: i % 2 === 1 ? D.surfaceAlt : "transparent" }}>
-                <Typography sx={{ fontSize: 14, color: sub ? D.textSub : D.text, fontWeight: sub ? 400 : 600, pl: sub ? 2.25 : 0 }}>
-                  <Hl text={row.label} terms={terms} />
-                  {row.unit ? <Box component="span" sx={{ ml: 0.75, fontSize: 12, fontWeight: 400, color: D.textMuted }}>{row.unit}</Box> : null}
-                </Typography>
-                <Typography sx={{ fontSize: 14, color: D.text, textAlign: "right" }}>{row.per100gPulver}</Typography>
-                <Typography sx={{ fontSize: 14, color: D.text, textAlign: "right", fontWeight: 700 }}>{row.per100mlUtblandet}</Typography>
+      </Box>
+
+      {/* Fullstendig næringstabell */}
+      <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", overflow: "hidden" }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: halves.length > 1 ? "1fr 1fr" : "1fr" } }}>
+          {halves.map((half, h) => (
+            <Box key={h} sx={{ borderLeft: { md: h > 0 ? `1px solid ${D.border}` : "none" } }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: columns, gap: 1, px: 1.75, py: 0.75, bgcolor: "#F6E6EF" }}>
+                <Box />
+                <Typography title={headers[2] || undefined} sx={headerCell}>Pr. 100 g</Typography>
+                <Typography title={headers[3] || undefined} sx={headerCell}>Pr. 100 ml</Typography>
               </Box>
-            );
-          })}
+              {half.map((row, i) => {
+                const sub = isSub(row.label);
+                return (
+                  <Box key={i} sx={{ display: "grid", gridTemplateColumns: columns, gap: 1, px: 1.75, py: 0.55, bgcolor: i % 2 === 1 ? D.surfaceAlt : "transparent" }}>
+                    <Typography sx={{ fontSize: 13.5, lineHeight: 1.35, color: sub ? D.textSub : D.text, fontWeight: sub ? 400 : 600, pl: sub ? 2 : 0 }}>
+                      <Hl text={row.label} terms={terms} />
+                      {row.unit ? <Box component="span" sx={{ ml: 0.75, fontSize: 11.5, fontWeight: 400, color: D.textMuted }}>{row.unit}</Box> : null}
+                    </Typography>
+                    <Typography sx={{ fontSize: 13.5, lineHeight: 1.35, color: D.text, textAlign: "right" }}>{row.per100gPulver}</Typography>
+                    <Typography sx={{ fontSize: 13.5, lineHeight: 1.35, color: D.text, textAlign: "right", fontWeight: 700 }}>{row.per100mlUtblandet}</Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          ))}
         </Box>
       </Box>
     </Box>
@@ -1219,6 +1472,28 @@ function TilberedningTab({ product, terms }: { product: Product; terms: string[]
           </Box>
         ) : null}
 
+        {/* Dosering etter alder */}
+        {product.doseringTabell ? (
+          <Box sx={{ display: "grid", gap: 1 }}>
+            <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Dosering etter alder</Typography>
+            <Box sx={{ border: `1px solid ${D.border}`, borderRadius: "12px", overflow: "hidden" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "1.5fr repeat(4, minmax(0, 1fr))", gap: 1, px: 2, py: 1.25, bgcolor: "#F6E6EF" }}>
+                {["Alder", "Vann (ml)", "Måleskjeer", "Måltider/døgn", "Bokser/mnd"].map((h, i) => (
+                  <Typography key={h} sx={{ fontSize: 12.5, fontWeight: 700, color: D.textSub, textAlign: i === 0 ? "left" : "right" }}>{h}</Typography>
+                ))}
+              </Box>
+              {product.doseringTabell.map((row, i) => (
+                <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1.5fr repeat(4, minmax(0, 1fr))", gap: 1, px: 2, py: 1.1, bgcolor: i % 2 === 1 ? D.surfaceAlt : "transparent" }}>
+                  <Typography sx={{ fontSize: 14.5, fontWeight: 700, color: D.text }}>{row.alder}</Typography>
+                  {[row.vann, row.skjeer, row.maaltider, row.bokser].map((val, j) => (
+                    <Typography key={j} sx={{ fontSize: 14.5, color: D.text, textAlign: "right" }}>{val}</Typography>
+                  ))}
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        ) : null}
+
         {/* Dosering og holdbarhet */}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
           {product.dosering ? (
@@ -1244,6 +1519,7 @@ type Dokument = { title: string; url: string; sizeLabel: string; color?: string 
 const INGR_EGENSKAPER_STANDARD = ["Glutenfri", "Inneholder fiskolje", "Inneholder laktose"];
 const INGR_EGENSKAPER_NEOCATE_LCP = ["Glutenfri", "Kostfiberfri", "Laktosefri"];
 const INGR_EGENSKAPER_NEOCATE_SPOON = ["Glutenfri", "Laktosefri"];
+const INGR_EGENSKAPER_ALTHERA = ["Glutenfri", "Inneholder laktose", "Halalsertifisert"];
 const INGR_EGENSKAPER_NEOCATE_JUNIOR = ["Glutenfri", "Laktosefri", "Melkeproteinfri", "Kostfiberfri"];
 
 function IngrediensTab({ product, terms }: { product: Product; terms: string[] }) {
@@ -1296,6 +1572,7 @@ function CopyRow({ label, value, terms }: { label: string; value: string; terms:
 }
 
 function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Product; dokumenter: Dokument[]; terms: string[] }) {
+  const maker = MANUFACTURERS[product.manufacturer];
   const card = { bgcolor: D.surfaceAlt, borderRadius: "12px", p: 2.25, display: "grid", gap: 1, alignContent: "start" } as const;
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3.5, alignItems: "flex-start" }}>
@@ -1380,14 +1657,18 @@ function BestillingOgDokumenterTab({ product, dokumenter, terms }: { product: Pr
 
         {/* Kontakt */}
         <Box sx={card}>
-          <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>Kontakt Nutricia</Typography>
-          <Typography sx={{ fontSize: 14, color: D.textSub, lineHeight: 1.6, fontStyle: "italic" }}>
-            Nutricias produkter er registrerte næringsmidler til spesielle medisinske formål og skal brukes i samråd med helsepersonell. Ved eneste kilde til ernæring må mikronæringsstoffstatus overvåkes.
-          </Typography>
+          <Typography component="h2" sx={{ fontWeight: 800, fontSize: 16, color: D.text }}>{maker.contactTitle}</Typography>
+          <Typography sx={{ fontSize: 14, color: D.textSub, lineHeight: 1.6, fontStyle: "italic" }}>{maker.notice}</Typography>
           <Typography sx={{ fontSize: 14.5, color: D.text, lineHeight: 1.7 }}>
-            Nutricia, % Danone AS<br />
-            Tlf. <Box component="a" href="tel:+4723002100" sx={{ color: D.purple, fontWeight: 600 }}>+47 23 00 21 00</Box><br />
-            E-post <Box component="a" href="mailto:nutricia.amnno@danone.com" sx={{ color: D.purple, fontWeight: 600 }}>nutricia.amnno@danone.com</Box>
+            {maker.address}<br />
+            Tlf. <Box component="a" href={maker.tel.href} sx={{ color: D.purple, fontWeight: 600 }}>{maker.tel.label}</Box><br />
+            E-post <Box component="a" href={`mailto:${maker.email}`} sx={{ color: D.purple, fontWeight: 600 }}>{maker.email}</Box>
+            {maker.extra.map((line) => (
+              <span key={line.label}>
+                <br />
+                {line.label} <Box component="a" href={line.href} target={line.href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" sx={{ color: D.purple, fontWeight: 600 }}>{line.value}</Box>
+              </span>
+            ))}
           </Typography>
         </Box>
       </Box>
@@ -1401,6 +1682,7 @@ const DOKUMENT_MAP: Record<string, Dokument[]> = {
   "pepticate-plus-2": [{ title: "Produktark Pepticate Plus", url: "/dokumenter/pepticate-plus-2-produktark.pdf", sizeLabel: "359 KB" }],
   "neocate-lcp": [{ title: "Produktark Neocate LCP", url: "/dokumenter/Neocate-LCP.pdf", sizeLabel: "530 KB" }],
   "neocate-spoon": [{ title: "Produktark Neocate Spoon", url: "/dokumenter/Neocate-spoon.pdf", sizeLabel: "493 KB" }],
+  "althera": [{ title: "Produktark Althéra", url: "/dokumenter/Althera.pdf", sizeLabel: "303 KB" }],
   "neocate-junior": [{ title: "Produktark Neocate Junior", url: "/dokumenter/Neocate-Junior-2026.pdf", sizeLabel: "1,1 MB" }],
 };
 
@@ -1414,6 +1696,7 @@ const ingrEgenskaper = (product: Product): string[] => {
   if (product.id === "neocate-lcp") return INGR_EGENSKAPER_NEOCATE_LCP;
   if (product.id === "neocate-spoon") return INGR_EGENSKAPER_NEOCATE_SPOON;
   if (product.id === "neocate-junior") return INGR_EGENSKAPER_NEOCATE_JUNIOR;
+  if (product.id === "althera") return INGR_EGENSKAPER_ALTHERA;
   return INGR_EGENSKAPER_STANDARD;
 };
 
@@ -1433,9 +1716,8 @@ function heroInfo(product: Product) {
       ),
     // «Fri for» + «Gluten» leses som «Fri for gluten».
     { label: "Fri for", value: g.fri.filter((l) => l !== "Laktosefri").map((l) => l.replace(/fri$/i, "")).join(" · "), span: 1 },
-    { label: "Tilsatt", value: g.tilsatt.join(" · "), span: 3 },
   ].filter((t) => t.value);
-  return { primary: g.primary, smak, tiles };
+  return { primary: g.primary, smak, tilsatt: g.tilsatt.join(" · "), tiles };
 }
 
 /** Alle tekster som vises for et produkt, gruppert etter hvor de står. `tab` -1 er produkthodet. */
@@ -1446,9 +1728,11 @@ function buildSearchFields(product: Product): SearchField[] {
   };
   const hero = heroInfo(product);
   add(-1, "Produkt", product.name);
+  add(-1, "Produsent", MANUFACTURERS[product.manufacturer].label);
   add(-1, "Alder", product.age);
   hero.primary.forEach((text) => add(-1, "Egenskaper", text));
   add(-1, "Smak", hero.smak);
+  add(-1, "Tilsatt", hero.tilsatt);
   hero.tiles.forEach((t) => add(-1, "Nøkkeltall", `${t.label}: ${t.value}`));
 
   fordelerList(product).forEach((text) => add(0, "Fordeler", text));
@@ -1692,15 +1976,22 @@ export default function MelkeerstatningTab() {
           hint={terms.length === 0 ? "Søker i navn, egenskaper, fordeler, bruksområder, tilberedning, ingredienser, næringsinnhold og bestillingsinfo – også på varenr." : undefined}
         />
       ) : (
-        <Box sx={{ display: "flex", gap: 1.25, px: 2, py: 1.75, flexShrink: 0, bgcolor: "#FFFAFD", borderBottom: `1px solid ${D.border}` }}>
-          <Box sx={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(3, minmax(0, 1fr))", lg: `repeat(${PRODUCTS.length}, minmax(0, 1fr))` }, gap: 1.25 }}>
-            {PRODUCTS.map(p => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                selected={p.id === selectedId}
-                onClick={() => { setSelectedId(p.id); setActiveTab(0); }}
-              />
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 2.5, py: 1.5, flexShrink: 0, bgcolor: "#FFFAFD", borderBottom: `1px solid ${D.border}` }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: "grid", gap: 0.75 }}>
+            {PRODUCT_GROUPS.map((group) => (
+              <Box key={group.id} role="group" aria-label={group.label} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 0.5, rowGap: 0.5 }}>
+                <Typography title={group.label} sx={{ flex: "0 0 76px", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: D.textMuted, whiteSpace: "nowrap" }}>
+                  {group.short}
+                </Typography>
+                {group.products.map((p) => (
+                  <ProductChip
+                    key={p.id}
+                    product={p}
+                    selected={p.id === selectedId}
+                    onClick={() => { setSelectedId(p.id); setActiveTab(0); }}
+                  />
+                ))}
+              </Box>
             ))}
           </Box>
           <SearchTrigger onClick={() => { setSearchOpen(true); setView("results"); }} />
@@ -1722,16 +2013,16 @@ export default function MelkeerstatningTab() {
           ) : null}
 
           {/* Produkthode */}
-          <Box ref={heroRef} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 3, px: 3, py: 2.25, flexShrink: 0, borderBottom: `1px solid ${D.border}` }}>
-            <Box sx={{ width: 120, height: 140, flexShrink: 0, borderRadius: "12px", bgcolor: "#F6EEF7", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          <Box ref={heroRef} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2.5, px: 3, py: 1.5, flexShrink: 0, borderBottom: `1px solid ${D.border}` }}>
+            <Box sx={{ width: 80, height: 92, flexShrink: 0, borderRadius: "10px", bgcolor: "#F6EEF7", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
               {product.image
-                ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 104, height: 124, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
-                : <BottleIcon size={56} color={D.purple} />}
+                ? <Box component="img" src={product.image} alt={product.name} sx={{ width: 70, height: 82, objectFit: "contain", transform: product.imageScale ? `scale(${product.imageScale})` : undefined }} />
+                : <BottleIcon size={40} color={D.purple} />}
             </Box>
 
-            <Box sx={{ flex: "1 1 320px", minWidth: 0, display: "grid", gap: 1 }}>
+            <Box sx={{ flex: "1 1 300px", minWidth: 0, display: "grid", gap: 0.75 }}>
               <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 1.5 }}>
-                <Typography component="h1" sx={{ fontWeight: 800, fontSize: 28, color: D.text, lineHeight: 1.15 }}><Hl text={product.name} terms={terms} /></Typography>
+                <Typography component="h1" sx={{ fontWeight: 800, fontSize: 24, color: D.text, lineHeight: 1.15 }}><Hl text={product.name} terms={terms} /></Typography>
                 <Typography sx={{ fontSize: 15, color: D.textMuted, fontWeight: 600 }}><Hl text={product.age} terms={terms} /></Typography>
               </Box>
               {hero.primary.length > 0 ? (
@@ -1743,17 +2034,27 @@ export default function MelkeerstatningTab() {
                   ))}
                 </Box>
               ) : null}
-              {hero.smak ? (
-                <Typography sx={{ fontSize: 14.5, color: D.textSub }}>
-                  <Box component="span" sx={{ color: D.textMuted, fontWeight: 600, mr: 1 }}>Smak</Box>
-                  <Hl text={hero.smak} terms={terms} />
-                </Typography>
+              {hero.smak || hero.tilsatt ? (
+                <Box sx={{ display: "flex", flexWrap: "wrap", columnGap: 2.5, rowGap: 0.25, fontSize: 14, color: D.textSub }}>
+                  {hero.smak ? (
+                    <Typography component="span" sx={{ fontSize: "inherit" }}>
+                      <Box component="span" sx={{ color: D.textMuted, fontWeight: 600, mr: 1 }}>Smak</Box>
+                      <Hl text={hero.smak} terms={terms} />
+                    </Typography>
+                  ) : null}
+                  {hero.tilsatt ? (
+                    <Typography component="span" sx={{ fontSize: "inherit" }}>
+                      <Box component="span" sx={{ color: D.textMuted, fontWeight: 600, mr: 1 }}>Tilsatt</Box>
+                      <Hl text={hero.tilsatt} terms={terms} />
+                    </Typography>
+                  ) : null}
+                </Box>
               ) : null}
             </Box>
 
-            <Box sx={{ flex: "1 1 300px", maxWidth: 380, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gridAutoFlow: "row dense", gap: 1 }}>
+            <Box sx={{ flex: "1.4 1 340px", maxWidth: 560, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gridAutoFlow: "row dense", gap: 0.75 }}>
               {hero.tiles.map((t, i) => (
-                <Box key={i} sx={{ gridColumn: `span ${t.span}`, bgcolor: D.surfaceAlt, borderRadius: "10px", px: 1.25, py: 1, display: "grid", gap: 0.25, alignContent: "start" }}>
+                <Box key={i} sx={{ gridColumn: `span ${t.span}`, bgcolor: D.surfaceAlt, borderRadius: "10px", px: 1.25, py: 0.75, display: "grid", gap: 0, alignContent: "start" }}>
                   <Typography sx={{ fontSize: 11.5, color: D.textMuted, fontWeight: 600 }}><Hl text={t.label} terms={terms} /></Typography>
                   <Typography sx={{ fontSize: 13.5, color: D.text, fontWeight: 700, lineHeight: 1.25 }}><Hl text={t.value} terms={terms} /></Typography>
                 </Box>
@@ -1808,7 +2109,7 @@ export default function MelkeerstatningTab() {
             {activeTab === 4 && <BestillingOgDokumenterTab product={product} dokumenter={aktiveDokumenter} terms={terms} />}
 
             <Typography sx={{ mt: 3, fontSize: 12, color: D.textMuted, textAlign: "center" }}>
-              Nutricias produkter er registrerte næringsmidler til spesielle medisinske formål og skal brukes i samråd med helsepersonell.
+              {MANUFACTURERS[product.manufacturer].footer}
             </Typography>
           </Box>
         </>
