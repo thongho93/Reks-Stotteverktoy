@@ -33,12 +33,14 @@ export type NutritionProduct = {
     malabsorption?: boolean | "caution";
   };
   notes?: string[];
+  /** Andre navn i produktkatalogen (forkortelser, annen stavemåte) – brukes til å finne VNR-varianter. */
+  aliases?: string[];
 };
 
 // All clinical use entries marked as "caution" = require agreement with doctor or clinical nutritionist (KEF).
 // Source: "Ernæring alder og sykdom.pdf" (PDF2) + "ernæring innhold.pdf" (PDF1)
 
-export const nutritionProducts: NutritionProduct[] = [
+const reviewedProducts: NutritionProduct[] = [
   // ─── Nutricia / Nutridrink-serien ───────────────────────────────────────────
   {
     id: "nutridrink",
@@ -96,6 +98,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "nutridrink-2kcal",
     name: "Nutridrink 2kcal",
+    aliases: ["Nutridrink 2,0"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -179,6 +182,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "nutridrink-juice-style",
     name: "Nutridrink Juice Style",
+    aliases: ["Nutridrink juice"],
     category: "Proteinrik",
     properties: {
       glutenFree: true,
@@ -196,6 +200,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "nutridrink-compact-protein",
     name: "Nutridrink Compact Protein",
+    aliases: ["Nutridrink comp prot"],
     category: "Proteinrik",
     properties: {
       glutenFree: true,
@@ -217,6 +222,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "nutilis-fruit-stage-3",
     name: "Nutilis Fruit Stage 3",
+    aliases: ["Nutilis fruit"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -253,6 +259,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "fortini-compact-multi-fiber",
     name: "Fortini Compact Multi Fiber",
+    aliases: ["Fortini comp multi"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -413,6 +420,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "elemental-028-extra",
     name: "Elemental 028 Extra",
+    aliases: ["Elemental 028 ext*"],
     category: "Malabsorpsjon",
     properties: {
       glutenFree: true,
@@ -449,6 +457,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "calogen-shot",
     name: "Calogen Shot",
+    aliases: ["Calogen extra shot*"],
     category: "Fettkilde",
     properties: {
       glutenFree: true,
@@ -486,6 +495,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "fresubin-2kcal-fiber-drink",
     name: "Fresubin 2 kcal Fiber Drink",
+    aliases: ["Fresubin 2kcal fib dri*"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -504,6 +514,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "fresubin-protein-energy-drink",
     name: "Fresubin Protein Energy Drink",
+    aliases: ["Fresubin protein e drink", "Fresubin prot ener drink", "Fresubin prot energy drk", "Fresubin prot energy drink"],
     category: "Proteinrik",
     properties: {
       completeNutrition: true,
@@ -585,6 +596,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "fresubin-energy-fiber-drink",
     name: "Fresubin Energy Fiber Drink",
+    aliases: ["Fresubin ener fib drink"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -650,6 +662,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "fresubin-thickened-niva-2",
     name: "Fresubin Thickened nivå 2",
+    aliases: ["Fresubin thick lev 2"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -663,6 +676,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "fresubin-thickened-niva-3",
     name: "Fresubin Thickened nivå 3",
+    aliases: ["Fresubin thick lev 3"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -822,6 +836,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "resource-2-0-fiber",
     name: "Resource 2.0 Fiber",
+    aliases: ["Resource 2,0+fibre"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -873,6 +888,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "resource-komplett",
     name: "Resource Komplett",
+    aliases: ["Resource kompl nær"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -905,6 +921,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "resource-addera-plus",
     name: "Resource Addera Plus",
+    aliases: ["Resource addera+"],
     category: "Proteinrik",
     properties: {
       glutenFree: true,
@@ -934,6 +951,7 @@ export const nutritionProducts: NutritionProduct[] = [
   {
     id: "minimax-barnesondeernering",
     name: "Minimax Barnesondeernæring",
+    aliases: ["Minimax barnesondenæring"],
     category: "Komplett ernæring",
     properties: {
       completeNutrition: true,
@@ -961,3 +979,117 @@ export const nutritionProducts: NutritionProduct[] = [
     notes: ["Omega-3"],
   },
 ];
+
+// ─── Fra produktkatalogen (PIM) ──────────────────────────────────────────────
+// Produkter som finnes i katalogen med VNR, men som ikke er gjennomgått mot PDF-kildene ennå.
+// Bare det som fremgår av navnet er fylt ut (kategori, fiber, proteinrik); alder og klinisk
+// bruk er tomt til de er vurdert. `aliases` er katalogens egne forkortelser/stavemåter, slik at
+// VNR-ene havner under riktig produkt. Kontroller mot produktblad før de brukes i rådgivning.
+const CATALOG_NOTE = "Lagt inn fra produktkatalogen – kliniske data er ikke gjennomgått.";
+
+type CatalogEntryOptions = { aliases?: string[]; fiber?: boolean; proteinRich?: boolean };
+
+const fromCatalog = (id: string, name: string, category: string, options: CatalogEntryOptions = {}): NutritionProduct => ({
+  id,
+  name,
+  ...(options.aliases ? { aliases: options.aliases } : {}),
+  category,
+  properties: {
+    ...(options.fiber ? { fiber: true } : {}),
+    ...(options.proteinRich ? { proteinRich: true } : {}),
+  },
+  age: {},
+  clinicalUse: {},
+  notes: [CATALOG_NOTE],
+});
+
+const DRINK = "Andre næringsdrikker";
+const TUBE = "Sondeernæring";
+const THICKENER = "Fortykningsmiddel";
+const POWDER = "Pulver og tilskudd";
+
+const catalogProducts: NutritionProduct[] = [
+  // Næringsdrikker, kremer og supper
+  fromCatalog("nutridrink-creme", "Nutridrink Creme", DRINK),
+  fromCatalog("nutridrink-juicy", "Nutridrink Juicy", DRINK),
+  fromCatalog("resource-2-5-compact", "Resource 2,5 Compact", DRINK, { aliases: ["Resource 2,5 comp", "Resource 2,5 fib comp"] }),
+  fromCatalog("resource-senior-active", "Resource Senior Activ", DRINK, { aliases: ["Resource aktiva"] }),
+  fromCatalog("resource-soup", "Resource Soup", DRINK, { aliases: ["Resource nypesuppe"] }),
+  fromCatalog("resource-aqua", "Resource Aqua+", DRINK),
+  fromCatalog("resource-addera", "Resource Addera", DRINK),
+  fromCatalog("fresubin-creme", "Fresubin Creme", DRINK),
+  fromCatalog("fresubin-soup", "Fresubin Soup", DRINK),
+  fromCatalog("fresubin-pro-drink", "Fresubin Pro Drink", DRINK),
+  fromCatalog("fresubin-pro-compact-drink", "Fresubin Pro Compact Drink", DRINK),
+  fromCatalog("fresubin-3-2kcal-drink", "Fresubin 3,2kcal Drink", DRINK),
+  fromCatalog("fresubin-pl-base-drink", "Fresubin PL Base Drink", DRINK),
+  fromCatalog("fresubin-thickened-stage", "Fresubin Thickened (stage 1/2)", DRINK, { aliases: ["Fresubin thickened stag*"] }),
+  fromCatalog("diben-2kcal-drink", "Diben 2kcal Drink", DRINK),
+
+  // Sondeernæring
+  fromCatalog("nutrison", "Nutrison", TUBE),
+  fromCatalog("nutrison-advanced", "Nutrison Advanced", TUBE, { aliases: ["Nutrison diason", "Nutrison peptisorb"] }),
+  fromCatalog("nutrison-plantbased", "Nutrison PlantBased", TUBE, { aliases: ["Nutrison plantba*"] }),
+  fromCatalog("nutrini", "Nutrini", TUBE),
+  fromCatalog("nutrinimax", "Nutrinimax", TUBE),
+  fromCatalog("nutrinikid", "NutriniKid", TUBE),
+  fromCatalog("fortini-mix", "Fortini Mix", TUBE),
+  fromCatalog("fresubin-original-sonde", "Fresubin Original (sonde)", TUBE, { aliases: ["Fresubin original"] }),
+  fromCatalog("fresubin-original-fiber-sonde", "Fresubin Original Fibre (sonde)", TUBE, { aliases: ["Fresubin original fibre"], fiber: true }),
+  fromCatalog("fresubin-energy-sonde", "Fresubin Energy (sonde)", TUBE, { aliases: ["Fresubin energy"] }),
+  fromCatalog("fresubin-energy-fiber-sonde", "Fresubin Energy Fibre (sonde)", TUBE, { aliases: ["Fresubin energy fibre"], fiber: true }),
+  fromCatalog("fresubin-hp-energy-sonde", "Fresubin HP Energy (sonde)", TUBE, { aliases: ["Fresubin HP energy"], proteinRich: true }),
+  fromCatalog("fresubin-hp-energy-fiber-sonde", "Fresubin HP Energy Fibre (sonde)", TUBE, { aliases: ["Fresubin HP energy fibre"], fiber: true, proteinRich: true }),
+  fromCatalog("fresubin-soya-fiber-sonde", "Fresubin Soya Fibre (sonde)", TUBE, { aliases: ["Fresubin soya fibre"], fiber: true }),
+  fromCatalog("fresubin-2kcal-hp-sonde", "Fresubin 2 kcal HP (sonde)", TUBE, { aliases: ["Fresubin 2kcal HP"], proteinRich: true }),
+  fromCatalog("fresubin-2kcal-hp-fiber-sonde", "Fresubin 2 kcal HP Fibre (sonde)", TUBE, { aliases: ["Fresubin 2kcal HP fibre"], fiber: true, proteinRich: true }),
+  fromCatalog("fresubin-complete-sonde", "Fresubin Complete (sonde)", TUBE, {
+    aliases: ["Fresubin 1000", "Fresubin 1200", "Fresubin 1500", "Fresubin 1800", "Fresubin 2250"],
+  }),
+  fromCatalog("fresubin-intensive-sonde", "Fresubin Intensive (sonde)", TUBE, { aliases: ["Fresubin intensive"] }),
+  fromCatalog("isosource-standard", "Isosource Standard", TUBE),
+  fromCatalog("isosource-energy", "Isosource Energy", TUBE),
+  fromCatalog("isosource-mix", "Isosource Mix", TUBE),
+  fromCatalog("isosource-protein", "Isosource Protein", TUBE, { proteinRich: true }),
+  fromCatalog("isosource-junior", "Isosource Junior", TUBE, { aliases: ["Isosource jr"] }),
+  fromCatalog("peptamen", "Peptamen", TUBE),
+  fromCatalog("peptamen-junior", "Peptamen Junior", TUBE),
+  fromCatalog("diben-sonde", "Diben (sonde)", TUBE, { aliases: ["Diben"] }),
+  fromCatalog("survimed-opd-sonde", "Survimed OPD (sonde)", TUBE, { aliases: ["Survimed opd"] }),
+  fromCatalog("supportan-sonde", "Supportan (sonde)", TUBE, { aliases: ["Supportan"] }),
+  fromCatalog("frebini-original-sonde", "Frebini Original (sonde)", TUBE, { aliases: ["Frebini original"] }),
+  fromCatalog("frebini-energy-sonde", "Frebini Energy (sonde)", TUBE, { aliases: ["Frebini energy"] }),
+  fromCatalog("novasource-gi", "Novasource GI", TUBE),
+  fromCatalog("novasource-diabet", "Novasource Diabet Plus", TUBE, { aliases: ["Novasource diabet"] }),
+  fromCatalog("impact-enteral", "Impact Enteral", TUBE),
+  fromCatalog("infatrini", "Infatrini", TUBE),
+  fromCatalog("infatrini-peptisorb", "Infatrini Peptisorb", TUBE),
+  fromCatalog("compleat-mix", "Compleat Mix", TUBE),
+  fromCatalog("compleat-paediatric-mix", "Compleat Paediatric Mix", TUBE),
+
+  // Fortykningsmidler
+  fromCatalog("thickenup-clear", "ThickenUp Clear", THICKENER),
+  fromCatalog("thickenup-junior", "ThickenUp Junior", THICKENER, { aliases: ["ThickenUp jr"] }),
+  fromCatalog("thickenup", "ThickenUp", THICKENER, { aliases: ["ThickenUp fortykningsmiddel"] }),
+  fromCatalog("resource-thickenup", "Resource ThickenUp", THICKENER, { aliases: ["Resource thicken up", "Resource thickenup"] }),
+  fromCatalog("thick-and-easy", "Thick&easy Clear", THICKENER, { aliases: ["Thick&easy"] }),
+  fromCatalog("nutilis-powder", "Nutilis Powder", THICKENER),
+  fromCatalog("fresubin-clear", "Fresubin Clear", THICKENER),
+
+  // Pulver og tilskudd
+  fromCatalog("scandishake-mix", "Scandishake Mix", POWDER),
+  fromCatalog("calshake", "Calshake", POWDER),
+  fromCatalog("maxijul", "Maxijul", POWDER),
+  fromCatalog("duocal", "Duocal", POWDER),
+  fromCatalog("fresubin-protein-powder", "Fresubin Protein Powder", POWDER, { aliases: ["Fresubin protein pulv"], proteinRich: true }),
+  fromCatalog("resource-instant-protein", "Resource Instant Protein", POWDER, { proteinRich: true }),
+  fromCatalog("resource-energi", "Resource Energi", POWDER),
+  fromCatalog("resource-meritene", "Resource Meritene", POWDER, { aliases: ["Meritene"] }),
+  fromCatalog("resource-complete", "Resource Complete", POWDER),
+  fromCatalog("oral-impact", "Oral Impact", POWDER),
+  fromCatalog("modulen-ibd", "Modulen IBD", POWDER, { aliases: ["Modulen"] }),
+  fromCatalog("nutricia-mct", "Nutricia MCT olje", POWDER),
+  fromCatalog("isosource-mct", "Isosource MCT", POWDER),
+];
+
+export const nutritionProducts: NutritionProduct[] = [...reviewedProducts, ...catalogProducts];

@@ -1,62 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GlobalStyles as CssVars, useTheme } from "@mui/material";
 import { nutritionProducts, type NutritionProduct } from "../data/nutritionProducts";
+import { buildVariantMap, type CatalogProduct, type VariantInfo } from "../data/nutritionVariants";
 import { MK, MK_DARK_VARS, MK_LIGHT_VARS } from "./melkeTheme";
-
-// ─── Katalogprodukt (for VNR-varianter) ──────────────────────────────────────
-type CatalogProduct = {
-  id: string;
-  name: string;
-  farmaloggNumber: string;
-  farmaloggDigits: string;
-  skuDigits: string;
-};
-
-type VariantRow = { vnr: string; flavor: string };
-type VariantInfo = { rows: VariantRow[] };
-
-function normName(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/(\d),(\d)/g, "$1.$2")
-    .replace(/\+/g, " ")
-    .replace(/\d+\s*x\s*\d+\s*(?:ml|g|cl|l)?\b/g, "")
-    .replace(/(\d+)\s+([a-zA-Z])/g, "$1$2")
-    .replace(/\bfibre\b/g, "fiber")
-    .replace(/\bfibr\b/g, "fiber")
-    .replace(/\bfib\b/g, "fiber")
-    .replace(/\bcomp\b/g, "compact")
-    .replace(/\bactiv\b/g, "active")
-    .replace(/\bfr\b/g, "fruit")
-    .replace(/\bjucy\b/g, "juicy")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
-function buildVariantMap(catalog: CatalogProduct[], npList: NutritionProduct[]): Map<string, VariantInfo> {
-  const map = new Map<string, VariantInfo>();
-  const npNorms = npList.map((np) => ({ np, norm: normName(np.name) }));
-  for (const cp of catalog) {
-    const cpNorm = normName(cp.name);
-    const vnr = cp.farmaloggNumber.trim();
-    if (!vnr) continue;
-    let bestNp: NutritionProduct | null = null;
-    let bestLen = 0;
-    for (const { np, norm: npNorm } of npNorms) {
-      if (cpNorm.startsWith(npNorm) && npNorm.length > bestLen) {
-        bestNp = np;
-        bestLen = npNorm.length;
-      }
-    }
-    if (!bestNp) continue;
-    if (!map.has(bestNp.id)) map.set(bestNp.id, { rows: [] });
-    const entry = map.get(bestNp.id)!;
-    const flavor = cpNorm.slice(bestLen).replace(/\d+\s*x\s*\d+.*/g, "").trim();
-    const flavorDisplay = flavor.charAt(0).toUpperCase() + flavor.slice(1);
-    if (!entry.rows.some((r) => r.vnr === vnr)) entry.rows.push({ vnr, flavor: flavorDisplay });
-  }
-  return map;
-}
 
 // ─── Etiketter og grupper ────────────────────────────────────────────────────
 type GroupKey = "cond" | "prop" | "age" | "cat";
@@ -360,7 +306,7 @@ function ProductRow({
                 {rows.map((r) => (
                   <li key={r.vnr} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <span style={{ flex: 1, minWidth: 0, fontSize: 14 }}>
-                      {r.flavor || <span style={{ color: MK.muted, fontStyle: "italic" }}>Nøytral</span>}
+                      {r.flavor || <span style={{ color: MK.muted, fontStyle: "italic" }}>Standard</span>}
                     </span>
                     <button
                       type="button"
