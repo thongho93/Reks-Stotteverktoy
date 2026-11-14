@@ -13,7 +13,8 @@ export type CatalogProduct = {
   skuDigits: string;
 };
 
-export type VariantRow = { vnr: string; flavor: string };
+/** `pack` er pakningen fra katalognavnet, f.eks. «8×500» (viktig for sondeernæring). */
+export type VariantRow = { vnr: string; flavor: string; pack?: string };
 export type VariantInfo = { rows: VariantRow[] };
 
 export function normName(s: string): string {
@@ -66,9 +67,11 @@ export function buildVariantMap(catalog: CatalogProduct[], npList: NutritionProd
     if (!bestNp) continue;
     if (!map.has(bestNp.id)) map.set(bestNp.id, { rows: [] });
     const entry = map.get(bestNp.id)!;
+    const packMatch = cp.name.match(/(\d+)\s*x\s*(\d+)/i);
+    const pack = packMatch ? `${packMatch[1]}×${packMatch[2]}` : undefined;
     const flavor = cpNorm.slice(bestLen).replace(/\d+\s*x\s*\d+.*/g, "").trim();
     const flavorDisplay = flavor.charAt(0).toUpperCase() + flavor.slice(1);
-    if (!entry.rows.some((r) => r.vnr === vnr)) entry.rows.push({ vnr, flavor: flavorDisplay });
+    if (!entry.rows.some((r) => r.vnr === vnr)) entry.rows.push({ vnr, flavor: flavorDisplay, ...(pack ? { pack } : {}) });
   }
   return map;
 }
