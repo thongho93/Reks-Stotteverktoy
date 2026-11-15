@@ -29,6 +29,7 @@ export type NutritionProduct = {
     liteProtein?: boolean;
   };
   age: {
+    fromInfancy?: boolean;
     from1Year?: boolean;
     from3Years?: boolean;
     from5Years?: boolean;
@@ -2285,6 +2286,170 @@ const reviewedProducts: NutritionProduct[] = [
       },
     ],
   },
+
+  // ─── Duocal (Nutricia) ───────────────────────────────────────────────────────
+  // Kilde: produktark «Duocal» (november 2018).
+  {
+    id: "duocal",
+    name: "Duocal",
+    category: "Pulver og tilskudd",
+    summary: "Lettløselig energitilskudd med en balansert blanding av karbohydrater og fett · 492 kcal per 100 g pulver · 400 g",
+    indication: "Energirik kost ved væskerestriksjon, f.eks. nyresykdom, leversykdom og katabolsk stress",
+    properties: {
+      glutenFree: true,
+      lactoseFree: true,
+      vegetarian: true,
+    },
+    age: { fromInfancy: true },
+    clinicalUse: {},
+    warnings: [
+      "Ikke egnet som eneste næringskilde.",
+      "Mengde og blandingsforhold skal fastsettes av lege eller klinisk ernæringsfysiolog, ut fra pasientens alder, kroppsvekt og medisinske tilstand.",
+      "God tannhygiene er viktig for spedbarn og barn: langvarig og hyppig kontakt med mat og drikke øker risikoen for hull i tennene.",
+    ],
+    sections: [
+      {
+        title: "Bruksområde",
+        lines: [
+          "Energitilskudd til kostbehandling av tilstander som krever en energirik kost i kombinasjon med væskerestriksjon, f.eks. nyresykdom, leversykdom og katabolsk stress.",
+          "Egnet til spedbarn, barn og voksne. Skal brukes i samråd med helsepersonell.",
+          "Kan drikkes som energitilskudd, smaksatt med frukt eller andre smaksvarianter. Kan også blandes inn i matretter, drikker og sondeløsninger ved behov for energiberikning, og tilsettes morsmelkerstatning og melkeerstatninger. Har liten påvirkning på konsistensen og nøytral smak.",
+        ],
+      },
+      {
+        title: "Dosering",
+        lines: [
+          "Bruk den mengden pulver og det blandingsforholdet som lege eller klinisk ernæringsfysiolog anbefaler.",
+          "1–2 ss kan uten smaksforandring tilsettes i 100 ml væske, for eksempel velling, melk, yoghurt og suppe. En strøken måleskje gir 1,2 g pulver.",
+        ],
+      },
+      {
+        title: "Tilberedning",
+        lines: [
+          "Mål opp anbefalt mengde pulver. Tilsett pulveret til tilmålt mengde væske og rør til jevn blanding med en gaffel. Tilsett resterende væske og rør til alt pulver er oppløst.",
+          "Kan kokes, men ikke fosskokes, fordi konsistensen kan endres. Er drikken varm, bør den avkjøles litt før pulveret tilsettes. Varm deretter drikken til ønsket temperatur.",
+          "I vann, klare drikker, fruktjuice eller saft kan drikken bli litt grumsete. Smaken er like god.",
+          "Tilberedt produkt oppbevares i kjøleskap og brukes innen 24 timer.",
+        ],
+      },
+      {
+        title: "Berikning av morsmelkerstatning",
+        lines: [
+          "Bland anbefalt mengde Duocal godt inn i melkeerstatningspulveret før det hele løses i vann etter instruksjonen på melkeerstatningen.",
+          "Brukes umiddelbart etter tilberedning.",
+        ],
+      },
+      {
+        title: "Holdbarhet og oppbevaring",
+        lines: [
+          "Åpnet boks lukkes godt og brukes innen en måned.",
+          "Oppbevares tørt i romtemperatur (under 25 °C, ikke i kjøleskap), utenfor sollys. Best før-dato står på boksen.",
+        ],
+      },
+      {
+        title: "Sammensetning",
+        lines: [
+          "Basert på hydrolysert maisstivelse og fett. Fettet er 35 % MCT og 65 % LCT.",
+          "Per 100 g pulver: 492 kcal, 22,3 g fett fra tistel-, kokos- og rapsolje (41 E%) og 72,7 g karbohydrat fra glukosesirup (59 E%).",
+        ],
+      },
+      {
+        title: "Egnethet",
+        lines: [
+          "Glutenfri og laktosefri.",
+          "Protein og kostfiber er ikke tilsatt.",
+          "Passer ved lakto-ovo-vegetarkost. Ikke halal-sertifisert.",
+          "FODMAP per 100 g: ingen.",
+        ],
+      },
+      {
+        title: "Bestilling",
+        lines: [
+          "Salgsenhet til apotek/sykehus: 1 boks à 400 g. Bestillingsnr. 117548.",
+          "Nutricia Norge AS: tlf. +47 23 00 21 00, nutricia@nutricia.no.",
+        ],
+      },
+      {
+        title: "Ingredienser",
+        wide: true,
+        lines: ["Tørket glukosesirup, fraksjonert kokosnøttolje, hybrid tistelolje, rapsolje, emulgator (E472c)."],
+      },
+    ],
+    nutrition: [
+      {
+        title: "Energi og næringsstoffer",
+        columns: ["Per 100 g", "Energi %"],
+        rows: [
+          { label: "Energi (kJ)", values: ["2061", ""] },
+          { label: "Energi (kcal)", values: ["492", ""] },
+          { label: "Fett (g)", values: ["22,3", "41"] },
+          { label: "hvorav mettede fettsyrer", values: ["8,4", ""], sub: true },
+          { label: "hvorav MCT", values: ["7,8", ""], sub: true },
+          { label: "enumettede fettsyrer", values: ["9,7", ""], sub: true },
+          { label: "flerumettede fettsyrer", values: ["3,1", ""], sub: true },
+          { label: "linolsyre (LA)", values: ["2,56", ""], sub: true },
+          { label: "α-linolensyre (ALA)", values: ["0,65", ""], sub: true },
+          { label: "MCT / LCT (%)", values: ["35 / 65", ""], sub: true },
+          { label: "Forhold n-6:n-3", values: ["4:1", ""], sub: true },
+          { label: "Karbohydrater (g)", values: ["72,7", "59"] },
+          { label: "hvorav sukkerarter", values: ["6,5", ""], sub: true },
+          { label: "hvorav laktose", values: ["–", ""], sub: true },
+          { label: "Kostfiber (g)", values: ["ikke tilsatt", "0"] },
+          { label: "Protein (g)", values: ["ikke tilsatt", "0"] },
+          { label: "Salt (g)", values: ["<0,05", ""] },
+          { label: "Natrium (mg)", values: ["<20", ""] },
+          { label: "Kalium (mg)", values: ["<5", ""] },
+          { label: "Klorid (mg)", values: ["<20", ""] },
+          { label: "Kalsium (mg)", values: ["<5", ""] },
+          { label: "Fosfor (mg)", values: ["<5", ""] },
+          { label: "Magnesium (mg)", values: ["<5", ""] },
+        ],
+      },
+      {
+        title: "Husholdningsmål",
+        note: "Omtrentlige mål. En strøken måleskje gir 1,2 g pulver.",
+        columns: ["Fett (g)", "Karbohydrat (g)", "Energi (kcal)"],
+        rows: [
+          { label: "1 dl (100 ml) ≈ 50 g", values: ["11", "36", "246"] },
+          { label: "1 ss (15 ml) ≈ 8 g", values: ["1,8", "6", "39"] },
+          { label: "1 ts (5 ml) ≈ 2,5 g", values: ["0,5", "2", "12"] },
+          { label: "1 kryddermål (1 ml) ≈ 0,5 g", values: ["0,1", "0,4", "2,5"] },
+        ],
+      },
+      {
+        title: "Blandingsforhold og osmolalitet",
+        columns: ["Vann (ml)", "Pulver (g)", "kcal/ml", "mOsmol/kg H₂O"],
+        rows: [
+          { label: "1:4", values: ["150", "37,5", "1,2", "196"] },
+          { label: "1:3", values: ["150", "50", "1,6", "310"] },
+          { label: "1:2", values: ["150", "75", "2,5", "525"] },
+        ],
+      },
+      {
+        title: "Typisk fettsyreprofil",
+        note: "Gram per 100 g fettsyrer.",
+        columns: ["g"],
+        rows: [
+          { label: "C8:0", values: ["20,5"] },
+          { label: "C10:0", values: ["14,1"] },
+          { label: "C12:0", values: ["0,03"] },
+          { label: "C14:0", values: ["0,02"] },
+          { label: "C16:0", values: ["3,2"] },
+          { label: "C18:0", values: ["1,2"] },
+          { label: "C18:1", values: ["44,9"] },
+          { label: "C18:2 linolsyre", values: ["11,5"] },
+          { label: "C18:3 α-linolensyre", values: ["2,9"] },
+        ],
+      },
+    ],
+    documents: [
+      {
+        title: "Produktark Duocal",
+        url: "/dokumenter/N%C3%A6ringsmidler/Duocal.pdf",
+        sizeLabel: "384 KB",
+      },
+    ],
+  },
 ];
 
 // ─── Fra produktkatalogen (PIM) ──────────────────────────────────────────────
@@ -2379,7 +2544,6 @@ const catalogProducts: NutritionProduct[] = [
 
   // Pulver og tilskudd
   fromCatalog("maxijul", "Maxijul", POWDER),
-  fromCatalog("duocal", "Duocal", POWDER),
   fromCatalog("fresubin-protein-powder", "Fresubin Protein Powder", POWDER, { aliases: ["Fresubin protein pulv"], proteinRich: true }),
   fromCatalog("resource-instant-protein", "Resource Instant Protein", POWDER, { proteinRich: true }),
   fromCatalog("resource-energi", "Resource Energi", POWDER),

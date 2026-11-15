@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Dialog, GlobalStyles as CssVars, useTheme } from "@mui/material";
 import { nutritionProducts, type NutritionProduct } from "../data/nutritionProducts";
 import { buildVariantMap, type CatalogProduct, type VariantInfo } from "../data/nutritionVariants";
@@ -22,7 +22,7 @@ const CLINICAL_LABELS: Record<string, string> = {
   diseaseRelatedMalnutrition: "Sykdomsrelatert underernæring", dysphagia: "Dysfagi", crohnsDisease: "Crohns sykdom",
 };
 const AGE_LABELS: Record<string, string> = {
-  from1Year: "Fra 1 år", from3Years: "Fra 3 år", from5Years: "Fra 5 år", over6Years: "Over 6 år", from15Years: "Fra 15 år", elderly: "Eldre",
+  fromInfancy: "Fra spedbarn", from1Year: "Fra 1 år", from3Years: "Fra 3 år", from5Years: "Fra 5 år", over6Years: "Over 6 år", from15Years: "Fra 15 år", elderly: "Eldre",
 };
 const ALL_LABELS: Record<string, string> = { ...CLINICAL_LABELS, ...PROP_LABELS, ...AGE_LABELS };
 const GROUP_NAMES: Record<GroupKey, string> = { cond: "Egnet ved", prop: "Egenskap", age: "Alder", cat: "Kategori" };
@@ -56,6 +56,7 @@ const CATEGORIES = Array.from(new Set(nutritionProducts.map((p) => p.category)))
 const countWhere = (fn: (x: Indexed) => boolean) => INDEX.filter(fn).length;
 
 function ageSummary(ages: string[]): string {
+  if (ages.includes("fromInfancy")) return "Fra spedbarn";
   if (ages.includes("from1Year")) return "Fra 1 år";
   if (ages.includes("from3Years")) return "Fra 3 år";
   if (ages.includes("from5Years")) return "Fra 5 år";
@@ -72,6 +73,7 @@ const ROW_HEIGHT = 124; // kort + mellomrom, med litt luft for kort med to rader
 const CHROME_HEIGHT = 160; // antall-linjen, sidetall og mellomrom rundt listen
 const MIN_ROWS = 3;
 const MAX_ROWS = 6;
+const MAX_SCALE = 1.4; // hvor mye kortene kan skaleres opp når det er god plass
 const VNR_RE = /^\d+$/;
 const EMPTY_SELECTION: Selection = { cond: [], prop: [], age: [], cat: [] };
 
@@ -85,8 +87,6 @@ const CSS = `
 .nm-chip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border-radius:999px;border:1px solid ${MK.borderAccent};background:${MK.surface};color:${MK.text};font-size:13.5px;font-weight:600;cursor:pointer;transition:border-color .12s,background .12s}
 .nm-chip:hover{border-color:${MK.hoverBorder};background:${MK.hover}}
 .nm-chip[aria-pressed="true"]{background:${MK.accentBg};border-color:${MK.accentBg};color:${MK.onAccent}}
-.nm-chip .nm-count{font-size:12px;font-weight:500;color:${MK.muted}}
-.nm-chip[aria-pressed="true"] .nm-count{color:${MK.onAccent};opacity:.85}
 .nm-trig{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:0 14px;border-radius:12px;border:1px solid ${MK.borderAccent};background:${MK.surface};color:${MK.text};font-size:14px;font-weight:600;cursor:pointer}
 .nm-trig:hover{border-color:${MK.hoverBorder}}
 .nm-trig[data-active="true"]{border-color:${MK.accent};background:${MK.pill};color:${MK.pillText}}
@@ -99,17 +99,16 @@ const CSS = `
 .nm-box svg{opacity:0}
 .nm-opt[aria-pressed="true"] .nm-box{background:${MK.accentBg};border-color:${MK.accentBg}}
 .nm-opt[aria-pressed="true"] .nm-box svg{opacity:1}
-.nm-opt .nm-count{margin-left:auto;font-size:12.5px;color:${MK.muted}}
 .nm-active{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 6px 0 12px;border-radius:999px;border:0;background:${MK.pill};color:${MK.pillText};font-size:13px;font-weight:600;cursor:pointer}
 .nm-active:hover{background:${MK.pillHover}}
 .nm-link{border:0;background:transparent;padding:6px 4px;color:${MK.accent};font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-.nm-row{display:grid;grid-template-columns:48px minmax(0,1fr) 20px;grid-template-areas:"thumb head chev" "thumb tags tags";gap:6px 12px;align-items:center;width:100%;box-sizing:border-box;padding:10px 12px;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.nm-row{display:grid;grid-template-columns:calc(48px*var(--nm-s,1)) minmax(0,1fr) 20px;grid-template-areas:"thumb head chev" "thumb tags tags";gap:calc(6px*var(--nm-s,1)) calc(12px*var(--nm-s,1));align-items:center;align-content:center;width:100%;box-sizing:border-box;padding:calc(10px*var(--nm-s,1)) calc(12px*var(--nm-s,1));border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
 .nm-row:hover{background:${MK.sel}}
 .nm-chev{display:grid;place-items:center}
-.nm-thumb{width:48px;height:48px;border-radius:10px;overflow:hidden;background:${MK.thumbBg};border:1px solid ${MK.lineSoft};box-sizing:border-box;display:grid;place-items:center}
+.nm-thumb{width:calc(48px*var(--nm-s,1));height:calc(48px*var(--nm-s,1));border-radius:calc(10px*var(--nm-s,1));overflow:hidden;background:${MK.thumbBg};border:1px solid ${MK.lineSoft};box-sizing:border-box;display:grid;place-items:center}
 .nm-thumb img{width:100%;height:100%;object-fit:contain;padding:4px;box-sizing:border-box}
-.nm-mono{width:100%;height:100%;display:grid;place-items:center;background:${MK.pill};color:${MK.pillText};font-size:20px;font-weight:700}
-.nm-tag{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:7px;background:${MK.alt};border:1px solid ${MK.lineSoft};color:${MK.sub};font-size:12px;font-weight:500;white-space:nowrap}
+.nm-mono{width:100%;height:100%;display:grid;place-items:center;background:${MK.pill};color:${MK.pillText};font-size:calc(20px*var(--nm-s,1));font-weight:700}
+.nm-tag{display:inline-flex;align-items:center;min-height:calc(24px*var(--nm-s,1));padding:0 calc(9px*var(--nm-s,1));border-radius:7px;background:${MK.alt};border:1px solid ${MK.lineSoft};color:${MK.sub};font-size:calc(12px*var(--nm-s,1));font-weight:500;white-space:nowrap}
 .nm-tag-more{background:transparent;border:1px dashed ${MK.borderAccent};color:${MK.muted}}
 .nm-tag-warn{background:${MK.warnBg};border:1px solid ${MK.warnBorder};color:${MK.warnText}}
 .nm-h{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${MK.muted}}
@@ -121,13 +120,20 @@ const CSS = `
 .nm-ok{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;background:${MK.okBg};color:${MK.ok}}
 .nm-cond{display:flex;align-items:center;gap:9px;min-height:36px;padding:0 12px;box-sizing:border-box;border-radius:10px;background:${MK.surface};border:1px solid ${MK.border};font-size:14px;font-weight:500}
 .nm-dot{flex:none;width:10px;height:10px;border-radius:50%}
-.nm-warn{display:flex;align-items:flex-start;gap:9px;padding:8px 12px;border-radius:10px;background:${MK.warnBg};border:1px solid ${MK.warnBorder};color:${MK.warnText};font-size:13px;line-height:1.4}
 .nm-alert{flex:1 1 100%;min-width:0;display:flex;align-items:flex-start;gap:12px;padding:12px 16px;box-sizing:border-box;border-radius:14px;background:${MK.warnBg};border:1.5px solid ${MK.warnBorder};color:${MK.warnText}}
 .nm-alert-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:${MK.warnText};color:${MK.warnBg}}
 .nm-alert ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:14px;line-height:1.45}
+.nm-accs{border:1px solid ${MK.border};border-radius:14px;background:${MK.surface};overflow:hidden}
+.nm-acc + .nm-acc{border-top:1px solid ${MK.border}}
+.nm-acc summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 16px;cursor:pointer;font-size:14.5px;font-weight:600;color:${MK.text}}
+.nm-acc summary::-webkit-details-marker{display:none}
+.nm-acc summary:hover{background:${MK.hover}}
+.nm-acc summary:focus-visible{outline:2px solid ${MK.accent};outline-offset:-2px}
+.nm-acc .nm-acc-chev{display:inline-flex;color:${MK.muted};transition:transform .15s}
+.nm-acc[open] .nm-acc-chev{transform:rotate(180deg)}
+.nm-acc-body{padding:2px 16px 16px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.5;color:${MK.sub}}
+.nm-doc-sm{min-height:34px;padding:0 12px;border-radius:10px;font-size:13.5px}
 .nm-vnr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 6px 12px;box-sizing:border-box;border-radius:10px;border:1px solid ${MK.border};background:${MK.surface}}
-.nm-linkbtn{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 6px;border:0;background:transparent;color:${MK.accent};font-size:13.5px;font-weight:600;cursor:pointer}
-.nm-linkbtn:hover{text-decoration:underline;text-underline-offset:3px}
 .nm-table{width:100%;border-collapse:collapse;font-size:13.5px}
 .nm-table th{padding:8px 12px;text-align:right;font-size:11.5px;font-weight:600;color:${MK.muted};background:${MK.alt};border-bottom:1px solid ${MK.border}}
 .nm-table th:first-child{text-align:left}
@@ -146,7 +152,7 @@ const CSS = `
 .nm-copy:hover{border-color:${MK.accent};background:${MK.pill};color:${MK.pillText}}
 .nm-close{display:inline-grid;place-items:center;flex:none;width:40px;height:40px;border:0;border-radius:11px;background:${MK.surface};box-shadow:inset 0 0 0 1px ${MK.border};color:${MK.sub};cursor:pointer}
 .nm-close:hover{background:${MK.hover}}
-.nm-close:focus-visible,.nm-copy:focus-visible,.nm-linkbtn:focus-visible,.nm-more:focus-visible{outline:2px solid ${MK.accent};outline-offset:2px}
+.nm-close:focus-visible,.nm-copy:focus-visible,.nm-more:focus-visible{outline:2px solid ${MK.accent};outline-offset:2px}
 .nm-pages{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px}
 .nm-page{display:inline-grid;place-items:center;min-width:40px;height:40px;padding:0 10px;box-sizing:border-box;border-radius:10px;border:1px solid ${MK.borderAccent};background:${MK.surface};color:${MK.text};font-size:14px;font-weight:600;cursor:pointer}
 .nm-page:hover:not(:disabled){background:${MK.hover};border-color:${MK.hoverBorder}}
@@ -181,9 +187,6 @@ const InfoIcon = () => (
 
 const PersonIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" {...svgProps}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" /></svg>
-);
-const BarcodeIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" {...svgProps}><path d="M4 6v12M8 6v12M12 6v12M16 6v12M20 6v12" /></svg>
 );
 const HeartIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" {...svgProps}><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10Z" /></svg>
@@ -267,7 +270,6 @@ function FilterMenu({
               <button key={o.key} type="button" className="nm-opt" aria-pressed={o.on} onClick={() => onPick(o.key)}>
                 <span className="nm-box"><CheckIcon /></span>
                 {o.label}
-                <span className="nm-count">{o.count}</span>
               </button>
             ))}
           </div>
@@ -323,28 +325,25 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 }
 
 // ─── Produktkort i listen (åpner pop-up) ─────────────────────────────────────
-function ProductRow({ item, variant, onOpen }: { item: Indexed; variant?: VariantInfo; onOpen: () => void }) {
+function ProductRow({ item, onOpen }: { item: Indexed; onOpen: () => void }) {
   const { p, conds, ages, unreviewed } = item;
   const condNames = conds.map((k) => CLINICAL_LABELS[k] ?? k);
-  const rowCount = variant?.rows.length ?? 0;
-  const meta = [p.category, ages.length > 0 ? ageSummary(ages) : null, rowCount > 0 ? `${rowCount} varenr.` : null]
-    .filter(Boolean)
-    .join(" · ");
+  const meta = [p.category, ages.length > 0 ? ageSummary(ages) : null].filter(Boolean).join(" · ");
 
   return (
-    <li style={{ background: MK.surface, border: `1px solid ${MK.border}`, borderRadius: 14, overflow: "hidden" }}>
+    <li style={{ display: "flex", background: MK.surface, border: `1px solid ${MK.border}`, borderRadius: 14, overflow: "hidden" }}>
       <button type="button" className="nm-row" aria-haspopup="dialog" onClick={onOpen}>
         <span style={{ gridArea: "thumb", display: "inline-flex" }}><ProductThumb id={p.id} name={p.name} /></span>
         <span style={{ gridArea: "head", minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", overflowWrap: "anywhere" }}>{p.name}</span>
-          <span style={{ fontSize: 12.5, color: MK.muted }}>{meta}</span>
+          <span style={{ fontSize: "calc(15px * var(--nm-s, 1))", fontWeight: 600, letterSpacing: "-0.01em", overflowWrap: "anywhere" }}>{p.name}</span>
+          <span style={{ fontSize: "calc(12.5px * var(--nm-s, 1))", color: MK.muted }}>{meta}</span>
         </span>
         <span style={{ gridArea: "tags", minWidth: 0, display: "flex", flexWrap: "wrap", gap: 5 }}>
           {condNames.slice(0, 3).map((c) => <span key={c} className="nm-tag">{c}</span>)}
           {condNames.length > 3 && <span className="nm-tag nm-tag-more">+{condNames.length - 3}</span>}
           {condNames.length === 0 && (unreviewed
             ? <span className="nm-tag nm-tag-warn">Ikke gjennomgått</span>
-            : <span style={{ fontSize: 12.5, color: MK.muted }}>{p.indication ?? "Ingen klinisk indikasjon oppgitt"}</span>)}
+            : <span style={{ fontSize: "calc(12.5px * var(--nm-s, 1))", color: MK.muted }}>{p.indication ?? "Ingen klinisk indikasjon oppgitt"}</span>)}
         </span>
         <span className="nm-chev" aria-hidden="true" style={{ gridArea: "chev", color: MK.muted, transform: "rotate(-90deg)" }}>
           <ChevronIcon size={18} />
@@ -353,6 +352,9 @@ function ProductRow({ item, variant, onOpen }: { item: Indexed; variant?: Varian
     </li>
   );
 }
+
+// Seksjoner som er viktige å se med en gang (bruk og dosering). Resten ligger i sammenleggbare rader.
+const KEY_SECTION = /bruksområde|dosering|tilbered|slik blander|^bruk$/i;
 
 // ─── Pop-up med produktkort ──────────────────────────────────────────────────
 const DIALOG_FONT = "-apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif";
@@ -371,10 +373,11 @@ function ProductDialog({
   const rows = variant?.rows ?? [];
   const facts = [
     { icon: <PersonIcon />, text: ages.length > 0 ? ageSummary(ages) : "Alder ikke oppgitt" },
-    { icon: <BarcodeIcon />, text: `${rows.length} ${rows.length === 1 ? "varenummer" : "varenumre"}` },
     ...(conds.length > 0 ? [{ icon: <HeartIcon />, text: `${conds.length} ${conds.length === 1 ? "indikasjon" : "indikasjoner"}` }] : []),
   ];
   const sectionStyle = { display: "flex", flexDirection: "column", gap: 8 } as const;
+  const keySections = (p.sections ?? []).filter((sec) => KEY_SECTION.test(sec.title));
+  const moreSections = (p.sections ?? []).filter((sec) => !KEY_SECTION.test(sec.title));
 
   return (
     <Dialog
@@ -410,9 +413,17 @@ function ProductDialog({
             {p.name}
           </h2>
           {p.summary && <p style={{ margin: "6px 0 0", fontSize: 14, lineHeight: 1.45, color: MK.sub }}>{p.summary}</p>}
-          <ul style={{ listStyle: "none", display: "flex", flexWrap: "wrap", gap: "6px 20px", margin: "10px 0 0", padding: 0, fontSize: 14, color: MK.sub }}>
+          <ul style={{ listStyle: "none", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 20px", margin: "10px 0 0", padding: 0, fontSize: 14, color: MK.sub }}>
             {facts.map((f) => (
               <li key={f.text} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{f.icon}{f.text}</li>
+            ))}
+            {p.documents?.map((d) => (
+              <li key={d.url} style={{ display: "inline-flex" }}>
+                <a className="nm-doc nm-doc-sm" href={d.url} target="_blank" rel="noopener noreferrer">
+                  <FileIcon />
+                  Åpne produktark (PDF)
+                </a>
+              </li>
             ))}
           </ul>
         </div>
@@ -498,20 +509,14 @@ function ProductDialog({
               {conds.length > 0 && <span className="nm-cnt">{conds.length}</span>}
             </div>
             {conds.length > 0 && (
-              <>
-                <div className="nm-warn" role="note">
-                  <span style={{ flex: "none", marginTop: 1, display: "inline-flex" }}><WarnIcon size={16} /></span>
-                  <span>Alle indikasjoner krever avtale med lege eller klinisk ernæringsfysiolog (KEF).</span>
-                </div>
-                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))", gap: 6 }}>
-                  {conds.map((k) => (
-                    <li key={k} className="nm-cond">
-                      <span className="nm-dot" aria-hidden="true" style={{ background: COND_COLORS[k] ?? MK.muted }} />
-                      {CLINICAL_LABELS[k] ?? k}
-                    </li>
-                  ))}
-                </ul>
-              </>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))", gap: 6 }}>
+                {conds.map((k) => (
+                  <li key={k} className="nm-cond">
+                    <span className="nm-dot" aria-hidden="true" style={{ background: COND_COLORS[k] ?? MK.muted }} />
+                    {CLINICAL_LABELS[k] ?? k}
+                  </li>
+                ))}
+              </ul>
             )}
             {unreviewed && (
               <div
@@ -538,12 +543,6 @@ function ProductDialog({
                 <h3 className="nm-h">VNR-varianter</h3>
                 <span className="nm-cnt">{rows.length}</span>
               </div>
-              {rows.length > 0 && (
-                <button type="button" className="nm-linkbtn" onClick={() => onCopy(rows.map((r) => r.vnr).join("\n"), "*")}>
-                  {copiedVnr === "*" ? <CheckIcon size={16} stroke={3} /> : <CopyIcon />}
-                  {copiedVnr === "*" ? "Kopiert" : "Kopier alle"}
-                </button>
-              )}
             </div>
             {rows.length > 0 ? (
               <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(225px, 1fr))", gap: 6 }}>
@@ -568,13 +567,13 @@ function ProductDialog({
           </section>
         </div>
 
-        {(p.sections?.length || p.nutrition?.length || p.documents?.length) ? (
+        {(p.sections?.length || p.nutrition?.length) ? (
           <div style={{ flex: "1 1 100%", minWidth: 0, display: "flex", flexDirection: "column", gap: 20, paddingTop: 20, borderTop: `1px solid ${MK.border}` }}>
-            {p.sections && p.sections.length > 0 && (
+            {keySections.length > 0 && (
               <section style={sectionStyle}>
-                <h3 className="nm-h">Produktinformasjon</h3>
+                <h3 className="nm-h">Slik bruker du</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
-                  {p.sections.map((sec) => (
+                  {keySections.map((sec) => (
                     <div
                       key={sec.title}
                       style={{
@@ -592,48 +591,56 @@ function ProductDialog({
               </section>
             )}
 
-            {p.nutrition && p.nutrition.length > 0 && (
+            {(moreSections.length > 0 || (p.nutrition && p.nutrition.length > 0)) && (
               <section style={sectionStyle}>
-                <h3 className="nm-h">Næringsinnhold</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 12 }}>
-                  {p.nutrition.map((table) => (
-                    <div key={table.title} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <div style={{ borderRadius: 12, border: `1px solid ${MK.border}`, background: MK.surface, overflow: "hidden" }}>
-                        <table className="nm-table">
-                          <caption style={{ captionSide: "top", padding: "10px 12px 8px", textAlign: "left", fontSize: 14, fontWeight: 700 }}>{table.title}</caption>
-                          <thead>
-                            <tr>
-                              <th scope="col"><span className="nm-sr">Næringsstoff</span></th>
-                              {table.columns.map((c) => <th key={c} scope="col">{c}</th>)}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {table.rows.map((r) => (
-                              <tr key={r.label} className={r.sub ? "nm-sub" : undefined}>
-                                <td>{r.label}</td>
-                                {r.values.map((v, i) => <td key={i}>{v}</td>)}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                <h3 className="nm-h">Mer informasjon</h3>
+                <div className="nm-accs">
+                  {p.nutrition && p.nutrition.length > 0 && (
+                    <details className="nm-acc">
+                      <summary>
+                        Næringsinnhold
+                        <span className="nm-acc-chev" aria-hidden="true"><ChevronIcon size={18} /></span>
+                      </summary>
+                      <div className="nm-acc-body">
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 12, paddingTop: 6 }}>
+                          {p.nutrition.map((table) => (
+                            <div key={table.title} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <div style={{ borderRadius: 12, border: `1px solid ${MK.border}`, background: MK.surface, overflow: "hidden" }}>
+                                <table className="nm-table">
+                                  <caption style={{ captionSide: "top", padding: "10px 12px 8px", textAlign: "left", fontSize: 14, fontWeight: 700 }}>{table.title}</caption>
+                                  <thead>
+                                    <tr>
+                                      <th scope="col"><span className="nm-sr">Næringsstoff</span></th>
+                                      {table.columns.map((c) => <th key={c} scope="col">{c}</th>)}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {table.rows.map((r) => (
+                                      <tr key={r.label} className={r.sub ? "nm-sub" : undefined}>
+                                        <td>{r.label}</td>
+                                        {r.values.map((v, i) => <td key={i}>{v}</td>)}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {table.note && <p style={{ margin: 0, fontSize: 12.5, color: MK.muted }}>{table.note}</p>}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      {table.note && <p style={{ margin: 0, fontSize: 12.5, color: MK.muted }}>{table.note}</p>}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {p.documents && p.documents.length > 0 && (
-              <section style={sectionStyle}>
-                <h3 className="nm-h">Dokumenter</h3>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {p.documents.map((d) => (
-                    <a key={d.url} className="nm-doc" href={d.url} target="_blank" rel="noopener noreferrer">
-                      <FileIcon />
-                      {d.title}
-                      {d.sizeLabel && <span style={{ fontWeight: 500, color: MK.muted }}>PDF · {d.sizeLabel}</span>}
-                    </a>
+                    </details>
+                  )}
+                  {moreSections.map((sec) => (
+                    <details key={sec.title} className="nm-acc">
+                      <summary>
+                        {sec.title}
+                        <span className="nm-acc-chev" aria-hidden="true"><ChevronIcon size={18} /></span>
+                      </summary>
+                      <div className="nm-acc-body">
+                        {sec.lines.map((line, i) => <p key={i} style={{ margin: 0 }}>{line}</p>)}
+                      </div>
+                    </details>
                   ))}
                 </div>
               </section>
@@ -663,8 +670,9 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
   const rootRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const [layout, setLayout] = useState({ cols: 2, rows: 4 });
+  const [layout, setLayout] = useState({ cols: 2, rows: 4, rowH: ROW_HEIGHT });
   const pageSize = layout.cols * layout.rows;
+  const cardScale = Math.round((layout.rowH / ROW_HEIGHT) * 100) / 100;
 
   // Mål plassen: antall kolonner følger bredden, antall rader følger høyden på sidefeltet.
   useEffect(() => {
@@ -677,7 +685,9 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
       const hostHeight = host?.clientHeight ?? window.innerHeight;
       const free = hostHeight - (sectionRef.current?.offsetHeight ?? 200) - CHROME_HEIGHT;
       const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, Math.floor(free / ROW_HEIGHT)));
-      setLayout((prev) => (prev.cols === cols && prev.rows === rows ? prev : { cols, rows }));
+      // Resten av høyden fordeles på radene, så kortene fyller siden i stedet for å la plassen stå tom.
+      const rowH = Math.round(Math.min(ROW_HEIGHT * MAX_SCALE, Math.max(ROW_HEIGHT, free / rows)));
+      setLayout((prev) => (prev.cols === cols && prev.rows === rows && prev.rowH === rowH ? prev : { cols, rows, rowH }));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -894,16 +904,11 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 12px" }}>
               <h3 style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MK.muted }}>Egnet ved</h3>
-              <p style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: MK.muted }}>
-                <InfoIcon />
-                Alle indikasjoner krever avtale med lege eller klinisk ernæringsfysiolog (KEF).
-              </p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {condOptions.map((o) => (
                 <button key={o.key} type="button" className="nm-chip" aria-pressed={o.on} onClick={() => toggle("cond", o.key)}>
                   {o.label}
-                  <span className="nm-count">{o.count}</span>
                 </button>
               ))}
             </div>
@@ -931,11 +936,12 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
 
         <div
           ref={resultsTopRef}
-          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "6px 16px", scrollMarginTop: 8 }}
+          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: "6px 16px", scrollMarginTop: 8 }}
         >
-          <p aria-live="polite" style={{ margin: 0, fontSize: 14.5 }}>
-            <strong style={{ fontWeight: 700 }}>{countLabel}</strong>
-            {totalPages > 1 && <span style={{ color: MK.muted }}> · side {currentPage} av {totalPages}</span>}
+          {/* Antall treff vises ikke, men leses fortsatt opp for skjermlesere. */}
+          <p aria-live="polite" className="nm-sr">
+            {countLabel}
+            {totalPages > 1 ? `, side ${currentPage} av ${totalPages}` : ""}
           </p>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <label htmlFor="nm-sort" style={{ fontSize: 13.5, color: MK.muted }}>Sorter</label>
@@ -952,13 +958,14 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
           style={{
             listStyle: "none", margin: 0, padding: 0, display: "grid", gap: CARD_GAP,
             gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`,
-          }}
+            gridAutoRows: `minmax(${layout.rowH - CARD_GAP}px, auto)`,
+            "--nm-s": cardScale,
+          } as CSSProperties}
         >
           {shown.map((item) => (
             <ProductRow
               key={item.p.id}
               item={item}
-              variant={variantMap.get(item.p.id)}
               onOpen={() => setSelectedId(item.p.id)}
             />
           ))}
