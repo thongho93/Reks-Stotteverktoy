@@ -176,7 +176,7 @@ const ALL_ENTRIES: SearchEntry[] = [
     path: "/produkt-og-rad",
     Icon: TipsAndUpdatesRoundedIcon,
     color: "#C93586",
-    keywords: ["produkt", "ernæring", "råd", "nutrition", "fresubin"],
+    keywords: ["produkt", "ernæring", "råd", "legemiddelråd", "virkestoff", "nutrition", "fresubin"],
   },
   {
     id: "faglig-innhold",
@@ -272,6 +272,12 @@ const BUILTIN_FAGLIG_TABS: FagligTabOption[] = [
     label: "Knuse-/delelisten",
     emoji: "💊",
     keywords: ["knuse", "dele", "tablett", "kapsel"],
+  },
+  {
+    id: "__migrene__",
+    label: "Migrene",
+    emoji: "🧠",
+    keywords: ["migrene", "hodepine", "triptan", "legemidler"],
   },
 ];
 

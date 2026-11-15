@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { arrayMove } from "@dnd-kit/sortable";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import MedicationRoundedIcon from "@mui/icons-material/MedicationRounded";
+import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
+import ChildFriendlyRoundedIcon from "@mui/icons-material/ChildFriendlyRounded";
+import PregnantWomanRoundedIcon from "@mui/icons-material/PregnantWomanRounded";
+import ContentCutRoundedIcon from "@mui/icons-material/ContentCutRounded";
+import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
+import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
+import ProduktOgRadHome, { type HomeTile } from "../components/ProduktOgRadHome";
 import NutritionProductFinder from "../components/NutritionProductFinder";
 import KnuseDelisteTab from "../components/KnuseDelisteTab";
 import TryggmammaTab from "../components/TryggmammaTab";
 import MelkeerstatningTab from "../components/MelkeerstatningTab";
 import TilbakemeldingPage from "../../tilbakemelding/pages/TilbakemeldingPage";
-import FagligDocView from "../components/FagligDocView";
+import FagligDocView, { type FagligDocViewDoc } from "../components/FagligDocView";
 import FagligTabBar, {
+  HOME_TAB_KEY,
   PRODUCT_TAB_KEY,
   ROUTINES_TAB_KEY,
   type FagligTabBarHandle,
@@ -62,7 +72,13 @@ import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SentimentSatisfiedAltRoundedIcon from "@mui/icons-material/SentimentSatisfiedAltRounded";
 import { useAuthUser } from "../../../app/auth/useAuthUser";
 import { db } from "../../../firebase/firebase";
-import { FAGLIG_DOC_QUERY_KEY, ROUTINE_TAB_QUERY_KEY, ROUTINE_DOC_QUERY_KEY } from "../queryKeys";
+import {
+  FAGLIG_DOC_QUERY_KEY,
+  ROUTINE_TAB_QUERY_KEY,
+  ROUTINE_DOC_QUERY_KEY,
+  LEGEMIDDEL_TAB_VALUE,
+} from "../queryKeys";
+import { MIGRENE_TAB_ID, VIRTUAL_TAB_LABELS, isVirtualTabId, orderTabIds } from "../fagligTabs";
 import { PAGE_GUTTER_X, PAGE_MAX_WIDTH } from "../../../app/pageLayout";
 
 type AdviceProductRow = {
@@ -180,15 +196,17 @@ const parseEmbedInput = (rawInput: string): { url: string; suggestedTitle: strin
   }
 };
 
-const VIRTUAL_SIDEBAR_IDS = ["__nutrition__", "__melkeerstatning__", "__tryggmamma__", "__knuse__"] as const;
 
-const VIRTUAL_TAB_LABELS: Record<string, string> = {
-  __nutrition__: "Næringsmidler",
-  __melkeerstatning__: "Melkeerstatning",
-  __tryggmamma__: "Tryggmamma",
-  __knuse__: "Knuse-/delelisten",
+
+
+// Fast fane: PDF-en følger appen (public/dokumenter) og trenger ikke Firestore.
+const MIGRENE_DOC: FagligDocViewDoc = {
+  id: MIGRENE_TAB_ID,
+  title: "Legemidler ved migrenebehandling",
+  kind: "pdf",
+  content: "",
+  url: "/dokumenter/Legemidler%20ved%20migrenebehandling.pdf",
 };
-
 
 const searchProducts = (list: AdviceProduct[], query: string): AdviceProduct[] => {
   const normalizedQuery = normalizeSearch(query);
@@ -225,6 +243,9 @@ const searchProducts = (list: AdviceProduct[], query: string): AdviceProduct[] =
   return list.filter((product) => matchesQuery(product, terms));
 };
 
+// Faneindekser: 0 Legemiddelråd, 1 dokumentfaner, 2 Rutiner, 3 forsiden (Oversikt).
+const HOME_TAB_INDEX = 3;
+
 export default function ProduktOgRadPage() {
   const { user } = useAuthUser();
   const theme = useTheme();
@@ -232,6 +253,15 @@ export default function ProduktOgRadPage() {
   const PINK = "#C93586";
   const pinkTheme = useMemo(() => createTheme(theme, { palette: { primary: theme.palette.augmentColor({ color: { main: PINK } }) } }), [theme]);
   const location = useLocation();
+  const navigate = useNavigate();
+  // Hver fane har egen adresse, slik at sidemenyen, historikken og «last inn på nytt» følger fanen.
+  const tabUrl = (key: string): string => {
+    if (key === HOME_TAB_KEY) return location.pathname;
+    if (key === PRODUCT_TAB_KEY) return `${location.pathname}?${ROUTINE_TAB_QUERY_KEY}=${LEGEMIDDEL_TAB_VALUE}`;
+    if (key === ROUTINES_TAB_KEY) return `${location.pathname}?${ROUTINE_TAB_QUERY_KEY}=rutiner`;
+    return `${location.pathname}?${FAGLIG_DOC_QUERY_KEY}=${encodeURIComponent(key)}`;
+  };
+  const selectTabRef = useRef<(key: string) => void>(() => undefined);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastAutoPastedRef = useRef<string | null>(null);
   const tabBarRef = useRef<FagligTabBarHandle | null>(null);
@@ -243,7 +273,9 @@ export default function ProduktOgRadPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get(ROUTINE_TAB_QUERY_KEY) === "rutiner" || params.has(ROUTINE_DOC_QUERY_KEY)) return 2;
     if (params.has(FAGLIG_DOC_QUERY_KEY)) return 1;
-    return 0;
+    if (params.get(ROUTINE_TAB_QUERY_KEY) === LEGEMIDDEL_TAB_VALUE) return 0;
+    // Uten parametere og uten søk fra global søk: forsiden.
+    return HOME_TAB_INDEX;
   });
   const [query, setQuery] = useState("");
   const [onlyWithAdvice, setOnlyWithAdvice] = useState<boolean>(() => {
@@ -259,9 +291,17 @@ export default function ProduktOgRadPage() {
     }
     if (params.has(FAGLIG_DOC_QUERY_KEY)) {
       setActiveTab(1);
+      // Sidemenyen lenker direkte til en fane (fast eller eget dokument). Ukjente id-er
+      // rettes opp av effekten som velger første dokument når listen er lastet.
+      const docId = params.get(FAGLIG_DOC_QUERY_KEY);
+      if (docId) setSelectedFagligDocId(docId);
       return;
     }
-    // No URL params: use location.state (command palette) or default to tab 0
+    if (params.get(ROUTINE_TAB_QUERY_KEY) === LEGEMIDDEL_TAB_VALUE) {
+      setActiveTab(0);
+      return;
+    }
+    // Uten URL-parametere: location.state (global søk) eller forsiden.
     const state = location.state as {
       searchQuery?: string;
       activeTab?: number;
@@ -280,7 +320,7 @@ export default function ProduktOgRadPage() {
         setSelectedFagligDocId(stateSelectedFagligDocId);
       }
     } else {
-      setActiveTab(0);
+      setActiveTab(searchQuery ? 0 : HOME_TAB_INDEX);
     }
 
     if (searchQuery) {
@@ -421,7 +461,7 @@ export default function ProduktOgRadPage() {
       .map(([code, names]) => ({ code, title: ATC_INGREDIENT[code] ?? (brandLabel(names) || code), count: names.length }));
   }, [products]);
   const selectedFagligDoc = useMemo(() => {
-    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return null;
+    if (isVirtualTabId(selectedFagligDocId)) return null;
     if (selectedFagligDocId) {
       const exact = fagligDocs.find((doc) => doc.id === selectedFagligDocId);
       if (exact) return exact;
@@ -432,13 +472,10 @@ export default function ProduktOgRadPage() {
 
   // Rekkefølgen på alle dokumentfaner (faste og egne). Faste faner som mangler i en gammel lagret
   // rekkefølge settes først, nye dokumenter sist.
-  const orderedTabIds = useMemo(() => {
-    const allIds: string[] = [...VIRTUAL_SIDEBAR_IDS, ...fagligDocs.map((doc) => doc.id)];
-    const saved = sidebarOrder.filter((id) => allIds.includes(id));
-    const missingBuiltIn = VIRTUAL_SIDEBAR_IDS.filter((id) => !saved.includes(id));
-    const missingDocs = allIds.filter((id) => !saved.includes(id) && !missingBuiltIn.includes(id as never));
-    return [...missingBuiltIn, ...saved, ...missingDocs];
-  }, [fagligDocs, sidebarOrder]);
+  const orderedTabIds = useMemo(
+    () => orderTabIds(fagligDocs.map((doc) => doc.id), sidebarOrder),
+    [fagligDocs, sidebarOrder]
+  );
 
   const fagligDocMenuOpen = Boolean(fagligDocMenuAnchorEl);
   const fagligEmojiPopoverOpen = Boolean(fagligEmojiAnchorEl);
@@ -454,7 +491,7 @@ export default function ProduktOgRadPage() {
   useEffect(() => {
     if (isFagligLoading) return;
     // Built-in virtual tabs — never auto-replace them
-    if (selectedFagligDocId === "__nutrition__" || selectedFagligDocId === "__melkeerstatning__" || selectedFagligDocId === "__knuse__" || selectedFagligDocId === "__tryggmamma__") return;
+    if (isVirtualTabId(selectedFagligDocId)) return;
     if (fagligDocs.length === 0) {
       setSelectedFagligDocId(null);
       return;
@@ -490,13 +527,13 @@ export default function ProduktOgRadPage() {
           return;
         }
 
-        if (activeTab !== 0) setActiveTab(0);
-        requestAnimationFrame(() => {
+        if (activeTab !== 0) selectTabRef.current(PRODUCT_TAB_KEY);
+        setTimeout(() => {
           const input = searchInputRef.current;
           if (!input) return;
           input.focus();
           input.select();
-        });
+        }, activeTab === 0 ? 0 : 150);
         return;
       }
 
@@ -619,7 +656,7 @@ export default function ProduktOgRadPage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      setSelectedFagligDocId(ref.id);
+      navigate(tabUrl(ref.id));
       setCopiedMessage("Nytt dokument opprettet");
       requestAnimationFrame(() => {
         const input = fagligTitleInputRef.current;
@@ -668,7 +705,7 @@ export default function ProduktOgRadPage() {
         await deleteDoc(docRef(db, "fagligDocuments", removeId));
       }
       if (selectedFagligDocId && removeIds.has(selectedFagligDocId)) {
-        setSelectedFagligDocId("__nutrition__");
+        navigate(tabUrl("__nutrition__"));
       }
       setCopiedMessage("Dokument slettet");
     } catch (err) {
@@ -766,9 +803,11 @@ export default function ProduktOgRadPage() {
     }, 350);
   };
 
-  const isBuiltInSelected = (VIRTUAL_SIDEBAR_IDS as readonly string[]).includes(selectedFagligDocId ?? "");
+  const isBuiltInSelected = isVirtualTabId(selectedFagligDocId);
   const activeTabKey =
-    activeTab === 0
+    activeTab === HOME_TAB_INDEX
+      ? HOME_TAB_KEY
+      : activeTab === 0
       ? PRODUCT_TAB_KEY
       : activeTab === 2
         ? ROUTINES_TAB_KEY
@@ -787,18 +826,62 @@ export default function ProduktOgRadPage() {
     [orderedTabIds, fagligDocById]
   );
 
-  const handleSelectTab = (key: string) => {
-    if (key === PRODUCT_TAB_KEY) {
-      setActiveTab(0);
-      return;
-    }
-    if (key === ROUTINES_TAB_KEY) {
-      setActiveTab(2);
-      return;
-    }
-    setSelectedFagligDocId(key);
-    setActiveTab(1);
-  };
+  const handleSelectTab = (key: string) => navigate(tabUrl(key));
+  selectTabRef.current = handleSelectTab;
+
+  // Flisene på forsiden: samme faner og rekkefølge som fanelinjen.
+  const homeTiles = useMemo<HomeTile[]>(() => {
+    const described: Record<string, { description: string; meta?: string; Icon: HomeTile["Icon"] }> = {
+      __nutrition__: {
+        description: "Finn næringsdrikker, sondeernæring og fortykningsmidler ut fra tilstand, egenskap og alder.",
+        Icon: RestaurantRoundedIcon,
+      },
+      __melkeerstatning__: {
+        description: "Spesialmelk og morsmelkerstatninger til spedbarn, med næringsinnhold og dokumenter.",
+        Icon: ChildFriendlyRoundedIcon,
+      },
+      __tryggmamma__: {
+        description: "Trygg og oppdatert informasjon om bruk av legemidler ved amming og graviditet.",
+        Icon: PregnantWomanRoundedIcon,
+      },
+      __knuse__: {
+        description: "Hvilke legemidler som kan knuses, deles eller åpnes.",
+        Icon: ContentCutRoundedIcon,
+      },
+      [MIGRENE_TAB_ID]: {
+        description: "Legemidler ved migrenebehandling.",
+        Icon: PictureAsPdfRoundedIcon,
+      },
+    };
+    const docTiles = orderedTabIds.flatMap((id): HomeTile[] => {
+      const known = described[id];
+      const label = VIRTUAL_TAB_LABELS[id];
+      if (known && label) return [{ key: id, label, ...known }];
+      const doc = fagligDocById.get(id);
+      if (!doc) return [];
+      return [{
+        key: id,
+        label: doc.title,
+        description: doc.kind === "pdf" ? "Innebygd dokument." : "Tekstdokument.",
+        Icon: doc.kind === "pdf" ? PictureAsPdfRoundedIcon : ArticleRoundedIcon,
+      }];
+    });
+    return [
+      {
+        key: PRODUCT_TAB_KEY,
+        label: "Legemiddelråd",
+        description: "Råd per virkestoff. Søk på ATC-kode, varenummer eller produktnavn.",
+        Icon: MedicationRoundedIcon,
+      },
+      ...docTiles,
+      {
+        key: ROUTINES_TAB_KEY,
+        label: "Rutiner",
+        description: "Felles rutinedokumenter med søk.",
+        Icon: EventNoteRoundedIcon,
+      },
+    ];
+  }, [orderedTabIds, fagligDocById]);
 
   const handleTabReorder = (activeId: string, overId: string) => {
     const oldIndex = orderedTabIds.indexOf(activeId);
@@ -867,7 +950,7 @@ export default function ProduktOgRadPage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      setSelectedFagligDocId(created.id);
+      navigate(tabUrl(created.id));
       setCopiedMessage("Dokument lagt til");
     } catch (err) {
       setCopiedMessage(mapFirebaseError(err, "Kunne ikke lagre innebygd dokument."));
@@ -1044,7 +1127,11 @@ export default function ProduktOgRadPage() {
         </Box>
       </Box>
 
-      {activeTab === 0 ? (
+      {activeTab === HOME_TAB_INDEX ? (
+        <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, py: 0.75 }}>
+          <ProduktOgRadHome tiles={homeTiles} onOpen={handleSelectTab} />
+        </Box>
+      ) : activeTab === 0 ? (
         <Box sx={{ maxWidth: PAGE_MAX_WIDTH, mx: "auto", px: PAGE_GUTTER_X, pt: 1, pb: 1 }}>
           {isLoading ? (
             <Box sx={{ py: 6, display: "grid", placeItems: "center", gap: 1 }}>
@@ -1128,6 +1215,12 @@ export default function ProduktOgRadPage() {
                 <KnuseDelisteTab />
               ) : selectedFagligDocId === "__tryggmamma__" ? (
                 <TryggmammaTab />
+              ) : selectedFagligDocId === MIGRENE_TAB_ID ? (
+                <FagligDocView
+                  doc={MIGRENE_DOC}
+                  titleInputRef={fagligTitleInputRef}
+                  onChangeText={updateSelectedTextDoc}
+                />
               ) : selectedFagligDoc ? (
                 <FagligDocView doc={selectedFagligDoc} titleInputRef={fagligTitleInputRef} onChangeText={updateSelectedTextDoc} />
               ) : (
