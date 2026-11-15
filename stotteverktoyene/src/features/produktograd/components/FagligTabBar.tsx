@@ -21,6 +21,7 @@ import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
+export const HOME_TAB_KEY = "__oversikt__";
 export const PRODUCT_TAB_KEY = "__produkt__";
 export const ROUTINES_TAB_KEY = "__rutiner__";
 
@@ -259,7 +260,7 @@ const FagligTabBar = forwardRef<FagligTabBarHandle, Props>(function FagligTabBar
   return (
     <Box
       role="tablist"
-      aria-label="Produkt og råd, faglig innhold og rutiner"
+      aria-label="Oversikt, legemiddelråd, faglig innhold og rutiner"
       sx={{
         position: "relative",
         mx: "auto",
@@ -273,11 +274,19 @@ const FagligTabBar = forwardRef<FagligTabBarHandle, Props>(function FagligTabBar
     >
       <ButtonBase
         role="tab"
+        aria-selected={activeKey === HOME_TAB_KEY}
+        onClick={() => onSelect(HOME_TAB_KEY)}
+        sx={{ ...tabSx(activeKey === HOME_TAB_KEY), flexShrink: 0 }}
+      >
+        Oversikt
+      </ButtonBase>
+      <ButtonBase
+        role="tab"
         aria-selected={activeKey === PRODUCT_TAB_KEY}
         onClick={() => onSelect(PRODUCT_TAB_KEY)}
         sx={{ ...tabSx(activeKey === PRODUCT_TAB_KEY), flexShrink: 0 }}
       >
-        Produkt og råd
+        Legemiddelråd
       </ButtonBase>
       {divider}
 

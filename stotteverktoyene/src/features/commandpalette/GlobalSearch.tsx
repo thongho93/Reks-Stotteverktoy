@@ -176,7 +176,7 @@ const ALL_ENTRIES: SearchEntry[] = [
     path: "/produkt-og-rad",
     Icon: TipsAndUpdatesRoundedIcon,
     color: "#C93586",
-    keywords: ["produkt", "ernæring", "råd", "nutrition", "fresubin"],
+    keywords: ["produkt", "ernæring", "råd", "legemiddelråd", "virkestoff", "nutrition", "fresubin"],
   },
   {
     id: "faglig-innhold",

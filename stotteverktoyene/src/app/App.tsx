@@ -46,6 +46,7 @@ import {
   ROUTINE_TAB_QUERY_KEY,
   ROUTINE_DOC_QUERY_KEY,
   NUTRITION_TAB_ID,
+  LEGEMIDDEL_TAB_VALUE,
 } from "../features/produktograd/queryKeys";
 import {
   VIRTUAL_TAB_LABELS,
@@ -139,7 +140,8 @@ const MAIN_ITEMS: SidebarItem[] = [
     ...NAV_COLORS.produkt,
     // Fanene mellom disse to hentes dynamisk i Sidebar (se produktSubItems).
     subItems: [
-      { label: "Produkt og råd", search: "" },
+      { label: "Oversikt", search: "" },
+      { label: "Legemiddelråd", search: `?${ROUTINE_TAB_QUERY_KEY}=${LEGEMIDDEL_TAB_VALUE}` },
       { label: "Rutiner", search: "?tab=rutiner" },
     ],
   },
@@ -156,7 +158,7 @@ const MAIN_ITEMS: SidebarItem[] = [
   { label: "Notater", path: "/tilbakemelding", Icon: SquarePenIcon, ...NAV_COLORS.notater },
 ];
 
-// Undermenyen til Produkt og råd speiler fanelinjen på siden: Produkt og råd, alle
+// Undermenyen til Produkt og råd speiler fanelinjen på siden: Oversikt, Legemiddelråd, alle
 // dokumentfaner (faste og egne, i brukerens rekkefølge) og Rutiner.
 function produktSubItems(docs: FagligDocTitle[]): SidebarSubItem[] {
   const titles = new Map(docs.map((doc) => [doc.id, doc.title]));
@@ -168,7 +170,12 @@ function produktSubItems(docs: FagligDocTitle[]): SidebarSubItem[] {
     label: VIRTUAL_TAB_LABELS[id] ?? titles.get(id) ?? "Dokument",
     search: `?${FAGLIG_DOC_QUERY_KEY}=${encodeURIComponent(id)}`,
   }));
-  return [{ label: "Produkt og råd", search: "" }, ...tabs, { label: "Rutiner", search: "?tab=rutiner" }];
+  return [
+    { label: "Oversikt", search: "" },
+    { label: "Legemiddelråd", search: `?${ROUTINE_TAB_QUERY_KEY}=${LEGEMIDDEL_TAB_VALUE}` },
+    ...tabs,
+    { label: "Rutiner", search: "?tab=rutiner" },
+  ];
 }
 
 function pathToUsagePage(pathname: string): UsagePage {
@@ -290,7 +297,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         const docId = params.get(FAGLIG_DOC_QUERY_KEY) || NUTRITION_TAB_ID;
         return subs.findIndex((sub) => sub.id === docId);
       }
-      return 0;
+      if (params.get(ROUTINE_TAB_QUERY_KEY) === LEGEMIDDEL_TAB_VALUE) return 1;
+      return 0; // forsiden
     }
     if (path === "/anbrudd") return params.get("tab") === "oversikt" ? 1 : 0;
     if (path === "/tilbakemelding") return params.get("tab") === "meldeskjema" ? 1 : 0;
