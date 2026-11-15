@@ -60,6 +60,8 @@ export type NutritionProduct = {
   summary?: string;
   /** Bruksområde i tekst når det ikke passer en av tilstandene i `clinicalUse`. */
   indication?: string;
+  /** Viktige begrensninger og advarsler (aldersgrenser, kontraindikasjoner …) – vises øverst i produktkortet. */
+  warnings?: string[];
   sections?: NutritionInfoSection[];
   nutrition?: NutritionTable[];
   documents?: NutritionDocument[];
@@ -1023,6 +1025,14 @@ const reviewedProducts: NutritionProduct[] = [
       diseaseRelatedMalnutrition: "caution",
     },
     notes: ["Til kostbehandling av sykdomsrelatert underernæring, spesielt ved høyt energibehov."],
+    warnings: [
+      "Skal brukes under medisinsk kontroll.",
+      "Ikke egnet som eneste næringskilde.",
+      "Ikke egnet til barn under 3 år. Anvendes med forsiktighet til barn under 6 år.",
+      "Ikke egnet ved galaktosemi.",
+      "Skal ikke benyttes dersom enteral ernæring er kontraindisert, som ved akutt gastrointestinal blødning, ileus og sjokk.",
+      "Brukes med forsiktighet ved alvorlige former for nedsatt fordøyelse og absorpsjon. Ikke egnet ved manglende evne til å metabolisere noen av næringsstoffene i Calshake POWDER.",
+    ],
     sections: [
       {
         title: "Dosering",
@@ -1036,22 +1046,6 @@ const reviewedProducts: NutritionProduct[] = [
         lines: [
           "Tilsett innholdet i 1 pose til 240 ml melk (3,5 % fett).",
           "Bland kraftig med visp, gaffel eller shaker. Serveres best kald.",
-        ],
-      },
-      {
-        title: "Viktig informasjon",
-        lines: [
-          "Skal brukes under medisinsk kontroll.",
-          "Ikke egnet som eneste næringskilde.",
-          "Ikke egnet til barn under 3 år. Anvendes med forsiktighet til barn under 6 år.",
-          "Ikke egnet ved galaktosemi.",
-        ],
-      },
-      {
-        title: "Kontraindikasjoner",
-        lines: [
-          "Skal ikke benyttes dersom enteral ernæring er kontraindisert, som ved akutt gastrointestinal blødning, ileus og sjokk.",
-          "Brukes med forsiktighet ved alvorlige former for nedsatt fordøyelse og absorpsjon. Ikke egnet ved manglende evne til å metabolisere noen av næringsstoffene i Calshake POWDER.",
         ],
       },
       {
@@ -1137,12 +1131,15 @@ const reviewedProducts: NutritionProduct[] = [
     },
     age: { from3Years: true },
     clinicalUse: {},
+    warnings: [
+      "Skal brukes under medisinsk tilsyn.",
+    ],
     sections: [
       {
         title: "Bruksområde",
         lines: [
           "Næringsmiddel til spesielle medisinske formål, ernæringsmessig fullverdig.",
-          "Tilpasset ernæringsbehandling av pasienter med, eller i risiko for, underernæring. Skal brukes under medisinsk tilsyn.",
+          "Tilpasset ernæringsbehandling av pasienter med, eller i risiko for, underernæring.",
           "Egnet som eneste næringskilde og kan brukes fra 3 års alder.",
           "Kan foreskrives på blå resept.",
         ],
@@ -1279,12 +1276,15 @@ const reviewedProducts: NutritionProduct[] = [
     },
     age: { from15Years: true },
     clinicalUse: {},
+    warnings: [
+      "Skal brukes under medisinsk tilsyn.",
+    ],
     sections: [
       {
         title: "Bruksområde",
         lines: [
           "Næringsmiddel til spesielle medisinske formål, næringsmessig fullverdig, med høyt energi- og proteininnhold.",
-          "Ment for kostbehandling av pasienter med, eller i risiko for, underernæring. Skal brukes under medisinsk tilsyn.",
+          "Ment for kostbehandling av pasienter med, eller i risiko for, underernæring.",
           "Egnet som eneste næringskilde og kan brukes fra 15 års alder.",
           "Kan foreskrives på blå resept.",
         ],
@@ -1422,12 +1422,15 @@ const reviewedProducts: NutritionProduct[] = [
     },
     age: { from1Year: true },
     clinicalUse: {},
+    warnings: [
+      "Skal brukes under medisinsk tilsyn.",
+    ],
     sections: [
       {
         title: "Bruksområde",
         lines: [
           "Næringsmiddel til spesielle medisinske formål, ernæringsmessig fullverdig og spesialtilpasset for barn.",
-          "Tilpasset kostbehandling av barn med, eller i risiko for, underernæring. Skal brukes under medisinsk tilsyn.",
+          "Tilpasset kostbehandling av barn med, eller i risiko for, underernæring.",
           "Kan brukes som eneste næringskilde fra 1 års alder.",
           "Kan foreskrives på blå resept.",
         ],
@@ -1565,13 +1568,17 @@ const reviewedProducts: NutritionProduct[] = [
     clinicalUse: {
       dysphagia: "caution",
     },
+    warnings: [
+      "Skal brukes under medisinsk tilsyn.",
+      "Kun til oralt bruk.",
+      "Ikke egnet som eneste næringskilde.",
+    ],
     sections: [
       {
         title: "Bruksområde",
         lines: [
-          "Næringsmiddel til spesielle medisinske formål. Skal brukes under medisinsk tilsyn.",
+          "Næringsmiddel til spesielle medisinske formål.",
           "Kostbehandling av pasienter med dysfagi, for barn over 3 år og voksne. For eksempel ved medfødte tygge- og svelgeproblemer, slag, nevrologiske lidelser som Parkinson, MS og ALS, kirurgiske inngrep i munn og svelg og ved dårlig tannstatus.",
-          "Kun til oralt bruk. Ikke egnet som eneste næringskilde.",
         ],
       },
       {
@@ -1670,13 +1677,17 @@ const reviewedProducts: NutritionProduct[] = [
     clinicalUse: {
       dysphagia: "caution",
     },
+    warnings: [
+      "Skal brukes under medisinsk tilsyn.",
+      "Kun til oralt bruk.",
+      "Ikke egnet som eneste næringskilde.",
+    ],
     sections: [
       {
         title: "Bruksområde",
         lines: [
-          "Næringsmiddel til spesielle medisinske formål. Skal brukes under medisinsk tilsyn.",
+          "Næringsmiddel til spesielle medisinske formål.",
           "Kostbehandling av pasienter med dysfagi, for barn over 3 år og voksne. For eksempel ved medfødte tygge- og svelgeproblemer, slag, nevrologiske lidelser som Parkinson, MS og ALS, kirurgiske inngrep i munn og svelg og ved dårlig tannstatus.",
-          "Kun til oralt bruk. Ikke egnet som eneste næringskilde.",
         ],
       },
       {
@@ -1781,6 +1792,11 @@ const reviewedProducts: NutritionProduct[] = [
     clinicalUse: {
       crohnsDisease: "caution",
     },
+    warnings: [
+      "Brukes i samråd med lege eller klinisk ernæringsfysiolog.",
+      "Kun egnet fra 5 års alder.",
+      "Ikke tilsett mat eller legemidler dersom produktet gis via sonde.",
+    ],
     sections: [
       {
         title: "Bruksområde",
@@ -1788,8 +1804,7 @@ const reviewedProducts: NutritionProduct[] = [
           "Næringsmiddel til spesielle medisinske formål, ernæringsmessig fullverdig.",
           "Kostbehandling ved Crohns sykdom. Kan også brukes som næringstilskudd ved andre tilstander.",
           "Kan brukes som eneste næringskilde ved Crohns sykdom, og passer som tillegg til «Crohn's Disease Exclusion Diet» (CDED). Både Modulen IBD og CDED inngår i kostholdsprogrammet ModuLife, som bør brukes i samråd med helsepersonell.",
-          "For oral bruk eller sondeernæring. Ikke tilsett mat eller legemidler dersom produktet gis via sonde.",
-          "Brukes i samråd med lege eller klinisk ernæringsfysiolog. Kun egnet fra 5 års alder.",
+          "For oral bruk eller sondeernæring.",
           "Kan foreskrives på blå resept.",
         ],
       },
@@ -1936,12 +1951,15 @@ const reviewedProducts: NutritionProduct[] = [
     },
     age: { from3Years: true },
     clinicalUse: {},
+    warnings: [
+      "Skal brukes under medisinsk tilsyn.",
+    ],
     sections: [
       {
         title: "Bruksområde",
         lines: [
           "Næringsmiddel til spesielle medisinske formål, fullverdig.",
-          "Ment for kostbehandling av pasienter med, eller i risiko for, underernæring som har et stort energibehov og/eller væskerestriksjon. Skal brukes under medisinsk tilsyn.",
+          "Ment for kostbehandling av pasienter med, eller i risiko for, underernæring som har et stort energibehov og/eller væskerestriksjon.",
           "Egnet som eneste næringskilde og kan brukes fra 3 års alder.",
           "Kan foreskrives på blå resept.",
         ],
@@ -2080,7 +2098,11 @@ const reviewedProducts: NutritionProduct[] = [
       diseaseRelatedMalnutrition: "caution",
       malabsorption: "caution",
     },
-    notes: ["Næringstilskudd. Ikke egnet som eneste ernæring – skal brukes som tilskudd til det normale kostholdet."],
+    warnings: [
+      "Ikke egnet som eneste ernæring. Skal brukes som tilskudd til det normale kostholdet.",
+      "Kontraindisert ved: barn under 3 år, galaktosemi, laktoseintoleranse og intoleranse mot en eller flere av produktets ingredienser.",
+      "Doseringen er individuell og skal gjøres i samråd med lege eller klinisk ernæringsfysiolog.",
+    ],
     sections: [
       {
         title: "Bruksområde",
@@ -2095,15 +2117,6 @@ const reviewedProducts: NutritionProduct[] = [
           "Anbefalt dosering per dag: 3–5 år: ½ pose + 240 ml helmelk. 5–10 år: 1 porsjon. Over 10 år: 1–2 porsjoner.",
           "1 porsjon er 1 pose (85 g pulver) blandet med 240 ml helmelk.",
           "Doseringen er individuell og skal gjøres i samråd med lege eller klinisk ernæringsfysiolog.",
-        ],
-      },
-      {
-        title: "Kontraindikasjoner",
-        lines: [
-          "Barn under 3 år.",
-          "Galaktosemi.",
-          "Laktoseintoleranse.",
-          "Intoleranse mot en eller flere av produktets ingredienser.",
         ],
       },
       {

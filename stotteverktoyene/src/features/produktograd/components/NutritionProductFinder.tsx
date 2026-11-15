@@ -122,6 +122,9 @@ const CSS = `
 .nm-cond{display:flex;align-items:center;gap:9px;min-height:36px;padding:0 12px;box-sizing:border-box;border-radius:10px;background:${MK.surface};border:1px solid ${MK.border};font-size:14px;font-weight:500}
 .nm-dot{flex:none;width:10px;height:10px;border-radius:50%}
 .nm-warn{display:flex;align-items:flex-start;gap:9px;padding:8px 12px;border-radius:10px;background:${MK.warnBg};border:1px solid ${MK.warnBorder};color:${MK.warnText};font-size:13px;line-height:1.4}
+.nm-alert{flex:1 1 100%;min-width:0;display:flex;align-items:flex-start;gap:12px;padding:12px 16px;box-sizing:border-box;border-radius:14px;background:${MK.warnBg};border:1.5px solid ${MK.warnBorder};color:${MK.warnText}}
+.nm-alert-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:${MK.warnText};color:${MK.warnBg}}
+.nm-alert ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:14px;line-height:1.45}
 .nm-vnr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 6px 12px;box-sizing:border-box;border-radius:10px;border:1px solid ${MK.border};background:${MK.surface}}
 .nm-linkbtn{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 6px;border:0;background:transparent;color:${MK.accent};font-size:13.5px;font-weight:600;cursor:pointer}
 .nm-linkbtn:hover{text-decoration:underline;text-underline-offset:3px}
@@ -424,6 +427,18 @@ function ProductDialog({
           padding: "20px 28px 24px", background: MK.soft, fontFamily: DIALOG_FONT,
         }}
       >
+        {p.warnings && p.warnings.length > 0 && (
+          <div className="nm-alert" role="note">
+            <span className="nm-alert-icon" aria-hidden="true"><WarnIcon size={18} /></span>
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ fontSize: 15 }}>Viktig å vite</strong>
+              <ul>
+                {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          </div>
+        )}
+
         <div style={{ flex: "0 1 auto", minWidth: 160, maxWidth: 240, display: "flex", flexDirection: "column", gap: 18 }}>
           <section style={sectionStyle}>
             <h3 className="nm-h">Passer for alder</h3>
