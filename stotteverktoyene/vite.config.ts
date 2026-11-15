@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { readFileSync } from "fs";
 
 // Unik markør for dette bygget. På Netlify settes COMMIT_REF (git-SHA) automatisk;
 // lokalt/annet CI faller vi tilbake til andre deploy-ider, til slutt et tidsstempel.
@@ -12,17 +13,25 @@ const appVersion =
   process.env.DEPLOY_ID ||
   String(Date.now());
 
-// Skriver version.json til rota av bygget med den samme versjonsmarkøren.
+// Skriver version.json til rota av bygget med den samme versjonsmarkøren, og
+// release notes fra src/releaseNotes/releases.json. Åpne faner leser notatene
+// herfra, så de kan vise hva som er nytt før de laster ny kode.
 // Serveres uten cache (se public/_headers) så polling alltid får siste verdi.
 function emitVersionJson(): Plugin {
   return {
     name: "emit-version-json",
     apply: "build",
     generateBundle() {
+      let releases: unknown = [];
+      try {
+        releases = JSON.parse(readFileSync(path.resolve(__dirname, "src/releaseNotes/releases.json"), "utf8"));
+      } catch (err) {
+        this.warn(`Kunne ikke lese releases.json: ${String(err)}`);
+      }
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: appVersion }),
+        source: JSON.stringify({ version: appVersion, releases }),
       });
     },
   };

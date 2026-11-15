@@ -86,6 +86,7 @@ const StandardtekstStatistikkPage = React.lazy(
 );
 const FeedbackPage = React.lazy(() => import("../features/feedback/pages/FeedbackPage"));
 const InnspillPage = React.lazy(() => import("../features/feedback/pages/InnspillPage"));
+const HvaErNyttPage = React.lazy(() => import("../features/hvaernytt/pages/HvaErNyttPage"));
 const FeedbackLauncher = React.lazy(
   () => import("../features/feedback/components/FeedbackLauncher")
 );
@@ -863,6 +864,7 @@ function Layout() {
                 <Route path="/anbrudd" element={null} />
                 <Route path="/tilbakemelding" element={<NotesPage />} />
                 <Route path="/innspill" element={<InnspillPage />} />
+                <Route path="/hva-er-nytt" element={<HvaErNyttPage />} />
                 <Route element={<RequireRekspert />}>
                   <Route path="/rekspert" element={<RekspertPage />} />
                 </Route>

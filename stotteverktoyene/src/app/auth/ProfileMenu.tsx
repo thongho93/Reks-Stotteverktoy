@@ -17,7 +17,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/firebase";
 import { useAuthUser } from "./useAuthUser";
 import { useColorMode } from "../../styles/colorModeContext";
-import { LogOutIcon, MoonIcon, SunIcon, UserIcon } from "../navIcons";
+import { LogOutIcon, MoonIcon, SparklesIcon, SunIcon, UserIcon } from "../navIcons";
 import styles from "../../styles/standardTekstPage.module.css";
 
 const menuItemSx = {
@@ -142,6 +142,19 @@ export function ProfileMenu() {
             <UserIcon sx={{ fontSize: 20 }} />
           </ListItemIcon>
           <ListItemText primary="Min profil" slotProps={{ primary: { sx: menuTextSx } }} />
+        </MenuItem>
+
+        <MenuItem
+          sx={menuItemSx}
+          onClick={() => {
+            handleClose();
+            navigate("/hva-er-nytt");
+          }}
+        >
+          <ListItemIcon sx={menuIconSx}>
+            <SparklesIcon sx={{ fontSize: 20 }} />
+          </ListItemIcon>
+          <ListItemText primary="Hva er nytt" slotProps={{ primary: { sx: menuTextSx } }} />
         </MenuItem>
 
         <MenuItem
