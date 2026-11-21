@@ -1,5 +1,5 @@
 /** Tekstseksjon fra produktarket (dosering, tilberedning, kontraindikasjoner …). */
-export type NutritionInfoSection = { title: string; lines: string[]; wide?: boolean };
+export type NutritionInfoSection = { title: string; lines: string[]; wide?: boolean; /** Stort tall øverst i seksjonen, f.eks. «3 × 30 ml daglig». */ highlight?: string };
 
 /** Næringsinnholdstabell, én per smak/variant. */
 export type NutritionTable = {
@@ -8,6 +8,14 @@ export type NutritionTable = {
   note?: string;
   columns: string[];
   rows: { label: string; values: string[]; sub?: boolean }[];
+};
+
+/** Faktaboksen i produktkortet: energi som stort tall, korte rader og egenskaper som piller. */
+export type ProductFacts = {
+  energy?: { value: string; unit: string };
+  rows?: { label: string; value: string }[];
+  /** Egenskaper ut over `properties` (halal, vegansk, laktoseinnhold …). */
+  traits?: string[];
 };
 
 export type NutritionDocument = { title: string; url: string; sizeLabel?: string };
@@ -57,10 +65,15 @@ export type NutritionProduct = {
   aliases?: string[];
   /** Lagt inn fra produktkatalogen uten at kliniske data er gjennomgått mot PDF-kildene. */
   unreviewed?: boolean;
-  /** Kort beskrivelse under navnet i produktkortet. */
+  /** Kort alderstekst som vises i stedet for aldersgruppene når «Fra X år» ikke stemmer (f.eks. ulike regler per smak). */
+  ageNote?: string;
+  /** Kort beskrivelse under navnet i produktkortet (kun første ledd, før « · », vises). */
   summary?: string;
+  facts?: ProductFacts;
   /** Bruksområde i tekst når det ikke passer en av tilstandene i `clinicalUse`. */
   indication?: string;
+  /** Produktbeskrivelse (f.eks. fra farmasiet.no). Vises øverst i Produktinfo. */
+  description?: string;
   /** Viktige begrensninger og advarsler (aldersgrenser, kontraindikasjoner …) – vises øverst i produktkortet. */
   warnings?: string[];
   sections?: NutritionInfoSection[];
@@ -470,11 +483,26 @@ const reviewedProducts: NutritionProduct[] = [
     id: "calogen",
     name: "Calogen",
     category: "Fettkilde",
+    ageNote: "Nøytral fra spedbarn · jordbær fra 3 år",
+    summary: "Fettemulsjon med svært høy energitetthet · 4,5 kcal/ml, uten protein og kostfiber · jordbær og nøytral smak · 4 × 200 ml",
+    facts: {
+      energy: { value: "450", unit: "kcal per 100 ml · jordbær 466" },
+      rows: [
+        { label: "Fett", value: "50 g" },
+        { label: "Karbohydrat", value: "0,1 g · jordbær 4,1 g" },
+        { label: "Protein og kostfiber", value: "0 g" },
+        { label: "Pakning", value: "4 × 200 ml" },
+      ],
+      traits: ["Halal", "Vegansk (ikke jordbær)", "FODMAP-fri"],
+    },
+    indication: "Økt energiinntak i lite volum, f.eks. underernærte eldre, kreft, nyresvikt, cystisk fibrose og HIV",
+    description:
+      "Calogen er et næringstilskudd med en meget høy energitetthet på 4,5 kcal/ml og egner seg godt til pasienter som trenger ekstra energi i et lite volum. Sykdomstilstander som kan ha behov for økt energiinntak kan være til underernærte eldre eller pasienter med kreft, nyresvikt, cystisk fibrose og HIV. Calogen er basert på langkjedet fett fra raps- og solsikkeolje, og inneholder de essensielle omega-6 fettsyrene. Calogen er en fettemulsjon og er derfor lett å blande med andre matvarer og drikker.",
     properties: {
       glutenFree: true,
       lactoseFree: true,
     },
-    age: { from1Year: true },
+    age: { fromInfancy: true },
     clinicalUse: {
       diabetes: "caution",
       pressureUlcers: "caution",
@@ -484,17 +512,78 @@ const reviewedProducts: NutritionProduct[] = [
       cancer: "caution",
       elderlyUndernutrition: "caution",
     },
+    warnings: [
+      "Ikke egnet som eneste ernæring.",
+      "Forsiktighet til barn under 6 år.",
+      "Dosering avtales med lege eller klinisk ernæringsfysiolog.",
+    ],
+    sections: [
+      {
+        title: "Dosering og bruk",
+        highlight: "3 × 30 ml daglig",
+        lines: [
+          "Gir 405 kcal (nøytral) eller 420 kcal (jordbær).",
+          "Rist flasken før servering. Kan drikkes alene eller blandes i sauser, grøt, kakao og andre flytende matvarer.",
+          "Til barn under 5 år kan Calogen trenge fortynning.",
+        ],
+      },
+      {
+        title: "Holdbarhet og oppbevaring",
+        lines: ["Åpnede flasker oppbevares i kjøleskap og brukes innen 14 dager. Uåpnet lagres tørt ved 5–25 °C."],
+      },
+      {
+        title: "Ingredienser",
+        lines: [
+          "Vegetabilske oljer (rapsolje, solsikkeolje), demineralisert vann, emulgator (sitronsyreestere av mono- og diglyserider av fettsyrer).",
+          "Jordbærsmak inneholder i tillegg sukker, aroma og fargestoff (karminer).",
+        ],
+      },
+    ],
+    nutrition: [
+      {
+        title: "Per 100 ml",
+        columns: ["Nøytral", "Jordbær"],
+        rows: [
+          { label: "Energi (kcal)", values: ["450", "466"] },
+          { label: "Fett (g)", values: ["50", "50"] },
+          { label: "Karbohydrat (g)", values: ["0,1", "4,1"] },
+          { label: "Protein (g)", values: ["0", "0"] },
+          { label: "Kostfiber (g)", values: ["0", "0"] },
+        ],
+      },
+    ],
+    documents: [
+      {
+        title: "Produktark Calogen",
+        url: "/dokumenter/N%C3%A6ringsmidler/Calogen.pdf",
+        sizeLabel: "578 KB",
+      },
+    ],
   },
   {
     id: "calogen-shot",
     name: "Calogen Shot",
     aliases: ["Calogen extra shot*"],
     category: "Fettkilde",
+    ageNote: "Ikke under 3 år (søtstoff) · forsiktighet til 6 år",
+    summary: "Fettemulsjon med protein, vitaminer og mineraler · 4,0 kcal/ml, 480 kcal per 3 × 40 ml · jordbærsmak · 6 × 40 ml",
+    facts: {
+      energy: { value: "400", unit: "kcal per 100 ml" },
+      rows: [
+        { label: "Fett", value: "40,3 g" },
+        { label: "Karbohydrat", value: "4,5 g · sukker 3,5 g" },
+        { label: "Protein", value: "5,0 g" },
+        { label: "Kostfiber", value: "0 g" },
+        { label: "Pakning", value: "6 × 40 ml" },
+      ],
+      traits: ["Halal", "Inneholder melkeprotein", "Inneholder søtstoff (sukralose)"],
+    },
+    indication: "Økt behov for energi og næringsstoffer i lite volum, f.eks. underernærte som ikke får i seg nok mat og kreftpasienter",
     properties: {
       glutenFree: true,
       lowLactose: true,
     },
-    age: { from1Year: true },
+    age: { from3Years: true },
     clinicalUse: {
       diabetes: "caution",
       pressureUlcers: "caution",
@@ -503,6 +592,52 @@ const reviewedProducts: NutritionProduct[] = [
       cancer: "caution",
       elderlyUndernutrition: "caution",
     },
+    warnings: [
+      "Ikke komplett og ikke egnet som eneste ernæring.",
+      "Kontraindisert ved galaktosemi, nyresvikt og intoleranse mot et av innholdsstoffene.",
+      "Dosering til barn bestemmes av lege eller klinisk ernæringsfysiolog.",
+    ],
+    sections: [
+      {
+        title: "Dosering og bruk",
+        highlight: "3 × 40 ml daglig",
+        lines: [
+          "For voksne. Gir 480 kcal.",
+          "Ristes godt før bruk. Drikkeklar og smaker best avkjølt. Brukes umiddelbart etter åpning, og rester kastes.",
+        ],
+      },
+      {
+        title: "Holdbarhet og oppbevaring",
+        lines: ["Lagres tørt ved 5–25 °C. Åpnet beger skal ikke oppbevares."],
+      },
+      {
+        title: "Ingredienser",
+        lines: [
+          "Vann, vegetabilske oljer (rapsolje, solsikkeolje), kumelkproteinkaseinat, sukker, kaliumsitrat, myseproteinhydrolysat (fra kumelk), trikalsiumfosfat, aroma, magnesiumhydrogenfosfat, magnesiumkarbonat, surhetsregulerende middel (sitronsyre), kolinklorid, fargestoff (karminsyre), stabilisatorer (mikrokrystallinsk cellulose, natriumkarboksymetylcellulose), natrium-L-askorbat, kaliumklorid, søtstoff (sukralose), jernlaktat, inositol, sinksulfat, natriumselenitt, nikotinamid, retinylacetat, kopperglukonat, mangansulfat, D-biotin, kalsium-D-pantotenat, kolekalsiferol, kromklorid, pteroylmonoglutaminsyre, maltodekstrin, cyanokobalamin, pyridoksinhydroklorid, tiaminhydroklorid, kaliumjodid, natriummolybdat, riboflavin, fytomenadion.",
+        ],
+      },
+    ],
+    nutrition: [
+      {
+        title: "Per 100 ml",
+        columns: ["Jordbær"],
+        rows: [
+          { label: "Energi (kcal)", values: ["400"] },
+          { label: "Fett (g)", values: ["40,3"] },
+          { label: "Karbohydrat (g)", values: ["4,5"] },
+          { label: "hvorav sukkerarter", values: ["3,5"], sub: true },
+          { label: "Protein (g)", values: ["5,0"] },
+          { label: "Kostfiber (g)", values: ["0"] },
+        ],
+      },
+    ],
+    documents: [
+      {
+        title: "Produktark Calogen Extra Shots",
+        url: "/dokumenter/N%C3%A6ringsmidler/Calogen%20extra%20shots.pdf",
+        sizeLabel: "499 KB",
+      },
+    ],
   },
 
   // ─── Fresubin-serien ────────────────────────────────────────────────────────
@@ -1017,11 +1152,21 @@ const reviewedProducts: NutritionProduct[] = [
     name: "Calshake Powder",
     aliases: ["Calshake"],
     category: "Pulver og tilskudd",
+    ageNote: "Ikke under 3 år · forsiktighet til 6 år",
     summary: "Energiberikningspulver til utblanding i melk · 1,9 kcal/ml ferdig tilberedt · 7 doseringsposer à 87–90 g",
+    facts: {
+      energy: { value: "493", unit: "kcal per 100 g pulver · jordbær" },
+      rows: [
+        { label: "Fett", value: "22,9 g" },
+        { label: "Karbohydrat", value: "69,3 g" },
+        { label: "Protein", value: "2,3 g" },
+        { label: "Pakning", value: "7 poser à 87–90 g" },
+      ],
+    },
     properties: {
       glutenFree: true,
     },
-    age: { over6Years: true },
+    age: { from3Years: true },
     clinicalUse: {
       diseaseRelatedMalnutrition: "caution",
     },
@@ -1029,7 +1174,6 @@ const reviewedProducts: NutritionProduct[] = [
     warnings: [
       "Skal brukes under medisinsk kontroll.",
       "Ikke egnet som eneste næringskilde.",
-      "Ikke egnet til barn under 3 år. Anvendes med forsiktighet til barn under 6 år.",
       "Ikke egnet ved galaktosemi.",
       "Skal ikke benyttes dersom enteral ernæring er kontraindisert, som ved akutt gastrointestinal blødning, ileus og sjokk.",
       "Brukes med forsiktighet ved alvorlige former for nedsatt fordøyelse og absorpsjon. Ikke egnet ved manglende evne til å metabolisere noen av næringsstoffene i Calshake POWDER.",
@@ -1123,7 +1267,18 @@ const reviewedProducts: NutritionProduct[] = [
     id: "compleat-mix",
     name: "Compleat Mix",
     category: "Sondeernæring",
-    summary: "Fullverdig sondenæring med ingredienser fra nøye utvalgte råvarer · 1,1 kcal/ml · 12 × 500 ml og 9 × 1000 ml",
+    summary: "Fullverdig sondenæring med ekte råvarer · 1,1 kcal/ml · 12 × 500 ml og 9 × 1000 ml",
+    facts: {
+      energy: { value: "110", unit: "kcal per 100 ml" },
+      rows: [
+        { label: "Fett", value: "3,7 g" },
+        { label: "Karbohydrat", value: "14 g" },
+        { label: "Protein", value: "4,4 g" },
+        { label: "Pakning", value: "12 × 500 ml · 9 × 1000 ml" },
+        { label: "Blå resept", value: "Ja" },
+      ],
+      traits: ["Halal", "Laktose <0,05 g/100 ml"],
+    },
     indication: "Pasienter med, eller i risiko for, underernæring",
     properties: {
       completeNutrition: true,
@@ -1163,10 +1318,6 @@ const reviewedProducts: NutritionProduct[] = [
           "Ingredienser fra råvarer: kylling, erter, bønner, fersken og appelsin.",
           "Fire fettkilder (raps-, solsikke-, MCT- og fiskolje), tre proteinkilder (melkeprotein, kylling og erter) og seks fiberkilder (ertefiber, fruktooligosakkarider, akasiegummi, inulin, erter og fersken).",
         ],
-      },
-      {
-        title: "Egnethet",
-        lines: ["Glutenfri.", "Halal-sertifisert.", "Laktose: under 0,05 g per 100 ml."],
       },
       {
         title: "Bestilling",
@@ -1267,7 +1418,18 @@ const reviewedProducts: NutritionProduct[] = [
     id: "compleat-mix-protein",
     name: "Compleat Mix Protein",
     category: "Sondeernæring",
-    summary: "Fullverdig energi- og proteinrik sondenæring med ingredienser fra nøye utvalgte råvarer · 1,5 kcal/ml · 12 × 500 ml",
+    summary: "Energi- og proteinrik sondenæring med ekte råvarer · 1,5 kcal/ml · 12 × 500 ml",
+    facts: {
+      energy: { value: "150", unit: "kcal per 100 ml" },
+      rows: [
+        { label: "Fett", value: "7,3 g" },
+        { label: "Karbohydrat", value: "12,7 g" },
+        { label: "Protein", value: "7,5 g" },
+        { label: "Pakning", value: "12 × 500 ml" },
+        { label: "Blå resept", value: "Ja" },
+      ],
+      traits: ["Halal", "Laktose ≤0,1 g/100 ml"],
+    },
     indication: "Pasienter med, eller i risiko for, underernæring",
     properties: {
       completeNutrition: true,
@@ -1308,10 +1470,6 @@ const reviewedProducts: NutritionProduct[] = [
           "Ingredienser fra råvarer: kylling, erter, bønner, fersken og appelsinjuice.",
           "Fire fettkilder (raps-, solsikke-, MCT- og fiskolje). 26 % av proteinet kommer fra kylling, resten er melkeprotein. Fem fiberkilder (havrefiber, fruktooligosakkarider, akasiegummi, inulin og fersken).",
         ],
-      },
-      {
-        title: "Egnethet",
-        lines: ["Glutenfri.", "Halal-sertifisert.", "Laktose: høyst 0,1 g per 100 ml."],
       },
       {
         title: "Bestilling",
@@ -1414,7 +1572,18 @@ const reviewedProducts: NutritionProduct[] = [
     id: "compleat-paediatric-mix",
     name: "Compleat Paediatric Mix",
     category: "Sondeernæring",
-    summary: "Fullverdig sondenæring med ingredienser fra nøye utvalgte råvarer, spesialtilpasset for barn · 1,17 kcal/ml · 12 × 500 ml",
+    summary: "Fullverdig sondenæring for barn · 1,17 kcal/ml · 12 × 500 ml",
+    facts: {
+      energy: { value: "117", unit: "kcal per 100 ml" },
+      rows: [
+        { label: "Fett", value: "5,0 g" },
+        { label: "Karbohydrat", value: "14 g" },
+        { label: "Protein", value: "3,6 g" },
+        { label: "Pakning", value: "12 × 500 ml" },
+        { label: "Blå resept", value: "Ja" },
+      ],
+      traits: ["Halal", "Laktose <0,05 g/100 ml"],
+    },
     indication: "Barn med, eller i risiko for, underernæring",
     properties: {
       completeNutrition: true,
@@ -1454,10 +1623,6 @@ const reviewedProducts: NutritionProduct[] = [
           "Ingredienser fra råvarer: kylling, erter, bønner, fersken og appelsin.",
           "Fire fettkilder (raps-, solsikke-, MCT- og fiskolje), tre proteinkilder (melkeprotein, kylling og erter) og seks fiberkilder (ertefiber, fruktooligosakkarider, akasiegummi, inulin, erter og fersken).",
         ],
-      },
-      {
-        title: "Egnethet",
-        lines: ["Glutenfri.", "Halal-sertifisert.", "Laktose: under 0,05 g per 100 ml."],
       },
       {
         title: "Bestilling",
@@ -1562,6 +1727,14 @@ const reviewedProducts: NutritionProduct[] = [
     aliases: ["ThickenUp fortykningsmiddel"],
     category: "Fortykningsmiddel",
     summary: "Lettoppløselig, stivelsesbasert fortykningsmiddel i pulverform · endrer konsistensen uten å endre smaken · 227 g",
+    facts: {
+      energy: { value: "364", unit: "kcal per 100 g pulver" },
+      rows: [
+        { label: "Karbohydrat", value: "90 g" },
+        { label: "Pakning", value: "227 g" },
+      ],
+      traits: ["Halal", "Uten melk"],
+    },
     properties: {
       glutenFree: true,
     },
@@ -1618,10 +1791,6 @@ const reviewedProducts: NutritionProduct[] = [
         ],
       },
       {
-        title: "Egnethet",
-        lines: ["Inneholder ikke melk.", "Glutenfri.", "Halal-sertifisert."],
-      },
-      {
         title: "Bestilling",
         lines: [
           "Kan kjøpes via apotek, bandagist eller leverandør av medisinsk forbruksmateriell.",
@@ -1671,6 +1840,15 @@ const reviewedProducts: NutritionProduct[] = [
     name: "ThickenUp Clear",
     category: "Fortykningsmiddel",
     summary: "Fortykningsmiddel i pulverform (xantangummi) · påvirker ikke smak, lukt eller farge · ettertykner ikke · 125 g",
+    facts: {
+      energy: { value: "306", unit: "kcal per 100 g pulver" },
+      rows: [
+        { label: "Karbohydrat", value: "62 g" },
+        { label: "Kostfiber", value: "27 g" },
+        { label: "Pakning", value: "125 g" },
+      ],
+      traits: ["Halal", "Kosher", "Uten melk"],
+    },
     properties: {
       glutenFree: true,
     },
@@ -1730,10 +1908,6 @@ const reviewedProducts: NutritionProduct[] = [
         ],
       },
       {
-        title: "Egnethet",
-        lines: ["Inneholder ikke melk.", "Glutenfri.", "Halal-sertifisert.", "Kosher-sertifisert."],
-      },
-      {
         title: "Bestilling",
         lines: [
           "Kan kjøpes via apotek, bandagist eller leverandør av medisinsk forbruksmateriell.",
@@ -1785,6 +1959,16 @@ const reviewedProducts: NutritionProduct[] = [
     aliases: ["Modulen"],
     category: "Pulver og tilskudd",
     summary: "Ernæringsmessig fullverdig næringsmiddel i pulverform · 1,0 kcal/ml ved standard tilberedning · 400 g pulver",
+    facts: {
+      energy: { value: "493", unit: "kcal per 100 g pulver" },
+      rows: [
+        { label: "Fett", value: "23 g" },
+        { label: "Karbohydrat", value: "54 g" },
+        { label: "Protein", value: "17,5 g" },
+        { label: "Pakning", value: "400 g" },
+      ],
+      traits: ["Halal", "Inneholder melkeprotein", "Laktose <0,1 g/100 ml"],
+    },
     properties: {
       completeNutrition: true,
       glutenFree: true,
@@ -1795,7 +1979,6 @@ const reviewedProducts: NutritionProduct[] = [
     },
     warnings: [
       "Brukes i samråd med lege eller klinisk ernæringsfysiolog.",
-      "Kun egnet fra 5 års alder.",
       "Ikke tilsett mat eller legemidler dersom produktet gis via sonde.",
     ],
     sections: [
@@ -1836,14 +2019,6 @@ const reviewedProducts: NutritionProduct[] = [
         lines: [
           "Ved standard tilberedning: 1,0 kcal/ml, 35 g protein/L, 26 % MCT-fett og 290 mOsm/L.",
           "Proteinkilden er kasein. Fett fra melkefett, MCT-fett, maisolje og soyalecitin. Karbohydrat fra glukosesirup og sukrose.",
-        ],
-      },
-      {
-        title: "Egnethet",
-        lines: [
-          "Glutenfri.",
-          "Halal-sertifisert.",
-          "Laktose: under 0,1 g per 100 ml. Inneholder melkeprotein og melkefett.",
         ],
       },
       {
@@ -1945,6 +2120,17 @@ const reviewedProducts: NutritionProduct[] = [
     aliases: ["Isosource energy"],
     category: "Sondeernæring",
     summary: "Energirik standardsondenæring med eller uten fiber · 1,6 kcal/ml · 12 × 500 ml",
+    facts: {
+      energy: { value: "157", unit: "kcal per 100 ml · Fibre 160" },
+      rows: [
+        { label: "Fett", value: "6,2 g" },
+        { label: "Karbohydrat", value: "19,3 g" },
+        { label: "Protein", value: "6,1 g" },
+        { label: "Pakning", value: "12 × 500 ml" },
+        { label: "Blå resept", value: "Ja" },
+      ],
+      traits: ["Halal", "Laktose <0,05 g/100 ml"],
+    },
     indication: "Pasienter med, eller i risiko for, underernæring som har stort energibehov og/eller væskerestriksjon",
     properties: {
       completeNutrition: true,
@@ -1983,10 +2169,6 @@ const reviewedProducts: NutritionProduct[] = [
           "Sammenkoblet med ernæringssett administreres produktet innen 24 timer.",
           "Åpnet flaske med korken på kan oppbevares i kjøleskap og brukes innen 24 timer.",
         ],
-      },
-      {
-        title: "Egnethet",
-        lines: ["Glutenfri.", "Halal-sertifisert.", "Laktose: under 0,05 g per 100 ml."],
       },
       {
         title: "Bestilling",
@@ -2090,6 +2272,16 @@ const reviewedProducts: NutritionProduct[] = [
     name: "Scandishake Mix",
     category: "Pulver og tilskudd",
     summary: "Energirikt pulvertilskudd til utblanding i melk eller juice · nesten 600 kcal og 12 g protein per pose (85 g) i 240 ml helmelk · fire smaker",
+    facts: {
+      energy: { value: "506", unit: "kcal per 100 g pulver · jordbær" },
+      rows: [
+        { label: "Fett", value: "24,2 g" },
+        { label: "Karbohydrat", value: "67,1 g" },
+        { label: "Protein", value: "4,9 g" },
+        { label: "Pakning", value: "6 × 85 g poser" },
+      ],
+      traits: ["Halal", "Melkebasert", "FODMAP: laktose 4,5 g per 100 ml"],
+    },
     properties: {
       glutenFree: true,
       vegetarian: true,
@@ -2101,7 +2293,7 @@ const reviewedProducts: NutritionProduct[] = [
     },
     warnings: [
       "Ikke egnet som eneste ernæring. Skal brukes som tilskudd til det normale kostholdet.",
-      "Kontraindisert ved: barn under 3 år, galaktosemi, laktoseintoleranse og intoleranse mot en eller flere av produktets ingredienser.",
+      "Kontraindisert ved: galaktosemi, laktoseintoleranse og intoleranse mot en eller flere av produktets ingredienser.",
       "Doseringen er individuell og skal gjøres i samråd med lege eller klinisk ernæringsfysiolog.",
     ],
     sections: [
@@ -2117,7 +2309,6 @@ const reviewedProducts: NutritionProduct[] = [
         lines: [
           "Anbefalt dosering per dag: 3–5 år: ½ pose + 240 ml helmelk. 5–10 år: 1 porsjon. Over 10 år: 1–2 porsjoner.",
           "1 porsjon er 1 pose (85 g pulver) blandet med 240 ml helmelk.",
-          "Doseringen er individuell og skal gjøres i samråd med lege eller klinisk ernæringsfysiolog.",
         ],
       },
       {
@@ -2133,16 +2324,6 @@ const reviewedProducts: NutritionProduct[] = [
         lines: [
           "24 måneder fra produksjonsdato. Holdbarhetsdato står på posen og ytre emballasje.",
           "En åpnet pose oppbevares tørt og bør brukes innen 2–3 dager. Lagres tørt og mellom 5 og 25 °C.",
-        ],
-      },
-      {
-        title: "Egnethet",
-        lines: [
-          "Melkebasert. Protein: 91 % kasein og 9 % myse.",
-          "Kostfiber er ikke tilsatt (sjokolade: 2,9 g per 100 g pulver).",
-          "Glutenfri. Halal-sertifisert.",
-          "Passer ved lakto-ovo-vegetarkost.",
-          "FODMAP: laktose 4,5 g per 100 ml.",
         ],
       },
       {
@@ -2294,6 +2475,16 @@ const reviewedProducts: NutritionProduct[] = [
     name: "Duocal",
     category: "Pulver og tilskudd",
     summary: "Lettløselig energitilskudd med en balansert blanding av karbohydrater og fett · 492 kcal per 100 g pulver · 400 g",
+    facts: {
+      energy: { value: "492", unit: "kcal per 100 g pulver" },
+      rows: [
+        { label: "Fett", value: "22,3 g" },
+        { label: "Karbohydrat", value: "72,7 g" },
+        { label: "Protein og kostfiber", value: "Ikke tilsatt" },
+        { label: "Pakning", value: "400 g" },
+      ],
+      traits: ["FODMAP-fri"],
+    },
     indication: "Energirik kost ved væskerestriksjon, f.eks. nyresykdom, leversykdom og katabolsk stress",
     properties: {
       glutenFree: true,
@@ -2319,7 +2510,6 @@ const reviewedProducts: NutritionProduct[] = [
       {
         title: "Dosering",
         lines: [
-          "Bruk den mengden pulver og det blandingsforholdet som lege eller klinisk ernæringsfysiolog anbefaler.",
           "1–2 ss kan uten smaksforandring tilsettes i 100 ml væske, for eksempel velling, melk, yoghurt og suppe. En strøken måleskje gir 1,2 g pulver.",
         ],
       },
@@ -2344,22 +2534,6 @@ const reviewedProducts: NutritionProduct[] = [
         lines: [
           "Åpnet boks lukkes godt og brukes innen en måned.",
           "Oppbevares tørt i romtemperatur (under 25 °C, ikke i kjøleskap), utenfor sollys. Best før-dato står på boksen.",
-        ],
-      },
-      {
-        title: "Sammensetning",
-        lines: [
-          "Basert på hydrolysert maisstivelse og fett. Fettet er 35 % MCT og 65 % LCT.",
-          "Per 100 g pulver: 492 kcal, 22,3 g fett fra tistel-, kokos- og rapsolje (41 E%) og 72,7 g karbohydrat fra glukosesirup (59 E%).",
-        ],
-      },
-      {
-        title: "Egnethet",
-        lines: [
-          "Glutenfri og laktosefri.",
-          "Protein og kostfiber er ikke tilsatt.",
-          "Passer ved lakto-ovo-vegetarkost. Ikke halal-sertifisert.",
-          "FODMAP per 100 g: ingen.",
         ],
       },
       {

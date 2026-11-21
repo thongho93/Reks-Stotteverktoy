@@ -1,8 +1,30 @@
 [
   {
+    "id": "2026-11-21",
+    "date": "2026-11-21",
+    "summary": "Produktkortene i Næringsmidler er bygget om med faktaboks og faner.",
+    "items": [
+      {
+        "type": "forbedret",
+        "title": "Nytt produktkort i Næringsmidler",
+        "text": "Faktaboksen står alltid til venstre, og resten er delt i fanene Produktinfo, Bruk og dosering, Ingredienser og Varenumre. Advarsler står øverst."
+      },
+      {
+        "type": "rettet",
+        "title": "Riktig aldersgrense",
+        "text": "Alder på Calogen, Calogen Extra Shots og Calshake stemmer nå med produktarkene."
+      },
+      {
+        "type": "forbedret",
+        "title": "Flere forbedringer i Næringsmidler",
+        "text": "Mer produktinfo om Calogen og nye produktbilder."
+      }
+    ]
+  },
+  {
     "id": "2026-11-15",
     "date": "2026-11-15",
-    "summary": "Næringsmidler har fått flere produkter og ryddigere produktkort, og Produkt og råd heter nå Legemiddelråd.",
+    "summary": "Næringsmidler er bygget om, og Produkt og råd heter nå Legemiddelråd.",
     "items": [
       {
         "type": "nytt",
@@ -10,24 +32,9 @@
         "text": "Oversikt over alle underfanene på ett sted. Fanen «Produkt og råd» har fått nytt navn."
       },
       {
-        "type": "nytt",
-        "title": "Duocal i Næringsmidler",
-        "text": "Duocal er lagt inn sammen med flere produkter som manglet."
-      },
-      {
         "type": "forbedret",
-        "title": "Ryddigere produktkort",
-        "text": "Begrensninger og advarsler står øverst, og kortene fyller høyden."
-      },
-      {
-        "type": "forbedret",
-        "title": "Kompakt produktliste",
-        "text": "Listen er kortere og har sider, og produktinfo hentes fra produktarkene."
-      },
-      {
-        "type": "rettet",
-        "title": "Bedre treff på VNR",
-        "text": "Produkter finnes oftere når du søker på varenummer."
+        "title": "Ny layout i Næringsmidler",
+        "text": "Kompakt produktliste med sider, ryddigere produktkort og bedre treff på varenummer."
       }
     ]
   },
@@ -55,8 +62,8 @@
       },
       {
         "type": "nytt",
-        "title": "OMEQ for morfin-dråper",
-        "text": "Dropizol og Oramorph, og Morfin SA stikkpille 10 mg."
+        "title": "Flere legemidler i OMEQ-beregning",
+        "text": "Nye morfinprodukter kan regnes om."
       }
     ]
   }
