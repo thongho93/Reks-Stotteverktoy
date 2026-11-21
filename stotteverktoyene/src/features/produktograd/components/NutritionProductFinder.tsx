@@ -391,6 +391,20 @@ type DialogTab = "info" | "use" | "ingredients" | "vnr";
 // ─── Pop-up med produktkort ──────────────────────────────────────────────────
 const DIALOG_FONT = "-apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif";
 
+/** Deler opp varenumrene etter smak. Et tall bakerst i smaken (f.eks. «Jordbær 200») er størrelsen. */
+function groupVariantsByFlavor(rows: VariantInfo["rows"]): { flavor: string; items: { vnr: string; size: string }[] }[] {
+  const groups = new Map<string, { vnr: string; size: string }[]>();
+  for (const r of rows) {
+    const m = r.flavor.match(/^(.*?)\s*(\d+(?:[.,]\d+)?)\s*(ml|g|l|kg)?$/i);
+    const flavor = (m ? m[1] : r.flavor).trim() || "Standard";
+    const size = r.pack ?? (m ? `${m[2]}${m[3] ? ` ${m[3]}` : ""}` : "");
+    groups.set(flavor, [...(groups.get(flavor) ?? []), { vnr: r.vnr, size }]);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "nb"))
+    .map(([flavor, items]) => ({ flavor, items }));
+}
+
 function ProductDialog({
   item, variant, onClose, copiedVnr, onCopy,
 }: {
@@ -402,6 +416,7 @@ function ProductDialog({
 }) {
   const { p, conds, props, ages, unreviewed } = item;
   const rows = variant?.rows ?? [];
+  const vnrGroups = groupVariantsByFlavor(rows);
   const headline = (p.summary ?? "").split(" · ")[0];
   const ageText = p.ageNote ?? (ages.length > 0 ? ageSummary(ages) : "Ikke oppgitt");
   const traits = [...props.map((k) => PROP_LABELS[k] ?? k), ...(p.facts?.traits ?? [])];
@@ -648,20 +663,29 @@ function ProductDialog({
             {tab === "vnr" && (
               <>
                 {rows.length > 0 ? (
-                  <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-                    {rows.map((r) => (
-                      <li key={r.vnr} className="nm-vnr" style={{ minHeight: 54, borderRadius: 16, padding: "6px 10px 6px 16px" }}>
-                        <span style={{ minWidth: 0, fontSize: 15 }}>
-                          <b style={{ fontWeight: 600 }}>{r.flavor || <span style={{ color: MK.muted, fontStyle: "italic", fontWeight: 400 }}>Standard</span>}</b>
-                          {r.pack && <span style={{ color: MK.muted }}> · {r.pack}</span>}
-                        </span>
-                        <button type="button" className="nm-copy" aria-label={`Kopier varenummer ${r.vnr}`} onClick={() => onCopy(r.vnr, r.vnr)}>
-                          {copiedVnr === r.vnr ? "Kopiert" : r.vnr}
-                          {copiedVnr === r.vnr ? <CheckIcon size={15} stroke={3} /> : <CopyIcon />}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  vnrGroups.map((g) => (
+                    <section key={g.flavor} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {vnrGroups.length > 1 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <h3 className="nm-h">{g.flavor}</h3>
+                          <span className="nm-cnt">{g.items.length}</span>
+                        </div>
+                      )}
+                      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                        {g.items.map((r) => (
+                          <li key={r.vnr} className="nm-vnr" style={{ minHeight: 54, borderRadius: 16, padding: "6px 10px 6px 16px" }}>
+                            <span style={{ minWidth: 0, fontSize: 15, fontWeight: 600 }}>
+                              {vnrGroups.length > 1 ? (r.size || "Standard") : `${g.flavor}${r.size ? ` · ${r.size}` : ""}`}
+                            </span>
+                            <button type="button" className="nm-copy" aria-label={`Kopier varenummer ${r.vnr}`} onClick={() => onCopy(r.vnr, r.vnr)}>
+                              {copiedVnr === r.vnr ? "Kopiert" : r.vnr}
+                              {copiedVnr === r.vnr ? <CheckIcon size={15} stroke={3} /> : <CopyIcon />}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))
                 ) : (
                   <p className="nm-empty">Fant ingen varenumre i produktkatalogen.</p>
                 )}
