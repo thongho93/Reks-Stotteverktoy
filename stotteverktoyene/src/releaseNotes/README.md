@@ -21,6 +21,7 @@ Før du merger en branch som endrer noe brukerne merker, legg et nytt innslag **
 - `type` er `nytt`, `forbedret` eller `rettet`.
 - Skriv for brukerne i apotekene, ikke for utviklere. Ingen interne begreper.
 - Maks 5–6 punkter per oppdatering.
+- Nye produkter (legemidler, næringsdrikker osv.) samles i **én linje** per type, for eksempel «Nye produkter i Næringsmidler». Ikke list opp hvilke produkter det er.
 
 ## Hva skjer ved merge
 
