@@ -24,7 +24,7 @@
   {
     "id": "2026-11-15",
     "date": "2026-11-15",
-    "summary": "Næringsmidler har fått flere produkter og ryddigere produktkort, og Produkt og råd heter nå Legemiddelråd.",
+    "summary": "Næringsmidler er bygget om, og Produkt og råd heter nå Legemiddelråd.",
     "items": [
       {
         "type": "nytt",
@@ -32,24 +32,9 @@
         "text": "Oversikt over alle underfanene på ett sted. Fanen «Produkt og råd» har fått nytt navn."
       },
       {
-        "type": "nytt",
-        "title": "Nye produkter i Næringsmidler",
-        "text": "Flere produkter som manglet er lagt inn."
-      },
-      {
         "type": "forbedret",
-        "title": "Ryddigere produktkort",
-        "text": "Begrensninger og advarsler står øverst, og kortene fyller høyden."
-      },
-      {
-        "type": "forbedret",
-        "title": "Kompakt produktliste",
-        "text": "Listen er kortere og har sider, og produktinfo hentes fra produktarkene."
-      },
-      {
-        "type": "rettet",
-        "title": "Bedre treff på VNR",
-        "text": "Produkter finnes oftere når du søker på varenummer."
+        "title": "Ny layout i Næringsmidler",
+        "text": "Kompakt produktliste med sider, ryddigere produktkort og bedre treff på varenummer."
       }
     ]
   },

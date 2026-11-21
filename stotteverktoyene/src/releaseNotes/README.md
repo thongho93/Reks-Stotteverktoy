@@ -13,7 +13,8 @@ Ikke alle endringer trenger et innslag. Dialogen vises for alle brukerne, så de
 
 **Ikke ta med**
 - Små justeringer av utseende og tekst.
-- Ny informasjon om enkeltprodukter, nye produktbilder og nye produkter i en liste.
+- Ny informasjon om enkeltprodukter og nye produktbilder.
+- Nye produkter i en liste, med mindre det er en stor utvidelse (se Gruppering).
 - Feil som brukerne ikke har merket, og interne endringer.
 
 Treffer ingenting av dette: ikke lag et innslag. Deploy uten innslag gir bare den vanlige, stille «Ny versjon»-linjen.
@@ -21,7 +22,7 @@ Treffer ingenting av dette: ikke lag et innslag. Deploy uten innslag gir bare de
 ## Gruppering
 
 - Flere små ting i samme område samles i **én linje**, for eksempel «Flere forbedringer i Næringsmidler».
-- Nye produkter (legemidler, næringsdrikker osv.) og ny produktinfo samles i én linje per type. Ikke list opp hvilke produkter det er.
+- Store utvidelser med nye produkter (legemidler, næringsdrikker osv.) samles i én linje per type. Ikke list opp hvilke produkter det er.
 - Maks 3–4 punkter per oppdatering.
 
 ## Slik legger du til en oppdatering
