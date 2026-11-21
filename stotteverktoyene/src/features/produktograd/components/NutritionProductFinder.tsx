@@ -75,6 +75,8 @@ const MIN_ROWS = 3;
 const MAX_ROWS = 6;
 const MAX_SCALE = 1.4; // hvor mye kortene kan skaleres opp når det er god plass
 const VNR_RE = /^\d+$/;
+/** Et varenummer (Farmalogg) er seks sifre. */
+const VNR_IN_TEXT = /(?<!\d)\d{6}(?!\d)/g;
 const EMPTY_SELECTION: Selection = { cond: [], prop: [], age: [], cat: [] };
 
 // ─── Stil (bruker samme fargevariabler som Melkeerstatning, også i mørk modus) ─
@@ -158,6 +160,7 @@ const CSS = `
 .nm-block{background:${MK.surface};border:1px solid ${MK.border};border-radius:20px;padding:18px 20px}
 .nm-block p{margin:0}
 .nm-b-row{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;box-sizing:border-box;border-radius:16px;background:${MK.surface};border:1px solid ${MK.border};font-size:15px;font-weight:500}
+.nm-b-chip{min-height:34px;padding:0 13px;gap:8px;border-radius:999px;font-size:14px}
 .nm-big{margin:8px 0 4px;font-size:42px;line-height:1.05;font-weight:650;letter-spacing:-0.035em}
 .nm-empty{margin:0;padding:18px 16px;border-radius:14px;border:1px dashed ${MK.borderAccent};background:${MK.surface};color:${MK.muted};font-size:14px}
 @media (max-width:760px){.nm-d{flex-direction:column;overflow-y:auto}.nm-rail{width:auto;overflow:visible}.nm-d-main{flex:none;overflow:visible}.nm-d-body{overflow:visible}}
@@ -586,9 +589,9 @@ function ProductDialog({
                   <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <h3 className="nm-h">Egnet ved</h3>
                     {conds.length > 0 ? (
-                      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {conds.map((k) => (
-                          <li key={k} className="nm-b-row">
+                          <li key={k} className="nm-b-row nm-b-chip">
                             <span className="nm-dot" aria-hidden="true" style={{ background: COND_COLORS[k] ?? MK.muted }} />
                             {CLINICAL_LABELS[k] ?? k}
                           </li>
@@ -742,6 +745,21 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
     return () => observer.disconnect();
   }, []);
   const [copiedVnr, setCopiedVnr] = useState<string | null>(null);
+
+  // Når søkefeltet aktiveres og er tomt, søkes det automatisk på et varenummer fra utklippstavlen.
+  // Samme utklipp brukes bare én gang, så «Tøm søket» ikke fyller feltet på nytt.
+  const lastClipboardVnr = useRef("");
+  const searchClipboardVnr = () => {
+    if (searchRef.current?.value !== "" || !navigator.clipboard?.readText) return;
+    navigator.clipboard.readText().then((text) => {
+      const found = Array.from(new Set(text.match(VNR_IN_TEXT) ?? []));
+      if (found.length !== 1 || found[0] === lastClipboardVnr.current) return;
+      if (searchRef.current?.value !== "") return;
+      lastClipboardVnr.current = found[0];
+      setQuery(found[0]);
+      setPage(1);
+    }).catch(() => undefined);
+  };
 
   // Ctrl/Cmd+S fokuserer søkefeltet, Esc tømmer det.
   useEffect(() => {
@@ -905,6 +923,7 @@ export default function NutritionProductFinder({ catalogProducts = [] }: { catal
                 autoComplete="off"
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                onFocus={searchClipboardVnr}
                 placeholder="Søk produkt, tilstand eller VNR …"
                 style={{
                   width: "100%", boxSizing: "border-box", height: 46, padding: "0 48px 0 46px", borderRadius: 12,
