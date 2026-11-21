@@ -45,7 +45,7 @@ const INDEX: Indexed[] = nutritionProducts.map((p) => {
   const props = trueKeys(p.properties);
   const ages = trueKeys(p.age);
   const unreviewed = p.unreviewed === true;
-  const hay = [p.name, p.category, p.summary ?? "", p.indication ?? "", ...(p.notes ?? []), ...(unreviewed ? ["ikke gjennomgått"] : []), ...conds, ...props, ...ages]
+  const hay = [p.name, p.category, p.summary ?? "", p.indication ?? "", p.description ?? "", ...(p.notes ?? []), ...(unreviewed ? ["ikke gjennomgått"] : []), ...conds, ...props, ...ages]
     .map((s) => ALL_LABELS[s] ?? s)
     .join(" ")
     .toLowerCase();
@@ -105,7 +105,8 @@ const CSS = `
 .nm-row{display:grid;grid-template-columns:calc(48px*var(--nm-s,1)) minmax(0,1fr) 20px;grid-template-areas:"thumb head chev" "thumb tags tags";gap:calc(6px*var(--nm-s,1)) calc(12px*var(--nm-s,1));align-items:center;align-content:center;width:100%;box-sizing:border-box;padding:calc(10px*var(--nm-s,1)) calc(12px*var(--nm-s,1));border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
 .nm-row:hover{background:${MK.sel}}
 .nm-chev{display:grid;place-items:center}
-.nm-thumb{width:calc(48px*var(--nm-s,1));height:calc(48px*var(--nm-s,1));border-radius:calc(10px*var(--nm-s,1));overflow:hidden;background:${MK.thumbBg};border:1px solid ${MK.lineSoft};box-sizing:border-box;display:grid;place-items:center}
+.nm-thumb{width:calc(48px*var(--nm-s,1));height:calc(48px*var(--nm-s,1));border-radius:calc(10px*var(--nm-s,1));overflow:hidden;background:${MK.thumbBg};border:1px solid ${MK.lineSoft};box-sizing:border-box;display:grid;grid-template:100%/100%;place-items:center}
+.nm-thumb.nm-tall{height:calc(72px*var(--nm-s,1))}
 .nm-thumb img{width:100%;height:100%;object-fit:contain;padding:4px;box-sizing:border-box}
 .nm-mono{width:100%;height:100%;display:grid;place-items:center;background:${MK.pill};color:${MK.pillText};font-size:calc(20px*var(--nm-s,1));font-weight:700}
 .nm-tag{display:inline-flex;align-items:center;min-height:calc(24px*var(--nm-s,1));padding:0 calc(9px*var(--nm-s,1));border-radius:7px;background:${MK.alt};border:1px solid ${MK.lineSoft};color:${MK.sub};font-size:calc(12px*var(--nm-s,1));font-weight:500;white-space:nowrap}
@@ -120,7 +121,7 @@ const CSS = `
 .nm-ok{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;background:${MK.okBg};color:${MK.ok}}
 .nm-cond{display:flex;align-items:center;gap:9px;min-height:36px;padding:0 12px;box-sizing:border-box;border-radius:10px;background:${MK.surface};border:1px solid ${MK.border};font-size:14px;font-weight:500}
 .nm-dot{flex:none;width:10px;height:10px;border-radius:50%}
-.nm-alert{flex:1 1 100%;min-width:0;display:flex;align-items:flex-start;gap:12px;padding:12px 16px;box-sizing:border-box;border-radius:14px;background:${MK.warnBg};border:1.5px solid ${MK.warnBorder};color:${MK.warnText}}
+.nm-alert{flex:none;min-width:0;display:flex;align-items:flex-start;gap:12px;padding:12px 16px;box-sizing:border-box;border-radius:14px;background:${MK.warnBg};border:1.5px solid ${MK.warnBorder};color:${MK.warnText}}
 .nm-alert-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:${MK.warnText};color:${MK.warnBg}}
 .nm-alert ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:14px;line-height:1.45}
 .nm-accs{border:1px solid ${MK.border};border-radius:14px;background:${MK.surface};overflow:hidden}
@@ -132,6 +133,34 @@ const CSS = `
 .nm-acc .nm-acc-chev{display:inline-flex;color:${MK.muted};transition:transform .15s}
 .nm-acc[open] .nm-acc-chev{transform:rotate(180deg)}
 .nm-acc-body{padding:2px 16px 16px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.5;color:${MK.sub}}
+.nm-d{display:flex;flex:1 1 auto;min-height:0}
+.nm-rail{flex:none;width:360px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:18px 24px;background:#2A1425;color:#fff;overflow:auto;scrollbar-width:none}
+.nm-rail::-webkit-scrollbar{display:none}
+.nm-rail > *{flex-shrink:0}
+.nm-rail > .nm-rail-img{flex:1 1 124px;flex-shrink:1;min-height:56px;max-height:124px;display:flex;justify-content:center}
+.nm-rail-eyebrow{margin:0;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#E6B8D2}
+.nm-rstat{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:6px 0;border-top:1px solid rgba(255,255,255,.14);font-size:13.5px;color:#E9D3DF}
+.nm-rstat b{font-weight:600;color:#fff;text-align:right}
+.nm-rchip{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:2px 10px;box-sizing:border-box;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:500}
+.nm-rpdf{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:none;min-height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.45);background:transparent;color:#fff;font-size:14px;font-weight:600;text-decoration:none}
+.nm-rpdf:hover{background:rgba(255,255,255,.12)}
+.nm-rpdf:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.nm-d-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;background:${MK.soft}}
+.nm-d-top{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px 0 28px;border-bottom:1px solid ${MK.border};background:${MK.surface}}
+.nm-d-tabs{display:flex;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.nm-d-tabs::-webkit-scrollbar{display:none}
+.nm-d-tab{flex:none;height:48px;padding:0 4px;margin-right:18px;border:0;border-bottom:3px solid transparent;background:transparent;color:${MK.sub};font-size:14.5px;font-weight:600;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
+.nm-d-tab:hover{color:${MK.text}}
+.nm-d-tab[aria-selected="true"]{color:${MK.text};border-bottom-color:${MK.accent}}
+.nm-d-tab[data-empty="true"]{color:${MK.muted};font-weight:500}
+.nm-d-tab:focus-visible{outline:2px solid ${MK.accent};outline-offset:-2px;border-radius:8px}
+.nm-d-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 28px 28px;display:flex;flex-direction:column;gap:16px}
+.nm-block{background:${MK.surface};border:1px solid ${MK.border};border-radius:20px;padding:18px 20px}
+.nm-block p{margin:0}
+.nm-b-row{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;box-sizing:border-box;border-radius:16px;background:${MK.surface};border:1px solid ${MK.border};font-size:15px;font-weight:500}
+.nm-big{margin:8px 0 4px;font-size:42px;line-height:1.05;font-weight:650;letter-spacing:-0.035em}
+.nm-empty{margin:0;padding:18px 16px;border-radius:14px;border:1px dashed ${MK.borderAccent};background:${MK.surface};color:${MK.muted};font-size:14px}
+@media (max-width:760px){.nm-d{flex-direction:column;overflow-y:auto}.nm-rail{width:auto;overflow:visible}.nm-d-main{flex:none;overflow:visible}.nm-d-body{overflow:visible}}
 .nm-doc-sm{min-height:34px;padding:0 12px;border-radius:10px;font-size:13.5px}
 .nm-vnr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 6px 12px;box-sizing:border-box;border-radius:10px;border:1px solid ${MK.border};background:${MK.surface}}
 .nm-table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -181,16 +210,7 @@ const ChevronIcon = ({ size = 16, stroke = 2.2 }: { size?: number; stroke?: numb
 const CheckIcon = ({ size = 12, stroke = 3.2 }: { size?: number; stroke?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={stroke} {...svgProps}><path d="m5 12 5 5 9-10" /></svg>
 );
-const InfoIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" {...svgProps}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
-);
 
-const PersonIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" {...svgProps}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" /></svg>
-);
-const HeartIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" {...svgProps}><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10Z" /></svg>
-);
 const WarnIcon = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth="2.2" {...svgProps}><path d="M12 3 2 20h20L12 3Z" /><path d="M12 10v5M12 18h.01" /></svg>
 );
@@ -212,11 +232,16 @@ const COND_COLORS: Record<string, string> = {
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp"];
 const missingImages = new Set<string>();
 
-function ProductThumb({ id, name, size }: { id: string; name: string; size?: number }) {
+function ProductThumb({ id, name, size, fit }: { id: string; name: string; size?: number; /** Fyll høyden til en fleksibel beholder (kvadratisk). */ fit?: boolean }) {
   const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(() => missingImages.has(id));
+  const [tall, setTall] = useState(false);
   return (
-    <span className="nm-thumb" aria-hidden="true" style={size ? { width: size, height: size, borderRadius: size / 4 } : undefined}>
+    <span
+      className={tall && !size && !fit ? "nm-thumb nm-tall" : "nm-thumb"}
+      aria-hidden="true"
+      style={fit ? { width: "auto", height: "100%", aspectRatio: "1 / 1", maxWidth: "100%", borderRadius: 22 } : size ? { width: size, height: size, borderRadius: size / 4 } : undefined}
+    >
       {failed ? (
         <span className="nm-mono" style={size ? { fontSize: size * 0.42 } : undefined}>{name.charAt(0).toUpperCase()}</span>
       ) : (
@@ -225,6 +250,7 @@ function ProductThumb({ id, name, size }: { id: string; name: string; size?: num
           src={`/nutrition/${id}.${IMAGE_EXTS[idx]}`}
           alt=""
           loading="lazy"
+          onLoad={(e) => setTall(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth * 1.3)}
           onError={() => {
             if (idx + 1 < IMAGE_EXTS.length) setIdx(idx + 1);
             else {
@@ -328,7 +354,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 function ProductRow({ item, onOpen }: { item: Indexed; onOpen: () => void }) {
   const { p, conds, ages, unreviewed } = item;
   const condNames = conds.map((k) => CLINICAL_LABELS[k] ?? k);
-  const meta = [p.category, ages.length > 0 ? ageSummary(ages) : null].filter(Boolean).join(" · ");
+  const meta = [p.category, p.ageNote ?? (ages.length > 0 ? ageSummary(ages) : null)].filter(Boolean).join(" · ");
 
   return (
     <li style={{ display: "flex", background: MK.surface, border: `1px solid ${MK.border}`, borderRadius: 14, overflow: "hidden" }}>
@@ -353,8 +379,14 @@ function ProductRow({ item, onOpen }: { item: Indexed; onOpen: () => void }) {
   );
 }
 
-// Seksjoner som er viktige å se med en gang (bruk og dosering). Resten ligger i sammenleggbare rader.
-const KEY_SECTION = /bruksområde|dosering|tilbered|slik blander|^bruk$/i;
+// Seksjonene fra produktarkene fordeles på fanene i produktkortet (samme inndeling som på farmasiet.no).
+const INTRO_SECTION = /^bruksområde$/i;
+const INGREDIENT_SECTION = /^ingredienser$/i;
+const COMPOSITION_SECTION = /^sammensetning$/i;
+const ORDER_SECTION = /^bestilling$/i;
+const USE_SECTION = /dosering|tilbered|slik blander|^bruk$|oppbevaring|holdbarhet|hengetid|lagring|blandingsforhold|husholdningsmål|berikning/i;
+
+type DialogTab = "info" | "use" | "ingredients" | "vnr";
 
 // ─── Pop-up med produktkort ──────────────────────────────────────────────────
 const DIALOG_FONT = "-apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif";
@@ -369,284 +401,275 @@ function ProductDialog({
   onCopy: (text: string, key: string) => void;
 }) {
   const { p, conds, props, ages, unreviewed } = item;
-  const propNames = props.map((k) => PROP_LABELS[k] ?? k);
   const rows = variant?.rows ?? [];
-  const facts = [
-    { icon: <PersonIcon />, text: ages.length > 0 ? ageSummary(ages) : "Alder ikke oppgitt" },
-    ...(conds.length > 0 ? [{ icon: <HeartIcon />, text: `${conds.length} ${conds.length === 1 ? "indikasjon" : "indikasjoner"}` }] : []),
+  const headline = (p.summary ?? "").split(" · ")[0];
+  const ageText = p.ageNote ?? (ages.length > 0 ? ageSummary(ages) : "Ikke oppgitt");
+  const traits = [...props.map((k) => PROP_LABELS[k] ?? k), ...(p.facts?.traits ?? [])];
+  const factRows = [{ label: "Alder", value: ageText }, ...(p.facts?.rows ?? [])];
+
+  const allSections = p.sections ?? [];
+  const introSections = allSections.filter((sec) => INTRO_SECTION.test(sec.title));
+  // Sammensetning står først i Ingredienser-fanen, over selve ingredienslisten.
+  const ingredientSections = [
+    ...allSections.filter((sec) => COMPOSITION_SECTION.test(sec.title)),
+    ...allSections.filter((sec) => INGREDIENT_SECTION.test(sec.title)),
   ];
-  const sectionStyle = { display: "flex", flexDirection: "column", gap: 8 } as const;
-  const keySections = (p.sections ?? []).filter((sec) => KEY_SECTION.test(sec.title));
-  const moreSections = (p.sections ?? []).filter((sec) => !KEY_SECTION.test(sec.title));
+  const orderSections = allSections.filter((sec) => ORDER_SECTION.test(sec.title));
+  const useSections = allSections.filter((sec) => USE_SECTION.test(sec.title) && !INGREDIENT_SECTION.test(sec.title));
+  const moreSections = allSections.filter((sec) => ![INTRO_SECTION, COMPOSITION_SECTION, INGREDIENT_SECTION, ORDER_SECTION, USE_SECTION].some((re) => re.test(sec.title)));
+  const hasNutrition = (p.nutrition?.length ?? 0) > 0;
+  const moreItems: { title: string; lines: string[] }[] = [
+    ...(!p.indication ? introSections : []),
+    ...(p.notes && p.notes.length > 0 ? [{ title: "Merknader", lines: p.notes }] : []),
+    ...moreSections,
+  ];
+
+  const [tab, setTab] = useState<DialogTab>("info");
+  const tabs: { key: DialogTab; label: string; empty: boolean; count?: number }[] = [
+    { key: "info", label: "Produktinfo", empty: false },
+    { key: "use", label: "Bruk og dosering", empty: useSections.length === 0 },
+    { key: "ingredients", label: "Ingredienser", empty: ingredientSections.length === 0 && !hasNutrition },
+    { key: "vnr", label: "Varenumre", empty: rows.length === 0 && orderSections.length === 0, count: rows.length || undefined },
+  ];
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const i = tabs.findIndex((t) => t.key === tab);
+    const next = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const target = tabs[(next + tabs.length) % tabs.length].key;
+    setTab(target);
+    document.getElementById(`nm-tab-${target}`)?.focus();
+  };
+
+  const renderSection = (sec: { title: string; lines: string[]; highlight?: string }) => (
+    <section key={sec.title} className="nm-block">
+      <h3 className="nm-h">{sec.title}</h3>
+      {sec.highlight && <div className="nm-big">{sec.highlight}</div>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8, fontSize: 15, lineHeight: 1.5 }}>
+        {sec.lines.map((line, i) => <p key={i}>{line}</p>)}
+      </div>
+    </section>
+  );
+  const renderAccordion = (items: { title: string; lines: string[] }[]) => (
+    <div className="nm-accs">
+      {items.map((sec) => (
+        <details key={sec.title} className="nm-acc">
+          <summary>{sec.title}<span className="nm-acc-chev" aria-hidden="true"><ChevronIcon size={18} /></span></summary>
+          <div className="nm-acc-body">{sec.lines.map((line, i) => <p key={i} style={{ margin: 0 }}>{line}</p>)}</div>
+        </details>
+      ))}
+    </div>
+  );
 
   return (
     <Dialog
       open
       onClose={onClose}
-      fullWidth
-      maxWidth="md"
       scroll="paper"
+      maxWidth={false}
       aria-labelledby="nm-dialog-title"
       slotProps={{
         paper: {
           sx: {
-            borderRadius: "24px", bgcolor: MK.surface, color: MK.text, backgroundImage: "none",
-            border: `1px solid ${MK.border}`, boxShadow: `0 24px 64px ${MK.shadow}`, m: 2, maxHeight: "calc(100% - 32px)",
-            overflow: "hidden",
+            width: 960, maxWidth: "calc(100% - 32px)", height: "min(700px, calc(100% - 32px))", m: 2,
+            borderRadius: "30px", bgcolor: MK.surface, color: MK.text, backgroundImage: "none",
+            border: `1px solid ${MK.border}`, boxShadow: `0 24px 64px ${MK.shadow}`, overflow: "hidden",
           },
         },
       }}
     >
-      <header
-        style={{
-          position: "relative", flex: "none", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "14px 22px",
-          padding: "20px 28px", background: MK.alt, borderBottom: `1px solid ${MK.border}`, fontFamily: DIALOG_FONT,
-        }}
-      >
-        <ProductThumb id={p.id} name={p.name} size={96} />
-        <div style={{ flex: "1 1 260px", minWidth: 0, paddingRight: 52 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-            <span className="nm-dchip nm-dchip-cat">{p.category}</span>
-            {unreviewed && <span className="nm-dchip nm-dchip-warn"><WarnIcon size={14} />Ikke gjennomgått</span>}
+      <div className="nm-d" style={{ fontFamily: DIALOG_FONT }}>
+        <aside className="nm-rail" aria-label="Fakta om produktet">
+          <div className="nm-rail-img">
+            <ProductThumb id={p.id} name={p.name} fit />
           </div>
-          <h2 id="nm-dialog-title" style={{ margin: 0, fontSize: 30, lineHeight: 1.1, fontWeight: 700, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>
-            {p.name}
-          </h2>
-          {p.summary && <p style={{ margin: "6px 0 0", fontSize: 14, lineHeight: 1.45, color: MK.sub }}>{p.summary}</p>}
-          <ul style={{ listStyle: "none", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 20px", margin: "10px 0 0", padding: 0, fontSize: 14, color: MK.sub }}>
-            {facts.map((f) => (
-              <li key={f.text} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{f.icon}{f.text}</li>
-            ))}
-            {p.documents?.map((d) => (
-              <li key={d.url} style={{ display: "inline-flex" }}>
-                <a className="nm-doc nm-doc-sm" href={d.url} target="_blank" rel="noopener noreferrer">
-                  <FileIcon />
-                  Åpne produktark (PDF)
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <button type="button" className="nm-close" aria-label="Lukk" onClick={onClose} style={{ position: "absolute", top: 16, right: 16 }}>
-          <CloseIcon size={18} />
-        </button>
-      </header>
-
-      <div
-        style={{
-          flex: "1 1 auto", minHeight: 0, overflowY: "auto", display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: "18px 32px",
-          padding: "20px 28px 24px", background: MK.soft, fontFamily: DIALOG_FONT,
-        }}
-      >
-        {p.warnings && p.warnings.length > 0 && (
-          <div className="nm-alert" role="note">
-            <span className="nm-alert-icon" aria-hidden="true"><WarnIcon size={18} /></span>
-            <div style={{ minWidth: 0 }}>
-              <strong style={{ fontSize: 15 }}>Viktig å vite</strong>
-              <ul>
-                {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
-              </ul>
+          <div>
+            <p className="nm-rail-eyebrow">{p.category}</p>
+            <h2 id="nm-dialog-title" style={{ margin: "4px 0 0", fontSize: 32, lineHeight: 1.08, fontWeight: 650, letterSpacing: "-0.03em", overflowWrap: "anywhere" }}>
+              {p.name}
+            </h2>
+            {headline && <p style={{ margin: "6px 0 0", fontSize: 13.5, lineHeight: 1.4, color: "#E9D3DF" }}>{headline}</p>}
+            {unreviewed && <span className="nm-rchip" style={{ marginTop: 8, background: MK.warnBg, color: MK.warnText }}><WarnIcon size={13} />Ikke gjennomgått</span>}
+          </div>
+          <section aria-label="Fakta" style={{ display: "flex", flexDirection: "column" }}>
+            <p className="nm-rail-eyebrow">Fakta</p>
+            {p.facts?.energy && (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "2px 0 4px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 26, lineHeight: 1.1, fontWeight: 650, letterSpacing: "-0.04em", fontVariantNumeric: "tabular-nums" }}>{p.facts.energy.value}</span>
+                <span style={{ fontSize: 13.5, lineHeight: 1.3, color: "#E9D3DF" }}>{p.facts.energy.unit}</span>
+              </div>
+            )}
+            <div style={{ marginTop: p.facts?.energy ? 0 : 6 }}>
+              {factRows.map((r) => (
+                <div key={r.label} className="nm-rstat"><span>{r.label}</span><b>{r.value}</b></div>
+              ))}
             </div>
-          </div>
-        )}
-
-        <div style={{ flex: "0 1 auto", minWidth: 160, maxWidth: 240, display: "flex", flexDirection: "column", gap: 18 }}>
-          <section style={sectionStyle}>
-            <h3 className="nm-h">Passer for alder</h3>
-            {ages.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {ages.map((k) => (
-                  <span key={k} className="nm-age"><CheckIcon size={14} stroke={3} />{AGE_LABELS[k] ?? k}</span>
+            {traits.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                {traits.map((t) => (
+                  <span key={t} className="nm-rchip"><CheckIcon size={12} stroke={3.4} />{t}</span>
                 ))}
               </div>
-            ) : (
-              <p style={{ margin: 0, fontSize: 13.5, color: MK.muted }}>Alder er ikke oppgitt for dette produktet.</p>
             )}
           </section>
+          {p.documents?.map((d) => (
+            <a key={d.url} className="nm-rpdf" href={d.url} target="_blank" rel="noopener noreferrer" style={{ marginTop: "auto" }}>
+              <FileIcon />
+              Åpne produktark
+            </a>
+          ))}
+        </aside>
 
-          <section style={sectionStyle}>
-            <h3 className="nm-h">Egenskaper</h3>
-            {propNames.length > 0 ? (
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-                {propNames.map((n) => (
-                  <li key={n} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14.5 }}>
-                    <span className="nm-ok"><CheckIcon size={13} /></span>
-                    {n}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{ margin: 0, fontSize: 13.5, color: MK.muted }}>Ingen egenskaper oppgitt.</p>
-            )}
-          </section>
+        <div className="nm-d-main">
+          <div className="nm-d-top">
+            <div className="nm-d-tabs" role="tablist" aria-label="Produktinformasjon" onKeyDown={onTabKey}>
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  id={`nm-tab-${t.key}`}
+                  type="button"
+                  role="tab"
+                  className="nm-d-tab"
+                  aria-selected={tab === t.key}
+                  aria-controls="nm-tabpanel"
+                  tabIndex={tab === t.key ? 0 : -1}
+                  data-empty={t.empty ? "true" : undefined}
+                  onClick={() => setTab(t.key)}
+                >
+                  {t.label}
+                  {t.count !== undefined && <span className="nm-cnt">{t.count}</span>}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="nm-close" aria-label="Lukk" onClick={onClose} style={{ marginBottom: 8 }}>
+              <CloseIcon size={18} />
+            </button>
+          </div>
 
-          {p.notes && p.notes.length > 0 && (
-            <section style={sectionStyle}>
-              <h3 className="nm-h">Merknader</h3>
-              <div
-                style={{
-                  display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 12px", borderRadius: 10,
-                  background: MK.alt, border: `1px solid ${MK.border}`, color: MK.sub, fontSize: 13, lineHeight: 1.45,
-                }}
-              >
-                <span style={{ flex: "none", marginTop: 1, display: "inline-flex" }}><InfoIcon /></span>
-                {p.notes.length === 1 ? (
-                  <span>{p.notes[0]}</span>
-                ) : (
-                  <ul style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
-                    {p.notes.map((n, i) => <li key={i}>{n}</li>)}
+          <div id="nm-tabpanel" role="tabpanel" aria-labelledby={`nm-tab-${tab}`} className="nm-d-body">
+            {tab === "info" && p.warnings && p.warnings.length > 0 && (
+              <div className="nm-alert" role="note">
+                <span className="nm-alert-icon" aria-hidden="true"><WarnIcon size={18} /></span>
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ fontSize: 15 }}>Viktig før du anbefaler</strong>
+                  <ul>
+                    {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
                   </ul>
+                </div>
+              </div>
+            )}
+
+            {tab === "info" && (
+              <>
+                {p.description && (
+                  <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3 className="nm-h">Om produktet</h3>
+                    <p className="nm-block" style={{ fontSize: 15, lineHeight: 1.6 }}>{p.description}</p>
+                  </section>
                 )}
-              </div>
-            </section>
-          )}
-        </div>
+                {(conds.length > 0 || p.indication) && (
+                  <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3 className="nm-h">Egnet ved</h3>
+                    {conds.length > 0 ? (
+                      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                        {conds.map((k) => (
+                          <li key={k} className="nm-b-row">
+                            <span className="nm-dot" aria-hidden="true" style={{ background: COND_COLORS[k] ?? MK.muted }} />
+                            {CLINICAL_LABELS[k] ?? k}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="nm-block" style={{ fontSize: 16.5, lineHeight: 1.5 }}>{p.indication}</p>
+                    )}
+                  </section>
+                )}
+                {unreviewed && (
+                  <p className="nm-empty" style={{ borderColor: MK.warnBorder, background: MK.warnBg, color: MK.warnText }}>
+                    <strong>Kliniske data er ikke gjennomgått.</strong> Sjekk produktbladet før produktet brukes i rådgivning.
+                  </p>
+                )}
+                {moreItems.length > 0 && (
+                  <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3 className="nm-h">Mer om produktet</h3>
+                    {renderAccordion(moreItems)}
+                  </section>
+                )}
+                {conds.length === 0 && !p.indication && !unreviewed && moreItems.length === 0 && (
+                  <p className="nm-empty">Ingen klinisk informasjon er lagt inn for dette produktet ennå.</p>
+                )}
+              </>
+            )}
 
-        <div style={{ flex: "1 1 380px", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
-          <section style={sectionStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <h3 className="nm-h">Egnet ved</h3>
-              {conds.length > 0 && <span className="nm-cnt">{conds.length}</span>}
-            </div>
-            {conds.length > 0 && (
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))", gap: 6 }}>
-                {conds.map((k) => (
-                  <li key={k} className="nm-cond">
-                    <span className="nm-dot" aria-hidden="true" style={{ background: COND_COLORS[k] ?? MK.muted }} />
-                    {CLINICAL_LABELS[k] ?? k}
-                  </li>
-                ))}
-              </ul>
+            {tab === "use" && (
+              useSections.length > 0
+                ? useSections.map(renderSection)
+                : <p className="nm-empty">Dosering og bruk er ikke lagt inn for dette produktet ennå.</p>
             )}
-            {unreviewed && (
-              <div
-                style={{
-                  display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px", borderRadius: 12,
-                  border: `1px dashed ${MK.warnBorder}`, background: MK.warnBg, color: MK.warnText,
-                }}
-              >
-                <span style={{ flex: "none", marginTop: 1, display: "inline-flex" }}><WarnIcon size={20} /></span>
-                <div style={{ fontSize: 14, lineHeight: 1.5 }}>
-                  <strong style={{ display: "block", fontSize: 15, marginBottom: 2 }}>Kliniske data er ikke gjennomgått</strong>
-                  Dette produktet er lagt inn fra produktkatalogen. Sjekk produktbladet før det brukes i rådgivning.
-                </div>
-              </div>
-            )}
-            {!unreviewed && conds.length === 0 && (
-              <p style={{ margin: 0, fontSize: 14.5, color: p.indication ? MK.text : MK.muted }}>{p.indication ?? "Ingen klinisk indikasjon oppgitt."}</p>
-            )}
-          </section>
 
-          <section style={sectionStyle}>
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "6px 12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <h3 className="nm-h">VNR-varianter</h3>
-                <span className="nm-cnt">{rows.length}</span>
-              </div>
-            </div>
-            {rows.length > 0 ? (
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(225px, 1fr))", gap: 6 }}>
-                {rows.map((r) => (
-                  <li key={r.vnr} className="nm-vnr">
-                    <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                      <span style={{ fontSize: 14.5, fontWeight: 500 }}>
-                        {r.flavor || <span style={{ color: MK.muted, fontStyle: "italic" }}>Standard</span>}
-                      </span>
-                      {r.pack && <span style={{ fontSize: 12.5, color: MK.muted }}>{r.pack}</span>}
-                    </span>
-                    <button type="button" className="nm-copy" aria-label={`Kopier varenummer ${r.vnr}`} onClick={() => onCopy(r.vnr, r.vnr)}>
-                      {copiedVnr === r.vnr ? "Kopiert" : r.vnr}
-                      {copiedVnr === r.vnr ? <CheckIcon size={15} stroke={3} /> : <CopyIcon />}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{ margin: 0, fontSize: 13.5, color: MK.muted }}>Fant ingen varenumre i produktkatalogen.</p>
-            )}
-          </section>
-        </div>
-
-        {(p.sections?.length || p.nutrition?.length) ? (
-          <div style={{ flex: "1 1 100%", minWidth: 0, display: "flex", flexDirection: "column", gap: 20, paddingTop: 20, borderTop: `1px solid ${MK.border}` }}>
-            {keySections.length > 0 && (
-              <section style={sectionStyle}>
-                <h3 className="nm-h">Slik bruker du</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
-                  {keySections.map((sec) => (
-                    <div
-                      key={sec.title}
-                      style={{
-                        gridColumn: sec.wide ? "1 / -1" : undefined, padding: "12px 14px", borderRadius: 12,
-                        background: MK.surface, border: `1px solid ${MK.border}`,
-                      }}
-                    >
-                      <h4 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700 }}>{sec.title}</h4>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13.5, lineHeight: 1.5, color: MK.sub }}>
-                        {sec.lines.map((line, i) => <p key={i} style={{ margin: 0 }}>{line}</p>)}
-                      </div>
+            {tab === "ingredients" && (
+              <>
+                {ingredientSections.map(renderSection)}
+                {hasNutrition && (
+                  <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3 className="nm-h">Næringsinnhold</h3>
+                    <div className="nm-accs">
+                      {p.nutrition!.map((table) => (
+                        <details key={table.title} className="nm-acc">
+                          <summary>{table.title}<span className="nm-acc-chev" aria-hidden="true"><ChevronIcon size={18} /></span></summary>
+                          <div className="nm-acc-body">
+                            <table className="nm-table">
+                              <thead>
+                                <tr>
+                                  <th scope="col"><span className="nm-sr">Næringsstoff</span></th>
+                                  {table.columns.map((c) => <th key={c} scope="col">{c}</th>)}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {table.rows.map((r) => (
+                                  <tr key={r.label} className={r.sub ? "nm-sub" : undefined}>
+                                    <td>{r.label}</td>
+                                    {r.values.map((v, i) => <td key={i}>{v}</td>)}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {table.note && <p style={{ margin: 0, fontSize: 12.5, color: MK.muted }}>{table.note}</p>}
+                          </div>
+                        </details>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </section>
+                  </section>
+                )}
+                {ingredientSections.length === 0 && !hasNutrition && <p className="nm-empty">Ingredienser er ikke lagt inn for dette produktet ennå.</p>}
+              </>
             )}
 
-            {(moreSections.length > 0 || (p.nutrition && p.nutrition.length > 0)) && (
-              <section style={sectionStyle}>
-                <h3 className="nm-h">Mer informasjon</h3>
-                <div className="nm-accs">
-                  {p.nutrition && p.nutrition.length > 0 && (
-                    <details className="nm-acc">
-                      <summary>
-                        Næringsinnhold
-                        <span className="nm-acc-chev" aria-hidden="true"><ChevronIcon size={18} /></span>
-                      </summary>
-                      <div className="nm-acc-body">
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 12, paddingTop: 6 }}>
-                          {p.nutrition.map((table) => (
-                            <div key={table.title} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <div style={{ borderRadius: 12, border: `1px solid ${MK.border}`, background: MK.surface, overflow: "hidden" }}>
-                                <table className="nm-table">
-                                  <caption style={{ captionSide: "top", padding: "10px 12px 8px", textAlign: "left", fontSize: 14, fontWeight: 700 }}>{table.title}</caption>
-                                  <thead>
-                                    <tr>
-                                      <th scope="col"><span className="nm-sr">Næringsstoff</span></th>
-                                      {table.columns.map((c) => <th key={c} scope="col">{c}</th>)}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {table.rows.map((r) => (
-                                      <tr key={r.label} className={r.sub ? "nm-sub" : undefined}>
-                                        <td>{r.label}</td>
-                                        {r.values.map((v, i) => <td key={i}>{v}</td>)}
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                              {table.note && <p style={{ margin: 0, fontSize: 12.5, color: MK.muted }}>{table.note}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </details>
-                  )}
-                  {moreSections.map((sec) => (
-                    <details key={sec.title} className="nm-acc">
-                      <summary>
-                        {sec.title}
-                        <span className="nm-acc-chev" aria-hidden="true"><ChevronIcon size={18} /></span>
-                      </summary>
-                      <div className="nm-acc-body">
-                        {sec.lines.map((line, i) => <p key={i} style={{ margin: 0 }}>{line}</p>)}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              </section>
+            {tab === "vnr" && (
+              <>
+                {rows.length > 0 ? (
+                  <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {rows.map((r) => (
+                      <li key={r.vnr} className="nm-vnr" style={{ minHeight: 54, borderRadius: 16, padding: "6px 10px 6px 16px" }}>
+                        <span style={{ minWidth: 0, fontSize: 15 }}>
+                          <b style={{ fontWeight: 600 }}>{r.flavor || <span style={{ color: MK.muted, fontStyle: "italic", fontWeight: 400 }}>Standard</span>}</b>
+                          {r.pack && <span style={{ color: MK.muted }}> · {r.pack}</span>}
+                        </span>
+                        <button type="button" className="nm-copy" aria-label={`Kopier varenummer ${r.vnr}`} onClick={() => onCopy(r.vnr, r.vnr)}>
+                          {copiedVnr === r.vnr ? "Kopiert" : r.vnr}
+                          {copiedVnr === r.vnr ? <CheckIcon size={15} stroke={3} /> : <CopyIcon />}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="nm-empty">Fant ingen varenumre i produktkatalogen.</p>
+                )}
+                {orderSections.length > 0 && renderAccordion(orderSections)}
+              </>
             )}
           </div>
-        ) : null}
+        </div>
       </div>
     </Dialog>
   );

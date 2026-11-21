@@ -1,5 +1,37 @@
 [
   {
+    "id": "2026-11-21",
+    "date": "2026-11-21",
+    "summary": "Produktkortene i Næringsmidler er bygget om med faktaboks og faner, og Calogen har fått mer informasjon.",
+    "items": [
+      {
+        "type": "forbedret",
+        "title": "Nytt produktkort",
+        "text": "Faktaboksen med energi, næringsstoffer og egenskaper står alltid til venstre, og resten er delt i fanene Produktinfo, Bruk og dosering, Ingredienser og Varenumre."
+      },
+      {
+        "type": "forbedret",
+        "title": "Viktig info først",
+        "text": "Advarsler og begrensninger står øverst i Produktinfo, og hver opplysning vises bare ett sted."
+      },
+      {
+        "type": "nytt",
+        "title": "Mer informasjon om Calogen",
+        "text": "Calogen og Calogen Extra Shots har fått produktinfo, dosering og ingredienser."
+      },
+      {
+        "type": "rettet",
+        "title": "Riktig aldersgrense",
+        "text": "Alder på Calogen, Calogen Extra Shots og Calshake stemmer nå med produktarkene."
+      },
+      {
+        "type": "rettet",
+        "title": "Bedre produktbilder",
+        "text": "Høye flasker vises hele, og Compleat-produktene har fått bilde."
+      }
+    ]
+  },
+  {
     "id": "2026-11-15",
     "date": "2026-11-15",
     "summary": "Næringsmidler har fått flere produkter og ryddigere produktkort, og Produkt og råd heter nå Legemiddelråd.",
