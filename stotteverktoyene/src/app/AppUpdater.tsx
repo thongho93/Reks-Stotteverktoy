@@ -1,8 +1,15 @@
-import { useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Alert, Button, Snackbar } from "@mui/material";
 
 import { useAppUpdate } from "../shared/hooks/useAppUpdate";
+import ReleaseNotesDialog from "../releaseNotes/ReleaseNotesDialog";
+import {
+  BUNDLED_RELEASES,
+  markReleaseSeen,
+  readSeenReleaseId,
+  releasesAfter,
+} from "../releaseNotes/releases";
 
 // Regnes som "midt i skriving" – da utsetter vi automatisk reload for å ikke
 // slette utfylt tekst (standardtekster, kundemeldinger osv.).
@@ -27,16 +34,53 @@ function autoReload(reloadNow: () => void): void {
   reloadNow();
 }
 
+// Sider uten innlogget bruker: der skal ikke «Hva er nytt» vises.
+const PAGES_WITHOUT_RELEASE_NOTES = ["/login", "/pending-approval"];
+
 /**
- * Viser en diskré "Ny versjon"-linje når en ny deploy er oppdaget, og laster
- * appen på nytt automatisk ved trygge tidspunkt: når brukeren bytter side, eller
- * når fanen får fokus igjen – men aldri mens et tekstfelt er i fokus. Brukeren
- * kan også trykke "Oppdater nå" selv.
+ * Når en ny deploy er oppdaget:
+ * - Har den nye versjonen release notes brukeren ikke har sett, vises en dialog med
+ *   oppsummering og «Oppdater nå».
+ * - Ellers vises en diskré "Ny versjon"-linje, og appen laster på nytt automatisk
+ *   ved trygge tidspunkt: når brukeren bytter side, eller når fanen får fokus igjen
+ *   – men aldri mens et tekstfelt er i fokus. Brukeren kan også trykke "Oppdater nå".
+ *
+ * Åpner brukeren appen først etter en deploy (eller lastes den på nytt automatisk),
+ * vises oppsummeringen i etterkant med «Forstått». Se src/releaseNotes/README.md.
  */
 export default function AppUpdater() {
-  const { updateReady, reloadNow } = useAppUpdate();
+  const { updateReady, deployedReleases, reloadNow } = useAppUpdate();
   const location = useLocation();
+  const navigate = useNavigate();
   const prevPath = useRef(location.pathname);
+
+  const bundledLatestId = BUNDLED_RELEASES[0]?.id ?? "";
+  // Ny bruker (ingenting lagret) skal ikke møte hele historikken: da regnes alt i bunten som sett.
+  const [seenId, setSeenId] = useState<string>(() => readSeenReleaseId() ?? bundledLatestId);
+  const [updating, setUpdating] = useState(false);
+  useEffect(() => {
+    if (bundledLatestId && readSeenReleaseId() === null) markReleaseSeen(bundledLatestId);
+  }, [bundledLatestId]);
+
+  const showNotes = !PAGES_WITHOUT_RELEASE_NOTES.includes(location.pathname);
+  const afterNotes = useMemo(() => releasesAfter(BUNDLED_RELEASES, seenId), [seenId]);
+  const updateNotes = useMemo(
+    () => (updateReady ? releasesAfter(deployedReleases, seenId) : []),
+    [updateReady, deployedReleases, seenId]
+  );
+  const dialogMode: "seen" | "update" | null =
+    !showNotes ? null : afterNotes.length > 0 ? "seen" : updateNotes.length > 0 ? "update" : null;
+
+  const closeSeen = () => {
+    markReleaseSeen(bundledLatestId);
+    setSeenId(bundledLatestId);
+  };
+  const updateWithNotes = () => {
+    setUpdating(true);
+    if (updateNotes[0]) markReleaseSeen(updateNotes[0].id);
+    // Kort pause så «Laster siden på nytt» rekker å vises.
+    window.setTimeout(reloadNow, 250);
+  };
 
   // Sidebytte er et trygt tidspunkt: brukeren navigerer, skriver ikke.
   useEffect(() => {
@@ -59,19 +103,38 @@ export default function AppUpdater() {
     };
   }, [updateReady, reloadNow]);
 
+  const dialog =
+    dialogMode === "seen" ? (
+      <ReleaseNotesDialog
+        mode="seen"
+        releases={afterNotes}
+        onUpdate={reloadNow}
+        onClose={closeSeen}
+        onOpenArchive={() => {
+          closeSeen();
+          navigate("/hva-er-nytt");
+        }}
+      />
+    ) : dialogMode === "update" ? (
+      <ReleaseNotesDialog mode="update" releases={updateNotes} updating={updating} onUpdate={updateWithNotes} onClose={() => {}} />
+    ) : null;
+
   return (
-    <Snackbar open={updateReady} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-      <Alert
-        severity="info"
-        variant="filled"
-        action={
-          <Button color="inherit" size="small" onClick={reloadNow} sx={{ textTransform: "none" }}>
-            Oppdater nå
-          </Button>
-        }
-      >
-        Ny versjon tilgjengelig – oppdaterer ved neste sidebytte.
-      </Alert>
-    </Snackbar>
+    <>
+      {dialog}
+      <Snackbar open={updateReady && dialogMode === null} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert
+          severity="info"
+          variant="filled"
+          action={
+            <Button color="inherit" size="small" onClick={reloadNow} sx={{ textTransform: "none" }}>
+              Oppdater nå
+            </Button>
+          }
+        >
+          Ny versjon tilgjengelig – oppdaterer ved neste sidebytte.
+        </Alert>
+      </Snackbar>
+    </>
   );
 }
